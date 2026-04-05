@@ -34,6 +34,18 @@ async function fetchTMDB(path) {
   return res.json();
 }
 
+/** /discover/tv uses first_air_date.* — movie uses primary_release_date.* */
+function tmdbTvParamsFromMovieParams(movieOriented) {
+  const tv = new URLSearchParams(movieOriented.toString());
+  const gte = tv.get("primary_release_date.gte");
+  const lte = tv.get("primary_release_date.lte");
+  tv.delete("primary_release_date.gte");
+  tv.delete("primary_release_date.lte");
+  if (gte) tv.set("first_air_date.gte", gte);
+  if (lte) tv.set("first_air_date.lte", lte);
+  return tv;
+}
+
 function normalizeTMDBItem(item, type) {
   return {
     id: `${type}-${item.id}`,
@@ -1164,11 +1176,13 @@ export default function App() {
         const regParams = new URLSearchParams(params);
         regParams.set("with_original_language", nonEngLangs.join("|"));
 
+        const engTv = tmdbTvParamsFromMovieParams(engParams);
+        const regTv = tmdbTvParamsFromMovieParams(regParams);
         const [engMovies, engTV, regMovies, regTV] = await Promise.all([
           fetchTMDB(`/discover/movie?${engParams.toString()}`),
-          fetchTMDB(`/discover/tv?${engParams.toString()}`),
+          fetchTMDB(`/discover/tv?${engTv.toString()}`),
           fetchTMDB(`/discover/movie?${regParams.toString()}`),
-          fetchTMDB(`/discover/tv?${regParams.toString()}`),
+          fetchTMDB(`/discover/tv?${regTv.toString()}`),
         ]);
         // Interleave: 1 English, 1 Regional alternating
         const eM = (engMovies.results || []).slice(0, 10);
@@ -1182,9 +1196,10 @@ export default function App() {
           if (rT[i]) allTVResults.push({ ...rT[i], _lang: "reg" });
         }
       } else {
+        const tvParams = tmdbTvParamsFromMovieParams(params);
         const [movieData, tvData] = await Promise.all([
           fetchTMDB(`/discover/movie?${params.toString()}`),
-          fetchTMDB(`/discover/tv?${params.toString()}`),
+          fetchTMDB(`/discover/tv?${tvParams.toString()}`),
         ]);
         allMovieResults = (movieData.results || []).slice(0, 10);
         allTVResults = (tvData.results || []).slice(0, 10);
@@ -1196,19 +1211,30 @@ export default function App() {
         synopsis: item.overview || "",
         poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
         backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
-        tmdbRating: Math.round(item.vote_average * 10) / 10,
+        tmdbRating: Math.round((item.vote_average || 0) * 10) / 10 || 7,
         genreIds: item.genre_ids || [],
         language: item.original_language || "en",
         popularity: item.popularity,
       });
-      const combined = [
+      let combined = [
         ...allMovieResults.slice(0, 10).map(m => normalize(m, "movie")),
         ...allTVResults.slice(0, 10).map(m => normalize(m, "tv")),
       ];
+      if (combined.length === 0) {
+        const [mFb, tFb] = await Promise.all([
+          fetchTMDB("/discover/movie?language=en-US&page=1&sort_by=popularity.desc"),
+          fetchTMDB("/discover/tv?language=en-US&page=1&sort_by=popularity.desc"),
+        ]);
+        combined = [
+          ...(mFb.results || []).slice(0, 8).map(m => normalize(m, "movie")),
+          ...(tFb.results || []).slice(0, 8).map(m => normalize(m, "tv")),
+        ];
+      }
       function scoreMoodFromTmdb() {
         const seen = new Set(Object.keys(userRatings));
-        return combined
-          .filter(m => !seen.has(m.id))
+        let pool = combined.filter(m => !seen.has(m.id));
+        if (pool.length === 0) pool = combined.slice();
+        return pool
           .map(m => ({
             movie: m,
             predicted: m.tmdbRating,
