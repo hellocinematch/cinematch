@@ -1205,15 +1205,9 @@ export default function App() {
         ...allMovieResults.slice(0, 10).map(m => normalize(m, "movie")),
         ...allTVResults.slice(0, 10).map(m => normalize(m, "tv")),
       ];
-      let scored = [];
-      if (user) {
-        const { data, error } = await supabase.functions.invoke("match", {
-          body: { action: "mood", userRatings, catalogue, movies: combined },
-        });
-        scored = !error && data?.scored ? data.scored : [];
-      } else {
+      function scoreMoodFromTmdb() {
         const seen = new Set(Object.keys(userRatings));
-        scored = combined
+        return combined
           .filter(m => !seen.has(m.id))
           .map(m => ({
             movie: m,
@@ -1225,6 +1219,19 @@ export default function App() {
           }))
           .sort((a, b) => b.predicted - a.predicted)
           .slice(0, 5);
+      }
+      let scored = [];
+      if (user) {
+        const { data, error } = await supabase.functions.invoke("match", {
+          body: { action: "mood", userRatings, catalogue, movies: combined },
+        });
+        if (!error && data?.scored?.length) scored = data.scored;
+        else {
+          if (error) console.warn("mood match function:", error.message);
+          scored = scoreMoodFromTmdb();
+        }
+      } else {
+        scored = scoreMoodFromTmdb();
       }
       setMoodResults(scored);
     } catch (e) { console.error(e); setMoodResults([]); }
