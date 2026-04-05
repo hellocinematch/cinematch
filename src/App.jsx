@@ -298,6 +298,16 @@ const styles = `
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
   .splash-logo { font-family:'DM Serif Display',serif; font-size:52px; letter-spacing:-2px; color:#f0ebe0; line-height:1; }
   .splash-logo span { color:#e8c96a; }
+  .app-brand { font-family:'DM Serif Display',serif; font-size:20px; letter-spacing:-1px; color:#f0ebe0; line-height:1; }
+  .app-brand span { color:#e8c96a; }
+  .home-header .app-brand { margin-bottom:10px; }
+  .discover-header .app-brand { margin-bottom:10px; }
+  .mood-header .app-brand { margin-bottom:8px; }
+  .profile-brand { padding:52px 24px 6px; }
+  .mood-results-brand { padding:52px 24px 8px; }
+  .mood-results-header { padding:0 24px 20px; display:flex; align-items:center; gap:12px; }
+  .detail-sticky-brand { position:sticky; top:0; z-index:25; background:#0a0a0a; padding:14px 24px 12px; text-align:center; border-bottom:1px solid #1a1a1a; }
+  .detail .back-btn { top:58px; }
   .splash-sub { font-size:13px; letter-spacing:4px; text-transform:uppercase; color:#666; margin-top:10px; margin-bottom:56px; }
   .btn-primary { background:#e8c96a; color:#0a0a0a; border:none; padding:16px 48px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:500; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; width:220px; }
   .btn-primary:hover { background:#f0d880; transform:translateY(-1px); }
@@ -483,7 +493,6 @@ const styles = `
   .mood-skip:hover { border-color:#555; color:#aaa; }
 
   .mood-results { min-height:100vh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-y:auto; }
-  .mood-results-header { padding:52px 24px 20px; display:flex; align-items:center; gap:12px; }
   .mood-results-back { background:none; border:none; color:#666; font-size:20px; cursor:pointer; padding:0; }
   .mood-results-title { font-family:'DM Serif Display',serif; font-size:26px; color:#f0ebe0; }
   .mood-result-card { margin:0 24px 16px; border-radius:16px; overflow:hidden; border:1px solid #1e1e1e; background:#141414; }
@@ -557,6 +566,7 @@ const styles = `
 
   .profile { min-height:100vh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-y:auto; }
   .profile-top { display:flex; gap:16px; align-items:flex-start; padding:52px 24px 20px; }
+  .profile .profile-top { padding:8px 24px 20px; }
   .profile-avatar { width:64px; height:64px; border-radius:50%; background:#e8c96a; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:700; color:#0a0a0a; font-family:'DM Sans',sans-serif; flex-shrink:0; }
   .profile-top-text { flex:1; min-width:0; }
   .profile-name { font-family:'DM Serif Display',serif; font-size:24px; color:#f0ebe0; line-height:1.2; }
@@ -646,6 +656,10 @@ function WhereToWatch({ tmdbId, type }) {
 // ---------------------------------------------------------------------------
 // Nav
 // ---------------------------------------------------------------------------
+function AppBrand() {
+  return <div className="app-brand" aria-label="Cinematch">cine<span>match</span></div>;
+}
+
 function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults }) {
   const tabs = [["🏠", "Home", "home"], ["🔍", "Discover", "discover"], ["🎭", "Mood", "mood"], ["👤", "Profile", "profile"]];
   return (
@@ -780,7 +794,7 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user, selectedStreamingProviderIds]);
 
-  /** Collaborative filtering + mock neighbors run in Edge Function `match` (not in the client bundle). */
+  /** Collaborative filtering runs in Edge Function `match` (neighbour ratings loaded server-side; not in the client bundle). */
   useEffect(() => {
     if (!user) {
       setMatchData(null);
@@ -1446,6 +1460,7 @@ export default function App() {
       {screen === "onboarding" && obMovie && (
         <div className="onboarding">
           <div className="ob-header">
+            <AppBrand />
             <div className="ob-step">Step {obStep + 1} of {obMovies.length}</div>
             <div className="ob-title">Rate what you've seen</div>
             <div className="ob-subtitle">We'll find your taste matches</div>
@@ -1501,6 +1516,7 @@ export default function App() {
         <div className="home">
           <div className="home-header">
             <div>
+              <AppBrand />
               <div className="home-greeting">Good evening, {userName}</div>
               <div className="home-title">Your picks</div>
             </div>
@@ -1683,6 +1699,7 @@ export default function App() {
       {screen === "rate-more" && obMovie && (
         <div className="onboarding">
           <div className="ob-header">
+            <AppBrand />
             <div className="ob-step">Rating {obStep + 1}</div>
             <div className="ob-title">Rate more titles</div>
             <div className="ob-subtitle">Improve your recommendations</div>
@@ -1719,6 +1736,7 @@ export default function App() {
       {screen === "discover" && (
         <div className="discover">
           <div className="discover-header">
+            <AppBrand />
             <div className="discover-title">Discover</div>
             <div className="search-box">
               <span className="search-icon">🔍</span>
@@ -1768,6 +1786,7 @@ export default function App() {
       {screen === "mood-picker" && currentMoodCard && (
         <div className="mood">
           <div className="mood-header">
+            <AppBrand />
             <button className="mood-back" onClick={() => { setNavTab("home"); setScreen("home"); }}>← Back</button>
             <div className="mood-step">Card {moodStep + 1} of {totalCards}</div>
             <div className="mood-title">{currentMoodCard.title}</div>
@@ -1800,6 +1819,7 @@ export default function App() {
       {/* MOOD RESULTS */}
       {screen === "mood-results" && (
         <div className="mood-results">
+          <div className="mood-results-brand"><AppBrand /></div>
           <div className="mood-results-header">
             <button className="mood-results-back" onClick={resetMood}>←</button>
             <div className="mood-results-title">Tonight's picks</div>
@@ -1843,6 +1863,7 @@ export default function App() {
       {screen === "rated" && (
         <div className="discover">
           <div className="discover-header">
+            <AppBrand />
             <button type="button" className="mood-back" style={{ marginBottom: 8 }} onClick={() => { setRatedSearchQuery(""); setScreen("profile"); }}>← Profile</button>
             <div className="discover-title">Your Ratings</div>
           </div>
@@ -1906,6 +1927,7 @@ export default function App() {
       {/* PROFILE */}
       {screen === "profile" && (
         <div className="profile">
+          <div className="profile-brand"><AppBrand /></div>
           <div className="profile-top">
             <div className="profile-avatar">{userInitial}</div>
             <div className="profile-top-text">
@@ -1977,6 +1999,7 @@ export default function App() {
         const myRating = userRatings[movie.id];
         return (
           <div className="detail">
+            <div className="detail-sticky-brand"><AppBrand /></div>
             <button className="back-btn" onClick={goBack}>← Back</button>
             <div className="d-poster">
               {movie.backdrop || movie.poster ? <img src={movie.backdrop || movie.poster} alt={movie.title} /> : <div className="d-poster-fallback">🎬</div>}
