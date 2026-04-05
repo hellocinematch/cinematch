@@ -46,6 +46,29 @@ function tmdbTvParamsFromMovieParams(movieOriented) {
   return tv;
 }
 
+/** Legacy rows used `/tmdb-images/...` (dev proxy); DB may store bare paths. */
+function normalizeWatchlistPosterUrl(poster) {
+  if (poster == null || poster === "") return null;
+  const s = String(poster).trim();
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/tmdb-images")) {
+    return `${TMDB_IMG_HOST}${s.slice("/tmdb-images".length)}`;
+  }
+  const path = s.startsWith("/") ? s : `/${s}`;
+  return `${TMDB_IMG}${path}`;
+}
+
+function buildWatchlistFromRows(watchlistData, catalogue) {
+  if (!watchlistData?.length) return [];
+  const movieMap = Object.fromEntries(catalogue.map(m => [m.id, m]));
+  return watchlistData.map(w => {
+    const id = `${w.media_type}-${w.tmdb_id}`;
+    const base = movieMap[id] || { id, tmdbId: w.tmdb_id, type: w.media_type, title: w.title, poster: w.poster };
+    const poster = normalizeWatchlistPosterUrl(base.poster);
+    return { ...base, poster: poster ?? base.poster };
+  }).filter(Boolean);
+}
+
 function normalizeTMDBItem(item, type) {
   return {
     id: `${type}-${item.id}`,
@@ -800,6 +823,18 @@ export default function App() {
     }
   }, [screen, catalogue, user]);
 
+  /** Re-merge watchlist when catalogue grows (streaming, search) so posters resolve from full movie rows. */
+  useEffect(() => {
+    if (!user || catalogue.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const { data: watchlistData } = await supabase.from("watchlist").select("*").eq("user_id", user.id);
+      if (cancelled || !watchlistData?.length) return;
+      setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
+    })();
+    return () => { cancelled = true; };
+  }, [user, catalogue]);
+
   async function loadUserData() {
     if (!user) return;
     const [{ data: ratingsData }, { data: watchlistData }] = await Promise.all([
@@ -812,12 +847,7 @@ export default function App() {
       setUserRatings(ratingsMap);
     }
     if (watchlistData && catalogue.length > 0) {
-      const movieMap = Object.fromEntries(catalogue.map(m => [m.id, m]));
-      const wl = watchlistData.map(w => {
-        const id = `${w.media_type}-${w.tmdb_id}`;
-        return movieMap[id] || { id, tmdbId: w.tmdb_id, type: w.media_type, title: w.title, poster: w.poster };
-      }).filter(Boolean);
-      setWatchlist(wl);
+      setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
     }
 
     const { data: profileRow } = await supabase.from("profiles").select("streaming_provider_ids").eq("id", user.id).maybeSingle();
