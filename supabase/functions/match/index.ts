@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +12,15 @@ const MIN_NEIGHBOR_OVERLAP = 1;
 const MIN_NEIGHBORS = 1;
 const MIN_MOVIE_RATINGS = 1;
 
+/** v1 caps: keep edge CPU + DB reads bounded. Tune as data grows. */
+const MAX_SEED_TITLE_KEYS = 100;
+const MAX_TMDB_IDS_PER_CHUNK = 120;
+const MAX_ROWS_OVERLAP_PER_CHUNK = 6000;
+const MAX_CANDIDATES_FROM_OVERLAP = 250;
+const MAX_NEIGHBORS_FULL_FETCH = 40;
+const MAX_ROWS_FULL_RATINGS = 15_000;
+const RATINGS_PAGE_SIZE = 1000;
+
 type Movie = Record<string, unknown> & {
   id: string;
   tmdbRating?: number;
@@ -21,57 +30,8 @@ type Movie = Record<string, unknown> & {
 type RatingsMap = Record<string, number>;
 type OtherRatings = Record<string, RatingsMap>;
 
-function hashStringToSeed(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h) || 1;
-}
-
-function mulberry32(seed: number): () => number {
-  return () => {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function pickRandomIds(ids: string[], count: number, rnd: () => number): string[] {
-  const shuffled = [...ids];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled.slice(0, count);
-}
-
-function buildMockRatings(catalogue: Movie[], userId: string): OtherRatings {
-  if (catalogue.length < 10) return {};
-  const ids = catalogue.map((m) => m.id);
-  const seedStr = `${userId}|${[...ids].sort().join(",")}`;
-  const rnd = mulberry32(hashStringToSeed(seedStr));
-  const rand = () => Math.round((rnd() * 4 + 6) * 10) / 10;
-  const pickRandom = (count: number) => {
-    const picked = pickRandomIds(ids, Math.min(count, ids.length), rnd);
-    return Object.fromEntries(picked.map((id) => [id, rand()]));
-  };
-  return {
-    alice: pickRandom(20),
-    bob: pickRandom(20),
-    carol: pickRandom(20),
-    dave: pickRandom(20),
-    eve: pickRandom(20),
-    frank: pickRandom(20),
-    grace: pickRandom(20),
-    henry: pickRandom(20),
-    iris: pickRandom(20),
-    jake: pickRandom(20),
-    kate: pickRandom(20),
-    leo: pickRandom(20),
-  };
+function ratingRowKey(mediaType: string, tmdbId: number): string {
+  return `${mediaType}-${tmdbId}`;
 }
 
 function cosineSimilarity(ratingsA: RatingsMap, ratingsB: RatingsMap): number {
@@ -190,15 +150,14 @@ function computeWorthALook(
 }
 
 function runFullMatch(
-  userId: string,
   userRatings: RatingsMap,
+  otherRatings: OtherRatings,
   catalogue: Movie[],
   inTheaters: Movie[],
   streamingMovies: Movie[],
   streamingTV: Movie[],
   topPickOffset: number,
 ) {
-  const otherRatings = buildMockRatings(catalogue, userId);
   const neighbors = findNeighbors(userRatings, otherRatings);
   const recommendations =
     Object.keys(userRatings).length === 0 || catalogue.length === 0
@@ -229,6 +188,138 @@ function runFullMatch(
   };
 }
 
+// --- Neighbour data (service role, Edge Function only) -----------------------
+//
+// Security:
+// - JWT + getUser() on the anon client proves who is calling; never trust client user_id.
+// - SUPABASE_SERVICE_ROLE_KEY bypasses RLS; it must exist only in Edge Function secrets
+//   (Supabase hosted functions inject it automatically). Never expose it to the browser.
+// - Responses stay aggregate (scores / confidence); raw neighbour user_ids are not returned.
+
+type RatingRow = {
+  user_id: string;
+  media_type: string;
+  tmdb_id: number;
+  score: number;
+};
+
+async function fetchOverlapForMediaType(
+  admin: SupabaseClient,
+  excludeUserId: string,
+  mediaType: string,
+  tmdbIds: number[],
+): Promise<RatingRow[]> {
+  const unique = [...new Set(tmdbIds)];
+  const out: RatingRow[] = [];
+  for (let i = 0; i < unique.length; i += MAX_TMDB_IDS_PER_CHUNK) {
+    const chunk = unique.slice(i, i + MAX_TMDB_IDS_PER_CHUNK);
+    const { data, error } = await admin
+      .from("ratings")
+      .select("user_id, media_type, tmdb_id, score")
+      .eq("media_type", mediaType)
+      .in("tmdb_id", chunk)
+      .neq("user_id", excludeUserId)
+      .limit(MAX_ROWS_OVERLAP_PER_CHUNK);
+    if (error) throw error;
+    if (data?.length) out.push(...(data as RatingRow[]));
+  }
+  return out;
+}
+
+async function fetchFullMapsForUsers(
+  admin: SupabaseClient,
+  userIds: string[],
+): Promise<OtherRatings> {
+  const maps: OtherRatings = {};
+  for (const id of userIds) maps[id] = {};
+  if (userIds.length === 0) return maps;
+
+  let from = 0;
+  let fetched = 0;
+  while (fetched < MAX_ROWS_FULL_RATINGS) {
+    const to = from + RATINGS_PAGE_SIZE - 1;
+    const { data, error } = await admin
+      .from("ratings")
+      .select("user_id, media_type, tmdb_id, score")
+      .in("user_id", userIds)
+      .order("user_id", { ascending: true })
+      .order("media_type", { ascending: true })
+      .order("tmdb_id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    const rows = (data ?? []) as RatingRow[];
+    if (rows.length === 0) break;
+    for (const r of rows) {
+      const key = ratingRowKey(r.media_type, r.tmdb_id);
+      maps[r.user_id]![key] = r.score;
+    }
+    fetched += rows.length;
+    from += RATINGS_PAGE_SIZE;
+    if (rows.length < RATINGS_PAGE_SIZE) break;
+  }
+  return maps;
+}
+
+async function loadNeighborRatingsFromDb(
+  admin: SupabaseClient | null,
+  currentUserId: string,
+  userRatings: RatingsMap,
+): Promise<OtherRatings> {
+  if (!admin || Object.keys(userRatings).length === 0) return {};
+
+  const titleKeys = Object.keys(userRatings).slice(0, MAX_SEED_TITLE_KEYS);
+  const movieIds: number[] = [];
+  const tvIds: number[] = [];
+  for (const k of titleKeys) {
+    const dash = k.indexOf("-");
+    if (dash <= 0) continue;
+    const type = k.slice(0, dash);
+    const id = parseInt(k.slice(dash + 1), 10);
+    if (Number.isNaN(id)) continue;
+    if (type === "movie") movieIds.push(id);
+    else if (type === "tv") tvIds.push(id);
+  }
+
+  const rows: RatingRow[] = [];
+  if (movieIds.length) {
+    rows.push(...await fetchOverlapForMediaType(admin, currentUserId, "movie", movieIds));
+  }
+  if (tvIds.length) {
+    rows.push(...await fetchOverlapForMediaType(admin, currentUserId, "tv", tvIds));
+  }
+
+  const partial: Record<string, RatingsMap> = {};
+  const overlapCount: Record<string, number> = {};
+
+  for (const r of rows) {
+    const key = ratingRowKey(r.media_type, r.tmdb_id);
+    if (!(key in userRatings)) continue;
+    if (!partial[r.user_id]) partial[r.user_id] = {};
+    partial[r.user_id]![key] = r.score;
+    overlapCount[r.user_id] = (overlapCount[r.user_id] || 0) + 1;
+  }
+
+  const candidateIds = Object.entries(overlapCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MAX_CANDIDATES_FROM_OVERLAP)
+    .map(([uid]) => uid);
+
+  if (candidateIds.length === 0) return {};
+
+  const rankedBySim = candidateIds
+    .map((uid) => ({
+      uid,
+      sim: cosineSimilarity(userRatings, partial[uid]!),
+    }))
+    .filter((x) => x.sim > 0)
+    .sort((a, b) => b.sim - a.sim);
+
+  const topIds = rankedBySim.slice(0, MAX_NEIGHBORS_FULL_FETCH).map((x) => x.uid);
+  if (topIds.length === 0) return {};
+
+  return await fetchFullMapsForUsers(admin, topIds);
+}
+
 // --- HTTP -------------------------------------------------------------------
 
 Deno.serve(async (req: Request) => {
@@ -247,6 +338,8 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? null;
+
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -259,12 +352,21 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const admin = serviceKey
+      ? createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+      : null;
+    if (!serviceKey) {
+      console.warn("match: SUPABASE_SERVICE_ROLE_KEY missing — neighbour CF disabled (cold-start only)");
+    }
+
     const body = await req.json();
     const action = (body.action as string) || "full";
     const userRatings = (body.userRatings as RatingsMap) || {};
     const catalogue = (body.catalogue as Movie[]) || [];
 
-    const otherRatings = buildMockRatings(catalogue, user.id);
+    const otherRatings = await loadNeighborRatingsFromDb(admin, user.id, userRatings);
     const neighbors = findNeighbors(userRatings, otherRatings);
 
     if (action === "predict") {
@@ -291,13 +393,13 @@ Deno.serve(async (req: Request) => {
           return pred
             ? { movie: m, ...pred }
             : {
-                movie: m,
-                predicted: (m.tmdbRating as number) ?? 7,
-                low: Math.max(1, ((m.tmdbRating as number) ?? 7) - 1),
-                high: Math.min(10, ((m.tmdbRating as number) ?? 7) + 1),
-                confidence: "low",
-                neighborCount: 0,
-              };
+              movie: m,
+              predicted: (m.tmdbRating as number) ?? 7,
+              low: Math.max(1, ((m.tmdbRating as number) ?? 7) - 1),
+              high: Math.min(10, ((m.tmdbRating as number) ?? 7) + 1),
+              confidence: "low",
+              neighborCount: 0,
+            };
         })
         .sort((a, b) => b.predicted - a.predicted)
         .slice(0, 5);
@@ -319,8 +421,8 @@ Deno.serve(async (req: Request) => {
     const topPickOffset = typeof body.topPickOffset === "number" ? body.topPickOffset : 0;
 
     const result = runFullMatch(
-      user.id,
       userRatings,
+      otherRatings,
       catalogue,
       inTheaters,
       streamingMovies,
