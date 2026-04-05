@@ -5,7 +5,10 @@ const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Di
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
 const TMDB_BASE = "https://api.themoviedb.org/3";
-const TMDB_IMG = "/tmdb-images/t/p/w500";
+/** Direct TMDB CDN URLs work on Vercel; `/tmdb-images` only works via Vite dev proxy. */
+const TMDB_IMG_HOST = "https://image.tmdb.org";
+const TMDB_IMG = `${TMDB_IMG_HOST}/t/p/w500`;
+const TMDB_IMG_BACKDROP = `${TMDB_IMG_HOST}/t/p/w780`;
 
 const TMDB_HEADERS = {
   Authorization: `Bearer ${TMDB_TOKEN}`,
@@ -42,7 +45,7 @@ function normalizeTMDBItem(item, type) {
     genreIds: item.genre_ids || [],
     synopsis: item.overview || "",
     poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
-    backdrop: item.backdrop_path ? `/tmdb-images/t/p/w780${item.backdrop_path}` : null,
+    backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
     tmdbRating: Math.round(item.vote_average * 10) / 10,
     popularity: item.popularity,
     language: item.original_language || "en",
@@ -101,7 +104,7 @@ async function fetchCatalogue() {
     genreIds: item.genre_ids || [],
     synopsis: item.overview || "",
     poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
-    backdrop: item.backdrop_path ? `/tmdb-images/t/p/w780${item.backdrop_path}` : null,
+    backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
     tmdbRating: Math.round(item.vote_average * 10) / 10,
     popularity: item.popularity,
     language: item.original_language || "en",
@@ -134,7 +137,7 @@ async function fetchRegionalTitles(langCode) {
       genreIds: item.genre_ids || [],
       synopsis: item.overview || "",
       poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
-      backdrop: item.backdrop_path ? `/tmdb-images/t/p/w780${item.backdrop_path}` : null,
+      backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
       tmdbRating: Math.round(item.vote_average * 10) / 10,
       popularity: item.popularity,
       language: item.original_language || langCode,
@@ -926,7 +929,7 @@ export default function App() {
           year: (item.release_date || item.first_air_date || "").slice(0, 4),
           synopsis: item.overview || "",
           poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
-          backdrop: item.backdrop_path ? `/tmdb-images/t/p/w780${item.backdrop_path}` : null,
+          backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
           tmdbRating: Math.round(item.vote_average * 10) / 10,
           genreIds: item.genre_ids || [],
           language: item.original_language || "en",
@@ -1192,7 +1195,7 @@ export default function App() {
         year: (item.release_date || item.first_air_date || "").slice(0, 4),
         synopsis: item.overview || "",
         poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
-        backdrop: item.backdrop_path ? `/tmdb-images/t/p/w780${item.backdrop_path}` : null,
+        backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
         tmdbRating: Math.round(item.vote_average * 10) / 10,
         genreIds: item.genre_ids || [],
         language: item.original_language || "en",
