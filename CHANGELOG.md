@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- **Navigation:** Opening a title from Picks/More/Discover/etc. now **`history.pushState`s** a dedicated step. **Browser Back** returns to that screen inside Cinemastro instead of the previous site in the tab history.
+
 ## 1.0.1
 
 - **Title detail screen:** Removed the in-app **← Back** control; exit via browser/OS back (aligned with catalog sites like TMDB).

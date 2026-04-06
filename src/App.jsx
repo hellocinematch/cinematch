@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import packageJson from "../package.json";
 import { supabase } from "./supabase";
 
 // Shown on Profile as "Cinemastro v…". See CHANGELOG.md for release notes.
-// v1.0.1: Title detail — removed in-app "← Back" (use browser/OS back). Added shared
-//   page-topbar (wordmark + avatar) like Discover/Mood/Profile; poster & metadata below;
-//   sticky top bar + safe-area. Removed .back-btn / centered sticky-brand-only header.
+// v1.0.1: Title detail — removed in-app "← Back"; page-topbar (wordmark + avatar); sticky + safe-area.
+// v1.0.2: history.pushState when opening title detail so browser Back returns to the in-app
+//   screen (Home, Discover, etc.) instead of leaving Cinemastro.
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
@@ -936,6 +936,14 @@ export default function App() {
   /** Region buckets to include (Settings). Empty = all regions. Logged-out users ignore. */
   const [showRegionKeys, setShowRegionKeys] = useState([]);
 
+  /** Browser Back should return to the in-app screen that opened detail, not leave the site (SPA history). */
+  const detailReturnScreenRef = useRef(null);
+  const detailHistoryPushedRef = useRef(false);
+  const screenRef = useRef(screen);
+  useEffect(() => {
+    screenRef.current = screen;
+  }, [screen]);
+
   // Pre-onboarding cinema preference state
   const [cinemaPreference, setCinemaPreference] = useState(null); // "hollywood" | "mix"
   const [otherCinema, setOtherCinema] = useState(null); // cinema option id
@@ -1464,6 +1472,9 @@ export default function App() {
         if (!error && data?.prediction) pred = data.prediction;
       } catch (_) { /* optional prediction */ }
     }
+    detailReturnScreenRef.current = screenRef.current;
+    history.pushState({ cinemastroDetail: true }, "", window.location.href);
+    detailHistoryPushedRef.current = true;
     setSelected({ movie, prediction: pred });
     if (opts.startEditing && userRatings[movie.id] != null) {
       setDetailEditRating(true);
@@ -1478,7 +1489,12 @@ export default function App() {
   }
 
   function goBack() {
+    if (detailHistoryPushedRef.current) {
+      history.back();
+      return;
+    }
     setDetailEditRating(false);
+    setSelected(null);
     setScreen(navTab === "mood" ? "mood-results" : navTab);
   }
 
@@ -1488,6 +1504,20 @@ export default function App() {
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [showAvatarMenu]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (!detailHistoryPushedRef.current) return;
+      detailHistoryPushedRef.current = false;
+      const ret = detailReturnScreenRef.current;
+      detailReturnScreenRef.current = null;
+      setDetailEditRating(false);
+      setSelected(null);
+      if (ret != null) setScreen(ret);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   async function toggleWatchlist(movie) {
     const alreadySaved = watchlist.find(m => m.id === movie.id);
