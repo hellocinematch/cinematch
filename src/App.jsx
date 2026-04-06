@@ -510,8 +510,8 @@ const styles = `
   .btn-skip:hover { border-color:#444; color:#aaa; }
 
   .home { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
-  .home-header { padding:52px 24px 20px; display:flex; justify-content:space-between; align-items:flex-start; }
-  .home-header > div:first-child { min-width:0; max-width:calc(100% - 56px); }
+  .home-header { padding:52px 24px 20px; display:flex; align-items:flex-start; gap:12px; }
+  .home-header > div:first-child { flex:1; min-width:0; max-width:none; }
   .home-greeting { font-size:14px; color:#666; letter-spacing:1px; }
   .home-title { font-family:'DM Serif Display',serif; font-size:36px; color:#f0ebe0; margin-top:4px; line-height:1.08; }
   .home-segments { display:flex; margin:0 24px 20px; padding:4px; background:#141414; border-radius:10px; border:1px solid #222; gap:2px; }
@@ -521,7 +521,7 @@ const styles = `
   .friends-placeholder { margin:24px; padding:32px 20px; border:1px dashed #2a2a2a; border-radius:12px; text-align:center; }
   .friends-placeholder-title { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; margin-bottom:8px; }
   .friends-placeholder-text { font-size:13px; color:#666; line-height:1.6; }
-  .avatar { width:44px; height:44px; border-radius:50%; background:#e8c96a; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:600; color:#0a0a0a; cursor:pointer; font-family:'DM Sans',sans-serif; }
+  .avatar { width:44px; height:44px; border-radius:50%; background:#e8c96a; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:600; color:#0a0a0a; cursor:pointer; font-family:'DM Sans',sans-serif; flex-shrink:0; }
   .section { padding:0 0 28px; min-width:0; }
   .section-header { padding:0 24px; display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
   .section-title { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; }
