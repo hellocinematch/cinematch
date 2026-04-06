@@ -411,8 +411,8 @@ const styles = `
 
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
   .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; }
-  /* Logo image: matches previous text sizes — header ~26px, splash ~52px cap height */
-  .app-brand.brand-logo { display:block; height:26px; width:auto; max-width:min(100%, 320px); object-fit:contain; object-position:left center; }
+  /* Logo image: in-app headers — size closer to avatar (44px) so wordmark + tagline read clearly */
+  .app-brand.brand-logo { display:block; height:44px; width:auto; max-width:min(100%, 340px); object-fit:contain; object-position:left center; }
   /* Taller on splash so wordmark + tagline stay readable (full logo viewBox 400×120). */
   .app-brand.brand-logo--splash { height:72px; max-width:min(100%, 380px); }
   .home-header .app-brand { margin-bottom:10px; }
@@ -726,6 +726,34 @@ const styles = `
   .conf-high { background:#1a2a1a; color:#6aaa6a; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
   .conf-medium { background:#2a2000; color:#aaaa50; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
   .conf-low { background:#2a1a1a; color:#aa6a6a; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
+
+  /* Desktop/tablet: let app breathe beyond the mobile shell while keeping phone UX unchanged. */
+  @media (min-width: 900px) {
+    .app { --shell:1120px; }
+    .app-brand.brand-logo { height:52px; max-width:420px; }
+    .home-header { padding:56px 32px 22px; }
+    .discover-header,
+    .mood-header { padding-left:32px; padding-right:32px; }
+    .home-segments { margin:0 32px 24px; }
+    .section-header { padding:0 32px; }
+    .strip { padding-left:32px; padding-right:32px; gap:18px; }
+    .strip-card { width:176px; }
+    .strip-poster { width:176px; height:242px; }
+    .strip-title { font-size:15px; }
+    .strip-genre { font-size:12px; }
+    .filter-row { padding-left:32px; padding-right:32px; }
+    .disc-grid { padding:0 32px; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
+    .profile-brand,
+    .profile-top,
+    .profile-settings,
+    .profile-section,
+    .rated-search-wrap,
+    .mood-results-brand,
+    .mood-results-header { padding-left:32px; padding-right:32px; }
+    .empty-box,
+    .no-recs { margin-left:32px; margin-right:32px; }
+    /* Keep Home picks stacked (In Theaters then Streaming) to preserve original flow. */
+  }
 
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
   @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
