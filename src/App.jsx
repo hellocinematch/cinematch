@@ -511,6 +511,7 @@ const styles = `
 
   .home { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
   .home-header { padding:52px 24px 20px; display:flex; justify-content:space-between; align-items:flex-start; }
+  .home-header > div:first-child { min-width:0; max-width:calc(100% - 56px); }
   .home-greeting { font-size:14px; color:#666; letter-spacing:1px; }
   .home-title { font-family:'DM Serif Display',serif; font-size:36px; color:#f0ebe0; margin-top:4px; line-height:1.08; }
   .home-segments { display:flex; margin:0 24px 20px; padding:4px; background:#141414; border-radius:10px; border:1px solid #222; gap:2px; }
@@ -681,6 +682,7 @@ const styles = `
   .profile { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
   .profile-top { display:flex; gap:16px; align-items:flex-start; padding:52px 24px 20px; }
   .profile .profile-top { padding:8px 24px 20px; }
+  .profile-top-text { min-width:0; }
   .profile-avatar { width:64px; height:64px; border-radius:50%; background:#e8c96a; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:700; color:#0a0a0a; font-family:'DM Sans',sans-serif; flex-shrink:0; }
   .profile-top-text { flex:1; min-width:0; }
   .profile-name { font-family:'DM Serif Display',serif; font-size:24px; color:#f0ebe0; line-height:1.2; }
@@ -726,6 +728,11 @@ const styles = `
   .conf-high { background:#1a2a1a; color:#6aaa6a; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
   .conf-medium { background:#2a2000; color:#aaaa50; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
   .conf-low { background:#2a1a1a; color:#aa6a6a; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
+
+  @media (max-width: 899px) {
+    /* Mobile clamp: prevent wide logo/tagline assets from pushing layout wider than viewport. */
+    .app-brand.brand-logo { max-width:min(100%, 240px); }
+  }
 
   /* Desktop/tablet: let app breathe beyond the mobile shell while keeping phone UX unchanged. */
   @media (min-width: 900px) {
