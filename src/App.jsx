@@ -34,6 +34,16 @@ async function fetchTMDB(path) {
   return res.json();
 }
 
+function getRegionLanguageCodes(regionKeys) {
+  if (!Array.isArray(regionKeys) || regionKeys.length === 0) return [];
+  return [...new Set(
+    PROFILE_REGION_OPTIONS
+      .filter(option => regionKeys.includes(option.id))
+      .flatMap(option => option.languages || [])
+      .map(code => String(code).toLowerCase()),
+  )];
+}
+
 /** /discover/tv uses first_air_date.* — movie uses primary_release_date.* */
 function tmdbTvParamsFromMovieParams(movieOriented) {
   const tv = new URLSearchParams(movieOriented.toString());
@@ -100,24 +110,28 @@ async function fetchInTheaters() {
  * Subscription streaming in the US (TMDB discover).
  * @param {number[]|null|undefined} providerIds - TMDB watch provider_ids; pipe = OR. Empty/null = any flatrate service.
  */
-async function fetchStreamingSplit(providerIds) {
+async function fetchStreamingSplit(providerIds, regionKeys) {
   try {
     const y = new Date().getFullYear();
     const seriesRecentCutoff = `${y - 2}-01-01`;
+    const langCodes = getRegionLanguageCodes(regionKeys);
+    const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
     const providerQuery =
       Array.isArray(providerIds) && providerIds.length > 0
         ? `&with_watch_providers=${providerIds.join("|")}`
         : "";
-    const [movieData, tvData] = await Promise.all([
-      fetchTMDB(
-        `/discover/movie?language=en-US&watch_region=US&with_watch_monetization_types=flatrate&sort_by=popularity.desc&page=1${providerQuery}`,
-      ),
-      fetchTMDB(
-        `/discover/tv?language=en-US&watch_region=US&with_watch_monetization_types=flatrate&sort_by=first_air_date.desc&first_air_date.gte=${seriesRecentCutoff}&page=1${providerQuery}`,
-      ),
+    const moviePathBase = `/discover/movie?language=en-US&watch_region=US&with_watch_monetization_types=flatrate&sort_by=popularity.desc${providerQuery}${langQuery}`;
+    const tvPathBase = `/discover/tv?language=en-US&watch_region=US&with_watch_monetization_types=flatrate&sort_by=first_air_date.desc&first_air_date.gte=${seriesRecentCutoff}${providerQuery}${langQuery}`;
+    const fetchPageNums = langCodes.length > 0 ? [1, 2] : [1];
+    const [moviePages, tvPages] = await Promise.all([
+      Promise.all(fetchPageNums.map(page => fetchTMDB(`${moviePathBase}&page=${page}`))),
+      Promise.all(fetchPageNums.map(page => fetchTMDB(`${tvPathBase}&page=${page}`))),
     ]);
-    const movies = (movieData.results || []).slice(0, 16).map(m => normalizeTMDBItem(m, "movie"));
-    const shows = (tvData.results || []).slice(0, 16).map(m => normalizeTMDBItem(m, "tv"));
+    const movieResults = moviePages.flatMap(page => page.results || []);
+    const tvResults = tvPages.flatMap(page => page.results || []);
+    const dedupeByTmdbId = (arr) => [...new Map(arr.map(item => [item.id, item])).values()];
+    const movies = dedupeByTmdbId(movieResults).slice(0, 16).map(m => normalizeTMDBItem(m, "movie"));
+    const shows = dedupeByTmdbId(tvResults).slice(0, 16).map(m => normalizeTMDBItem(m, "tv"));
     return { movies, shows };
   } catch {
     return { movies: [], shows: [] };
@@ -840,7 +854,7 @@ export default function App() {
     (async () => {
       try {
         const ids = selectedStreamingProviderIds.length > 0 ? selectedStreamingProviderIds : null;
-        const { movies: sm, shows: st } = await fetchStreamingSplit(ids);
+        const { movies: sm, shows: st } = await fetchStreamingSplit(ids, showRegionKeys);
         if (cancelled) return;
         setStreamingMovies(sm);
         setStreamingTV(st);
@@ -856,7 +870,7 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, selectedStreamingProviderIds]);
+  }, [user, selectedStreamingProviderIds, showRegionKeys]);
 
   const catalogueForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return catalogue;
@@ -1684,7 +1698,13 @@ export default function App() {
                       <div className="section-meta">Now playing</div>
                     </div>
                     {theaterRecs.length === 0 ? (
-                      <div className="empty-box"><div className="empty-text">No theatrical releases</div></div>
+                      <div className="empty-box">
+                        <div className="empty-text">
+                          {showRegionKeys.length > 0
+                            ? "Limited titles for this region in US theaters right now"
+                            : "No theatrical releases"}
+                        </div>
+                      </div>
                     ) : (
                       <div className="strip">
                         {theaterRecs.map(rec => (
