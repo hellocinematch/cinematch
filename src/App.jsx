@@ -426,10 +426,8 @@ const styles = `
   /* Taller on splash so wordmark + tagline stay readable (full logo viewBox 400×120). */
   .app-brand.brand-logo--splash { width:min(86vw, 380px); height:auto; }
   .home-header .app-brand { margin-bottom:10px; }
-  .discover-header .app-brand { margin-bottom:10px; }
-  .mood-header .app-brand { margin-bottom:8px; }
-  .profile-brand { padding:52px 24px 6px; }
-  .mood-results-brand { padding:52px 24px 8px; }
+  .discover-header { padding:16px 24px 12px; }
+  .mood-header { padding:16px 24px 16px; }
   .mood-results-header { padding:0 24px 20px; display:flex; align-items:center; gap:12px; }
   .btn-primary { background:#e8c96a; color:#0a0a0a; border:none; padding:16px 48px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:500; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; width:220px; }
   .btn-primary:hover { background:#f0d880; transform:translateY(-1px); }
@@ -520,7 +518,22 @@ const styles = `
   .home { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
   .home-topbar { display:none; }
   .home-desktop-nav-row { display:none; }
-  .page-topbar { display:none; }
+  /* Shared top chrome on Discover / Mood / Profile / Detail / Rated (not on Home — Home uses home-header + tagline). */
+  .page-topbar {
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    align-items:center;
+    gap:20px;
+    padding:14px 20px;
+    padding-top:max(14px, env(safe-area-inset-top, 0px));
+    border-bottom:1px solid #1a1a1a;
+    background:#0a0a0a;
+    position:sticky;
+    top:0;
+    z-index:50;
+  }
+  .page-topbar .app-brand { margin:0; }
+  .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
   .home-topnav { display:flex; gap:3px; padding:4px; background:#141414; border-radius:11px; border:1px solid #222; width:100%; max-width:620px; }
   .home-topnav .home-segment { flex:1; }
   .home-header { padding:48px 24px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; }
@@ -598,7 +611,6 @@ const styles = `
   .legal-muted { color:#666; font-size:13px; }
 
   .discover { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
-  .discover-header { padding:48px 24px 12px; }
   .discover-title { font-family:'DM Serif Display',serif; font-size:30px; color:#ddd7cd; }
   .search-box { position:relative; margin-top:12px; }
   .search-input { width:100%; background:#141414; border:1px solid #2a2a2a; border-radius:10px; padding:12px 16px 12px 42px; font-family:'DM Sans',sans-serif; font-size:14px; color:#f0ebe0; outline:none; transition:border-color 0.2s; }
@@ -628,7 +640,6 @@ const styles = `
   .disc-empty-text { font-size:14px; color:#444; }
 
   .mood { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
-  .mood-header { padding:52px 24px 20px; }
   .mood-back { background:none; border:none; color:#666; font-size:14px; cursor:pointer; font-family:'DM Sans',sans-serif; margin-bottom:16px; display:block; padding:0; }
   .mood-back:hover { color:#ccc; }
   .mood-step { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#e8c96a; margin-bottom:8px; }
@@ -685,22 +696,6 @@ const styles = `
   .wtw-link:hover { text-decoration:underline; }
 
   .detail { min-height:100vh; min-height:100dvh; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-y:auto; min-width:0; position:relative; }
-  /* Detail uses the same top bar as other main screens at all breakpoints (.page-topbar is hidden by default). */
-  .detail .page-topbar {
-    display:grid;
-    grid-template-columns:auto 1fr auto;
-    align-items:center;
-    gap:20px;
-    padding:14px 20px;
-    padding-top:max(14px, env(safe-area-inset-top, 0px));
-    border-bottom:1px solid #1a1a1a;
-    background:#0a0a0a;
-    position:sticky;
-    top:0;
-    z-index:50;
-  }
-  .detail .page-topbar .app-brand { margin:0; }
-  .detail .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
   .d-poster { height:320px; position:relative; overflow:hidden; }
   .d-poster img { width:100%; height:100%; object-fit:cover; }
   .d-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:100px; background:#141414; }
@@ -810,10 +805,7 @@ const styles = `
     .home-topbar { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:20px; padding:14px 32px; border-bottom:1px solid #1a1a1a; }
     .home-topbar .app-brand { margin:0; }
     .home-topbar .avatar-wrap { justify-self:end; align-self:center; }
-    .page-topbar { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:20px; padding:14px 32px; border-bottom:1px solid #1a1a1a; }
-    .page-topbar .app-brand { margin:0; }
-    .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
-    .detail .page-topbar { padding:14px 32px; padding-top:max(14px, env(safe-area-inset-top, 0px)); }
+    .page-topbar { padding:14px 32px; padding-top:max(14px, env(safe-area-inset-top, 0px)); }
     .app-footer { padding-left:32px; padding-right:32px; }
     .legal-body { padding-left:32px; padding-right:32px; }
     .home-desktop-nav-row { display:flex; justify-content:center; padding:8px 32px 8px; }
@@ -826,9 +818,6 @@ const styles = `
     .home-subtitle { font-size:36px; max-width:none; white-space:nowrap; }
     .discover-header,
     .mood-header { padding-left:32px; padding-right:32px; }
-    .discover-header .app-brand,
-    .mood-header .app-brand,
-    .profile-brand { display:none; }
     .home-segments { display:none; }
     .section-header { padding:0 32px; }
     .strip { padding-left:32px; padding-right:32px; gap:18px; }
@@ -838,12 +827,10 @@ const styles = `
     .strip-genre { font-size:12px; }
     .filter-row { padding-left:32px; padding-right:32px; }
     .disc-grid { padding:0 32px; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
-    .profile-brand,
     .profile-top,
     .profile-settings,
     .profile-section,
     .rated-search-wrap,
-    .mood-results-brand,
     .mood-results-header { padding-left:32px; padding-right:32px; }
     .empty-box,
     .no-recs { margin-left:32px; margin-right:32px; }
@@ -2245,7 +2232,6 @@ export default function App() {
             <AccountAvatarMenu />
           </div>
           <div className="discover-header">
-            <AppBrand />
             <div className="discover-title">Discover</div>
             <div className="search-box">
               <span className="search-icon">🔍</span>
@@ -2305,7 +2291,6 @@ export default function App() {
             <AccountAvatarMenu />
           </div>
           <div className="mood-header">
-            <AppBrand />
             <button className="mood-back" onClick={() => { setNavTab("home"); setScreen("home"); }}>← Back</button>
             <div className="mood-step">Card {moodStep + 1} of {totalCards}</div>
             <div className="mood-title">{currentMoodCard.title}</div>
@@ -2343,7 +2328,11 @@ export default function App() {
       {/* MOOD RESULTS */}
       {screen === "mood-results" && (
         <div className="mood-results">
-          <div className="mood-results-brand"><AppBrand /></div>
+          <div className="page-topbar">
+            <AppBrand />
+            <div />
+            <AccountAvatarMenu />
+          </div>
           <div className="mood-results-header">
             <button className="mood-results-back" onClick={resetMood}>←</button>
             <div className="mood-results-title">Tonight's picks</div>
@@ -2391,8 +2380,12 @@ export default function App() {
       {/* RATED */}
       {screen === "rated" && (
         <div className="discover">
-          <div className="discover-header">
+          <div className="page-topbar">
             <AppBrand />
+            <div />
+            <AccountAvatarMenu />
+          </div>
+          <div className="discover-header">
             <button type="button" className="mood-back" style={{ marginBottom: 8 }} onClick={() => { setRatedSearchQuery(""); setScreen("profile"); }}>← Profile</button>
             <div className="discover-title">Your Ratings</div>
           </div>
@@ -2466,7 +2459,6 @@ export default function App() {
             <div />
             <AccountAvatarMenu />
           </div>
-          <div className="profile-brand"><AppBrand /></div>
           <div className="profile-top">
             <div className="profile-avatar">{userInitial}</div>
             <div className="profile-top-text">
