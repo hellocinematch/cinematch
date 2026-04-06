@@ -1883,8 +1883,7 @@ export default function App() {
             <div className="home-hero">
               <AppBrand />
               <div className="home-hero-copy">
-                <div className="home-greeting">Welcome.</div>
-                <div className="home-subtitle">Movies and TV shows curated and picked for YOU!</div>
+                <div className="home-subtitle">Movies and Shows - Picked for your TASTE!</div>
               </div>
             </div>
             <AccountAvatarMenu />
