@@ -511,11 +511,17 @@ const styles = `
   .btn-skip:hover { border-color:#444; color:#aaa; }
 
   .home { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
-  .home-header { padding:52px 24px 20px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; }
-  .home-greeting { font-size:14px; color:#666; letter-spacing:1px; }
-  .home-title { font-family:'DM Serif Display',serif; font-size:36px; color:#f0ebe0; margin-top:4px; line-height:1.08; }
-  .home-segments { display:flex; margin:0 24px 20px; padding:4px; background:#141414; border-radius:10px; border:1px solid #222; gap:2px; }
-  .home-segment { flex:1; text-align:center; padding:10px 4px; font-size:12px; font-family:'DM Sans',sans-serif; color:#888; cursor:pointer; border-radius:8px; border:none; background:transparent; transition:all 0.2s; }
+  .home-topbar { display:none; }
+  .home-desktop-nav-row { display:none; }
+  .page-topbar { display:none; }
+  .home-topnav { display:flex; gap:3px; padding:4px; background:#141414; border-radius:11px; border:1px solid #222; width:100%; max-width:620px; }
+  .home-topnav .home-segment { flex:1; }
+  .home-header { padding:48px 24px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; }
+  .home-hero-copy { padding:0; display:inline-block; max-width:100%; }
+  .home-greeting { font-family:'DM Sans',sans-serif; font-size:52px; font-weight:600; color:#f0ebe0; margin-top:2px; line-height:1.02; letter-spacing:-0.6px; }
+  .home-subtitle { font-family:'DM Sans',sans-serif; font-size:42px; font-weight:500; color:#e6e6e6; margin-top:8px; line-height:1.1; max-width:960px; letter-spacing:-0.4px; }
+  .home-segments { display:flex; margin:0 24px 22px; padding:4px; background:#141414; border-radius:11px; border:1px solid #222; gap:3px; }
+  .home-segment { flex:1; text-align:center; padding:11px 6px; font-size:13px; font-family:'DM Sans',sans-serif; color:#888; cursor:pointer; border-radius:8px; border:none; background:transparent; transition:all 0.2s; }
   .home-segment:hover { color:#bbb; }
   .home-segment.active { background:#2a2610; color:#e8c96a; font-weight:500; }
   .friends-placeholder { margin:24px; padding:32px 20px; border:1px dashed #2a2a2a; border-radius:12px; text-align:center; }
@@ -528,24 +534,24 @@ const styles = `
   .avatar-menu-btn:hover { background:#1f1f1f; }
   .avatar-menu-btn.danger { color:#f09a9a; }
   .avatar-menu-btn.danger:hover { background:#2a1818; }
-  .section { padding:0 0 28px; min-width:0; }
-  .section-header { padding:0 24px; display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
-  .section-title { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; }
+  .section { padding:0 0 30px; min-width:0; }
+  .section-header { padding:0 24px; display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+  .section-title { font-family:'DM Serif Display',serif; font-size:22px; color:#f0ebe0; }
   .section-meta { font-size:12px; color:#555; letter-spacing:1px; text-transform:uppercase; }
-  .top-picks-block { margin-top:20px; }
+  .top-picks-block { margin-top:24px; }
   .top-picks-block:first-of-type { margin-top:0; }
-  .top-picks-block .section-header { margin-bottom:12px; }
-  .top-picks-block .section-title { font-size:19px; }
+  .top-picks-block .section-header { margin-bottom:10px; }
+  .top-picks-block .section-title { font-size:22px; }
 
-  .strip { padding-left:20px; padding-right:20px; display:flex; gap:14px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; max-width:100%; min-width:0; }
+  .strip { padding-left:24px; padding-right:24px; display:flex; gap:14px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; max-width:100%; min-width:0; scroll-padding-left:24px; }
   .strip::-webkit-scrollbar { display:none; }
-  .strip-card { flex-shrink:0; width:146px; cursor:pointer; transition:transform 0.2s; }
+  .strip-card { flex-shrink:0; width:152px; cursor:pointer; transition:transform 0.2s; }
   .strip-card:hover { transform:translateY(-3px); }
-  .strip-poster { width:146px; height:200px; border-radius:11px; overflow:hidden; position:relative; border:1px solid #1e1e1e; background:#1a1a1a; }
+  .strip-poster { width:152px; height:212px; border-radius:12px; overflow:hidden; position:relative; border:1px solid #1e1e1e; background:#1a1a1a; }
   .strip-poster img { width:100%; height:100%; object-fit:cover; }
   .strip-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:40px; }
   .strip-badge { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.82); padding:4px 8px; border-radius:10px; font-size:12px; color:#e8c96a; font-family:'DM Serif Display',serif; z-index:2; }
-  .strip-title { font-size:14px; color:#ccc; margin-top:8px; line-height:1.35; }
+  .strip-title { font-size:14px; color:#ccc; margin-top:9px; line-height:1.35; }
   .strip-genre { font-size:11px; color:#555; margin-top:2px; }
   .strip-range { font-size:10px; color:#666; margin-top:1px; }
 
@@ -563,14 +569,14 @@ const styles = `
   .nav-label { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#e8c96a; }
 
   .discover { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
-  .discover-header { padding:52px 24px 16px; }
+  .discover-header { padding:48px 24px 12px; }
   .discover-title { font-family:'DM Serif Display',serif; font-size:30px; color:#f0ebe0; }
-  .search-box { position:relative; margin-top:14px; }
+  .search-box { position:relative; margin-top:12px; }
   .search-input { width:100%; background:#141414; border:1px solid #2a2a2a; border-radius:10px; padding:12px 16px 12px 42px; font-family:'DM Sans',sans-serif; font-size:14px; color:#f0ebe0; outline:none; transition:border-color 0.2s; }
   .search-input::placeholder { color:#444; }
   .search-input:focus { border-color:#555; }
   .search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:16px; pointer-events:none; }
-  .filter-row { display:flex; gap:8px; padding:12px 24px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; max-width:100%; min-width:0; }
+  .filter-row { display:flex; gap:8px; padding:10px 24px 14px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; max-width:100%; min-width:0; }
   .filter-row::-webkit-scrollbar { display:none; }
   .filter-pill { flex-shrink:0; padding:7px 14px; border-radius:20px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; border:1px solid #2a2a2a; background:transparent; color:#888; transition:all 0.2s; white-space:nowrap; }
   .filter-pill.active { background:#e8c96a; color:#0a0a0a; border-color:#e8c96a; font-weight:500; }
@@ -738,21 +744,48 @@ const styles = `
   @media (max-width: 899px) {
     /* Keep branded header fully within viewport on narrow screens. */
     .home-header { padding-left:20px; padding-right:20px; }
+    .home-hero-copy { padding:0; }
+    .home-greeting { font-size:40px; letter-spacing:-0.4px; }
+    .home-subtitle { font-size:24px; max-width:none; line-height:1.14; }
+    .strip { padding-left:20px; padding-right:20px; scroll-padding-left:20px; }
+    .strip-card { width:144px; }
+    .strip-poster { width:144px; height:200px; }
+    .section-header { padding-left:20px; padding-right:20px; }
+    .home-segments { margin-left:20px; margin-right:20px; }
+    .discover-header { padding-left:20px; padding-right:20px; }
+    .filter-row { padding-left:20px; padding-right:20px; }
+    .disc-grid { padding-left:20px; padding-right:20px; }
   }
 
   /* Desktop/tablet: let app breathe beyond the mobile shell while keeping phone UX unchanged. */
   @media (min-width: 900px) {
     .app { --shell:1120px; }
     .app-brand.brand-logo--header { width:320px; }
-    .home-header { padding:56px 32px 22px; }
+    .home-topbar { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:20px; padding:14px 32px; border-bottom:1px solid #1a1a1a; }
+    .home-topbar .app-brand { margin:0; }
+    .home-topbar .avatar-wrap { justify-self:end; align-self:center; }
+    .page-topbar { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:20px; padding:14px 32px; border-bottom:1px solid #1a1a1a; }
+    .page-topbar .app-brand { margin:0; }
+    .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
+    .home-desktop-nav-row { display:flex; justify-content:center; padding:8px 32px 8px; }
+    .home .section-divider { margin:0 32px 10px !important; }
+    .home-desktop-nav-row .home-topnav { max-width:620px; }
+    .home-header { padding:18px 32px 10px; display:block; }
+    .home-header .app-brand,
+    .home-header .avatar-wrap { display:none; }
+    .home-greeting { font-size:56px; }
+    .home-subtitle { font-size:36px; max-width:none; white-space:nowrap; }
     .discover-header,
     .mood-header { padding-left:32px; padding-right:32px; }
-    .home-segments { margin:0 32px 24px; }
+    .discover-header .app-brand,
+    .mood-header .app-brand,
+    .profile-brand { display:none; }
+    .home-segments { display:none; }
     .section-header { padding:0 32px; }
     .strip { padding-left:32px; padding-right:32px; gap:18px; }
-    .strip-card { width:176px; }
-    .strip-poster { width:176px; height:242px; }
-    .strip-title { font-size:15px; }
+    .strip-card { width:184px; }
+    .strip-poster { width:184px; height:256px; }
+    .strip-title { font-size:15px; line-height:1.32; }
     .strip-genre { font-size:12px; }
     .filter-row { padding-left:32px; padding-right:32px; }
     .disc-grid { padding:0 32px; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
@@ -766,6 +799,14 @@ const styles = `
     .empty-box,
     .no-recs { margin-left:32px; margin-right:32px; }
     /* Keep Home picks stacked (In Theaters then Streaming) to preserve original flow. */
+  }
+
+  @media (min-width: 1200px) {
+    .app { --shell:1240px; }
+    .home-segments { max-width:680px; }
+    .strip-card { width:198px; }
+    .strip-poster { width:198px; height:276px; }
+    .disc-grid { grid-template-columns:repeat(5, minmax(0, 1fr)); gap:18px; }
   }
 
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
@@ -1618,6 +1659,47 @@ export default function App() {
 
   const navProps = { navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults, showGenreIds };
 
+  function AccountAvatarMenu() {
+    return (
+      <div className="avatar-wrap">
+        <div
+          className="avatar"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAvatarMenu(v => !v);
+          }}
+        >
+          {userInitial}
+        </div>
+        {showAvatarMenu && (
+          <div className="avatar-menu" onClick={e => e.stopPropagation()}>
+            <button
+              type="button"
+              className="avatar-menu-btn"
+              onClick={() => {
+                setShowAvatarMenu(false);
+                setNavTab("profile");
+                setScreen("profile");
+              }}
+            >
+              Profile
+            </button>
+            <button
+              type="button"
+              className="avatar-menu-btn danger"
+              onClick={() => {
+                setShowAvatarMenu(false);
+                handleSignOut();
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <style>{styles}</style>
@@ -1792,47 +1874,40 @@ export default function App() {
       {/* HOME */}
       {screen === "home" && (
         <div className="home">
+          <div className="home-topbar">
+            <AppBrand />
+            <div />
+            <AccountAvatarMenu />
+          </div>
           <div className="home-header">
-            <div>
+            <div className="home-hero">
               <AppBrand />
-              <div className="home-greeting">Good evening, {userName}</div>
-              <div className="home-title">Your picks</div>
-            </div>
-            <div className="avatar-wrap">
-              <div
-                className="avatar"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowAvatarMenu(v => !v);
-                }}
-              >
-                {userInitial}
+              <div className="home-hero-copy">
+                <div className="home-greeting">Welcome.</div>
+                <div className="home-subtitle">Movies and TV shows curated and picked for YOU!</div>
               </div>
-              {showAvatarMenu && (
-                <div className="avatar-menu" onClick={e => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="avatar-menu-btn"
-                    onClick={() => {
-                      setShowAvatarMenu(false);
-                      setNavTab("profile");
-                      setScreen("profile");
-                    }}
-                  >
-                    Profile
-                  </button>
-                  <button
-                    type="button"
-                    className="avatar-menu-btn danger"
-                    onClick={() => {
-                      setShowAvatarMenu(false);
-                      handleSignOut();
-                    }}
-                  >
-                    Sign out
-                  </button>
-                </div>
-              )}
+            </div>
+            <AccountAvatarMenu />
+          </div>
+          <div className="section-divider" style={{ margin: "0 24px 10px", borderTop: "1px solid #1a1a1a" }} />
+          <div className="home-desktop-nav-row">
+            <div className="home-topnav" role="tablist" aria-label="Home sections desktop">
+              {[
+                ["picks", "Picks"],
+                ["more", "More"],
+                ["friends", "Friends"],
+              ].map(([id, label]) => (
+                <button
+                  key={`desktop-${id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={homeSegment === id}
+                  className={`home-segment ${homeSegment === id ? "active" : ""}`}
+                  onClick={() => setHomeSegment(id)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
           <div className="home-segments" role="tablist" aria-label="Home sections">
@@ -2054,6 +2129,11 @@ export default function App() {
       {/* DISCOVER */}
       {screen === "discover" && (
         <div className="discover">
+          <div className="page-topbar">
+            <AppBrand />
+            <div />
+            <AccountAvatarMenu />
+          </div>
           <div className="discover-header">
             <AppBrand />
             <div className="discover-title">Discover</div>
@@ -2104,6 +2184,11 @@ export default function App() {
       {/* MOOD PICKER */}
       {screen === "mood-picker" && currentMoodCard && (
         <div className="mood">
+          <div className="page-topbar">
+            <AppBrand />
+            <div />
+            <AccountAvatarMenu />
+          </div>
           <div className="mood-header">
             <AppBrand />
             <button className="mood-back" onClick={() => { setNavTab("home"); setScreen("home"); }}>← Back</button>
@@ -2246,6 +2331,11 @@ export default function App() {
       {/* PROFILE */}
       {screen === "profile" && (
         <div className="profile">
+          <div className="page-topbar">
+            <AppBrand />
+            <div />
+            <AccountAvatarMenu />
+          </div>
           <div className="profile-brand"><AppBrand /></div>
           <div className="profile-top">
             <div className="profile-avatar">{userInitial}</div>
