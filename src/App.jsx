@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import packageJson from "../package.json";
+import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./legal.jsx";
 import { supabase } from "./supabase";
 
 // Shown on Profile as "Cinemastro v…". See CHANGELOG.md for release notes.
 // v1.0.1: Title detail — removed in-app "← Back"; page-topbar (wordmark + avatar); sticky + safe-area.
-// v1.0.2: history.pushState when opening title detail so browser Back returns to the in-app
-//   screen (Home, Discover, etc.) instead of leaving Cinemastro.
+// v1.0.2: history.pushState when opening title detail so browser Back returns in-app.
+// v1.0.3: Footer (About, Privacy, Terms, Contact, ©, TMDB attribution) + placeholder legal pages;
+//   legal screens use pushState + popstate like detail.
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
@@ -573,6 +575,28 @@ const styles = `
   .nav-icon { font-size:20px; }
   .nav-label { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#e8c96a; }
 
+  .app-footer { padding:20px 24px 28px; border-top:1px solid #1a1a1a; margin-top:8px; }
+  .app-footer-links { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 10px; margin-bottom:12px; }
+  .app-footer-link { background:none; border:none; color:#888; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; text-decoration:underline; padding:0; }
+  .app-footer-link:hover { color:#ccc; }
+  a.app-footer-link { display:inline; }
+  .app-footer-dot { color:#444; font-size:12px; }
+  .app-footer-line { font-size:11px; color:#555; text-align:center; line-height:1.5; margin-bottom:6px; }
+  .app-footer-muted { color:#444; }
+  .app-footer-tmdb { font-size:10px; color:#444; text-align:center; line-height:1.45; margin-top:10px; max-width:520px; margin-left:auto; margin-right:auto; }
+  .app-footer-tmdb a { color:#6a7a8a; }
+  .legal-shell { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:calc(24px + env(safe-area-inset-bottom,0px)); animation:fadeIn 0.3s ease; }
+  .legal-topbar { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; padding:14px 20px; padding-top:max(14px, env(safe-area-inset-top,0px)); border-bottom:1px solid #1a1a1a; position:sticky; top:0; background:#0a0a0a; z-index:40; }
+  .legal-back { background:none; border:none; color:#888; font-size:14px; cursor:pointer; font-family:'DM Sans',sans-serif; padding:6px 0; }
+  .legal-back:hover { color:#ccc; }
+  .legal-topbar-title { font-family:'DM Serif Display',serif; font-size:18px; color:#ddd7cd; text-align:center; }
+  .legal-body { padding:20px 24px 32px; max-width:640px; margin:0 auto; }
+  .legal-meta { font-size:11px; color:#555; margin-bottom:16px; }
+  .legal-h2 { font-family:'DM Serif Display',serif; font-size:20px; color:#ddd7cd; margin:22px 0 10px; }
+  .legal-p { font-size:14px; color:#888; line-height:1.65; margin-bottom:12px; }
+  .legal-p a { color:#e8c96a; }
+  .legal-muted { color:#666; font-size:13px; }
+
   .discover { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
   .discover-header { padding:48px 24px 12px; }
   .discover-title { font-family:'DM Serif Display',serif; font-size:30px; color:#ddd7cd; }
@@ -789,6 +813,8 @@ const styles = `
     .page-topbar .app-brand { margin:0; }
     .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
     .detail .page-topbar { padding:14px 32px; padding-top:max(14px, env(safe-area-inset-top, 0px)); }
+    .app-footer { padding-left:32px; padding-right:32px; }
+    .legal-body { padding-left:32px; padding-right:32px; }
     .home-desktop-nav-row { display:flex; justify-content:center; padding:8px 32px 8px; }
     .home .section-divider { margin:0 32px 10px !important; }
     .home-desktop-nav-row .home-topnav { max-width:620px; }
@@ -939,6 +965,8 @@ export default function App() {
   /** Browser Back should return to the in-app screen that opened detail, not leave the site (SPA history). */
   const detailReturnScreenRef = useRef(null);
   const detailHistoryPushedRef = useRef(false);
+  const legalReturnScreenRef = useRef(null);
+  const legalHistoryPushedRef = useRef(false);
   const screenRef = useRef(screen);
   useEffect(() => {
     screenRef.current = screen;
@@ -1498,6 +1526,23 @@ export default function App() {
     setScreen(navTab === "mood" ? "mood-results" : navTab);
   }
 
+  function openLegalPage(target) {
+    legalReturnScreenRef.current = screenRef.current;
+    history.pushState({ cinemastroLegal: true }, "", window.location.href);
+    legalHistoryPushedRef.current = true;
+    setScreen(target);
+  }
+
+  function closeLegalPage() {
+    if (legalHistoryPushedRef.current) {
+      history.back();
+      return;
+    }
+    const ret = legalReturnScreenRef.current;
+    legalReturnScreenRef.current = null;
+    setScreen(ret ?? "home");
+  }
+
   useEffect(() => {
     if (!showAvatarMenu) return;
     const close = () => setShowAvatarMenu(false);
@@ -1507,13 +1552,21 @@ export default function App() {
 
   useEffect(() => {
     const onPopState = () => {
-      if (!detailHistoryPushedRef.current) return;
-      detailHistoryPushedRef.current = false;
-      const ret = detailReturnScreenRef.current;
-      detailReturnScreenRef.current = null;
-      setDetailEditRating(false);
-      setSelected(null);
-      if (ret != null) setScreen(ret);
+      if (detailHistoryPushedRef.current) {
+        detailHistoryPushedRef.current = false;
+        const ret = detailReturnScreenRef.current;
+        detailReturnScreenRef.current = null;
+        setDetailEditRating(false);
+        setSelected(null);
+        if (ret != null) setScreen(ret);
+        return;
+      }
+      if (legalHistoryPushedRef.current) {
+        legalHistoryPushedRef.current = false;
+        const ret = legalReturnScreenRef.current;
+        legalReturnScreenRef.current = null;
+        if (ret != null) setScreen(ret);
+      }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -2136,6 +2189,11 @@ export default function App() {
             </div>
           )}
 
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -2228,6 +2286,11 @@ export default function App() {
               })}
             </div>
           )}
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -2267,6 +2330,11 @@ export default function App() {
               Skip this card
             </button>
           </div>
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -2310,6 +2378,11 @@ export default function App() {
               </div>
             ))
           )}
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -2375,6 +2448,11 @@ export default function App() {
               )}
             </>
           )}
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -2485,9 +2563,18 @@ export default function App() {
             </div>
             <div className="profile-app-version">Cinemastro v{APP_VERSION}</div>
           </div>
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
         </div>
       )}
+
+      {screen === "privacy" && <LegalPagePrivacy onBack={closeLegalPage} />}
+      {screen === "terms" && <LegalPageTerms onBack={closeLegalPage} />}
+      {screen === "about" && <LegalPageAbout onBack={closeLegalPage} />}
 
       {/* DETAIL */}
       {screen === "detail" && selectedMovie && (() => {
