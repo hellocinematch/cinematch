@@ -97,8 +97,21 @@ function normalizeTMDBItem(item, type) {
   };
 }
 
-async function fetchInTheaters() {
+async function fetchInTheaters(regionKeys = []) {
   try {
+    const langCodes = getRegionLanguageCodes(regionKeys);
+    if (langCodes.length > 0) {
+      const now = new Date();
+      const end = now.toISOString().slice(0, 10);
+      const startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 120);
+      const start = startDate.toISOString().slice(0, 10);
+      const base = `/discover/movie?language=en-US&sort_by=popularity.desc&region=US&with_original_language=${langCodes.join("|")}&with_release_type=2|3&release_date.gte=${start}&release_date.lte=${end}`;
+      const [p1, p2] = await Promise.all([fetchTMDB(`${base}&page=1`), fetchTMDB(`${base}&page=2`)]);
+      const merged = [...(p1.results || []), ...(p2.results || [])];
+      const unique = [...new Map(merged.map(item => [item.id, item])).values()];
+      if (unique.length > 0) return unique.slice(0, 15).map(m => normalizeTMDBItem(m, "movie"));
+    }
     const data = await fetchTMDB("/movie/now_playing?language=en-US&page=1&region=US");
     return (data.results || []).slice(0, 15).map(m => normalizeTMDBItem(m, "movie"));
   } catch {
@@ -832,7 +845,7 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const [data, theaters] = await Promise.all([fetchCatalogue(), fetchInTheaters()]);
+        const [data, theaters] = await Promise.all([fetchCatalogue(), fetchInTheaters([])]);
         if (cancelled) return;
         const seen = new Set(data.map(m => m.id));
         const addedTheaters = theaters.filter(m => !seen.has(m.id));
@@ -846,6 +859,31 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  /**
+   * In Theaters should react to region settings (e.g., Indian languages in US theatrical release window).
+   * We keep the data source US-specific and enrich candidates via discover movie when regions are selected.
+   */
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const theaters = await fetchInTheaters(showRegionKeys);
+        if (cancelled) return;
+        setInTheaters(theaters);
+        setCatalogue(prev => {
+          const seen = new Set(prev.map(m => m.id));
+          const added = theaters.filter(m => !seen.has(m.id));
+          if (added.length === 0) return prev;
+          return [...prev, ...added];
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, showRegionKeys]);
 
   /** Home streaming strip: TMDB discover with optional with_watch_providers (OR). No selection = all flatrate US. */
   useEffect(() => {
