@@ -210,6 +210,34 @@ const OTHER_CINEMA_OPTIONS = [
 // ---------------------------------------------------------------------------
 const ALL_INDIAN_LANGS = ["hi", "ta", "te", "ml", "kn", "bn", "mr"];
 
+/** TMDB genre ids for “Genres to show” in Settings. Empty profile array = all genres. Title matches if it has ≥1 of these ids. */
+const PROFILE_GENRE_OPTIONS = [
+  { id: 28, label: "🔥 Action" },
+  { id: 12, label: "🗺️ Adventure" },
+  { id: 16, label: "🎨 Animation" },
+  { id: 35, label: "😂 Comedy" },
+  { id: 80, label: "🕵️ Crime" },
+  { id: 99, label: "📖 Documentary" },
+  { id: 18, label: "😢 Drama" },
+  { id: 10751, label: "👨‍👩‍👧 Family" },
+  { id: 14, label: "🧙 Fantasy" },
+  { id: 36, label: "📜 History" },
+  { id: 27, label: "👻 Horror" },
+  { id: 10402, label: "🎵 Music" },
+  { id: 9648, label: "🔍 Mystery" },
+  { id: 10749, label: "💕 Romance" },
+  { id: 878, label: "🚀 Sci-Fi" },
+  { id: 53, label: "😱 Thriller" },
+  { id: 10752, label: "⚔️ War" },
+  { id: 37, label: "🤠 Western" },
+];
+
+function passesShowGenresFilter(movie, showGenreIds) {
+  if (!showGenreIds || showGenreIds.length === 0) return true;
+  const ids = movie.genreIds || [];
+  return ids.some(gid => showGenreIds.includes(gid));
+}
+
 const MOOD_CARDS = [
   {
     id: "region",
@@ -270,6 +298,35 @@ const MOOD_CARDS = [
     ]
   }
 ];
+
+const MOOD_GENRE_IDS_FROM_PROFILE = new Set(MOOD_CARDS.find(c => c.id === "genre").options.map(o => o.id));
+
+function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults, showGenreIds }) {
+  const tabs = [["🏠", "Home", "home"], ["🔍", "Discover", "discover"], ["🎭", "Mood", "mood"], ["👤", "Profile", "profile"]];
+  return (
+    <div className="bottom-nav">
+      {tabs.map(([icon, label, tab]) => (
+        <div key={label}
+          className={`nav-item ${navTab === tab ? "active" : ""}`}
+          onClick={() => {
+            setNavTab(tab);
+            if (tab === "mood") {
+              setMoodStep(0);
+              const gFromProfile = (showGenreIds || []).filter(id => MOOD_GENRE_IDS_FROM_PROFILE.has(id));
+              setMoodSelections({ region: [], indian_lang: [], genre: gFromProfile, vibe: [] });
+              setMoodResults([]);
+              setScreen("mood-picker");
+            } else {
+              setScreen(tab);
+            }
+          }}>
+          <div className="nav-icon">{icon}</div>
+          {navTab === tab && <div className="nav-label">{label}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Match / collaborative filtering runs on the server (Supabase Edge Function `match`).
 // When the function is unavailable, home strips fall back to TMDB-only scores (not the CF algorithm).
@@ -585,6 +642,9 @@ const styles = `
   .settings-provider-pill { padding:8px 12px; border-radius:20px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; border:1px solid #2a2a2a; background:#0f0f0f; color:#888; transition:all 0.2s; }
   .settings-provider-pill:hover { border-color:#444; color:#bbb; }
   .settings-provider-pill.selected { border-color:#e8c96a; background:#1a1600; color:#e8c96a; }
+  .settings-genre-actions { display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+  .settings-genre-action-btn { background:#1a1a1a; color:#888; border:1px solid #2a2a2a; padding:8px 14px; font-size:12px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.2s; }
+  .settings-genre-action-btn:hover { border-color:#555; color:#ccc; }
   .profile-watchlist-section { padding:0 0 8px; }
   .stat-box { background:#141414; border:1px solid #1e1e1e; border-radius:12px; padding:16px; text-align:center; }
   .stat-box-clickable { cursor:pointer; transition:border-color 0.2s, background 0.2s; }
@@ -661,32 +721,6 @@ function AppBrand() {
   return <div className="app-brand" aria-label="Cinematch">cine<span>match</span></div>;
 }
 
-function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults }) {
-  const tabs = [["🏠", "Home", "home"], ["🔍", "Discover", "discover"], ["🎭", "Mood", "mood"], ["👤", "Profile", "profile"]];
-  return (
-    <div className="bottom-nav">
-      {tabs.map(([icon, label, tab]) => (
-        <div key={label}
-          className={`nav-item ${navTab === tab ? "active" : ""}`}
-          onClick={() => {
-            setNavTab(tab);
-            if (tab === "mood") {
-              setMoodStep(0);
-              setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
-              setMoodResults([]);
-              setScreen("mood-picker");
-            } else {
-              setScreen(tab);
-            }
-          }}>
-          <div className="nav-icon">{icon}</div>
-          {navTab === tab && <div className="nav-label">{label}</div>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
@@ -727,6 +761,8 @@ export default function App() {
   const [streamingTab, setStreamingTab] = useState("movie"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [homeSegment, setHomeSegment] = useState("picks"); // "picks" | "more" | "friends"
+  /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
+  const [showGenreIds, setShowGenreIds] = useState([]);
 
   // Pre-onboarding cinema preference state
   const [cinemaPreference, setCinemaPreference] = useState(null); // "hollywood" | "mix"
@@ -795,6 +831,26 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user, selectedStreamingProviderIds]);
 
+  const catalogueForRecs = useMemo(() => {
+    if (!user || !showGenreIds.length) return catalogue;
+    return catalogue.filter(m => passesShowGenresFilter(m, showGenreIds));
+  }, [catalogue, user, showGenreIds]);
+
+  const inTheatersForRecs = useMemo(() => {
+    if (!user || !showGenreIds.length) return inTheaters;
+    return inTheaters.filter(m => passesShowGenresFilter(m, showGenreIds));
+  }, [inTheaters, user, showGenreIds]);
+
+  const streamingMoviesForRecs = useMemo(() => {
+    if (!user || !showGenreIds.length) return streamingMovies;
+    return streamingMovies.filter(m => passesShowGenresFilter(m, showGenreIds));
+  }, [streamingMovies, user, showGenreIds]);
+
+  const streamingTVForRecs = useMemo(() => {
+    if (!user || !showGenreIds.length) return streamingTV;
+    return streamingTV.filter(m => passesShowGenresFilter(m, showGenreIds));
+  }, [streamingTV, user, showGenreIds]);
+
   /** Collaborative filtering runs in Edge Function `match` (neighbour ratings loaded server-side; not in the client bundle). */
   useEffect(() => {
     if (!user) {
@@ -808,10 +864,10 @@ export default function App() {
           body: {
             action: "full",
             userRatings,
-            catalogue,
-            inTheaters,
-            streamingMovies,
-            streamingTV,
+            catalogue: catalogueForRecs,
+            inTheaters: inTheatersForRecs,
+            streamingMovies: streamingMoviesForRecs,
+            streamingTV: streamingTVForRecs,
             topPickOffset,
           },
         });
@@ -830,7 +886,7 @@ export default function App() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [user, userRatings, catalogue, inTheaters, streamingMovies, streamingTV, topPickOffset]);
+  }, [user, userRatings, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, topPickOffset]);
 
   useEffect(() => {
     if (screen === "loading-catalogue" && catalogue.length > 0 && user) {
@@ -865,7 +921,7 @@ export default function App() {
       setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
     }
 
-    const { data: profileRow } = await supabase.from("profiles").select("streaming_provider_ids").eq("id", user.id).maybeSingle();
+    const { data: profileRow } = await supabase.from("profiles").select("streaming_provider_ids, show_genre_ids").eq("id", user.id).maybeSingle();
     let providerIds = [];
     if (Array.isArray(profileRow?.streaming_provider_ids) && profileRow.streaming_provider_ids.length) {
       providerIds = profileRow.streaming_provider_ids;
@@ -876,6 +932,11 @@ export default function App() {
       } catch (_) { /* ignore */ }
     }
     setSelectedStreamingProviderIds(Array.isArray(providerIds) ? providerIds.filter(n => typeof n === "number") : []);
+    if (Array.isArray(profileRow?.show_genre_ids) && profileRow.show_genre_ids.length) {
+      setShowGenreIds(profileRow.show_genre_ids.filter(n => typeof n === "number"));
+    } else {
+      setShowGenreIds([]);
+    }
   }
 
   async function persistStreamingProviders(ids) {
@@ -887,6 +948,20 @@ export default function App() {
     } catch (_) { /* ignore */ }
     const { error } = await supabase.from("profiles").update({ streaming_provider_ids: clean }).eq("id", user.id);
     if (error) console.warn("Could not save streaming providers to profile:", error.message);
+  }
+
+  async function persistShowGenreIds(ids) {
+    if (!user) return;
+    const clean = [...new Set(ids.filter(n => typeof n === "number"))].sort((a, b) => a - b);
+    setShowGenreIds(clean);
+    const { error } = await supabase.from("profiles").update({ show_genre_ids: clean }).eq("id", user.id);
+    if (error) console.warn("Could not save genre preferences:", error.message);
+  }
+
+  function toggleShowGenre(genreId) {
+    const has = showGenreIds.includes(genreId);
+    const next = has ? showGenreIds.filter(id => id !== genreId) : [...showGenreIds, genreId].sort((a, b) => a - b);
+    persistShowGenreIds(next);
   }
 
   function toggleStreamingProvider(providerId) {
@@ -922,6 +997,7 @@ export default function App() {
     setUser(null); setUserRatings({}); setWatchlist([]);
     setMatchData(null);
     setSelectedStreamingProviderIds([]);
+    setShowGenreIds([]);
     setStreamingMovies([]);
     setStreamingTV([]);
     setCinemaPreference(null); setOtherCinema(null);
@@ -1027,20 +1103,20 @@ export default function App() {
   const theaterRecs = useMemo(() => {
     const fromMatch = matchData?.theaterRecs;
     if (fromMatch?.length) return fromMatch;
-    return inTheaters.map(m => tmdbOnlyRec(m)).sort((a, b) => b.predicted - a.predicted);
-  }, [matchData?.theaterRecs, inTheaters]);
+    return inTheatersForRecs.map(m => tmdbOnlyRec(m)).sort((a, b) => b.predicted - a.predicted);
+  }, [matchData?.theaterRecs, inTheatersForRecs]);
 
   const streamingMovieRecsResolved = useMemo(() => {
     const fromMatch = matchData?.streamingMovieRecs;
     if (fromMatch?.length) return fromMatch;
-    return streamingMovies.map(m => tmdbOnlyRec(m)).sort((a, b) => b.predicted - a.predicted);
-  }, [matchData?.streamingMovieRecs, streamingMovies]);
+    return streamingMoviesForRecs.map(m => tmdbOnlyRec(m)).sort((a, b) => b.predicted - a.predicted);
+  }, [matchData?.streamingMovieRecs, streamingMoviesForRecs]);
 
   const streamingTvRecsResolved = useMemo(() => {
     const fromMatch = matchData?.streamingTvRecs;
     if (fromMatch?.length) return fromMatch;
-    return streamingTV.map(m => tmdbOnlyRec(m)).sort((a, b) => b.predicted - a.predicted);
-  }, [matchData?.streamingTvRecs, streamingTV]);
+    return streamingTVForRecs.map(m => tmdbOnlyRec(m)).sort((a, b) => b.predicted - a.predicted);
+  }, [matchData?.streamingTvRecs, streamingTVForRecs]);
 
   const streamingRecs = streamingTab === "movie" ? streamingMovieRecsResolved : streamingTvRecsResolved;
 
@@ -1060,8 +1136,8 @@ export default function App() {
   const unratedPopularRecs = useMemo(() => {
     const seen = new Set(Object.keys(userRatings));
     const byPop = (a, b) => (b.popularity || 0) - (a.popularity || 0);
-    return catalogue.filter(m => !seen.has(m.id)).sort(byPop).map(m => tmdbOnlyRec(m));
-  }, [userRatings, catalogue]);
+    return catalogueForRecs.filter(m => !seen.has(m.id)).sort(byPop).map(m => tmdbOnlyRec(m));
+  }, [userRatings, catalogueForRecs]);
 
   /** Strip 1: personalised rotation when we have CF recs; otherwise first popularity chunk (same heading as before). */
   const moreForYouStrip = useMemo(() => {
@@ -1090,9 +1166,12 @@ export default function App() {
   const FILTERS = ["All", "Movies", "TV Shows"];
 
   const discoverItems = useMemo(() => {
-    if (searchQuery.length >= 2) return searchResults;
-    return catalogue.filter(m => activeFilter === "All" ? true : activeFilter === "Movies" ? m.type === "movie" : m.type === "tv");
-  }, [catalogue, searchQuery, searchResults, activeFilter]);
+    let base;
+    if (searchQuery.length >= 2) base = searchResults;
+    else base = catalogue.filter(m => activeFilter === "All" ? true : activeFilter === "Movies" ? m.type === "movie" : m.type === "tv");
+    if (!user || !showGenreIds.length) return base;
+    return base.filter(m => passesShowGenresFilter(m, showGenreIds));
+  }, [catalogue, searchQuery, searchResults, activeFilter, user, showGenreIds]);
 
   async function addRating(movieId, score) {
     setUserRatings(prev => ({ ...prev, [movieId]: score }));
@@ -1338,7 +1417,7 @@ export default function App() {
     ? ratedMovies.filter(({ movie }) => (movie.title || "").toLowerCase().includes(ratedSearchLower))
     : ratedMovies;
 
-  const navProps = { navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults };
+  const navProps = { navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults, showGenreIds };
 
   return (
     <div className="app">
@@ -1982,6 +2061,24 @@ export default function App() {
                     onClick={() => toggleStreamingProvider(s.id)}
                   >
                     {s.label}
+                  </button>
+                ))}
+              </div>
+              <div className="profile-settings-label" style={{ marginTop: 20 }}>Genres to show</div>
+              <p className="settings-providers-hint">Recommendations and Discover use TMDB genres. A title appears if it has at least one of the genres you select. Leave none selected to show all genres — including animation.</p>
+              <div className="settings-genre-actions">
+                <button type="button" className="settings-genre-action-btn" onClick={() => persistShowGenreIds(PROFILE_GENRE_OPTIONS.map(g => g.id))}>Select all</button>
+                <button type="button" className="settings-genre-action-btn" onClick={() => persistShowGenreIds([])}>Clear (all genres)</button>
+              </div>
+              <div className="settings-provider-grid">
+                {PROFILE_GENRE_OPTIONS.map(g => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    className={`settings-provider-pill ${showGenreIds.includes(g.id) ? "selected" : ""}`}
+                    onClick={() => toggleShowGenre(g.id)}
+                  >
+                    {g.label}
                   </button>
                 ))}
               </div>
