@@ -104,11 +104,15 @@ async function fetchInTheaters(regionKeys = []) {
       const now = new Date();
       const end = now.toISOString().slice(0, 10);
       const startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - 120);
+      startDate.setDate(startDate.getDate() - 210);
       const start = startDate.toISOString().slice(0, 10);
-      const base = `/discover/movie?language=en-US&sort_by=popularity.desc&region=US&with_original_language=${langCodes.join("|")}&with_release_type=2|3&release_date.gte=${start}&release_date.lte=${end}`;
-      const [p1, p2] = await Promise.all([fetchTMDB(`${base}&page=1`), fetchTMDB(`${base}&page=2`)]);
-      const merged = [...(p1.results || []), ...(p2.results || [])];
+      const base = `/discover/movie?language=en-US&sort_by=popularity.desc&region=US&with_original_language=${langCodes.join("|")}&primary_release_date.gte=${start}&primary_release_date.lte=${end}`;
+      const [p1, p2, p3] = await Promise.all([
+        fetchTMDB(`${base}&page=1`),
+        fetchTMDB(`${base}&page=2`),
+        fetchTMDB(`${base}&page=3`),
+      ]);
+      const merged = [...(p1.results || []), ...(p2.results || []), ...(p3.results || [])];
       const unique = [...new Map(merged.map(item => [item.id, item])).values()];
       if (unique.length > 0) return unique.slice(0, 15).map(m => normalizeTMDBItem(m, "movie"));
     }
@@ -1014,13 +1018,34 @@ export default function App() {
     if (Array.isArray(profileRow?.show_genre_ids) && profileRow.show_genre_ids.length) {
       setShowGenreIds(profileRow.show_genre_ids.filter(n => typeof n === "number"));
     } else {
-      setShowGenreIds([]);
+      try {
+        const raw = localStorage.getItem(`cinematch_show_genres_${user.id}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setShowGenreIds(Array.isArray(parsed) ? parsed.filter(n => typeof n === "number") : []);
+        } else {
+          setShowGenreIds([]);
+        }
+      } catch (_) {
+        setShowGenreIds([]);
+      }
     }
     if (Array.isArray(profileRow?.show_region_keys) && profileRow.show_region_keys.length) {
       const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
       setShowRegionKeys(profileRow.show_region_keys.filter(k => typeof k === "string" && allowed.has(k)));
     } else {
-      setShowRegionKeys([]);
+      try {
+        const raw = localStorage.getItem(`cinematch_show_regions_${user.id}`);
+        const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setShowRegionKeys(Array.isArray(parsed) ? parsed.filter(k => typeof k === "string" && allowed.has(k)) : []);
+        } else {
+          setShowRegionKeys([]);
+        }
+      } catch (_) {
+        setShowRegionKeys([]);
+      }
     }
   }
 
@@ -1042,6 +1067,9 @@ export default function App() {
     if (!user) return;
     const clean = [...new Set(ids.filter(n => typeof n === "number"))].sort((a, b) => a - b);
     setShowGenreIds(clean);
+    try {
+      localStorage.setItem(`cinematch_show_genres_${user.id}`, JSON.stringify(clean));
+    } catch (_) { /* ignore */ }
     const { error } = await supabase.from("profiles").upsert(
       { id: user.id, show_genre_ids: clean },
       { onConflict: "id" },
@@ -1054,6 +1082,9 @@ export default function App() {
     const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
     const clean = [...new Set(keys.filter(k => typeof k === "string" && allowed.has(k)))].sort();
     setShowRegionKeys(clean);
+    try {
+      localStorage.setItem(`cinematch_show_regions_${user.id}`, JSON.stringify(clean));
+    } catch (_) { /* ignore */ }
     const { error } = await supabase.from("profiles").upsert(
       { id: user.id, show_region_keys: clean },
       { onConflict: "id" },
