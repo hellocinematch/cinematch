@@ -993,7 +993,10 @@ export default function App() {
     try {
       localStorage.setItem(`cinematch_streaming_providers_${user.id}`, JSON.stringify(clean));
     } catch (_) { /* ignore */ }
-    const { error } = await supabase.from("profiles").update({ streaming_provider_ids: clean }).eq("id", user.id);
+    const { error } = await supabase.from("profiles").upsert(
+      { id: user.id, streaming_provider_ids: clean },
+      { onConflict: "id" },
+    );
     if (error) console.warn("Could not save streaming providers to profile:", error.message);
   }
 
@@ -1001,7 +1004,10 @@ export default function App() {
     if (!user) return;
     const clean = [...new Set(ids.filter(n => typeof n === "number"))].sort((a, b) => a - b);
     setShowGenreIds(clean);
-    const { error } = await supabase.from("profiles").update({ show_genre_ids: clean }).eq("id", user.id);
+    const { error } = await supabase.from("profiles").upsert(
+      { id: user.id, show_genre_ids: clean },
+      { onConflict: "id" },
+    );
     if (error) console.warn("Could not save genre preferences:", error.message);
   }
 
@@ -1010,7 +1016,10 @@ export default function App() {
     const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
     const clean = [...new Set(keys.filter(k => typeof k === "string" && allowed.has(k)))].sort();
     setShowRegionKeys(clean);
-    const { error } = await supabase.from("profiles").update({ show_region_keys: clean }).eq("id", user.id);
+    const { error } = await supabase.from("profiles").upsert(
+      { id: user.id, show_region_keys: clean },
+      { onConflict: "id" },
+    );
     if (error) console.warn("Could not save region preferences:", error.message);
   }
 
