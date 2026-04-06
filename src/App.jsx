@@ -410,10 +410,11 @@ const styles = `
   .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; min-height:100vh; min-height:100dvh; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; min-width:0; }
 
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
-  .splash-logo { font-family:'DM Serif Display',serif; font-size:52px; letter-spacing:-2px; color:#f0ebe0; line-height:1; }
-  .splash-logo span { color:#e8c96a; }
-  .app-brand { font-family:'DM Serif Display',serif; font-size:26px; letter-spacing:-1px; color:#f0ebe0; line-height:1; }
-  .app-brand span { color:#e8c96a; }
+  .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; }
+  /* Logo image: matches previous text sizes — header ~26px, splash ~52px cap height */
+  .app-brand.brand-logo { display:block; height:26px; width:auto; max-width:min(100%, 320px); object-fit:contain; object-position:left center; }
+  /* Taller on splash so wordmark + tagline stay readable (full logo viewBox 400×120). */
+  .app-brand.brand-logo--splash { height:72px; max-width:min(100%, 380px); }
   .home-header .app-brand { margin-bottom:10px; }
   .discover-header .app-brand { margin-bottom:10px; }
   .mood-header .app-brand { margin-bottom:8px; }
@@ -422,7 +423,6 @@ const styles = `
   .mood-results-header { padding:0 24px 20px; display:flex; align-items:center; gap:12px; }
   .detail-sticky-brand { position:sticky; top:0; z-index:25; background:#0a0a0a; padding:14px 24px 12px; text-align:center; border-bottom:1px solid #1a1a1a; }
   .detail .back-btn { top:58px; }
-  .splash-sub { font-size:13px; letter-spacing:4px; text-transform:uppercase; color:#666; margin-top:10px; margin-bottom:56px; }
   .btn-primary { background:#e8c96a; color:#0a0a0a; border:none; padding:16px 48px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:500; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; width:220px; }
   .btn-primary:hover { background:#f0d880; transform:translateY(-1px); }
   .btn-ghost { background:transparent; color:#888; border:1px solid #333; padding:14px 48px; font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; border-radius:2px; margin-top:12px; transition:all 0.2s; width:220px; }
@@ -773,8 +773,17 @@ function WhereToWatch({ tmdbId, type }) {
 // ---------------------------------------------------------------------------
 // Nav
 // ---------------------------------------------------------------------------
-function AppBrand() {
-  return <div className="app-brand" aria-label="Cinematch">cine<span>match</span></div>;
+/** Wordmark: `public/cinemastro-logo.svg` — replace file with your export (same path). */
+function AppBrand({ variant = "header" }) {
+  const splash = variant === "splash";
+  return (
+    <img
+      className={`app-brand brand-logo ${splash ? "brand-logo--splash" : "brand-logo--header"}`}
+      src="/cinemastro-logo.svg"
+      alt="Cinemastro"
+      decoding="async"
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1567,8 +1576,7 @@ export default function App() {
       {/* SPLASH */}
       {screen === "splash" && (
         <div className="splash">
-          <div className="splash-logo">cine<span>match</span></div>
-          <div className="splash-sub">Your taste. Refined.</div>
+          <div className="splash-logo"><AppBrand variant="splash" /></div>
           <button className="btn-primary" onClick={() => { setAuthMode("signup"); setScreen("auth"); }}>Get Started</button>
           <button className="btn-ghost" onClick={() => { setAuthMode("signin"); setScreen("auth"); }}>Sign In</button>
         </div>
@@ -1579,7 +1587,7 @@ export default function App() {
         <div className="auth">
           <button className="auth-back" onClick={() => setScreen("splash")}>← Back</button>
           <div className="auth-title">{authMode === "signup" ? "Create account" : "Welcome back"}</div>
-          <div className="auth-sub">{authMode === "signup" ? "Join Cinematch to get personalised picks" : "Sign in to your Cinematch account"}</div>
+          <div className="auth-sub">{authMode === "signup" ? "Join Cinemastro to get personalised picks" : "Sign in to your Cinemastro account"}</div>
           {authError && <div className="auth-error">{authError}</div>}
           {authMode === "signup" && (
             <div className="auth-field">
@@ -1601,7 +1609,7 @@ export default function App() {
           <div className="auth-switch">
             {authMode === "signup"
               ? <>Already have an account? <span onClick={() => { setAuthMode("signin"); setAuthError(""); }}>Sign in</span></>
-              : <>New to Cinematch? <span onClick={() => { setAuthMode("signup"); setAuthError(""); }}>Create account</span></>}
+              : <>New to Cinemastro? <span onClick={() => { setAuthMode("signup"); setAuthError(""); }}>Create account</span></>}
           </div>
         </div>
       )}
@@ -1662,7 +1670,7 @@ export default function App() {
       {screen === "loading-catalogue" && (
         <div className="loading">
           <div className="loading-ring" />
-          <div className="loading-title">Loading Cinematch…</div>
+          <div className="loading-title">Loading Cinemastro…</div>
           <div className="loading-sub">Fetching your profile</div>
         </div>
       )}
