@@ -423,7 +423,8 @@ const styles = `
   .mood-results-brand { padding:52px 24px 8px; }
   .mood-results-header { padding:0 24px 20px; display:flex; align-items:center; gap:12px; }
   .detail-sticky-brand { position:sticky; top:0; z-index:25; background:#0a0a0a; padding:14px 24px 12px; text-align:center; border-bottom:1px solid #1a1a1a; }
-  .detail .back-btn { top:58px; }
+  /* Sticky brand was stacking above the back button (z-index 10), hiding taps — keep Back above chrome. */
+  .detail .back-btn { top:58px; z-index:40; }
   .btn-primary { background:#e8c96a; color:#0a0a0a; border:none; padding:16px 48px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:500; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; width:220px; }
   .btn-primary:hover { background:#f0d880; transform:translateY(-1px); }
   .btn-ghost { background:transparent; color:#888; border:1px solid #333; padding:14px 48px; font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; border-radius:2px; margin-top:12px; transition:all 0.2s; width:220px; }
