@@ -1,5 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
+import packageJson from "../package.json";
 import { supabase } from "./supabase";
+
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md for release notes.
+// v1.0.1: Title detail — removed in-app "← Back" (use browser/OS back). Added shared
+//   page-topbar (wordmark + avatar) like Discover/Mood/Profile; poster & metadata below;
+//   sticky top bar + safe-area. Removed .back-btn / centered sticky-brand-only header.
+const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
 
@@ -422,9 +429,6 @@ const styles = `
   .profile-brand { padding:52px 24px 6px; }
   .mood-results-brand { padding:52px 24px 8px; }
   .mood-results-header { padding:0 24px 20px; display:flex; align-items:center; gap:12px; }
-  .detail-sticky-brand { position:sticky; top:0; z-index:25; background:#0a0a0a; padding:14px 24px 12px; text-align:center; border-bottom:1px solid #1a1a1a; }
-  /* Sticky brand was stacking above the back button (z-index 10), hiding taps — keep Back above chrome. */
-  .detail .back-btn { top:58px; z-index:40; }
   .btn-primary { background:#e8c96a; color:#0a0a0a; border:none; padding:16px 48px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:500; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; width:220px; }
   .btn-primary:hover { background:#f0d880; transform:translateY(-1px); }
   .btn-ghost { background:transparent; color:#888; border:1px solid #333; padding:14px 48px; font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; border-radius:2px; margin-top:12px; transition:all 0.2s; width:220px; }
@@ -657,7 +661,22 @@ const styles = `
   .wtw-link:hover { text-decoration:underline; }
 
   .detail { min-height:100vh; min-height:100dvh; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-y:auto; min-width:0; position:relative; }
-  .back-btn { position:fixed; top:calc(50px + env(safe-area-inset-top,0px)); left:max(10px, calc(50% - min(100%, var(--shell)) / 2 + 10px)); z-index:10; background:rgba(0,0,0,0.7); border:1px solid #333; color:#f0ebe0; padding:8px 14px; font-size:13px; cursor:pointer; border-radius:20px; backdrop-filter:blur(10px); max-width:calc(100% - 20px); }
+  /* Detail uses the same top bar as other main screens at all breakpoints (.page-topbar is hidden by default). */
+  .detail .page-topbar {
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    align-items:center;
+    gap:20px;
+    padding:14px 20px;
+    padding-top:max(14px, env(safe-area-inset-top, 0px));
+    border-bottom:1px solid #1a1a1a;
+    background:#0a0a0a;
+    position:sticky;
+    top:0;
+    z-index:50;
+  }
+  .detail .page-topbar .app-brand { margin:0; }
+  .detail .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
   .d-poster { height:320px; position:relative; overflow:hidden; }
   .d-poster img { width:100%; height:100%; object-fit:cover; }
   .d-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:100px; background:#141414; }
@@ -707,6 +726,7 @@ const styles = `
   .profile-settings-title { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#555; margin-bottom:12px; }
   .profile-settings-card { background:#141414; border:1px solid #1e1e1e; border-radius:12px; padding:16px 18px; }
   .profile-settings-email { font-size:13px; color:#888; word-break:break-all; margin-bottom:16px; line-height:1.4; }
+  .profile-app-version { font-size:11px; color:#444; margin-top:14px; letter-spacing:0.02em; }
   .profile-settings-label { font-size:11px; color:#555; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
   .settings-providers-hint { font-size:12px; color:#555; line-height:1.45; margin-bottom:14px; }
   .settings-provider-grid { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
@@ -768,6 +788,7 @@ const styles = `
     .page-topbar { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:20px; padding:14px 32px; border-bottom:1px solid #1a1a1a; }
     .page-topbar .app-brand { margin:0; }
     .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
+    .detail .page-topbar { padding:14px 32px; padding-top:max(14px, env(safe-area-inset-top, 0px)); }
     .home-desktop-nav-row { display:flex; justify-content:center; padding:8px 32px 8px; }
     .home .section-divider { margin:0 32px 10px !important; }
     .home-desktop-nav-row .home-topnav { max-width:620px; }
@@ -2432,6 +2453,7 @@ export default function App() {
               <div className="profile-settings-label" style={{ marginTop: 20 }}>Email</div>
               <div className="profile-settings-email">{user?.email || "—"}</div>
             </div>
+            <div className="profile-app-version">Cinemastro v{APP_VERSION}</div>
           </div>
           <BottomNav {...navProps} />
         </div>
@@ -2443,8 +2465,11 @@ export default function App() {
         const myRating = userRatings[movie.id];
         return (
           <div className="detail">
-            <div className="detail-sticky-brand"><AppBrand /></div>
-            <button className="back-btn" onClick={goBack}>← Back</button>
+            <div className="page-topbar">
+              <AppBrand />
+              <div />
+              <AccountAvatarMenu />
+            </div>
             <div className="d-poster">
               {movie.backdrop || movie.poster ? <img src={movie.backdrop || movie.poster} alt={movie.title} /> : <div className="d-poster-fallback">🎬</div>}
               <div className="d-overlay" />

@@ -1,4 +1,6 @@
-# Cinematch / Cinemastro — handoff for next chat
+# Cinematch / Cinemastro — next version
+
+**Topic for upcoming work:** plan and build the **next version of Cinemastro** (features, polish, backlog below — not a full rewrite unless explicitly requested).
 
 ## Stack
 - **Frontend:** Vite + React 19 — main UI: `src/App.jsx` (single large component + inline CSS string).
