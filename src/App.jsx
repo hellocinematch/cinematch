@@ -210,6 +210,18 @@ const OTHER_CINEMA_OPTIONS = [
 // ---------------------------------------------------------------------------
 const ALL_INDIAN_LANGS = ["hi", "ta", "te", "ml", "kn", "bn", "mr"];
 
+/**
+ * Region buckets for profile recommendations settings.
+ * Empty profile array = no region filter (all languages/regions).
+ */
+const PROFILE_REGION_OPTIONS = [
+  { id: "hollywood", label: "🌍 Hollywood", languages: ["en"] },
+  { id: "indian", label: "🎭 Indian", languages: ALL_INDIAN_LANGS },
+  { id: "asian", label: "🎌 Asian", languages: ["ko", "ja", "zh", "th", "vi", "id", "ms", "tl"] },
+  { id: "latam", label: "🌮 Latin / Iberian", languages: ["es", "pt"] },
+  { id: "european", label: "🇫🇷 European", languages: ["fr", "de", "it", "nl", "sv", "no", "da", "fi", "pl"] },
+];
+
 /** TMDB genre ids for “Genres to show” in Settings. Empty profile array = all genres. Title matches if it has ≥1 of these ids. */
 const PROFILE_GENRE_OPTIONS = [
   { id: 28, label: "🔥 Action" },
@@ -236,6 +248,19 @@ function passesShowGenresFilter(movie, showGenreIds) {
   if (!showGenreIds || showGenreIds.length === 0) return true;
   const ids = movie.genreIds || [];
   return ids.some(gid => showGenreIds.includes(gid));
+}
+
+function passesShowRegionsFilter(movie, showRegionKeys) {
+  if (!showRegionKeys || showRegionKeys.length === 0) return true;
+  const lang = String(movie?.language || "").toLowerCase();
+  if (!lang) return false;
+  return PROFILE_REGION_OPTIONS
+    .filter(option => showRegionKeys.includes(option.id))
+    .some(option => option.languages.includes(lang));
+}
+
+function passesProfileFilters(movie, showGenreIds, showRegionKeys) {
+  return passesShowGenresFilter(movie, showGenreIds) && passesShowRegionsFilter(movie, showRegionKeys);
 }
 
 const MOOD_CARDS = [
@@ -763,6 +788,8 @@ export default function App() {
   const [homeSegment, setHomeSegment] = useState("picks"); // "picks" | "more" | "friends"
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
   const [showGenreIds, setShowGenreIds] = useState([]);
+  /** Region buckets to include (Settings). Empty = all regions. Logged-out users ignore. */
+  const [showRegionKeys, setShowRegionKeys] = useState([]);
 
   // Pre-onboarding cinema preference state
   const [cinemaPreference, setCinemaPreference] = useState(null); // "hollywood" | "mix"
@@ -832,24 +859,24 @@ export default function App() {
   }, [user, selectedStreamingProviderIds]);
 
   const catalogueForRecs = useMemo(() => {
-    if (!user || !showGenreIds.length) return catalogue;
-    return catalogue.filter(m => passesShowGenresFilter(m, showGenreIds));
-  }, [catalogue, user, showGenreIds]);
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return catalogue;
+    return catalogue.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [catalogue, user, showGenreIds, showRegionKeys]);
 
   const inTheatersForRecs = useMemo(() => {
-    if (!user || !showGenreIds.length) return inTheaters;
-    return inTheaters.filter(m => passesShowGenresFilter(m, showGenreIds));
-  }, [inTheaters, user, showGenreIds]);
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return inTheaters;
+    return inTheaters.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [inTheaters, user, showGenreIds, showRegionKeys]);
 
   const streamingMoviesForRecs = useMemo(() => {
-    if (!user || !showGenreIds.length) return streamingMovies;
-    return streamingMovies.filter(m => passesShowGenresFilter(m, showGenreIds));
-  }, [streamingMovies, user, showGenreIds]);
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingMovies;
+    return streamingMovies.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingMovies, user, showGenreIds, showRegionKeys]);
 
   const streamingTVForRecs = useMemo(() => {
-    if (!user || !showGenreIds.length) return streamingTV;
-    return streamingTV.filter(m => passesShowGenresFilter(m, showGenreIds));
-  }, [streamingTV, user, showGenreIds]);
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingTV;
+    return streamingTV.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingTV, user, showGenreIds, showRegionKeys]);
 
   /** Collaborative filtering runs in Edge Function `match` (neighbour ratings loaded server-side; not in the client bundle). */
   useEffect(() => {
@@ -921,7 +948,7 @@ export default function App() {
       setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
     }
 
-    const { data: profileRow } = await supabase.from("profiles").select("streaming_provider_ids, show_genre_ids").eq("id", user.id).maybeSingle();
+    const { data: profileRow } = await supabase.from("profiles").select("streaming_provider_ids, show_genre_ids, show_region_keys").eq("id", user.id).maybeSingle();
     let providerIds = [];
     if (Array.isArray(profileRow?.streaming_provider_ids) && profileRow.streaming_provider_ids.length) {
       providerIds = profileRow.streaming_provider_ids;
@@ -936,6 +963,12 @@ export default function App() {
       setShowGenreIds(profileRow.show_genre_ids.filter(n => typeof n === "number"));
     } else {
       setShowGenreIds([]);
+    }
+    if (Array.isArray(profileRow?.show_region_keys) && profileRow.show_region_keys.length) {
+      const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
+      setShowRegionKeys(profileRow.show_region_keys.filter(k => typeof k === "string" && allowed.has(k)));
+    } else {
+      setShowRegionKeys([]);
     }
   }
 
@@ -958,10 +991,25 @@ export default function App() {
     if (error) console.warn("Could not save genre preferences:", error.message);
   }
 
+  async function persistShowRegionKeys(keys) {
+    if (!user) return;
+    const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
+    const clean = [...new Set(keys.filter(k => typeof k === "string" && allowed.has(k)))].sort();
+    setShowRegionKeys(clean);
+    const { error } = await supabase.from("profiles").update({ show_region_keys: clean }).eq("id", user.id);
+    if (error) console.warn("Could not save region preferences:", error.message);
+  }
+
   function toggleShowGenre(genreId) {
     const has = showGenreIds.includes(genreId);
     const next = has ? showGenreIds.filter(id => id !== genreId) : [...showGenreIds, genreId].sort((a, b) => a - b);
     persistShowGenreIds(next);
+  }
+
+  function toggleShowRegion(regionKey) {
+    const has = showRegionKeys.includes(regionKey);
+    const next = has ? showRegionKeys.filter(id => id !== regionKey) : [...showRegionKeys, regionKey].sort();
+    persistShowRegionKeys(next);
   }
 
   function toggleStreamingProvider(providerId) {
@@ -998,6 +1046,7 @@ export default function App() {
     setMatchData(null);
     setSelectedStreamingProviderIds([]);
     setShowGenreIds([]);
+    setShowRegionKeys([]);
     setStreamingMovies([]);
     setStreamingTV([]);
     setCinemaPreference(null); setOtherCinema(null);
@@ -1169,9 +1218,9 @@ export default function App() {
     let base;
     if (searchQuery.length >= 2) base = searchResults;
     else base = catalogue.filter(m => activeFilter === "All" ? true : activeFilter === "Movies" ? m.type === "movie" : m.type === "tv");
-    if (!user || !showGenreIds.length) return base;
-    return base.filter(m => passesShowGenresFilter(m, showGenreIds));
-  }, [catalogue, searchQuery, searchResults, activeFilter, user, showGenreIds]);
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return base;
+    return base.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [catalogue, searchQuery, searchResults, activeFilter, user, showGenreIds, showRegionKeys]);
 
   async function addRating(movieId, score) {
     setUserRatings(prev => ({ ...prev, [movieId]: score }));
@@ -2079,6 +2128,24 @@ export default function App() {
                     onClick={() => toggleShowGenre(g.id)}
                   >
                     {g.label}
+                  </button>
+                ))}
+              </div>
+              <div className="profile-settings-label" style={{ marginTop: 20 }}>Regions to show</div>
+              <p className="settings-providers-hint">Recommendations and Discover can be narrowed by original language buckets like Hollywood, Indian, and Asian cinema. Leave none selected to show all regions.</p>
+              <div className="settings-genre-actions">
+                <button type="button" className="settings-genre-action-btn" onClick={() => persistShowRegionKeys(PROFILE_REGION_OPTIONS.map(r => r.id))}>Select all</button>
+                <button type="button" className="settings-genre-action-btn" onClick={() => persistShowRegionKeys([])}>Clear (all regions)</button>
+              </div>
+              <div className="settings-provider-grid">
+                {PROFILE_REGION_OPTIONS.map(r => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className={`settings-provider-pill ${showRegionKeys.includes(r.id) ? "selected" : ""}`}
+                    onClick={() => toggleShowRegion(r.id)}
+                  >
+                    {r.label}
                   </button>
                 ))}
               </div>
