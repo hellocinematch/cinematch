@@ -522,6 +522,12 @@ const styles = `
   .friends-placeholder-title { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; margin-bottom:8px; }
   .friends-placeholder-text { font-size:13px; color:#666; line-height:1.6; }
   .avatar { width:44px; height:44px; border-radius:50%; background:#e8c96a; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:600; color:#0a0a0a; cursor:pointer; font-family:'DM Sans',sans-serif; flex-shrink:0; }
+  .avatar-wrap { position:relative; flex-shrink:0; }
+  .avatar-menu { position:absolute; top:52px; right:0; min-width:150px; background:#141414; border:1px solid #2a2a2a; border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,0.45); padding:6px; z-index:120; }
+  .avatar-menu-btn { width:100%; text-align:left; background:transparent; border:none; color:#ccc; padding:10px 12px; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; }
+  .avatar-menu-btn:hover { background:#1f1f1f; }
+  .avatar-menu-btn.danger { color:#f09a9a; }
+  .avatar-menu-btn.danger:hover { background:#2a1818; }
   .section { padding:0 0 28px; min-width:0; }
   .section-header { padding:0 24px; display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
   .section-title { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; }
@@ -861,6 +867,7 @@ export default function App() {
   const [streamingTab, setStreamingTab] = useState("movie"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [homeSegment, setHomeSegment] = useState("picks"); // "picks" | "more" | "friends"
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
   const [showGenreIds, setShowGenreIds] = useState([]);
   /** Region buckets to include (Settings). Empty = all regions. Logged-out users ignore. */
@@ -1412,6 +1419,13 @@ export default function App() {
     setScreen(navTab === "mood" ? "mood-results" : navTab);
   }
 
+  useEffect(() => {
+    if (!showAvatarMenu) return;
+    const close = () => setShowAvatarMenu(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [showAvatarMenu]);
+
   async function toggleWatchlist(movie) {
     const alreadySaved = watchlist.find(m => m.id === movie.id);
     setWatchlist(w => alreadySaved ? w.filter(m => m.id !== movie.id) : [...w, movie]);
@@ -1784,7 +1798,42 @@ export default function App() {
               <div className="home-greeting">Good evening, {userName}</div>
               <div className="home-title">Your picks</div>
             </div>
-            <div className="avatar" onClick={() => { setNavTab("profile"); setScreen("profile"); }}>{userInitial}</div>
+            <div className="avatar-wrap">
+              <div
+                className="avatar"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAvatarMenu(v => !v);
+                }}
+              >
+                {userInitial}
+              </div>
+              {showAvatarMenu && (
+                <div className="avatar-menu" onClick={e => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="avatar-menu-btn"
+                    onClick={() => {
+                      setShowAvatarMenu(false);
+                      setNavTab("profile");
+                      setScreen("profile");
+                    }}
+                  >
+                    Profile
+                  </button>
+                  <button
+                    type="button"
+                    className="avatar-menu-btn danger"
+                    onClick={() => {
+                      setShowAvatarMenu(false);
+                      handleSignOut();
+                    }}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div className="home-segments" role="tablist" aria-label="Home sections">
             {[
@@ -2292,7 +2341,6 @@ export default function App() {
               </div>
               <div className="profile-settings-label" style={{ marginTop: 20 }}>Email</div>
               <div className="profile-settings-email">{user?.email || "—"}</div>
-              <button type="button" className="signout-btn" onClick={handleSignOut}>Sign Out</button>
             </div>
           </div>
           <BottomNav {...navProps} />
