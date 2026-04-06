@@ -411,10 +411,11 @@ const styles = `
 
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
   .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; }
-  /* Logo image: in-app headers — size closer to avatar (44px) so wordmark + tagline read clearly */
-  .app-brand.brand-logo { display:block; height:44px; width:auto; max-width:min(100%, 340px); object-fit:contain; object-position:left center; }
+  .app-brand.brand-logo { display:block; max-width:100%; object-fit:contain; object-position:left center; }
+  /* Mobile-first header sizing by width to prevent right-side overflow with wide logo/tagline assets. */
+  .app-brand.brand-logo--header { width:min(220px, calc(100vw - 124px)); height:auto; }
   /* Taller on splash so wordmark + tagline stay readable (full logo viewBox 400×120). */
-  .app-brand.brand-logo--splash { height:72px; max-width:min(100%, 380px); }
+  .app-brand.brand-logo--splash { width:min(86vw, 380px); height:auto; }
   .home-header .app-brand { margin-bottom:10px; }
   .discover-header .app-brand { margin-bottom:10px; }
   .mood-header .app-brand { margin-bottom:8px; }
@@ -510,8 +511,7 @@ const styles = `
   .btn-skip:hover { border-color:#444; color:#aaa; }
 
   .home { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
-  .home-header { padding:52px 24px 20px; display:flex; align-items:flex-start; gap:12px; }
-  .home-header > div:first-child { flex:1; min-width:0; max-width:none; }
+  .home-header { padding:52px 24px 20px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; }
   .home-greeting { font-size:14px; color:#666; letter-spacing:1px; }
   .home-title { font-family:'DM Serif Display',serif; font-size:36px; color:#f0ebe0; margin-top:4px; line-height:1.08; }
   .home-segments { display:flex; margin:0 24px 20px; padding:4px; background:#141414; border-radius:10px; border:1px solid #222; gap:2px; }
@@ -730,14 +730,14 @@ const styles = `
   .conf-low { background:#2a1a1a; color:#aa6a6a; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
 
   @media (max-width: 899px) {
-    /* Mobile clamp: prevent wide logo/tagline assets from pushing layout wider than viewport. */
-    .app-brand.brand-logo { max-width:min(100%, 240px); }
+    /* Keep branded header fully within viewport on narrow screens. */
+    .home-header { padding-left:20px; padding-right:20px; }
   }
 
   /* Desktop/tablet: let app breathe beyond the mobile shell while keeping phone UX unchanged. */
   @media (min-width: 900px) {
     .app { --shell:1120px; }
-    .app-brand.brand-logo { height:52px; max-width:420px; }
+    .app-brand.brand-logo--header { width:320px; }
     .home-header { padding:56px 32px 22px; }
     .discover-header,
     .mood-header { padding-left:32px; padding-right:32px; }
