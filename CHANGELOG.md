@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.20
+
+- **Home (mobile):** Picks tagline uses **fluid `font-size`** (`clamp`) so it scales with viewport width; **desktop** tagline unchanged.
+
 ## 1.0.19
 
 - **Home (desktop):** Hide **`topbar-brand-cluster`** inside **`home-header`** when **`home-topbar`** is visible — removes duplicate community/ratings next to the tagline. Mobile unchanged (no top home bar).

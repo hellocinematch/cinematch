@@ -874,7 +874,8 @@ const styles = `
     .home-header { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .home-hero-copy { padding:0; }
     .home-greeting { font-size:40px; letter-spacing:-0.4px; }
-    .home-subtitle { font-size:24px; max-width:none; line-height:1.14; }
+    /* Fluid size on phones so the tagline can stay one line on wider mobiles; shrinks on narrow widths. Desktop unchanged. */
+    .home-subtitle { font-size:clamp(15px, 2.75vw + 11px, 23px); max-width:none; line-height:1.12; letter-spacing:-0.35px; }
     .strip { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); scroll-padding-left:max(20px, env(safe-area-inset-left, 0px)); }
     .strip-card { width:144px; }
     .strip-poster { width:144px; height:200px; }
