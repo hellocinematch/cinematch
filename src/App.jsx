@@ -708,8 +708,8 @@ const styles = `
   .filter-pill.active { background:#e8c96a; color:#0a0a0a; border-color:#e8c96a; font-weight:500; }
   .filter-pill:not(.active):hover { border-color:#555; color:#ccc; }
   .search-status { padding:8px 24px; font-size:12px; color:#666; overflow-wrap:anywhere; word-break:break-word; }
-  .disc-grid { padding:0 24px; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
-  .disc-card { cursor:pointer; transition:transform 0.2s; min-width:0; width:100%; max-width:100%; }
+  .disc-grid { padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
+  .disc-card { cursor:pointer; transition:transform 0.2s; min-width:0; }
   .disc-card:hover { transform:translateY(-3px); }
   .disc-poster { width:100%; aspect-ratio:2/3; border-radius:12px; overflow:hidden; position:relative; border:1px solid #1e1e1e; background:#1a1a1a; }
   .disc-poster img { width:100%; height:100%; object-fit:cover; }

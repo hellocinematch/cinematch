@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.32
+
+- **Stabilization rollback:** Revert v1.0.31 Discover grid tweak (`repeat(minmax)` + forced card width) after regression reports on Home mobile overflow. Returns Discover grid to prior sizing baseline while preserving earlier global overflow hardening.
+
 ## 1.0.31
 
 - **Discover results overflow fix:** Use `grid-template-columns: repeat(2, minmax(0, 1fr))` for mobile Discover results and constrain cards to `width/max-width:100%`. Prevents result columns from expanding horizontally as search results populate.
