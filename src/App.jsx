@@ -530,6 +530,7 @@ const styles = `
 
   .onboarding { min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; background:#0a0a0a; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .ob-header { padding:max(48px, env(safe-area-inset-top, 0px)) 20px 12px; display:flex; flex-direction:column; gap:6px; width:100%; max-width:min(100%, 440px); margin:0 auto; box-sizing:border-box; }
+  .ob-header .topbar-brand-cluster { align-self:flex-start; }
   .ob-step { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#e8c96a; }
   .ob-title { font-family:'DM Serif Display',serif; font-size:clamp(22px, 4.2vw, 28px); color:#f0ebe0; line-height:1.2; }
   .ob-subtitle { font-size:13px; color:#666; margin-top:2px; }
@@ -592,12 +593,18 @@ const styles = `
   }
   .page-topbar .app-brand { margin:0; }
   .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
+  .topbar-brand-cluster { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:nowrap; }
+  .topbar-brand-cluster .app-brand-button { flex-shrink:1; }
+  .public-site-stats { display:flex; flex-direction:column; gap:1px; justify-content:center; flex-shrink:0; line-height:1.12; padding:2px 0; }
+  .public-site-stats-row { display:flex; align-items:baseline; gap:5px; white-space:nowrap; }
+  .public-site-stats-val { font-family:'DM Sans',sans-serif; font-size:11px; font-weight:600; color:#c4a85a; letter-spacing:0.02em; }
+  .public-site-stats-lbl { font-family:'DM Sans',sans-serif; font-size:8px; font-weight:500; letter-spacing:0.55px; text-transform:uppercase; color:#555; }
   .home-topnav { display:flex; gap:3px; padding:4px; background:#141414; border-radius:11px; border:1px solid #222; width:100%; max-width:620px; }
   .home-topnav .home-segment { flex:1; }
   .home-header { padding:48px 24px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; min-width:0; }
   /* More / Friends: tighter mobile hero without tagline (wordmark + avatar only). */
   .home-header--no-picks-tagline { padding-top:28px; padding-bottom:12px; }
-  .home-hero { min-width:0; }
+  .home-hero { min-width:0; display:flex; flex-direction:column; gap:10px; align-items:flex-start; }
   .home-hero-copy { padding:0; display:block; max-width:100%; min-width:0; }
   .home-greeting { font-family:'DM Sans',sans-serif; font-size:52px; font-weight:600; color:#f0ebe0; margin-top:2px; line-height:1.02; letter-spacing:-0.6px; overflow-wrap:anywhere; }
   .home-subtitle { font-family:'DM Serif Display',serif; font-size:42px; font-weight:400; color:#cdcdc8; margin-top:8px; line-height:1.1; max-width:100%; letter-spacing:-0.2px; overflow-wrap:anywhere; }
@@ -904,6 +911,9 @@ const styles = `
   @media (min-width: 900px) {
     .app { --shell:1120px; }
     .app-brand.brand-logo--header { width:320px; }
+    .topbar-brand-cluster { gap:14px; }
+    .public-site-stats-val { font-size:12px; }
+    .public-site-stats-lbl { font-size:9px; }
     .home-topbar { display:grid; grid-template-columns:minmax(0, auto) 1fr auto; align-items:center; gap:20px; padding:14px 32px; border-bottom:1px solid #1a1a1a; }
     .home-topbar .app-brand { margin:0; }
     .home-topbar .avatar-wrap { justify-self:end; align-self:center; }
@@ -1038,6 +1048,41 @@ function AppBrand({ variant = "header", onPress }) {
   return img;
 }
 
+function formatPublicStat(n) {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const x = Math.floor(n);
+  if (x < 1000) return String(x);
+  if (x < 10000) return `${(x / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  if (x < 1_000_000) return `${Math.round(x / 1000)}k`;
+  return `${(x / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+}
+
+/** Site-wide counts (not the signed-in user). Fetched via public RPC. */
+function PublicSiteStats({ community, ratings }) {
+  if (community === undefined && ratings === undefined) return null;
+  return (
+    <div className="public-site-stats" aria-label="Cinemastro community stats">
+      <div className="public-site-stats-row">
+        <span className="public-site-stats-val">{formatPublicStat(community)}</span>
+        <span className="public-site-stats-lbl">community</span>
+      </div>
+      <div className="public-site-stats-row">
+        <span className="public-site-stats-val">{formatPublicStat(ratings)}</span>
+        <span className="public-site-stats-lbl">ratings</span>
+      </div>
+    </div>
+  );
+}
+
+function TopbarBrandCluster({ onPress, community, ratings }) {
+  return (
+    <div className="topbar-brand-cluster">
+      <AppBrand onPress={onPress} />
+      <PublicSiteStats community={community} ratings={ratings} />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
@@ -1084,6 +1129,8 @@ export default function App() {
   const [showGenreIds, setShowGenreIds] = useState([]);
   /** Region buckets to include (Settings). Empty = all regions. Logged-out users ignore. */
   const [showRegionKeys, setShowRegionKeys] = useState([]);
+  /** Public marketing counts (RPC). Undefined until first successful fetch. */
+  const [siteStats, setSiteStats] = useState(null);
 
   /** Browser Back should return to the in-app screen that opened detail, not leave the site (SPA history). */
   const detailReturnScreenRef = useRef(null);
@@ -1094,6 +1141,21 @@ export default function App() {
   useEffect(() => {
     screenRef.current = screen;
   }, [screen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("get_public_site_stats");
+      if (cancelled || error) return;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return;
+      setSiteStats({
+        community: Number(row.community_count),
+        ratings: Number(row.ratings_count),
+      });
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Pre-onboarding cinema preference state
   const [cinemaPreference, setCinemaPreference] = useState(null); // "hollywood" | "mix"
@@ -2201,7 +2263,7 @@ export default function App() {
       {screen === "onboarding" && obMovie && (
         <div className="onboarding">
           <div className="ob-header">
-            <AppBrand onPress={goHome} />
+            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div className="ob-step">Step {obStep + 1} of {obMovies.length}</div>
             <div className="ob-title">Rate what you've seen</div>
             <div className="ob-subtitle">We'll find your taste matches</div>
@@ -2256,13 +2318,13 @@ export default function App() {
       {screen === "home" && (
         <div className="home">
           <div className="home-topbar">
-            <AppBrand onPress={goHome} />
+            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div />
             <AccountAvatarMenu />
           </div>
           <div className={`home-header ${homeSegment !== "picks" ? "home-header--no-picks-tagline" : ""}`}>
             <div className="home-hero">
-              <AppBrand onPress={goHome} />
+              <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
               {homeSegment === "picks" && (
                 <div className="home-hero-copy">
                   <div className="home-subtitle">Movies and Shows - Picked for your TASTE!</div>
@@ -2480,7 +2542,7 @@ export default function App() {
       {screen === "rate-more" && obMovie && (
         <div className="onboarding">
           <div className="ob-header">
-            <AppBrand onPress={goHome} />
+            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div className="ob-step">Rating {obStep + 1}</div>
             <div className="ob-title">Rate more titles</div>
             <div className="ob-subtitle">Improve your recommendations</div>
@@ -2517,7 +2579,7 @@ export default function App() {
       {screen === "discover" && (
         <div className="discover">
           <div className="page-topbar">
-            <AppBrand onPress={goHome} />
+            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2576,7 +2638,7 @@ export default function App() {
       {screen === "mood-picker" && currentMoodCard && (
         <div className="mood">
           <div className="page-topbar">
-            <AppBrand onPress={goHome} />
+            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2619,7 +2681,7 @@ export default function App() {
       {screen === "mood-results" && (
         <div className="mood-results">
           <div className="page-topbar">
-            <AppBrand onPress={goHome} />
+            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2671,7 +2733,7 @@ export default function App() {
       {screen === "rated" && (
         <div className="discover">
           <div className="page-topbar">
-            <AppBrand onPress={goHome} />
+            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2745,7 +2807,7 @@ export default function App() {
       {screen === "profile" && (
         <div className="profile">
           <div className="page-topbar">
-            <AppBrand onPress={goHome} />
+            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2866,7 +2928,7 @@ export default function App() {
         return (
           <div className="detail">
             <div className="page-topbar">
-              <AppBrand onPress={goHome} />
+              <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
               <div />
               <AccountAvatarMenu />
             </div>

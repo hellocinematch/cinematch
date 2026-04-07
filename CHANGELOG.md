@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.18
+
+- **Community stats (marketing):** Next to the wordmark in **top bars** and **home hero** — two lines (**community** = `profiles` count, **ratings** = `ratings` row count). Fetched once via Supabase RPC **`get_public_site_stats`** (apply migration **`20260407140000_get_public_site_stats.sql`**). Compact format (e.g. `1.2k`) when large; hidden until first successful load.
+
 ## 1.0.17
 
 - **Mobile overflow (follow-up):** Horizontal strips use explicit **`width:100%`** + **`min-width:0`**; **`top-picks-block`** constrained. Section headers use **safe-area padding**; **`section-meta`** is **full-width + `text-align:right`** on narrow screens (was `align-self:flex-end` on a too-wide ancestor). Slightly tighter meta typography. **`overscroll-behavior-x: none`** on `html` / `body` / `#root`. Main shells (`home`, `discover`, `profile`, `mood`, `detail`) get **`width:100%`**.

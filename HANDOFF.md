@@ -66,6 +66,7 @@ Shipped in **1.0.5 → 1.0.13** (mostly `src/App.jsx`, `public/cinemastro-logo.s
 - `supabase/migrations/20260402120000_profiles_streaming_provider_ids.sql`
 - `supabase/migrations/20260406120000_profiles_show_genre_ids.sql`
 - `supabase/migrations/20260406133000_profiles_show_region_keys.sql`
+- `supabase/migrations/20260407140000_get_public_site_stats.sql` — RPC **`get_public_site_stats`** for public **community** (profile count) + **ratings** count (header marketing).
 
 ## Key files
 | Area | File |
