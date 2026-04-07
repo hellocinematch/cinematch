@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.33
+
+- **Discover search trigger:** Results now fetch only on explicit submit (tap search icon or keyboard Search/Enter), not while typing. Added submitted-query state and search form button; status/empty messages now reference submitted query.
+
 ## 1.0.32
 
 - **Stabilization rollback:** Revert v1.0.31 Discover grid tweak (`repeat(minmax)` + forced card width) after regression reports on Home mobile overflow. Returns Discover grid to prior sizing baseline while preserving earlier global overflow hardening.

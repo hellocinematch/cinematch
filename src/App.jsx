@@ -698,6 +698,9 @@ const styles = `
   .discover { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
   .discover-title { font-family:'DM Serif Display',serif; font-size:30px; color:#ddd7cd; }
   .search-box { position:relative; margin-top:12px; min-width:0; }
+  .search-submit-btn { position:absolute; left:8px; top:50%; transform:translateY(-50%); width:28px; height:28px; border:none; background:transparent; color:#888; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; }
+  .search-submit-btn:active { opacity:0.8; }
+  .search-submit-btn .search-icon { position:static; transform:none; font-size:16px; }
   .search-input { width:100%; min-width:0; background:#141414; border:1px solid #2a2a2a; border-radius:10px; padding:12px 16px 12px 42px; font-family:'DM Sans',sans-serif; font-size:14px; color:#f0ebe0; outline:none; transition:border-color 0.2s; }
   .search-input::placeholder { color:#444; }
   .search-input:focus { border-color:#555; }
@@ -1127,6 +1130,7 @@ export default function App() {
   const [detailEditRating, setDetailEditRating] = useState(false);
   const [ratedSearchQuery, setRatedSearchQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -1647,9 +1651,9 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (searchQuery.length < 2) { setSearchResults([]); setSearching(false); return; }
+    if (appliedSearchQuery.length < 2) { setSearchResults([]); setSearching(false); return; }
     setSearching(true);
-    const timer = setTimeout(async () => {
+    (async () => {
       try {
         const normalize = (item, type) => ({
           id: `${type}-${item.id}`, tmdbId: item.id, type,
@@ -1664,8 +1668,8 @@ export default function App() {
         });
         const filterType = activeFilter === "Movies" ? "movie" : activeFilter === "TV Shows" ? "tv" : null;
         const searches = filterType
-          ? [fetchTMDB(`/search/${filterType}?query=${encodeURIComponent(searchQuery)}&page=1`)]
-          : [fetchTMDB(`/search/movie?query=${encodeURIComponent(searchQuery)}&page=1`), fetchTMDB(`/search/tv?query=${encodeURIComponent(searchQuery)}&page=1`)];
+          ? [fetchTMDB(`/search/${filterType}?query=${encodeURIComponent(appliedSearchQuery)}&page=1`)]
+          : [fetchTMDB(`/search/movie?query=${encodeURIComponent(appliedSearchQuery)}&page=1`), fetchTMDB(`/search/tv?query=${encodeURIComponent(appliedSearchQuery)}&page=1`)];
         const results = await Promise.all(searches);
         const combined = filterType
           ? (results[0].results || []).slice(0, 20).map(m => normalize(m, filterType))
@@ -1673,9 +1677,8 @@ export default function App() {
         setSearchResults(combined);
       } catch (e) { console.error(e); }
       finally { setSearching(false); }
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchQuery, activeFilter]);
+    })();
+  }, [appliedSearchQuery, activeFilter]);
 
   const ONBOARDING_COUNT = 12;
   const obMovies = useMemo(() => {
@@ -1762,11 +1765,11 @@ export default function App() {
 
   const discoverItems = useMemo(() => {
     let base;
-    if (searchQuery.length >= 2) base = searchResults;
+    if (appliedSearchQuery.length >= 2) base = searchResults;
     else base = catalogue.filter(m => activeFilter === "All" ? true : activeFilter === "Movies" ? m.type === "movie" : m.type === "tv");
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return base;
     return base.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [catalogue, searchQuery, searchResults, activeFilter, user, showGenreIds, showRegionKeys]);
+  }, [catalogue, appliedSearchQuery, searchResults, activeFilter, user, showGenreIds, showRegionKeys]);
 
   async function addRating(movieId, score) {
     setUserRatings(prev => ({ ...prev, [movieId]: score }));
@@ -2583,11 +2586,26 @@ export default function App() {
           </div>
           <div className="discover-header">
             <div className="discover-title">Discover</div>
-            <div className="search-box">
-              <span className="search-icon">🔍</span>
-              <input className="search-input" type="text" placeholder="Search any movie or show…"
-                value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-            </div>
+            <form
+              className="search-box"
+              onSubmit={e => {
+                e.preventDefault();
+                const q = searchQuery.trim();
+                setAppliedSearchQuery(q);
+                if (q.length < 2) setSearchResults([]);
+              }}
+            >
+              <button type="submit" className="search-submit-btn" aria-label="Search">
+                <span className="search-icon">🔍</span>
+              </button>
+              <input
+                className="search-input"
+                type="text"
+                placeholder="Search any movie or show…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </form>
           </div>
           <div className="filter-row">
             {FILTERS.map(f => (
@@ -2595,11 +2613,11 @@ export default function App() {
             ))}
           </div>
           {searching && <div className="search-status">Searching…</div>}
-          {!searching && searchQuery.length >= 2 && (
-            <div className="search-status">{discoverItems.length} result{discoverItems.length !== 1 ? "s" : ""} for "{searchQuery}"</div>
+          {!searching && appliedSearchQuery.length >= 2 && (
+            <div className="search-status">{discoverItems.length} result{discoverItems.length !== 1 ? "s" : ""} for "{appliedSearchQuery}"</div>
           )}
           {discoverItems.length === 0 && !searching ? (
-            <div className="disc-empty"><div className="disc-empty-text">{searchQuery.length >= 2 ? `No results for "${searchQuery}"` : "No titles found"}</div></div>
+            <div className="disc-empty"><div className="disc-empty-text">{appliedSearchQuery.length >= 2 ? `No results for "${appliedSearchQuery}"` : "Type a title and tap search"}</div></div>
           ) : (
             <div className="disc-grid">
               {discoverItems.map(m => {
