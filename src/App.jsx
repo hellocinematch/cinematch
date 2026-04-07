@@ -1163,29 +1163,46 @@ export default function App() {
     screenRef.current = screen;
   }, [screen]);
 
-  // Safari can retain horizontal viewport drift after horizontal gestures.
-  // Re-clamp X scroll on key UI transitions.
-  useEffect(() => {
-    const clampX = () => {
-      const y = window.scrollY || 0;
-      window.scrollTo(0, y);
-      document.documentElement.scrollLeft = 0;
-      if (document.body) document.body.scrollLeft = 0;
-    };
-    clampX();
-    const raf = requestAnimationFrame(clampX);
-    return () => cancelAnimationFrame(raf);
-  }, [screen, searching, appliedSearchQuery, homeSegment]);
-
-  // Root-cause guard for iOS Safari drift:
-  // allow horizontal pan only on intentional x-scrollers, never on the page viewport.
+  // iOS Safari can keep horizontal viewport drift even when overflow-x is hidden.
+  // Guard in two layers:
+  // 1) prevent page-level horizontal gestures (except intended x-scrollers)
+  // 2) aggressively clamp viewport/document x back to 0 after touch/scroll/layout events
   useEffect(() => {
     const ALLOW_PAN_X_SELECTOR = ".strip, .filter-row";
     let startX = 0;
     let startY = 0;
     let allowPanX = false;
+    let clampRaf = null;
 
     const toElement = (target) => (target && target.nodeType === 1 ? target : target?.parentElement) ?? null;
+    const hasViewportDrift = () =>
+      Math.abs(window.scrollX || 0) > 0 ||
+      Math.abs(window.pageXOffset || 0) > 0 ||
+      Math.abs(document.documentElement.scrollLeft || 0) > 0 ||
+      Math.abs(document.body?.scrollLeft || 0) > 0;
+
+    const clampXOnce = () => {
+      if (!hasViewportDrift()) return;
+      const y = window.scrollY || window.pageYOffset || 0;
+      window.scrollTo(0, y);
+      document.documentElement.scrollLeft = 0;
+      if (document.body) document.body.scrollLeft = 0;
+    };
+
+    const scheduleClampBurst = () => {
+      if (clampRaf != null) return;
+      let tries = 6;
+      const tick = () => {
+        clampXOnce();
+        tries -= 1;
+        if (tries > 0 && hasViewportDrift()) {
+          clampRaf = requestAnimationFrame(tick);
+        } else {
+          clampRaf = null;
+        }
+      };
+      clampRaf = requestAnimationFrame(tick);
+    };
 
     const onTouchStart = (e) => {
       const t = e.touches?.[0];
@@ -1204,15 +1221,34 @@ export default function App() {
       if (Math.abs(dx) <= Math.abs(dy)) return; // primarily vertical gesture
       if (allowPanX) return; // keep intended horizontal strips working
       e.preventDefault(); // block page-level sideways pan
+      scheduleClampBurst();
     };
 
+    const onTouchEnd = () => scheduleClampBurst();
+    const onScroll = () => scheduleClampBurst();
+    const onResize = () => scheduleClampBurst();
+    const onPageShow = () => scheduleClampBurst();
+
+    scheduleClampBurst();
     document.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
     document.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
+    document.addEventListener("touchend", onTouchEnd, { passive: true, capture: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    window.addEventListener("orientationchange", onResize, { passive: true });
+    window.addEventListener("pageshow", onPageShow);
+
     return () => {
       document.removeEventListener("touchstart", onTouchStart, { capture: true });
       document.removeEventListener("touchmove", onTouchMove, { capture: true });
+      document.removeEventListener("touchend", onTouchEnd, { capture: true });
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+      window.removeEventListener("pageshow", onPageShow);
+      if (clampRaf != null) cancelAnimationFrame(clampRaf);
     };
-  }, []);
+  }, [screen, searching, appliedSearchQuery, homeSegment]);
 
   useEffect(() => {
     let cancelled = false;

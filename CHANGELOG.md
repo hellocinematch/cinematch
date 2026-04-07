@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.37
+
+- **iOS overflow hardening (drift recovery):** Keep intentional horizontal scrollers (`.strip`, `.filter-row`) but aggressively re-clamp page viewport X back to `0` after touch/scroll/resize/pageshow and key screen transitions. Fixes cases where Safari remained shifted to the right even after the earlier gesture-blocking fix.
+
 ## 1.0.36
 
 - **Root-cause iOS overflow resolution:** Replace continuous scroll-clamp workaround with gesture-level prevention. Horizontal touch gestures are now blocked at page level and only allowed inside intentional x-scrollers (`.strip`, `.filter-row`). This prevents Safari viewport drift while preserving horizontal card/chip scrolling.
