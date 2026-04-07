@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.29
+
+- **Mobile horizontal-pan lock:** Prevent viewport sideways drag by setting app shell `touch-action: pan-y`; keep intentional horizontal scrolling on strips/filter chips via `touch-action: pan-x`. Fixes Home clipping/drag state where “In Theaters” and top controls appeared partially off-screen.
+
 ## 1.0.28
 
 - **Discover typing overflow fix (mobile):** Harden result cards against intrinsic-width growth while typing. `disc-card` now has `min-width:0`; `disc-title` and `disc-meta` hard-wrap long/unbroken text. This prevents horizontal pan when search results appear.

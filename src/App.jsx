@@ -455,7 +455,7 @@ const styles = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0a0a0a; }
   /* Shell: use % not 100vw — iOS Safari can treat 100vw wider than the paint area and allow sideways pan */
-  .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; min-height:100vh; min-height:100dvh; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; min-width:0; position:relative; }
+  .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; min-height:100vh; min-height:100dvh; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; min-width:0; position:relative; touch-action:pan-y; }
 
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
   .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; width:100%; }
@@ -647,6 +647,7 @@ const styles = `
     min-width:0;
     scroll-padding-left:24px;
     box-sizing:border-box;
+    touch-action:pan-x;
   }
   .strip::-webkit-scrollbar { display:none; }
   .strip-card { flex-shrink:0; width:152px; cursor:pointer; transition:transform 0.2s; }
@@ -701,7 +702,7 @@ const styles = `
   .search-input::placeholder { color:#444; }
   .search-input:focus { border-color:#555; }
   .search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:16px; pointer-events:none; }
-  .filter-row { display:flex; gap:8px; padding:10px 24px 14px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
+  .filter-row { display:flex; gap:8px; padding:10px 24px 14px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; width:100%; max-width:100%; min-width:0; box-sizing:border-box; touch-action:pan-x; }
   .filter-row::-webkit-scrollbar { display:none; }
   .filter-pill { flex-shrink:0; padding:7px 14px; border-radius:20px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; border:1px solid #2a2a2a; background:transparent; color:#888; transition:all 0.2s; white-space:nowrap; }
   .filter-pill.active { background:#e8c96a; color:#0a0a0a; border-color:#e8c96a; font-weight:500; }
