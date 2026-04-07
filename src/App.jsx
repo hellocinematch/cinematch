@@ -456,8 +456,9 @@ const styles = `
   html, body { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
   input, textarea, select { font-size:16px; }
   body { background: #0a0a0a; }
+  .viewport-shell { position:fixed; inset:0; width:100%; max-width:100%; overflow:hidden; display:flex; justify-content:center; align-items:stretch; background:#0a0a0a; }
   /* Shell: use % not 100vw — iOS Safari can treat 100vw wider than the paint area and allow sideways pan */
-  .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; min-height:100vh; min-height:100dvh; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; overflow-x:clip; min-width:0; position:relative; touch-action:pan-y; }
+  .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; height:100%; min-height:100%; max-height:100%; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; overflow-x:clip; overflow-y:hidden; min-width:0; position:relative; touch-action:pan-y; }
 
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
   .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; width:100%; }
@@ -2214,8 +2215,9 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <style>{styles}</style>
+    <div className="viewport-shell">
+      <div className="app">
+        <style>{styles}</style>
 
       {/* SPLASH */}
       {screen === "splash" && (
@@ -3028,7 +3030,7 @@ export default function App() {
       {screen === "about" && <LegalPageAbout onBack={closeLegalPage} />}
 
       {/* DETAIL */}
-      {screen === "detail" && selectedMovie && (() => {
+        {screen === "detail" && selectedMovie && (() => {
         const { movie, prediction } = selectedMovie;
         const myRating = userRatings[movie.id];
         return (
@@ -3146,7 +3148,8 @@ export default function App() {
             </div>
           </div>
         );
-      })()}
+        })()}
+      </div>
     </div>
   );
 }
