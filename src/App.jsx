@@ -405,7 +405,7 @@ function tmdbOnlyRec(movie) {
   };
 }
 
-/** Supabase recovery links issue a JWT whose `amr` includes `recovery` until `updateUser({ password })` runs. */
+/** Supabase recovery sessions: JWT `amr` includes recovery (string or { method }) until `updateUser({ password })` runs. */
 function isPasswordRecoverySession(session) {
   if (!session?.access_token) return false;
   try {
@@ -415,15 +415,36 @@ function isPasswordRecoverySession(session) {
     const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
     const payload = JSON.parse(atob(padded));
     const amr = payload.amr;
-    if (!Array.isArray(amr)) return false;
-    return amr.some(
-      entry =>
-        entry === "recovery" ||
-        (typeof entry === "object" && entry !== null && entry.method === "recovery"),
-    );
+    if (Array.isArray(amr)) {
+      const isRec = amr.some(
+        entry =>
+          entry === "recovery" ||
+          (typeof entry === "object" && entry !== null && entry.method === "recovery"),
+      );
+      if (isRec) return true;
+    }
+    // Fallback: some issuers stringify or nest differently
+    const blob = JSON.stringify(payload);
+    if (/\brecovery\b/.test(blob) && /"amr"/.test(blob)) return true;
+    return false;
   } catch {
     return false;
   }
+}
+
+function urlIndicatesPasswordRecovery() {
+  if (typeof window === "undefined") return false;
+  const q = new URLSearchParams(window.location.search);
+  if (q.get("recovery") === "1") return true;
+  const h = window.location.hash;
+  return /type=recovery(?:&|$|#|%26)/.test(h) || /type%3[Dd]recovery/.test(window.location.search + h);
+}
+
+/** `redirectTo` for reset emails — add ?recovery=1 so PKCE landings work even if JWT shape differs (whitelist this URL in Supabase). */
+function passwordRecoveryRedirectTo() {
+  const u = new URL(window.location.origin);
+  u.searchParams.set("recovery", "1");
+  return u.toString();
 }
 
 // ---------------------------------------------------------------------------
@@ -1012,27 +1033,37 @@ export default function App() {
   const totalCards = cardOrder.length;
 
   useEffect(() => {
-    function routeRecovery(session) {
+    function routeRecovery() {
       setScreen("auth");
       setAuthMode("reset");
       setAuthError("");
       setAuthNotice("Recovery link verified. Set a new password to continue.");
     }
+    function goAppFromSplash() {
+      setScreen(prev => (prev === "splash" || prev === "auth" ? "loading-catalogue" : prev));
+    }
+    // Hydrate user; do not navigate to home here — avoids racing PASSWORD_RECOVERY (PKCE) and overwriting the reset screen.
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session?.user) return;
-      setUser(session.user);
-      const url = typeof window !== "undefined" ? `${window.location.hash}${window.location.search}` : "";
-      const urlRecovery = /type=recovery(?:&|$|#)/.test(url);
-      // Do not send recovery sessions to the app — getSession() can race PASSWORD_RECOVERY and skip the reset screen.
-      if (urlRecovery || isPasswordRecoverySession(session)) {
-        routeRecovery(session);
-        return;
+      if (session?.user) setUser(session.user);
+      if (session?.user && (urlIndicatesPasswordRecovery() || isPasswordRecoverySession(session))) {
+        routeRecovery();
       }
-      setScreen("loading-catalogue");
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || (session && isPasswordRecoverySession(session) && (event === "SIGNED_IN" || event === "INITIAL_SESSION"))) {
-        routeRecovery(session);
+      if (event === "PASSWORD_RECOVERY") {
+        routeRecovery();
+        setUser(session?.user ?? null);
+        return;
+      }
+      if (session?.user && (urlIndicatesPasswordRecovery() || isPasswordRecoverySession(session)) && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+        routeRecovery();
+        setUser(session.user);
+        return;
+      }
+      if (session?.user && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+        setUser(session.user);
+        goAppFromSplash();
+        return;
       }
       setUser(session?.user ?? null);
     });
@@ -1336,7 +1367,7 @@ export default function App() {
     }
     setAuthLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: passwordRecoveryRedirectTo(),
     });
     setAuthLoading(false);
     if (error) {
