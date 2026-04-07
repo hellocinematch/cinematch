@@ -1408,49 +1408,27 @@ export default function App() {
       setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
     }
 
-    const { data: profileRow } = await supabase.from("profiles").select("streaming_provider_ids, show_genre_ids, show_region_keys").eq("id", user.id).maybeSingle();
-    let providerIds = [];
-    if (Array.isArray(profileRow?.streaming_provider_ids) && profileRow.streaming_provider_ids.length) {
-      providerIds = profileRow.streaming_provider_ids;
-    } else {
-      try {
-        const raw = localStorage.getItem(`cinematch_streaming_providers_${user.id}`);
-        if (raw) providerIds = JSON.parse(raw);
-      } catch (_) { /* ignore */ }
-    }
-    setSelectedStreamingProviderIds(Array.isArray(providerIds) ? providerIds.filter(n => typeof n === "number") : []);
-    if (Array.isArray(profileRow?.show_genre_ids) && profileRow.show_genre_ids.length) {
-      setShowGenreIds(profileRow.show_genre_ids.filter(n => typeof n === "number"));
-    } else {
-      try {
-        const raw = localStorage.getItem(`cinematch_show_genres_${user.id}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          setShowGenreIds(Array.isArray(parsed) ? parsed.filter(n => typeof n === "number") : []);
-        } else {
-          setShowGenreIds([]);
-        }
-      } catch (_) {
-        setShowGenreIds([]);
-      }
-    }
-    if (Array.isArray(profileRow?.show_region_keys) && profileRow.show_region_keys.length) {
-      const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
-      setShowRegionKeys(profileRow.show_region_keys.filter(k => typeof k === "string" && allowed.has(k)));
-    } else {
-      try {
-        const raw = localStorage.getItem(`cinematch_show_regions_${user.id}`);
-        const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          setShowRegionKeys(Array.isArray(parsed) ? parsed.filter(k => typeof k === "string" && allowed.has(k)) : []);
-        } else {
-          setShowRegionKeys([]);
-        }
-      } catch (_) {
-        setShowRegionKeys([]);
-      }
-    }
+    const { data: profileRow } = await supabase
+      .from("profiles")
+      .select("streaming_provider_ids, show_genre_ids, show_region_keys")
+      .eq("id", user.id)
+      .maybeSingle();
+    const allowedRegions = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
+    setSelectedStreamingProviderIds(
+      Array.isArray(profileRow?.streaming_provider_ids)
+        ? profileRow.streaming_provider_ids.filter(n => typeof n === "number")
+        : [],
+    );
+    setShowGenreIds(
+      Array.isArray(profileRow?.show_genre_ids)
+        ? profileRow.show_genre_ids.filter(n => typeof n === "number")
+        : [],
+    );
+    setShowRegionKeys(
+      Array.isArray(profileRow?.show_region_keys)
+        ? profileRow.show_region_keys.filter(k => typeof k === "string" && allowedRegions.has(k))
+        : [],
+    );
     return { ratingCount: ratingsData?.length ?? 0 };
   }
 
@@ -1474,9 +1452,6 @@ export default function App() {
     if (!user) return;
     const clean = [...new Set(ids.filter(n => typeof n === "number"))].sort((a, b) => a - b);
     setSelectedStreamingProviderIds(clean);
-    try {
-      localStorage.setItem(`cinematch_streaming_providers_${user.id}`, JSON.stringify(clean));
-    } catch (_) { /* ignore */ }
     const { error } = await supabase.from("profiles").upsert(
       { id: user.id, streaming_provider_ids: clean },
       { onConflict: "id" },
@@ -1488,9 +1463,6 @@ export default function App() {
     if (!user) return;
     const clean = [...new Set(ids.filter(n => typeof n === "number"))].sort((a, b) => a - b);
     setShowGenreIds(clean);
-    try {
-      localStorage.setItem(`cinematch_show_genres_${user.id}`, JSON.stringify(clean));
-    } catch (_) { /* ignore */ }
     const { error } = await supabase.from("profiles").upsert(
       { id: user.id, show_genre_ids: clean },
       { onConflict: "id" },
@@ -1503,9 +1475,6 @@ export default function App() {
     const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
     const clean = [...new Set(keys.filter(k => typeof k === "string" && allowed.has(k)))].sort();
     setShowRegionKeys(clean);
-    try {
-      localStorage.setItem(`cinematch_show_regions_${user.id}`, JSON.stringify(clean));
-    } catch (_) { /* ignore */ }
     const { error } = await supabase.from("profiles").upsert(
       { id: user.id, show_region_keys: clean },
       { onConflict: "id" },

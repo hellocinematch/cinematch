@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.22
+
+- **Profile settings sync:** Remove localStorage fallback for streaming/genre/region preferences. App now always loads these from `profiles` in Supabase (DB is the single source of truth across devices). Saves still upsert to `profiles`.
+
 ## 1.0.21
 
 - **Discover/mobile overflow fix:** Tighten **`page-topbar`** on narrow screens (2-column grid, smaller brand cluster footprint) so entering Discover does not push horizontal pan state across screens. Also hard-wrap **`search-status`** for long queries and enforce `min-width:0` for Discover header/search box.
