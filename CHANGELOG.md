@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.7
+
+- **Splash:** Center the wordmark with the **Get Started** / **Sign In** buttons (splash-only `object-position` + light horizontal nudge; `splash-logo` uses full width for alignment).
+
 ## 1.0.6
 
 - **Auth:** Sign-in / sign-up form constrained on **desktop** (`max-width` + centered) so email, password, and primary button are not full viewport width.

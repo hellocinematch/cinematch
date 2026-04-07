@@ -416,14 +416,15 @@ const styles = `
   .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; min-height:100vh; min-height:100dvh; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; min-width:0; }
 
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
-  .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; }
+  .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; width:100%; }
   .app-brand.brand-logo { display:block; max-width:100%; object-fit:contain; object-position:left center; }
   .app-brand-button { display:block; line-height:0; padding:0; margin:0; border:none; background:none; cursor:pointer; font:inherit; color:inherit; text-align:left; }
   .app-brand-button:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:4px; }
   /* Mobile-first header sizing by width to prevent right-side overflow with wide logo/tagline assets. */
   .app-brand.brand-logo--header { width:min(220px, calc(100vw - 124px)); height:auto; }
   /* Taller on splash so wordmark + tagline stay readable (full logo viewBox 400×120). */
-  .app-brand.brand-logo--splash { width:min(86vw, 380px); height:auto; }
+  /* Wordmark is left-heavy in the asset; nudge so optical center lines up with centered 220px buttons. */
+  .app-brand.brand-logo--splash { width:min(86vw, 380px); height:auto; object-position:center center; transform:translateX(4.5%); }
   .home-header .app-brand { margin-bottom:10px; }
   .discover-header { padding:16px 24px 12px; }
   .mood-header { padding:16px 24px 16px; }
