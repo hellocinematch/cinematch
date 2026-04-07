@@ -455,7 +455,7 @@ const styles = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0a0a0a; }
   /* Shell: use % not 100vw — iOS Safari can treat 100vw wider than the paint area and allow sideways pan */
-  .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; min-height:100vh; min-height:100dvh; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; min-width:0; position:relative; touch-action:pan-y; }
+  .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; min-height:100vh; min-height:100dvh; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; overflow-x:clip; min-width:0; position:relative; touch-action:pan-y; }
 
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
   .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; width:100%; }
@@ -528,7 +528,7 @@ const styles = `
   .pref-btn:hover { background:#f0d880; }
   .pref-btn:disabled { opacity:0.4; cursor:default; }
 
-  .onboarding { min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; background:#0a0a0a; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .onboarding { min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; background:#0a0a0a; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .ob-header { padding:max(48px, env(safe-area-inset-top, 0px)) 20px 12px; display:flex; flex-direction:column; gap:6px; width:100%; max-width:min(100%, 440px); margin:0 auto; box-sizing:border-box; }
   .ob-header .topbar-brand-cluster { align-self:flex-start; }
   .ob-step { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#e8c96a; }
@@ -574,7 +574,7 @@ const styles = `
     .card-poster { max-height: min(28vh, 360px); }
   }
 
-  .home { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
+  .home { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
   .home-topbar { display:none; }
   .home-desktop-nav-row { display:none; }
   /* Shared top chrome on Discover / Mood / Profile / Detail / Rated (not on Home — Home uses home-header + tagline). */
@@ -695,7 +695,7 @@ const styles = `
   .legal-p a { color:#e8c96a; }
   .legal-muted { color:#666; font-size:13px; }
 
-  .discover { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
+  .discover { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
   .discover-title { font-family:'DM Serif Display',serif; font-size:30px; color:#ddd7cd; }
   .search-box { position:relative; margin-top:12px; min-width:0; }
   .search-input { width:100%; min-width:0; background:#141414; border:1px solid #2a2a2a; border-radius:10px; padding:12px 16px 12px 42px; font-family:'DM Sans',sans-serif; font-size:14px; color:#f0ebe0; outline:none; transition:border-color 0.2s; }
@@ -724,7 +724,7 @@ const styles = `
   .disc-empty { padding:48px 24px; text-align:center; }
   .disc-empty-text { font-size:14px; color:#444; }
 
-  .mood { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
+  .mood { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
   .mood-back { background:none; border:none; color:#666; font-size:14px; cursor:pointer; font-family:'DM Sans',sans-serif; margin-bottom:16px; display:block; padding:0; }
   .mood-back:hover { color:#ccc; }
   .mood-step { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#e8c96a; margin-bottom:8px; }
@@ -744,7 +744,7 @@ const styles = `
   .mood-skip { background:transparent; color:#666; border:1px solid #2a2a2a; padding:13px; font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; border-radius:2px; transition:all 0.2s; }
   .mood-skip:hover { border-color:#555; color:#aaa; }
 
-  .mood-results { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
+  .mood-results { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
   .mood-results-back { background:none; border:none; color:#666; font-size:20px; cursor:pointer; padding:0; }
   .mood-results-title { font-family:'DM Serif Display',serif; font-size:26px; color:#f0ebe0; }
   .mood-result-card { margin:0 24px 16px; border-radius:16px; overflow:hidden; border:1px solid #1e1e1e; background:#141414; }
@@ -780,7 +780,7 @@ const styles = `
   .wtw-link { display:block; margin-top:10px; font-size:12px; color:#e8c96a; text-decoration:none; }
   .wtw-link:hover { text-decoration:underline; }
 
-  .detail { min-height:100vh; min-height:100dvh; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-y:auto; min-width:0; position:relative; width:100%; max-width:100%; }
+  .detail { min-height:100vh; min-height:100dvh; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-x:clip; overflow-y:auto; min-width:0; position:relative; width:100%; max-width:100%; }
   /* Poster column (desktop): one Discover card width. Content column: wider; rate controls capped separately. */
   .detail-poster-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
   .detail-content-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
@@ -819,7 +819,7 @@ const styles = `
   .no-recs { margin:0 24px; padding:28px; border:1px dashed #222; border-radius:12px; text-align:center; }
   .no-recs-text { font-size:13px; color:#444; line-height:1.6; }
 
-  .profile { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
+  .profile { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; min-width:0; width:100%; max-width:100%; }
   .profile-top { display:flex; gap:16px; align-items:flex-start; padding:52px 24px 20px; }
   .profile .profile-top { padding:8px 24px 20px; }
   .profile-top-text { min-width:0; }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.30
+
+- **Mobile overflow hardening:** Use `overflow-x: clip` (with existing `hidden`) at root/app/screen shells to prevent Safari from retaining sideways viewport drift. Horizontal strip/filter scrolling remains enabled.
+
 ## 1.0.29
 
 - **Mobile horizontal-pan lock:** Prevent viewport sideways drag by setting app shell `touch-action: pan-y`; keep intentional horizontal scrolling on strips/filter chips via `touch-action: pan-x`. Fixes Home clipping/drag state where “In Theaters” and top controls appeared partially off-screen.
