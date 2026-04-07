@@ -453,9 +453,11 @@ function passwordRecoveryRedirectTo() {
 const styles = `
   ${FONTS}
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* iOS focus hardening: keep Safari from inflating text/zooming inputs on focus. */
   html, body { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
   input, textarea, select { font-size:16px; }
   body { background: #0a0a0a; }
+  /* Fixed clipping shell: visual viewport shifts stay inside app bounds and cannot expand page width. */
   .viewport-shell { position:fixed; inset:0; width:100%; max-width:100%; overflow:hidden; display:flex; justify-content:center; align-items:stretch; background:#0a0a0a; }
   /* Shell: use % not 100vw — iOS Safari can treat 100vw wider than the paint area and allow sideways pan */
   .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; height:100%; min-height:100%; max-height:100%; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; overflow-x:clip; overflow-y:hidden; min-width:0; position:relative; touch-action:pan-y; }
@@ -704,6 +706,7 @@ const styles = `
   .search-submit-btn { position:absolute; left:8px; top:50%; transform:translateY(-50%); width:28px; height:28px; border:none; background:transparent; color:#888; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; }
   .search-submit-btn:active { opacity:0.8; }
   .search-submit-btn .search-icon { position:static; transform:none; font-size:16px; }
+  /* Discover/Rated search keeps 16px + native reset to avoid iOS focus expansion. */
   .search-input { width:100%; min-width:0; background:#141414; border:1px solid #2a2a2a; border-radius:10px; padding:12px 16px 12px 42px; font-family:'DM Sans',sans-serif; font-size:16px; line-height:1.2; color:#f0ebe0; outline:none; transition:border-color 0.2s; -webkit-appearance:none; appearance:none; }
   .search-input::placeholder { color:#444; }
   .search-input:focus { border-color:#555; }

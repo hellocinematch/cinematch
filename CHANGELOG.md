@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+- **iOS viewport expansion hardening:** Added a fixed `viewport-shell` wrapper so visual viewport shifts cannot expand the app beyond intended mobile width.
+- **Input-focus stability:** Enforced iOS-safe form control sizing/text behavior (`text-size-adjust` + 16px controls) and updated auth/search input styling so focusing fields does not trigger persistent layout expansion.
+- **Discover-specific fix:** Raised `.search-input` to 16px with native appearance reset to stop Safari focus expansion on Discover/Rated search bars.
+
 ## 1.0.37
 
 - **iOS overflow hardening (drift recovery):** Keep intentional horizontal scrollers (`.strip`, `.filter-row`) but aggressively re-clamp page viewport X back to `0` after touch/scroll/resize/pageshow and key screen transitions. Fixes cases where Safari remained shifted to the right even after the earlier gesture-blocking fix.
