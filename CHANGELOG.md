@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.11
+
+- **Onboarding:** New accounts that **sign in** (or confirm email then sign in) now get the same flow as immediate sign-up: if onboarding is not finished, load goes to **cinema preference** then ratings. Completion is stored in auth **`user_metadata.onboarding_complete`**; existing users with **at least one saved rating** are treated as already onboarded.
+
 ## 1.0.10
 
 - **Auth / recovery:** Password reset for **PKCE**: stop `getSession()` from overwriting the reset screen; route recovery via `PASSWORD_RECOVERY`, URL `?recovery=1` (add this redirect URL in Supabase), and stronger JWT recovery detection. Enter the app from splash/auth only through `onAuthStateChange`.

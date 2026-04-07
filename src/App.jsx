@@ -1197,9 +1197,28 @@ export default function App() {
   }, [user, userRatings, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, topPickOffset]);
 
   useEffect(() => {
-    if (screen === "loading-catalogue" && catalogue.length > 0 && user) {
-      loadUserData().then(() => { setScreen("home"); setNavTab("home"); });
-    }
+    if (screen !== "loading-catalogue" || catalogue.length === 0 || !user) return;
+    let cancelled = false;
+    (async () => {
+      const { ratingCount } = await loadUserData();
+      if (cancelled) return;
+      const { data: authData } = await supabase.auth.getUser();
+      const meta = authData?.user?.user_metadata;
+      const onboardingDone =
+        meta?.onboarding_complete === true ||
+        ratingCount > 0; /* existing accounts before this flag */
+      if (!onboardingDone) {
+        setObStep(0);
+        setCinemaPreference(null);
+        setOtherCinema(null);
+        setObCatalogue(catalogue);
+        setScreen("pref-primary");
+        return;
+      }
+      setScreen("home");
+      setNavTab("home");
+    })();
+    return () => { cancelled = true; };
   }, [screen, catalogue, user]);
 
   /** Re-merge watchlist when catalogue grows (streaming, search) so posters resolve from full movie rows. */
@@ -1215,7 +1234,7 @@ export default function App() {
   }, [user, catalogue]);
 
   async function loadUserData() {
-    if (!user) return;
+    if (!user) return { ratingCount: 0 };
     const [{ data: ratingsData }, { data: watchlistData }] = await Promise.all([
       supabase.from("ratings").select("*").eq("user_id", user.id),
       supabase.from("watchlist").select("*").eq("user_id", user.id),
@@ -1271,6 +1290,23 @@ export default function App() {
       } catch (_) {
         setShowRegionKeys([]);
       }
+    }
+    return { ratingCount: ratingsData?.length ?? 0 };
+  }
+
+  /** Persisted on auth user so sign-in / new tab can skip onboarding after first completion. */
+  async function markOnboardingComplete() {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.auth.updateUser({ data: { onboarding_complete: true } });
+      if (error) {
+        console.warn("Could not persist onboarding flag:", error.message);
+        return;
+      }
+      const u = data?.user;
+      if (u) setUser(u);
+    } catch (e) {
+      console.warn("Could not persist onboarding flag:", e);
     }
   }
 
@@ -1596,6 +1632,7 @@ export default function App() {
     if (obStep < obMovies.length - 1) {
       setObStep(s => s + 1);
     } else {
+      void markOnboardingComplete();
       if (screen === "rate-more") { setNavTab("home"); setScreen("home"); }
       else { setScreen("loading-recs"); setTimeout(() => { setNavTab("home"); setScreen("home"); }, 2200); }
     }
@@ -1660,6 +1697,8 @@ export default function App() {
   }
 
   function goHome() {
+    const s = screenRef.current;
+    if (s === "onboarding" || s === "rate-more") void markOnboardingComplete();
     setNavTab("home");
     setScreen("home");
     setSelected(null);
@@ -2363,10 +2402,10 @@ export default function App() {
             <input className="slider" type="range" min="1" max="10" step="0.5" value={sliderVal}
               onChange={e => { setSliderVal(parseFloat(e.target.value)); setSliderTouched(true); }} />
             <div className="ob-actions">
-              <button className="btn-confirm" onClick={() => { confirmRating(); setSliderVal(7); setSliderTouched(false); if (obStep >= obMovies.length - 1) { setNavTab("home"); setScreen("home"); } }} disabled={!sliderTouched}>Confirm Rating</button>
-              <button className="btn-skip" onClick={() => { advanceOb(); if (obStep >= obMovies.length - 1) { setNavTab("home"); setScreen("home"); } }}>Skip</button>
+              <button className="btn-confirm" onClick={() => { confirmRating(); setSliderVal(7); setSliderTouched(false); }} disabled={!sliderTouched}>Confirm Rating</button>
+              <button className="btn-skip" onClick={() => advanceOb()}>Skip</button>
             </div>
-            <button className="btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={() => { setNavTab("home"); setScreen("home"); }}>Done for now</button>
+            <button className="btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={() => { void markOnboardingComplete(); setNavTab("home"); setScreen("home"); }}>Done for now</button>
           </div>
         </div>
       )}
