@@ -789,7 +789,7 @@ const styles = `
   .wtw-link { display:block; margin-top:10px; font-size:12px; color:#e8c96a; text-decoration:none; }
   .wtw-link:hover { text-decoration:underline; }
 
-  .detail { min-height:100vh; min-height:100dvh; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-x:clip; overflow-y:auto; min-width:0; position:relative; width:100%; max-width:100%; }
+  .detail { height:100%; min-height:0; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; position:relative; width:100%; max-width:100%; }
   /* Poster column (desktop): one Discover card width. Content column: wider; rate controls capped separately. */
   .detail-poster-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
   .detail-content-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
