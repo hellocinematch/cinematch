@@ -4,10 +4,7 @@ import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./l
 import { supabase } from "./supabase";
 
 // Shown on Profile as "Cinemastro v…". See CHANGELOG.md for release notes.
-// v1.0.1: Title detail — removed in-app "← Back"; page-topbar (wordmark + avatar); sticky + safe-area.
-// v1.0.2: history.pushState when opening title detail so browser Back returns in-app.
-// v1.0.3: Footer (About, Privacy, Terms, Contact, ©, TMDB attribution) + placeholder legal pages;
-//   legal screens use pushState + popstate like detail.
+// v1.0.4: Home tagline only on Picks segment; More/Friends omit hero line (mobile + desktop).
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
@@ -537,6 +534,8 @@ const styles = `
   .home-topnav { display:flex; gap:3px; padding:4px; background:#141414; border-radius:11px; border:1px solid #222; width:100%; max-width:620px; }
   .home-topnav .home-segment { flex:1; }
   .home-header { padding:48px 24px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; }
+  /* More / Friends: tighter mobile hero without tagline (wordmark + avatar only). */
+  .home-header--no-picks-tagline { padding-top:28px; padding-bottom:12px; }
   .home-hero-copy { padding:0; display:inline-block; max-width:100%; }
   .home-greeting { font-family:'DM Sans',sans-serif; font-size:52px; font-weight:600; color:#f0ebe0; margin-top:2px; line-height:1.02; letter-spacing:-0.6px; }
   .home-subtitle { font-family:'DM Serif Display',serif; font-size:42px; font-weight:400; color:#cdcdc8; margin-top:8px; line-height:1.1; max-width:960px; letter-spacing:-0.2px; }
@@ -812,6 +811,8 @@ const styles = `
     .home .section-divider { margin:0 32px 10px !important; }
     .home-desktop-nav-row .home-topnav { max-width:620px; }
     .home-header { padding:18px 32px 10px; display:block; }
+    /* Desktop: tagline-only strip hidden on More/Friends (logo + avatar stay in home-topbar). */
+    .home-header--no-picks-tagline { display:none; }
     .home-header .app-brand,
     .home-header .avatar-wrap { display:none; }
     .home-greeting { font-size:56px; }
@@ -1972,12 +1973,14 @@ export default function App() {
             <div />
             <AccountAvatarMenu />
           </div>
-          <div className="home-header">
+          <div className={`home-header ${homeSegment !== "picks" ? "home-header--no-picks-tagline" : ""}`}>
             <div className="home-hero">
               <AppBrand />
-              <div className="home-hero-copy">
-                <div className="home-subtitle">Movies and Shows - Picked for your TASTE!</div>
-              </div>
+              {homeSegment === "picks" && (
+                <div className="home-hero-copy">
+                  <div className="home-subtitle">Movies and Shows - Picked for your TASTE!</div>
+                </div>
+              )}
             </div>
             <AccountAvatarMenu />
           </div>
