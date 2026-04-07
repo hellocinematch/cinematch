@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.31
+
+- **Discover results overflow fix:** Use `grid-template-columns: repeat(2, minmax(0, 1fr))` for mobile Discover results and constrain cards to `width/max-width:100%`. Prevents result columns from expanding horizontally as search results populate.
+
 ## 1.0.30
 
 - **Mobile overflow hardening:** Use `overflow-x: clip` (with existing `hidden`) at root/app/screen shells to prevent Safari from retaining sideways viewport drift. Horizontal strip/filter scrolling remains enabled.
