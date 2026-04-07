@@ -1200,23 +1200,32 @@ export default function App() {
     if (screen !== "loading-catalogue" || catalogue.length === 0 || !user) return;
     let cancelled = false;
     (async () => {
-      const { ratingCount } = await loadUserData();
-      if (cancelled) return;
-      const { data: authData } = await supabase.auth.getUser();
-      const meta = authData?.user?.user_metadata;
-      const onboardingDone =
-        meta?.onboarding_complete === true ||
-        ratingCount > 0; /* existing accounts before this flag */
-      if (!onboardingDone) {
-        setObStep(0);
-        setCinemaPreference(null);
-        setOtherCinema(null);
-        setObCatalogue(catalogue);
-        setScreen("pref-primary");
-        return;
+      try {
+        const { ratingCount } = await loadUserData();
+        if (cancelled) return;
+        const { data: authData } = await supabase.auth.getUser();
+        const { data: sess } = await supabase.auth.getSession();
+        const meta = authData?.user?.user_metadata ?? sess?.session?.user?.user_metadata;
+        const raw = meta?.onboarding_complete;
+        const flaggedDone = raw === true || raw === "true";
+        const onboardingDone = flaggedDone || ratingCount > 0; /* ratings = legacy accounts */
+        if (!onboardingDone) {
+          setObStep(0);
+          setCinemaPreference(null);
+          setOtherCinema(null);
+          setObCatalogue(catalogue);
+          setScreen("pref-primary");
+          return;
+        }
+        setScreen("home");
+        setNavTab("home");
+      } catch (e) {
+        console.warn("Post-login routing failed:", e);
+        if (!cancelled) {
+          setObCatalogue(catalogue);
+          setScreen("pref-primary");
+        }
       }
-      setScreen("home");
-      setNavTab("home");
     })();
     return () => { cancelled = true; };
   }, [screen, catalogue, user]);
@@ -1380,9 +1389,15 @@ export default function App() {
     if (error) { setAuthError(error.message); return; }
     if (data.user) {
       await supabase.from("profiles").update({ name: authName }).eq("id", data.user.id);
-      setUser(data.user);
-      setScreen("pref-primary"); // Go to cinema preference screen first
     }
+    // Email confirmation: no session yet — stay on auth and ask user to confirm, then sign in.
+    if (!data.session) {
+      setAuthNotice("Check your email to confirm your account, then sign in. Onboarding starts after your first login.");
+      return;
+    }
+    setUser(data.user);
+    // Same path as sign-in: wait for catalogue in loading-catalogue before pref/onboarding (avoids empty obMovies).
+    setScreen("loading-catalogue");
   }
 
   async function handleSignIn() {
@@ -1448,6 +1463,7 @@ export default function App() {
 
   // Handle cinema preference confirmation
   async function confirmPrimaryPreference() {
+    if (catalogue.length === 0) return;
     if (cinemaPreference === "hollywood") {
       // Use English catalogue only for onboarding
       setObCatalogue(catalogue);
@@ -1461,6 +1477,7 @@ export default function App() {
   // Handle secondary cinema selection and build mixed onboarding catalogue
   async function confirmSecondaryPreference() {
     if (!otherCinema) {
+      if (catalogue.length === 0) return;
       setObCatalogue(catalogue);
       setScreen("onboarding");
       return;
@@ -2047,7 +2064,10 @@ export default function App() {
               </div>
             </div>
           </div>
-          <button className="pref-btn" disabled={!cinemaPreference} onClick={confirmPrimaryPreference}>
+          {catalogue.length === 0 && (
+            <p className="pref-sub" style={{ marginTop: 16, color: "#888" }}>Loading catalogue…</p>
+          )}
+          <button className="pref-btn" disabled={!cinemaPreference || catalogue.length === 0} onClick={confirmPrimaryPreference}>
             Continue →
           </button>
         </div>
@@ -2095,6 +2115,13 @@ export default function App() {
       {screen === "fetching" && catalogue.length > 0 && (() => { setTimeout(() => setScreen("onboarding"), 100); return null; })()}
 
       {/* ONBOARDING */}
+      {screen === "onboarding" && !obMovie && (
+        <div className="loading">
+          <div className="loading-ring" />
+          <div className="loading-title">Preparing titles…</div>
+          <div className="loading-sub">One moment</div>
+        </div>
+      )}
       {screen === "onboarding" && obMovie && (
         <div className="onboarding">
           <div className="ob-header">
