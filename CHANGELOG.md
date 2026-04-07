@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.21
+
+- **Discover/mobile overflow fix:** Tighten **`page-topbar`** on narrow screens (2-column grid, smaller brand cluster footprint) so entering Discover does not push horizontal pan state across screens. Also hard-wrap **`search-status`** for long queries and enforce `min-width:0` for Discover header/search box.
+
 ## 1.0.20
 
 - **Home (mobile):** Picks tagline uses **fluid `font-size`** (`clamp`) so it scales with viewport width; **desktop** tagline unchanged.
