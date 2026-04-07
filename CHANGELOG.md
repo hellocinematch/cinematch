@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.15
+
+- **Detail (desktop):** Poster stays **one grid-card wide**; **title, prediction, synopsis, where to watch** use a **wider column** (two Discover cards + gap, same math as `.disc-grid`). **Slider + rating buttons** capped at **380px** centered. Mobile: unchanged full-width flow (rules scoped to `min-width: 900px`).
+
 ## 1.0.14
 
 - **Detail (desktop):** Main column matches **one Discover grid card width** (`detail-inner` uses the same `calc` as `.disc-grid` for 4- and 5-column breakpoints). Poster uses **2:3** aspect ratio and card-style border/radius like grid posters. Mobile unchanged.

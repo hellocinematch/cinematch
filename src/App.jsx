@@ -756,8 +756,10 @@ const styles = `
   .wtw-link:hover { text-decoration:underline; }
 
   .detail { min-height:100vh; min-height:100dvh; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-y:auto; min-width:0; position:relative; }
-  /* Desktop: same column width as one card in Discover grid (see .disc-grid breakpoints). */
-  .detail-inner { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
+  /* Poster column (desktop): one Discover card width. Content column: wider; rate controls capped separately. */
+  .detail-poster-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
+  .detail-content-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
+  .detail-rate-section { width:100%; }
   .d-poster { height:320px; position:relative; overflow:hidden; }
   .d-poster img { width:100%; height:100%; object-fit:cover; }
   .d-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:100px; background:#141414; }
@@ -891,18 +893,22 @@ const styles = `
     .strip-genre { font-size:12px; }
     .filter-row { padding-left:32px; padding-right:32px; }
     .disc-grid { padding:0 32px; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
-    /* One discover-column width: (shell − grid padding − gaps) / columns */
-    .detail-inner {
+    /* Match Discover: one card wide, two cards + gap for copy (readable line length). */
+    .detail-poster-wrap {
       max-width:calc((min(100%, var(--shell)) - 64px - 48px) / 4);
     }
-    .detail-inner .d-poster {
+    .detail-poster-wrap .d-poster {
       height:auto;
       aspect-ratio:2/3;
       border-radius:12px;
       border:1px solid #1e1e1e;
       box-sizing:border-box;
     }
-    .detail-inner .d-body { padding-left:16px; padding-right:16px; }
+    .detail-content-wrap {
+      max-width:calc((min(100%, var(--shell)) - 112px) / 2 + 16px);
+    }
+    .detail-content-wrap .d-body { padding-left:20px; padding-right:20px; }
+    .detail-rate-section { max-width:380px; margin-left:auto; margin-right:auto; }
     .profile-top,
     .profile-settings,
     .profile-section,
@@ -919,8 +925,11 @@ const styles = `
     .strip-card { width:198px; }
     .strip-poster { width:198px; height:276px; }
     .disc-grid { grid-template-columns:repeat(5, minmax(0, 1fr)); gap:18px; }
-    .detail-inner {
+    .detail-poster-wrap {
       max-width:calc((min(100%, var(--shell)) - 64px - 72px) / 5);
+    }
+    .detail-content-wrap {
+      max-width:calc(2 * (min(100%, var(--shell)) - 64px - 72px) / 5 + 18px);
     }
   }
 
@@ -2823,107 +2832,111 @@ export default function App() {
               <div />
               <AccountAvatarMenu />
             </div>
-            <div className="detail-inner">
-            <div className="d-poster">
-              {movie.backdrop || movie.poster ? <img src={movie.backdrop || movie.poster} alt={movie.title} /> : <div className="d-poster-fallback">🎬</div>}
-              <div className="d-overlay" />
-            </div>
-            <div className="d-body">
-              <div className="d-type-genre">
-                <span className="d-type-pill">{movie.type === "movie" ? "Movie" : "TV Show"}</span>
-                {movie.year && <span className="d-genre-text">{movie.year}</span>}
+            <div className="detail-poster-wrap">
+              <div className="d-poster">
+                {movie.backdrop || movie.poster ? <img src={movie.backdrop || movie.poster} alt={movie.title} /> : <div className="d-poster-fallback">🎬</div>}
+                <div className="d-overlay" />
               </div>
-              <div className="d-title">{movie.title}</div>
-              {prediction && (
-                <div className="d-pred-box">
-                  <div>
-                    <div className="d-pred-label">Predicted rating for you</div>
-                    <div className="d-pred-sub">Based on {prediction.neighborCount} taste {prediction.neighborCount === 1 ? "match" : "matches"}</div>
-                    <span className={confClass(prediction.confidence)}>{confLabel(prediction.confidence)}</span>
-                  </div>
-                  <div>
-                    <div className="d-pred-val">{prediction.predicted}</div>
-                    <div className="d-pred-range">{prediction.low}–{prediction.high}</div>
-                    {movie.tmdbRating && <div className="d-tmdb">TMDB avg: {movie.tmdbRating}</div>}
-                  </div>
+            </div>
+            <div className="detail-content-wrap">
+              <div className="d-body">
+                <div className="d-type-genre">
+                  <span className="d-type-pill">{movie.type === "movie" ? "Movie" : "TV Show"}</span>
+                  {movie.year && <span className="d-genre-text">{movie.year}</span>}
                 </div>
-              )}
-              {!prediction && (
-                <div>
-                  {movie.tmdbRating && (
-                    <div className="d-pred-box" style={{ marginBottom: 10 }}>
-                      <div>
-                        <div className="d-pred-label">TMDB Average Rating</div>
-                        <div className="d-pred-sub">From the broader community</div>
-                      </div>
-                      <div className="d-pred-val" style={{ fontSize: 32 }}>{movie.tmdbRating}</div>
-                    </div>
-                  )}
+                <div className="d-title">{movie.title}</div>
+                {prediction && (
                   <div className="d-pred-box">
                     <div>
-                      <div className="d-pred-label">Predicted Rating for You</div>
-                      <div className="d-pred-sub">Rate more titles to unlock</div>
+                      <div className="d-pred-label">Predicted rating for you</div>
+                      <div className="d-pred-sub">Based on {prediction.neighborCount} taste {prediction.neighborCount === 1 ? "match" : "matches"}</div>
+                      <span className={confClass(prediction.confidence)}>{confLabel(prediction.confidence)}</span>
                     </div>
-                    <div className="d-pred-val" style={{ fontSize: 32, color: "#555" }}>TBD</div>
-                  </div>
-                </div>
-              )}
-              <div className="d-synopsis">{movie.synopsis}</div>
-              <WhereToWatch tmdbId={movie.tmdbId} type={movie.type} />
-              {myRating && !detailEditRating ? (
-                <div className="rated-box" style={{ marginTop: 20 }}>
-                  <div className="rated-score">{myRating}</div>
-                  <div className="rated-label">Your rating saved ✓</div>
-                  {prediction && <div className="rated-pred">Predicted was {prediction.predicted} ({prediction.low}–{prediction.high})</div>}
-                  <button type="button" className="btn-full btn-full-dark" style={{ marginTop: 16, width: "100%" }}
-                    onClick={() => { setDetailEditRating(true); setDetailRating(myRating); setDetailTouched(true); }}>
-                    Change rating
-                  </button>
-                </div>
-              ) : myRating && detailEditRating ? (
-                <div style={{ marginTop: 20 }}>
-                  <div className="d-rate-label">Update your rating</div>
-                  <div className="d-rate-row">
-                    <input className="slider" type="range" min="1" max="10" step="0.5"
-                      value={detailRating} style={{ flex: 1 }}
-                      onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }} />
-                    <div className="d-rate-val" style={{ color: "#e8c96a" }}>{detailRating}</div>
-                  </div>
-                  <div className="d-actions" style={{ marginTop: 14 }}>
-                    <button className="btn-full btn-full-gold" disabled={!detailTouched}
-                      onClick={() => { addRating(movie.id, detailRating); setDetailEditRating(false); }}>
-                      Save new rating
-                    </button>
-                    <button type="button" className="btn-full btn-full-dark"
-                      onClick={() => { setDetailEditRating(false); setDetailRating(myRating); }}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : !myRating ? (
-                <div style={{ marginTop: 20 }}>
-                  <div className="d-rate-label">Your rating</div>
-                  <div className="d-rate-row">
-                    <input className="slider" type="range" min="1" max="10" step="0.5"
-                      value={detailRating} style={{ flex: 1 }}
-                      onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }} />
-                    <div className="d-rate-val" style={{ color: detailTouched ? "#e8c96a" : "#444" }}>
-                      {detailTouched ? detailRating : "—"}
+                    <div>
+                      <div className="d-pred-val">{prediction.predicted}</div>
+                      <div className="d-pred-range">{prediction.low}–{prediction.high}</div>
+                      {movie.tmdbRating && <div className="d-tmdb">TMDB avg: {movie.tmdbRating}</div>}
                     </div>
                   </div>
-                  <div className="d-actions">
-                    <button className="btn-full btn-full-gold" disabled={!detailTouched}
-                      onClick={() => { addRating(movie.id, detailRating); setTimeout(() => goBack(), 800); }}>
-                      Submit Rating
-                    </button>
-                    <button className={`btn-full btn-full-dark ${inWatchlist(movie.id) ? "saved-style" : ""}`}
-                      onClick={() => toggleWatchlist(movie)}>
-                      {inWatchlist(movie.id) ? "✓ Saved" : "+ Watchlist"}
-                    </button>
+                )}
+                {!prediction && (
+                  <div>
+                    {movie.tmdbRating && (
+                      <div className="d-pred-box" style={{ marginBottom: 10 }}>
+                        <div>
+                          <div className="d-pred-label">TMDB Average Rating</div>
+                          <div className="d-pred-sub">From the broader community</div>
+                        </div>
+                        <div className="d-pred-val" style={{ fontSize: 32 }}>{movie.tmdbRating}</div>
+                      </div>
+                    )}
+                    <div className="d-pred-box">
+                      <div>
+                        <div className="d-pred-label">Predicted Rating for You</div>
+                        <div className="d-pred-sub">Rate more titles to unlock</div>
+                      </div>
+                      <div className="d-pred-val" style={{ fontSize: 32, color: "#555" }}>TBD</div>
+                    </div>
                   </div>
+                )}
+                <div className="d-synopsis">{movie.synopsis}</div>
+                <WhereToWatch tmdbId={movie.tmdbId} type={movie.type} />
+                <div className="detail-rate-section">
+                  {myRating && !detailEditRating ? (
+                    <div className="rated-box" style={{ marginTop: 20 }}>
+                      <div className="rated-score">{myRating}</div>
+                      <div className="rated-label">Your rating saved ✓</div>
+                      {prediction && <div className="rated-pred">Predicted was {prediction.predicted} ({prediction.low}–{prediction.high})</div>}
+                      <button type="button" className="btn-full btn-full-dark" style={{ marginTop: 16, width: "100%" }}
+                        onClick={() => { setDetailEditRating(true); setDetailRating(myRating); setDetailTouched(true); }}>
+                        Change rating
+                      </button>
+                    </div>
+                  ) : myRating && detailEditRating ? (
+                    <div style={{ marginTop: 20 }}>
+                      <div className="d-rate-label">Update your rating</div>
+                      <div className="d-rate-row">
+                        <input className="slider" type="range" min="1" max="10" step="0.5"
+                          value={detailRating} style={{ flex: 1 }}
+                          onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }} />
+                        <div className="d-rate-val" style={{ color: "#e8c96a" }}>{detailRating}</div>
+                      </div>
+                      <div className="d-actions" style={{ marginTop: 14 }}>
+                        <button className="btn-full btn-full-gold" disabled={!detailTouched}
+                          onClick={() => { addRating(movie.id, detailRating); setDetailEditRating(false); }}>
+                          Save new rating
+                        </button>
+                        <button type="button" className="btn-full btn-full-dark"
+                          onClick={() => { setDetailEditRating(false); setDetailRating(myRating); }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : !myRating ? (
+                    <div style={{ marginTop: 20 }}>
+                      <div className="d-rate-label">Your rating</div>
+                      <div className="d-rate-row">
+                        <input className="slider" type="range" min="1" max="10" step="0.5"
+                          value={detailRating} style={{ flex: 1 }}
+                          onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }} />
+                        <div className="d-rate-val" style={{ color: detailTouched ? "#e8c96a" : "#444" }}>
+                          {detailTouched ? detailRating : "—"}
+                        </div>
+                      </div>
+                      <div className="d-actions">
+                        <button className="btn-full btn-full-gold" disabled={!detailTouched}
+                          onClick={() => { addRating(movie.id, detailRating); setTimeout(() => goBack(), 800); }}>
+                          Submit Rating
+                        </button>
+                        <button className={`btn-full btn-full-dark ${inWatchlist(movie.id) ? "saved-style" : ""}`}
+                          onClick={() => toggleWatchlist(movie)}>
+                          {inWatchlist(movie.id) ? "✓ Saved" : "+ Watchlist"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
+              </div>
             </div>
           </div>
         );
