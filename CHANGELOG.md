@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- **Discover mobile parity:** Keep Discover as a full-height in-shell vertical scroller so mobile can reach the full result list consistently after search focus and results load.
+
 ## 1.1.0
 
 - **iOS viewport expansion hardening:** Added a fixed `viewport-shell` wrapper so visual viewport shifts cannot expand the app beyond intended mobile width.
