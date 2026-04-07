@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.34
+
+- **Safari drift clamp:** Add a UI-transition fail-safe that resets horizontal scroll (`window/document x=0`) on screen/search/home-segment changes. Prevents persistent left/right viewport shift after gestures, especially around Discover/Home transitions on iOS Safari.
+
 ## 1.0.33
 
 - **Discover search trigger:** Results now fetch only on explicit submit (tap search icon or keyboard Search/Enter), not while typing. Added submitted-query state and search form button; status/empty messages now reference submitted query.

@@ -1163,6 +1163,20 @@ export default function App() {
     screenRef.current = screen;
   }, [screen]);
 
+  // Safari can retain horizontal viewport drift after horizontal gestures.
+  // Re-clamp X scroll on key UI transitions.
+  useEffect(() => {
+    const clampX = () => {
+      const y = window.scrollY || 0;
+      window.scrollTo(0, y);
+      document.documentElement.scrollLeft = 0;
+      if (document.body) document.body.scrollLeft = 0;
+    };
+    clampX();
+    const raf = requestAnimationFrame(clampX);
+    return () => cancelAnimationFrame(raf);
+  }, [screen, searching, appliedSearchQuery, homeSegment]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
