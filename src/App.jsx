@@ -444,9 +444,13 @@ const styles = `
   .auth-input:focus { border-color:#e8c96a; }
   .auth-input::placeholder { color:#444; }
   .auth-error { font-size:13px; color:#cc4444; margin-bottom:16px; padding:10px 14px; background:#1a0808; border:1px solid #441111; border-radius:8px; }
+  .auth-note { font-size:13px; color:#8bc58f; margin-bottom:16px; padding:10px 14px; background:#0f1a11; border:1px solid #29432d; border-radius:8px; }
   .auth-btn { width:100%; background:#e8c96a; color:#0a0a0a; border:none; padding:15px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:500; cursor:pointer; border-radius:2px; transition:all 0.2s; margin-top:8px; }
   .auth-btn:hover { background:#f0d880; }
   .auth-btn:disabled { opacity:0.5; cursor:default; }
+  .auth-link-row { display:flex; justify-content:flex-end; margin-top:-4px; margin-bottom:8px; }
+  .auth-link-btn { background:none; border:none; color:#e8c96a; cursor:pointer; font-size:12px; font-family:'DM Sans',sans-serif; padding:0; }
+  .auth-link-btn:hover { text-decoration:underline; }
   .auth-switch { text-align:center; margin-top:20px; font-size:13px; color:#666; }
   .auth-switch span { color:#e8c96a; cursor:pointer; }
   .auth-switch span:hover { text-decoration:underline; }
@@ -927,6 +931,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [catalogue, setCatalogue] = useState([]);
   const [matchData, setMatchData] = useState(null);
@@ -988,7 +993,13 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) { setUser(session.user); setScreen("loading-catalogue"); }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setScreen("auth");
+        setAuthMode("reset");
+        setAuthError("");
+        setAuthNotice("Recovery link verified. Set your new password.");
+      }
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
@@ -1279,6 +1290,46 @@ export default function App() {
     setAuthLoading(false);
     if (error) { setAuthError(error.message); return; }
     if (data.user) { setUser(data.user); setScreen("loading-catalogue"); }
+  }
+
+  async function handleForgotPassword() {
+    const email = authEmail.trim();
+    setAuthError("");
+    setAuthNotice("");
+    if (!email) {
+      setAuthError("Enter your email first, then tap Forgot password.");
+      return;
+    }
+    setAuthLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    setAuthLoading(false);
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
+    setAuthNotice("Reset link sent. Open the email and continue from the link.");
+  }
+
+  async function handleUpdatePassword() {
+    const nextPassword = authPassword.trim();
+    setAuthError("");
+    setAuthNotice("");
+    if (nextPassword.length < 6) {
+      setAuthError("Password must be at least 6 characters.");
+      return;
+    }
+    setAuthLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: nextPassword });
+    setAuthLoading(false);
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
+    setAuthNotice("Password updated. You can now sign in.");
+    setAuthMode("signin");
+    setAuthPassword("");
   }
 
   async function handleSignOut() {
@@ -1829,8 +1880,9 @@ export default function App() {
       {screen === "auth" && (
         <div className="auth">
           <button className="auth-back" onClick={() => setScreen("splash")}>← Back</button>
-          <div className="auth-title">{authMode === "signup" ? "Create account" : "Welcome back"}</div>
-          <div className="auth-sub">{authMode === "signup" ? "Join Cinemastro to get personalised picks" : "Sign in to your Cinemastro account"}</div>
+          <div className="auth-title">{authMode === "signup" ? "Create account" : authMode === "reset" ? "Reset password" : "Welcome back"}</div>
+          <div className="auth-sub">{authMode === "signup" ? "Join Cinemastro to get personalised picks" : authMode === "reset" ? "Set a new password for your account" : "Sign in to your Cinemastro account"}</div>
+          {authNotice && <div className="auth-note">{authNotice}</div>}
           {authError && <div className="auth-error">{authError}</div>}
           {authMode === "signup" && (
             <div className="auth-field">
@@ -1843,17 +1895,24 @@ export default function App() {
             <input className="auth-input" type="email" placeholder="you@example.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)} />
           </div>
           <div className="auth-field">
-            <label className="auth-label">Password</label>
+            <label className="auth-label">{authMode === "reset" ? "New password" : "Password"}</label>
             <input className="auth-input" type="password" placeholder="Min. 6 characters" value={authPassword} onChange={e => setAuthPassword(e.target.value)} />
           </div>
-          <button className="auth-btn" disabled={authLoading} onClick={authMode === "signup" ? handleSignUp : handleSignIn}>
-            {authLoading ? "Please wait…" : authMode === "signup" ? "Create Account" : "Sign In"}
+          {authMode === "signin" && (
+            <div className="auth-link-row">
+              <button type="button" className="auth-link-btn" onClick={handleForgotPassword} disabled={authLoading}>Forgot password?</button>
+            </div>
+          )}
+          <button className="auth-btn" disabled={authLoading} onClick={authMode === "signup" ? handleSignUp : authMode === "reset" ? handleUpdatePassword : handleSignIn}>
+            {authLoading ? "Please wait…" : authMode === "signup" ? "Create Account" : authMode === "reset" ? "Update Password" : "Sign In"}
           </button>
-          <div className="auth-switch">
-            {authMode === "signup"
-              ? <>Already have an account? <span onClick={() => { setAuthMode("signin"); setAuthError(""); }}>Sign in</span></>
-              : <>New to Cinemastro? <span onClick={() => { setAuthMode("signup"); setAuthError(""); }}>Create account</span></>}
-          </div>
+          {authMode !== "reset" && (
+            <div className="auth-switch">
+              {authMode === "signup"
+                ? <>Already have an account? <span onClick={() => { setAuthMode("signin"); setAuthError(""); setAuthNotice(""); }}>Sign in</span></>
+                : <>New to Cinemastro? <span onClick={() => { setAuthMode("signup"); setAuthError(""); setAuthNotice(""); }}>Create account</span></>}
+            </div>
+          )}
         </div>
       )}
 
