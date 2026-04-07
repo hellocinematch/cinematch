@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.24
+
+- **Profile settings save fix:** Revert to **single-field upserts** for streaming/genre/region (DB-only source remains). This avoids stale in-memory payloads accidentally writing `streaming_provider_ids` back to empty.
+
 ## 1.0.23
 
 - **Profile sync fix (cross-device):** Preference saves now upsert **all three profile arrays together** (`streaming_provider_ids`, `show_genre_ids`, `show_region_keys`) on every save to prevent partial writes from wiping the other fields.
