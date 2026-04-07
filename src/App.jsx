@@ -423,8 +423,7 @@ const styles = `
   /* Mobile-first header sizing by width to prevent right-side overflow with wide logo/tagline assets. */
   .app-brand.brand-logo--header { width:min(220px, calc(100vw - 124px)); height:auto; }
   /* Taller on splash so wordmark + tagline stay readable (full logo viewBox 400×120). */
-  /* Wordmark is left-heavy in the asset; nudge so optical center lines up with centered 220px buttons. */
-  .app-brand.brand-logo--splash { width:min(86vw, 380px); height:auto; object-position:center center; transform:translateX(4.5%); }
+  .app-brand.brand-logo--splash { width:min(86vw, 380px); height:auto; object-position:center center; }
   .home-header .app-brand { margin-bottom:10px; }
   .discover-header { padding:16px 24px 12px; }
   .mood-header { padding:16px 24px 16px; }

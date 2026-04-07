@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" role="img" aria-label="Cinemastro">
   <!-- Inline styles so this renders when used as <img src> (external SVG + <style> is often ignored). -->
-  <text y="80" text-anchor="start" x="4" font-family="Georgia, 'Times New Roman', serif" font-size="72" letter-spacing="-3">
+  <text x="200" y="80" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="72" letter-spacing="-3">
     <tspan fill="#f0ebe0">cinem</tspan><tspan fill="#8B1A1A">a</tspan><tspan fill="#e8c96a">stro</tspan>
   </text>
-  <text x="4" y="105" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="11" letter-spacing="4" fill="#555">YOUR PERSONAL FILM MAESTRO</text>
+  <text x="200" y="105" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="11" letter-spacing="4" fill="#555">YOUR PERSONAL FILM MAESTRO</text>
 </svg>
