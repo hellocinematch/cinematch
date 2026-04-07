@@ -1,30 +1,55 @@
-# Cinematch / Cinemastro — next version
+# Cinematch / Cinemastro — handoff for next chat
 
-**Topic for upcoming work:** plan and build the **next version of Cinemastro** (features, polish, backlog below — not a full rewrite unless explicitly requested).
+**Focus:** Continue **next version of Cinemastro** (incremental features/polish). Prefer **small diffs** in `src/App.jsx` (very large file).
 
 ## Stack
-- **Frontend:** Vite + React 19 — main UI: `src/App.jsx` (single large component + inline CSS string).
+- **Frontend:** Vite + React 19 — main UI: `src/App.jsx` (single component + inline CSS string).
 - **Backend:** Supabase Auth, `public.profiles`, `public.ratings`, `public.watchlist`.
-- **Recommendations:** Supabase Edge Function `supabase/functions/match/index.ts` — client calls **only** `supabase.functions.invoke('match', …)`; service role loads neighbour data server-side (never expose full ratings in client).
-- **Data:** TMDB API (token in `src/App.jsx` today — consider env var for production).
-- **Deploy:** Push to GitHub → Vercel. Edge functions: `npx supabase functions deploy match` (separate from Vercel).
+- **Recommendations:** Edge Function `supabase/functions/match/index.ts` — client **only** `supabase.functions.invoke('match', …)`; service role loads neighbour ratings server-side.
+- **Data:** TMDB (bearer token in `App.jsx` — consider env for production).
+- **Deploy:** GitHub → Vercel. Edge functions deploy separately: `npx supabase functions deploy match`.
 
 ## Env (Vite)
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 
+## Version & changelog
+- App version from `package.json`, shown on Profile as **Cinemastro v…** (import in `App.jsx`).
+- **`CHANGELOG.md`** lists releases (e.g. **1.0.4** at last handoff).
+- Remote: **`hellocinematch/cinematch`**, branch **`main`**. User often says **“push it”** when they want commits pushed.
+
 ## Brand / assets
-- App name in UI: **Cinemastro** (rebranded from Cinematch in places).
-- Logo: `public/cinemastro-logo.svg` — wordmark + tagline; text left-anchored in SVG for alignment with page copy.
-- Favicon: `public/favicon.svg` (unchanged unless you update).
+- UI name: **Cinemastro**. Logo: `public/cinemastro-logo.svg`. Favicon: `public/favicon.svg`.
 
-## Recent product / UX (high level)
-- **Profile settings:** streaming providers (`streaming_provider_ids`), genres (`show_genre_ids`), regions (`show_region_keys`). Empty arrays = no filter. Region buckets drive language-based filtering + richer US streaming/theater queries for Indian etc.
-- **Persistence:** Profile prefs use `upsert` + localStorage fallbacks (`cinematch_show_genres_*`, `cinematch_show_regions_*`, `cinematch_streaming_providers_*`) so prefs survive missing profile rows / reload.
-- **Layout:** Responsive shell (`--shell` 480px mobile, wider at `≥900px`, `≥1200px`). Desktop Home: top bar (logo + avatar), centered segment row (Picks/More/Friends), hero tagline, divider, then content. Shared `page-topbar` on Discover / Mood / Profile (desktop). Mobile: overflow fixes for wide logo; detail **Back** button `z-index` raised so it isn’t hidden under sticky brand (`66f6076`).
-- **Account:** Top avatar opens menu: Profile + Sign out; duplicate sign-out removed from Profile settings card.
+## Product / UX (current behaviour — read before changing)
 
-## DB migrations (run in Supabase if not already)
+### Home
+- Segments: **Picks** / **More** / **Friends**.
+- **Hero tagline** (“Movies and Shows - Picked for your TASTE!”) **only when segment is Picks**. More/Friends: no tagline; mobile uses tighter header; desktop hides empty hero strip (logo + avatar stay in **`home-topbar`**).
+
+### Navigation & chrome
+- **`page-topbar`:** wordmark + avatar + bottom border — used on **Discover, Mood (picker + results), Profile, Rated, Detail**, and on **all breakpoints** (mobile included). **Home** does not use `page-topbar` on mobile (uses **`home-header`** with hero + avatar instead).
+- **Duplicate header wordmarks** under `page-topbar` were removed (discover/mood/profile blocks rely on top bar only).
+- **Cinemastro logo:** **`AppBrand`** accepts **`onPress`**; main app passes **`goHome`** → `setNavTab("home")`, `setScreen("home")`, clears detail selection / avatar menu. **Splash** uses **`variant="splash"`** (logo not clickable for home).
+
+### Detail screen
+- **No in-app Back** — browser/OS back; **`history.pushState`** when opening detail so back stays in-app (`detailReturnScreenRef` + `popstate`).
+- Sticky **`page-topbar`** (logo + avatar); poster/body below.
+
+### Legal / footer
+- **`src/legal.jsx`** — `AppFooter`, placeholder **Privacy / Terms / About** pages.
+- **`src/legalConstants.js`** — placeholders (entity, email, URL). Replace before production.
+- Footer above bottom nav on main tabs; **`openLegalPage` / `closeLegalPage`** use **`history.pushState`** + **`legalHistoryPushedRef`** like detail.
+
+### Profile / recommendations
+- **“Matches”** on Profile = **`recommendations.length`** from the match API (collaborative list size), **not** “films you rated.” CF needs **other users** with **overlapping rated titles**; small user base → often **0 matches** despite many ratings.
+
+### Other
+- Profile settings: streaming / genres / regions; **upsert** + **localStorage** fallbacks (`cinematch_*` keys).
+- **Mobile:** section headers stack title above meta when narrow (avoid “More For You” wrapping).
+- **iOS:** shell uses `%` not `100vw` where noted in codebase.
+
+## DB migrations (Supabase, if not applied)
 - `supabase/migrations/20260402120000_profiles_streaming_provider_ids.sql`
 - `supabase/migrations/20260406120000_profiles_show_genre_ids.sql`
 - `supabase/migrations/20260406133000_profiles_show_region_keys.sql`
@@ -32,31 +57,27 @@
 ## Key files
 | Area | File |
 |------|------|
-| UI + styles + flows | `src/App.jsx` |
-| Supabase client | `src/supabase.js` (if present) |
-| Match CF | `supabase/functions/match/index.ts` |
-| Global CSS (iOS scroll etc.) | `src/index.css` |
+| UI + flows + styles | `src/App.jsx` |
+| Legal UI + footer | `src/legal.jsx`, `src/legalConstants.js` |
+| Supabase client | `src/supabase.js` |
+| Match Edge Function | `supabase/functions/match/index.ts` |
+| Global CSS | `src/index.css` |
 | Entry | `index.html`, `src/main.jsx` |
 
-## Git / deploy
-- Remote: e.g. `hellocinematch/cinematch` on GitHub; default branch `main`.
-- Recent fix commit example: `66f6076` — detail back button z-index.
-
-## Ideas not built / backlog
-- Admin/stats dashboard (user count, total ratings, distinct titles) — needs RLS-safe aggregates or Edge Function + service role + allowlist.
-- “Rate more” onboarding nudges, public community counts — discussed, not implemented.
-- Region product lines beyond current TMDB discover patterns — optional.
+## Backlog / not built
+- Admin/stats (RLS-safe aggregates or Edge + service role).
+- “Rate more” nudges / public community counts.
+- Richer region / TMDB discover product lines.
 
 ## Quick local dev
 ```bash
 cd /path/to/Cinematch
 npm install
 npm run dev
-# Optional phone: npm run dev -- --host
+# Phone on LAN: npm run dev -- --host
 ```
 
 ## Notes for the next assistant
-- Prefer **small, focused diffs** in `App.jsx`; file is very large.
 - **No drive-by refactors** unless asked.
-- User prefers **pushing** changes to GitHub when they say “push it.”
-- **iOS Safari:** avoid `100vw` for shell; horizontal scroll was addressed in `index.css` / App shell patterns earlier in project history.
+- **CHANGELOG** + **version bump** (`package.json` / lockfile) when shipping user-visible releases (pattern established through **1.0.4**).
+- Match **cold start / community size** affects CF output; don’t assume “bug” if Matches stays 0 with few users.
