@@ -453,6 +453,8 @@ function passwordRecoveryRedirectTo() {
 const styles = `
   ${FONTS}
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  input, textarea, select { font-size:16px; }
   body { background: #0a0a0a; }
   /* Shell: use % not 100vw — iOS Safari can treat 100vw wider than the paint area and allow sideways pan */
   .app { --shell:480px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; min-height:100vh; min-height:100dvh; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; overflow-x:clip; min-width:0; position:relative; touch-action:pan-y; }
@@ -475,26 +477,26 @@ const styles = `
   .btn-ghost { background:transparent; color:#888; border:1px solid #333; padding:14px 48px; font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; border-radius:2px; margin-top:12px; transition:all 0.2s; width:220px; }
   .btn-ghost:hover { border-color:#666; color:#ccc; }
 
-  .auth { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:0 32px; animation:fadeIn 0.5s ease; box-sizing:border-box; }
-  .auth-inner { width:100%; max-width:400px; }
+  .auth { height:100vh; min-height:100dvh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:0 32px; animation:fadeIn 0.5s ease; box-sizing:border-box; width:100%; max-width:100%; min-width:0; overflow-x:hidden; overflow-x:clip; }
+  .auth-inner { width:100%; max-width:min(100%, 400px); min-width:0; }
   .auth-back { position:absolute; top:52px; left:24px; background:none; border:none; color:#666; font-size:14px; cursor:pointer; font-family:'DM Sans',sans-serif; }
   .auth-back:hover { color:#ccc; }
   .auth-title { font-family:'DM Serif Display',serif; font-size:32px; color:#f0ebe0; margin-bottom:8px; }
-  .auth-sub { font-size:14px; color:#666; margin-bottom:36px; }
+  .auth-sub { font-size:14px; color:#666; margin-bottom:36px; overflow-wrap:anywhere; }
   .auth-field { margin-bottom:16px; }
   .auth-label { font-size:12px; color:#888; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; display:block; }
-  .auth-input { width:100%; background:#141414; border:1px solid #2a2a2a; border-radius:8px; padding:13px 16px; font-family:'DM Sans',sans-serif; font-size:14px; color:#f0ebe0; outline:none; transition:border-color 0.2s; }
+  .auth-input { width:100%; background:#141414; border:1px solid #2a2a2a; border-radius:8px; padding:13px 16px; font-family:'DM Sans',sans-serif; font-size:16px; color:#f0ebe0; outline:none; transition:border-color 0.2s; min-width:0; }
   .auth-input:focus { border-color:#e8c96a; }
   .auth-input::placeholder { color:#444; }
-  .auth-error { font-size:13px; color:#cc4444; margin-bottom:16px; padding:10px 14px; background:#1a0808; border:1px solid #441111; border-radius:8px; }
-  .auth-note { font-size:13px; color:#8bc58f; margin-bottom:16px; padding:10px 14px; background:#0f1a11; border:1px solid #29432d; border-radius:8px; }
+  .auth-error { font-size:13px; color:#cc4444; margin-bottom:16px; padding:10px 14px; background:#1a0808; border:1px solid #441111; border-radius:8px; overflow-wrap:anywhere; }
+  .auth-note { font-size:13px; color:#8bc58f; margin-bottom:16px; padding:10px 14px; background:#0f1a11; border:1px solid #29432d; border-radius:8px; overflow-wrap:anywhere; }
   .auth-btn { width:100%; background:#e8c96a; color:#0a0a0a; border:none; padding:15px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:500; cursor:pointer; border-radius:2px; transition:all 0.2s; margin-top:8px; }
   .auth-btn:hover { background:#f0d880; }
   .auth-btn:disabled { opacity:0.5; cursor:default; }
   .auth-link-row { display:flex; justify-content:flex-end; margin-top:-4px; margin-bottom:8px; }
   .auth-link-btn { background:none; border:none; color:#e8c96a; cursor:pointer; font-size:12px; font-family:'DM Sans',sans-serif; padding:0; }
   .auth-link-btn:hover { text-decoration:underline; }
-  .auth-switch { text-align:center; margin-top:20px; font-size:13px; color:#666; }
+  .auth-switch { text-align:center; margin-top:20px; font-size:13px; color:#666; overflow-wrap:anywhere; }
   .auth-switch span { color:#e8c96a; cursor:pointer; }
   .auth-switch span:hover { text-decoration:underline; }
 
