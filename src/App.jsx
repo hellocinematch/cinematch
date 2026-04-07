@@ -418,6 +418,8 @@ const styles = `
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
   .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; }
   .app-brand.brand-logo { display:block; max-width:100%; object-fit:contain; object-position:left center; }
+  .app-brand-button { display:block; line-height:0; padding:0; margin:0; border:none; background:none; cursor:pointer; font:inherit; color:inherit; text-align:left; }
+  .app-brand-button:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:4px; }
   /* Mobile-first header sizing by width to prevent right-side overflow with wide logo/tagline assets. */
   .app-brand.brand-logo--header { width:min(220px, calc(100vw - 124px)); height:auto; }
   /* Taller on splash so wordmark + tagline stay readable (full logo viewBox 400×120). */
@@ -893,9 +895,9 @@ function WhereToWatch({ tmdbId, type }) {
 // Nav
 // ---------------------------------------------------------------------------
 /** Wordmark: `public/cinemastro-logo.svg` — replace file with your export (same path). */
-function AppBrand({ variant = "header" }) {
+function AppBrand({ variant = "header", onPress }) {
   const splash = variant === "splash";
-  return (
+  const img = (
     <img
       className={`app-brand brand-logo ${splash ? "brand-logo--splash" : "brand-logo--header"}`}
       src="/cinemastro-logo.svg"
@@ -903,6 +905,14 @@ function AppBrand({ variant = "header" }) {
       decoding="async"
     />
   );
+  if (onPress && !splash) {
+    return (
+      <button type="button" className="app-brand-button" onClick={onPress} aria-label="Go to home">
+        {img}
+      </button>
+    );
+  }
+  return img;
 }
 
 // ---------------------------------------------------------------------------
@@ -1532,6 +1542,14 @@ export default function App() {
     setScreen(ret ?? "home");
   }
 
+  function goHome() {
+    setNavTab("home");
+    setScreen("home");
+    setSelected(null);
+    setDetailEditRating(false);
+    setShowAvatarMenu(false);
+  }
+
   useEffect(() => {
     if (!showAvatarMenu) return;
     const close = () => setShowAvatarMenu(false);
@@ -1914,7 +1932,7 @@ export default function App() {
       {screen === "onboarding" && obMovie && (
         <div className="onboarding">
           <div className="ob-header">
-            <AppBrand />
+            <AppBrand onPress={goHome} />
             <div className="ob-step">Step {obStep + 1} of {obMovies.length}</div>
             <div className="ob-title">Rate what you've seen</div>
             <div className="ob-subtitle">We'll find your taste matches</div>
@@ -1969,13 +1987,13 @@ export default function App() {
       {screen === "home" && (
         <div className="home">
           <div className="home-topbar">
-            <AppBrand />
+            <AppBrand onPress={goHome} />
             <div />
             <AccountAvatarMenu />
           </div>
           <div className={`home-header ${homeSegment !== "picks" ? "home-header--no-picks-tagline" : ""}`}>
             <div className="home-hero">
-              <AppBrand />
+              <AppBrand onPress={goHome} />
               {homeSegment === "picks" && (
                 <div className="home-hero-copy">
                   <div className="home-subtitle">Movies and Shows - Picked for your TASTE!</div>
@@ -2193,7 +2211,7 @@ export default function App() {
       {screen === "rate-more" && obMovie && (
         <div className="onboarding">
           <div className="ob-header">
-            <AppBrand />
+            <AppBrand onPress={goHome} />
             <div className="ob-step">Rating {obStep + 1}</div>
             <div className="ob-title">Rate more titles</div>
             <div className="ob-subtitle">Improve your recommendations</div>
@@ -2230,7 +2248,7 @@ export default function App() {
       {screen === "discover" && (
         <div className="discover">
           <div className="page-topbar">
-            <AppBrand />
+            <AppBrand onPress={goHome} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2289,7 +2307,7 @@ export default function App() {
       {screen === "mood-picker" && currentMoodCard && (
         <div className="mood">
           <div className="page-topbar">
-            <AppBrand />
+            <AppBrand onPress={goHome} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2332,7 +2350,7 @@ export default function App() {
       {screen === "mood-results" && (
         <div className="mood-results">
           <div className="page-topbar">
-            <AppBrand />
+            <AppBrand onPress={goHome} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2384,7 +2402,7 @@ export default function App() {
       {screen === "rated" && (
         <div className="discover">
           <div className="page-topbar">
-            <AppBrand />
+            <AppBrand onPress={goHome} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2458,7 +2476,7 @@ export default function App() {
       {screen === "profile" && (
         <div className="profile">
           <div className="page-topbar">
-            <AppBrand />
+            <AppBrand onPress={goHome} />
             <div />
             <AccountAvatarMenu />
           </div>
@@ -2579,7 +2597,7 @@ export default function App() {
         return (
           <div className="detail">
             <div className="page-topbar">
-              <AppBrand />
+              <AppBrand onPress={goHome} />
               <div />
               <AccountAvatarMenu />
             </div>
