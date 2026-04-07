@@ -54,6 +54,7 @@ html {
   overflow-x: hidden;
   width: 100%;
   max-width: 100%;
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -61,6 +62,7 @@ body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100%;
+  overscroll-behavior-x: none;
 }
 
 /* Cinematch is full-bleed mobile; avoid template width/flex that can cause horizontal pan on iOS Safari */
@@ -75,6 +77,7 @@ body {
   border: none;
   box-sizing: border-box;
   overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 h1,

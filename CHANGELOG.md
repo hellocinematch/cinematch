@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.17
+
+- **Mobile overflow (follow-up):** Horizontal strips use explicit **`width:100%`** + **`min-width:0`**; **`top-picks-block`** constrained. Section headers use **safe-area padding**; **`section-meta`** is **full-width + `text-align:right`** on narrow screens (was `align-self:flex-end` on a too-wide ancestor). Slightly tighter meta typography. **`overscroll-behavior-x: none`** on `html` / `body` / `#root`. Main shells (`home`, `discover`, `profile`, `mood`, `detail`) get **`width:100%`**.
+
 ## 1.0.16
 
 - **Mobile overflow:** Remove **`100vw` / `86vw`** from header and splash logos (use **`%` / `100%`** so sizing tracks the `.app` shell — iOS Safari often treats `100vw` wider than the painted column). **`minmax(0, …)`** on top bar grids, **`min-width: 0`** on home hero / section headers, **`overflow-wrap`** on tagline and section meta, and **bottom nav** centered with **`left:0; right:0`** instead of **`translateX(-50%)`** to avoid subpixel horizontal pan.
