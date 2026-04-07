@@ -1177,6 +1177,34 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, [screen, searching, appliedSearchQuery, homeSegment]);
 
+  // Hard iOS Safari guard: keep viewport x locked to 0 even after gesture/bounce.
+  useEffect(() => {
+    let ticking = false;
+    const clampX = () => {
+      const y = window.scrollY || 0;
+      if ((window.scrollX || 0) !== 0) window.scrollTo(0, y);
+      if (document.documentElement.scrollLeft !== 0) document.documentElement.scrollLeft = 0;
+      if (document.body && document.body.scrollLeft !== 0) document.body.scrollLeft = 0;
+      ticking = false;
+    };
+    const scheduleClamp = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(clampX);
+    };
+    window.addEventListener("scroll", scheduleClamp, { passive: true });
+    window.addEventListener("touchmove", scheduleClamp, { passive: true });
+    window.addEventListener("touchend", scheduleClamp, { passive: true });
+    window.addEventListener("resize", scheduleClamp, { passive: true });
+    scheduleClamp();
+    return () => {
+      window.removeEventListener("scroll", scheduleClamp);
+      window.removeEventListener("touchmove", scheduleClamp);
+      window.removeEventListener("touchend", scheduleClamp);
+      window.removeEventListener("resize", scheduleClamp);
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {

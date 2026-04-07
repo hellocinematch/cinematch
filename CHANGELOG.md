@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.35
+
+- **iOS overflow lock (continuous):** Add runtime horizontal-scroll clamp listeners (`scroll`, `touchmove`, `touchend`, `resize`) that force viewport/document `scrollLeft` back to `0`. This prevents persistent sideways drift on landing/home after Safari gesture bounce.
+
 ## 1.0.34
 
 - **Safari drift clamp:** Add a UI-transition fail-safe that resets horizontal scroll (`window/document x=0`) on screen/search/home-segment changes. Prevents persistent left/right viewport shift after gestures, especially around Discover/Home transitions on iOS Safari.
