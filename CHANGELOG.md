@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.27
+
+- **Mobile overflow (home/login path):** Hide `public-site-stats` inside mobile `home-header` (logo remains). This removes immediate horizontal overflow on login/home without changing desktop stats placement.
+
 ## 1.0.26
 
 - **Mobile overflow guard (top bars):** Hide the small **community/ratings** stats block inside mobile `page-topbar` (Discover/Profile/Detail/etc) to avoid Safari width overflows. Logo remains; desktop and home hero behavior unchanged.

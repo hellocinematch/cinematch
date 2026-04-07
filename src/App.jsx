@@ -900,6 +900,8 @@ const styles = `
       font-size:11px;
     }
     .home-segments { margin-left:max(20px, env(safe-area-inset-left, 0px)); margin-right:max(20px, env(safe-area-inset-right, 0px)); }
+    /* Home login path: logo+stats in hero can overflow on narrow Safari widths. Keep logo only on mobile. */
+    .home-header .public-site-stats { display:none; }
     .discover-header { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); min-width:0; }
     .filter-row { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .disc-grid { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
