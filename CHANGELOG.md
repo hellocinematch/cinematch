@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.25
+
+- **Profile save reliability:** Preference writes now use `update(...).eq(id)` (not upsert) and show an in-app error banner in Profile when a save fails. This makes streaming-provider save failures visible and avoids conflict-path quirks.
+
 ## 1.0.24
 
 - **Profile settings save fix:** Revert to **single-field upserts** for streaming/genre/region (DB-only source remains). This avoids stale in-memory payloads accidentally writing `streaming_provider_ids` back to empty.

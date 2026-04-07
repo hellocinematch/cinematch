@@ -1138,6 +1138,7 @@ export default function App() {
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [homeSegment, setHomeSegment] = useState("picks"); // "picks" | "more" | "friends"
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
+  const [profileSettingsError, setProfileSettingsError] = useState("");
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
   const [showGenreIds, setShowGenreIds] = useState([]);
   /** Region buckets to include (Settings). Empty = all regions. Logged-out users ignore. */
@@ -1452,22 +1453,30 @@ export default function App() {
     if (!user) return;
     const clean = [...new Set(ids.filter(n => typeof n === "number"))].sort((a, b) => a - b);
     setSelectedStreamingProviderIds(clean);
-    const { error } = await supabase.from("profiles").upsert(
-      { id: user.id, streaming_provider_ids: clean },
-      { onConflict: "id" },
-    );
-    if (error) console.warn("Could not save streaming providers to profile:", error.message);
+    setProfileSettingsError("");
+    const { error } = await supabase
+      .from("profiles")
+      .update({ streaming_provider_ids: clean })
+      .eq("id", user.id);
+    if (error) {
+      setProfileSettingsError(`Could not save "Where you watch": ${error.message}`);
+      console.warn("Could not save streaming providers to profile:", error.message);
+    }
   }
 
   async function persistShowGenreIds(ids) {
     if (!user) return;
     const clean = [...new Set(ids.filter(n => typeof n === "number"))].sort((a, b) => a - b);
     setShowGenreIds(clean);
-    const { error } = await supabase.from("profiles").upsert(
-      { id: user.id, show_genre_ids: clean },
-      { onConflict: "id" },
-    );
-    if (error) console.warn("Could not save genre preferences:", error.message);
+    setProfileSettingsError("");
+    const { error } = await supabase
+      .from("profiles")
+      .update({ show_genre_ids: clean })
+      .eq("id", user.id);
+    if (error) {
+      setProfileSettingsError(`Could not save genres: ${error.message}`);
+      console.warn("Could not save genre preferences:", error.message);
+    }
   }
 
   async function persistShowRegionKeys(keys) {
@@ -1475,11 +1484,15 @@ export default function App() {
     const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
     const clean = [...new Set(keys.filter(k => typeof k === "string" && allowed.has(k)))].sort();
     setShowRegionKeys(clean);
-    const { error } = await supabase.from("profiles").upsert(
-      { id: user.id, show_region_keys: clean },
-      { onConflict: "id" },
-    );
-    if (error) console.warn("Could not save region preferences:", error.message);
+    setProfileSettingsError("");
+    const { error } = await supabase
+      .from("profiles")
+      .update({ show_region_keys: clean })
+      .eq("id", user.id);
+    if (error) {
+      setProfileSettingsError(`Could not save regions: ${error.message}`);
+      console.warn("Could not save region preferences:", error.message);
+    }
   }
 
   function toggleShowGenre(genreId) {
@@ -2834,6 +2847,7 @@ export default function App() {
           </div>
           <div className="profile-settings">
             <div className="profile-settings-title">Settings</div>
+            {profileSettingsError && <div className="auth-error" style={{ marginBottom: 12 }}>{profileSettingsError}</div>}
             <div className="profile-settings-card">
               <div className="profile-settings-label">Where you watch</div>
               <p className="settings-providers-hint">Select the services you subscribe to. We’ll use this to tailor availability and picks.</p>
