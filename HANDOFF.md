@@ -15,8 +15,21 @@
 
 ## Version & changelog
 - App version from `package.json`, shown on Profile as **Cinemastro v…** (import in `App.jsx`).
-- **`CHANGELOG.md`** lists releases (e.g. **1.0.4** at last handoff).
+- **`CHANGELOG.md`** lists releases — **current release: 1.0.13** (see file for full history).
 - Remote: **`hellocinematch/cinematch`**, branch **`main`**. User often says **“push it”** when they want commits pushed.
+
+### Recent work (session summary — for the next chat)
+Shipped in **1.0.5 → 1.0.13** (mostly `src/App.jsx`, `public/cinemastro-logo.svg`, Supabase dashboard config):
+
+| Area | What changed |
+|------|----------------|
+| **Auth** | Forgot password → `resetPasswordForEmail`; recovery UI (`PASSWORD_RECOVERY`, set new password). **PKCE:** do not let `getSession()` navigate to home before reset; `redirectTo` includes **`?recovery=1`** — add **`https://<production-domain>/?recovery=1`** (and localhost for dev) under **Authentication → URL Configuration → Redirect URLs**; **Site URL** should be **`https://…`** not `http://localhost`. |
+| **Auth UI** | Sign-in form **`auth-inner`** max-width on desktop. |
+| **Brand** | Logo SVG: centered wordmark + tagline (`text-anchor="middle"`). |
+| **Onboarding** | If user has **no** `user_metadata.onboarding_complete` and **no** ratings → **`loading-catalogue` → pref → onboarding** (same for sign-in after email confirm). **Sign-up with session** uses loading gate so catalogue is loaded (avoids empty `obMovies`). Mark complete via **`updateUser({ data: { onboarding_complete: true } })`** when exiting onboarding; legacy users: **any rating** counts as onboarded. |
+| **Onboarding UI** | Responsive card/rating: no flex stretch on desktop; 16:9 poster caps with `vh` / breakpoints. |
+
+**Not done here:** “User count” next to tab bar (discussed only). **Backlog** unchanged unless user asks.
 
 ## Brand / assets
 - UI name: **Cinemastro**. Logo: `public/cinemastro-logo.svg`. Favicon: `public/favicon.svg`.
@@ -79,5 +92,5 @@ npm run dev
 
 ## Notes for the next assistant
 - **No drive-by refactors** unless asked.
-- **CHANGELOG** + **version bump** (`package.json` / lockfile) when shipping user-visible releases (pattern established through **1.0.4**).
+- **CHANGELOG** + **version bump** (`package.json` / lockfile) when shipping user-visible releases (pattern through **1.0.13**).
 - Match **cold start / community size** affects CF output; don’t assume “bug” if Matches stays 0 with few users.
