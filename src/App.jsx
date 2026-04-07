@@ -433,7 +433,8 @@ const styles = `
   .btn-ghost { background:transparent; color:#888; border:1px solid #333; padding:14px 48px; font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; border-radius:2px; margin-top:12px; transition:all 0.2s; width:220px; }
   .btn-ghost:hover { border-color:#666; color:#ccc; }
 
-  .auth { height:100vh; display:flex; flex-direction:column; justify-content:center; padding:0 32px; animation:fadeIn 0.5s ease; }
+  .auth { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:0 32px; animation:fadeIn 0.5s ease; box-sizing:border-box; }
+  .auth-inner { width:100%; max-width:400px; }
   .auth-back { position:absolute; top:52px; left:24px; background:none; border:none; color:#666; font-size:14px; cursor:pointer; font-family:'DM Sans',sans-serif; }
   .auth-back:hover { color:#ccc; }
   .auth-title { font-family:'DM Serif Display',serif; font-size:32px; color:#f0ebe0; margin-bottom:8px; }
@@ -1880,39 +1881,41 @@ export default function App() {
       {screen === "auth" && (
         <div className="auth">
           <button className="auth-back" onClick={() => setScreen("splash")}>← Back</button>
-          <div className="auth-title">{authMode === "signup" ? "Create account" : authMode === "reset" ? "Reset password" : "Welcome back"}</div>
-          <div className="auth-sub">{authMode === "signup" ? "Join Cinemastro to get personalised picks" : authMode === "reset" ? "Set a new password for your account" : "Sign in to your Cinemastro account"}</div>
-          {authNotice && <div className="auth-note">{authNotice}</div>}
-          {authError && <div className="auth-error">{authError}</div>}
-          {authMode === "signup" && (
+          <div className="auth-inner">
+            <div className="auth-title">{authMode === "signup" ? "Create account" : authMode === "reset" ? "Reset password" : "Welcome back"}</div>
+            <div className="auth-sub">{authMode === "signup" ? "Join Cinemastro to get personalised picks" : authMode === "reset" ? "Set a new password for your account" : "Sign in to your Cinemastro account"}</div>
+            {authNotice && <div className="auth-note">{authNotice}</div>}
+            {authError && <div className="auth-error">{authError}</div>}
+            {authMode === "signup" && (
+              <div className="auth-field">
+                <label className="auth-label">Your name</label>
+                <input className="auth-input" type="text" placeholder="e.g. Alex" value={authName} onChange={e => setAuthName(e.target.value)} />
+              </div>
+            )}
             <div className="auth-field">
-              <label className="auth-label">Your name</label>
-              <input className="auth-input" type="text" placeholder="e.g. Alex" value={authName} onChange={e => setAuthName(e.target.value)} />
+              <label className="auth-label">Email</label>
+              <input className="auth-input" type="email" placeholder="you@example.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)} />
             </div>
-          )}
-          <div className="auth-field">
-            <label className="auth-label">Email</label>
-            <input className="auth-input" type="email" placeholder="you@example.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)} />
+            <div className="auth-field">
+              <label className="auth-label">{authMode === "reset" ? "New password" : "Password"}</label>
+              <input className="auth-input" type="password" placeholder="Min. 6 characters" value={authPassword} onChange={e => setAuthPassword(e.target.value)} />
+            </div>
+            {authMode === "signin" && (
+              <div className="auth-link-row">
+                <button type="button" className="auth-link-btn" onClick={handleForgotPassword} disabled={authLoading}>Forgot password?</button>
+              </div>
+            )}
+            <button className="auth-btn" disabled={authLoading} onClick={authMode === "signup" ? handleSignUp : authMode === "reset" ? handleUpdatePassword : handleSignIn}>
+              {authLoading ? "Please wait…" : authMode === "signup" ? "Create Account" : authMode === "reset" ? "Update Password" : "Sign In"}
+            </button>
+            {authMode !== "reset" && (
+              <div className="auth-switch">
+                {authMode === "signup"
+                  ? <>Already have an account? <span onClick={() => { setAuthMode("signin"); setAuthError(""); setAuthNotice(""); }}>Sign in</span></>
+                  : <>New to Cinemastro? <span onClick={() => { setAuthMode("signup"); setAuthError(""); setAuthNotice(""); }}>Create account</span></>}
+              </div>
+            )}
           </div>
-          <div className="auth-field">
-            <label className="auth-label">{authMode === "reset" ? "New password" : "Password"}</label>
-            <input className="auth-input" type="password" placeholder="Min. 6 characters" value={authPassword} onChange={e => setAuthPassword(e.target.value)} />
-          </div>
-          {authMode === "signin" && (
-            <div className="auth-link-row">
-              <button type="button" className="auth-link-btn" onClick={handleForgotPassword} disabled={authLoading}>Forgot password?</button>
-            </div>
-          )}
-          <button className="auth-btn" disabled={authLoading} onClick={authMode === "signup" ? handleSignUp : authMode === "reset" ? handleUpdatePassword : handleSignIn}>
-            {authLoading ? "Please wait…" : authMode === "signup" ? "Create Account" : authMode === "reset" ? "Update Password" : "Sign In"}
-          </button>
-          {authMode !== "reset" && (
-            <div className="auth-switch">
-              {authMode === "signup"
-                ? <>Already have an account? <span onClick={() => { setAuthMode("signin"); setAuthError(""); setAuthNotice(""); }}>Sign in</span></>
-                : <>New to Cinemastro? <span onClick={() => { setAuthMode("signup"); setAuthError(""); setAuthNotice(""); }}>Create account</span></>}
-            </div>
-          )}
         </div>
       )}
 

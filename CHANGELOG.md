@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.6
+
+- **Auth:** Sign-in / sign-up form constrained on **desktop** (`max-width` + centered) so email, password, and primary button are not full viewport width.
+
 ## 1.0.5
 
 - **Auth:** **Forgot password** on sign-in (email reset link via Supabase). Recovery links open in-app so the user can set a **new password** before signing in again.
