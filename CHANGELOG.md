@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.36
+
+- **Root-cause iOS overflow resolution:** Replace continuous scroll-clamp workaround with gesture-level prevention. Horizontal touch gestures are now blocked at page level and only allowed inside intentional x-scrollers (`.strip`, `.filter-row`). This prevents Safari viewport drift while preserving horizontal card/chip scrolling.
+
 ## 1.0.35
 
 - **iOS overflow lock (continuous):** Add runtime horizontal-scroll clamp listeners (`scroll`, `touchmove`, `touchend`, `resize`) that force viewport/document `scrollLeft` back to `0`. This prevents persistent sideways drift on landing/home after Safari gesture bounce.

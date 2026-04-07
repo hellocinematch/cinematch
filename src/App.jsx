@@ -1177,31 +1177,40 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, [screen, searching, appliedSearchQuery, homeSegment]);
 
-  // Hard iOS Safari guard: keep viewport x locked to 0 even after gesture/bounce.
+  // Root-cause guard for iOS Safari drift:
+  // allow horizontal pan only on intentional x-scrollers, never on the page viewport.
   useEffect(() => {
-    let ticking = false;
-    const clampX = () => {
-      const y = window.scrollY || 0;
-      if ((window.scrollX || 0) !== 0) window.scrollTo(0, y);
-      if (document.documentElement.scrollLeft !== 0) document.documentElement.scrollLeft = 0;
-      if (document.body && document.body.scrollLeft !== 0) document.body.scrollLeft = 0;
-      ticking = false;
+    const ALLOW_PAN_X_SELECTOR = ".strip, .filter-row";
+    let startX = 0;
+    let startY = 0;
+    let allowPanX = false;
+
+    const toElement = (target) => (target && target.nodeType === 1 ? target : target?.parentElement) ?? null;
+
+    const onTouchStart = (e) => {
+      const t = e.touches?.[0];
+      if (!t) return;
+      startX = t.clientX;
+      startY = t.clientY;
+      const el = toElement(e.target);
+      allowPanX = Boolean(el?.closest(ALLOW_PAN_X_SELECTOR));
     };
-    const scheduleClamp = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(clampX);
+
+    const onTouchMove = (e) => {
+      const t = e.touches?.[0];
+      if (!t) return;
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (Math.abs(dx) <= Math.abs(dy)) return; // primarily vertical gesture
+      if (allowPanX) return; // keep intended horizontal strips working
+      e.preventDefault(); // block page-level sideways pan
     };
-    window.addEventListener("scroll", scheduleClamp, { passive: true });
-    window.addEventListener("touchmove", scheduleClamp, { passive: true });
-    window.addEventListener("touchend", scheduleClamp, { passive: true });
-    window.addEventListener("resize", scheduleClamp, { passive: true });
-    scheduleClamp();
+
+    document.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
+    document.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
     return () => {
-      window.removeEventListener("scroll", scheduleClamp);
-      window.removeEventListener("touchmove", scheduleClamp);
-      window.removeEventListener("touchend", scheduleClamp);
-      window.removeEventListener("resize", scheduleClamp);
+      document.removeEventListener("touchstart", onTouchStart, { capture: true });
+      document.removeEventListener("touchmove", onTouchMove, { capture: true });
     };
   }, []);
 
