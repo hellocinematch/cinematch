@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.26
+
+- **Mobile overflow guard (top bars):** Hide the small **community/ratings** stats block inside mobile `page-topbar` (Discover/Profile/Detail/etc) to avoid Safari width overflows. Logo remains; desktop and home hero behavior unchanged.
+
 ## 1.0.25
 
 - **Profile save reliability:** Preference writes now use `update(...).eq(id)` (not upsert) and show an in-app error banner in Profile when a save fails. This makes streaming-provider save failures visible and avoids conflict-path quirks.

@@ -914,8 +914,8 @@ const styles = `
     .page-topbar > div:nth-child(2) { display:none; }
     .page-topbar .topbar-brand-cluster { gap:6px; min-width:0; }
     .page-topbar .app-brand.brand-logo--header { width:min(176px, 100%); }
-    .page-topbar .public-site-stats-val { font-size:10px; }
-    .page-topbar .public-site-stats-lbl { font-size:7px; letter-spacing:0.45px; }
+    /* Mobile stability: stats beside logo can reintroduce tiny horizontal pan on some Safari widths. */
+    .page-topbar .public-site-stats { display:none; }
   }
 
   /* Desktop/tablet: let app breathe beyond the mobile shell while keeping phone UX unchanged. */
