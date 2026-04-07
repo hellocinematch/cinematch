@@ -405,6 +405,27 @@ function tmdbOnlyRec(movie) {
   };
 }
 
+/** Supabase recovery links issue a JWT whose `amr` includes `recovery` until `updateUser({ password })` runs. */
+function isPasswordRecoverySession(session) {
+  if (!session?.access_token) return false;
+  try {
+    const part = session.access_token.split(".")[1];
+    if (!part) return false;
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    const amr = payload.amr;
+    if (!Array.isArray(amr)) return false;
+    return amr.some(
+      entry =>
+        entry === "recovery" ||
+        (typeof entry === "object" && entry !== null && entry.method === "recovery"),
+    );
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
@@ -991,15 +1012,27 @@ export default function App() {
   const totalCards = cardOrder.length;
 
   useEffect(() => {
+    function routeRecovery(session) {
+      setScreen("auth");
+      setAuthMode("reset");
+      setAuthError("");
+      setAuthNotice("Recovery link verified. Set a new password to continue.");
+    }
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) { setUser(session.user); setScreen("loading-catalogue"); }
+      if (!session?.user) return;
+      setUser(session.user);
+      const url = typeof window !== "undefined" ? `${window.location.hash}${window.location.search}` : "";
+      const urlRecovery = /type=recovery(?:&|$|#)/.test(url);
+      // Do not send recovery sessions to the app — getSession() can race PASSWORD_RECOVERY and skip the reset screen.
+      if (urlRecovery || isPasswordRecoverySession(session)) {
+        routeRecovery(session);
+        return;
+      }
+      setScreen("loading-catalogue");
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setScreen("auth");
-        setAuthMode("reset");
-        setAuthError("");
-        setAuthNotice("Recovery link verified. Set your new password.");
+      if (event === "PASSWORD_RECOVERY" || (session && isPasswordRecoverySession(session) && (event === "SIGNED_IN" || event === "INITIAL_SESSION"))) {
+        routeRecovery(session);
       }
       setUser(session?.user ?? null);
     });
@@ -1328,9 +1361,9 @@ export default function App() {
       setAuthError(error.message);
       return;
     }
-    setAuthNotice("Password updated. You can now sign in.");
-    setAuthMode("signin");
+    setAuthNotice("");
     setAuthPassword("");
+    setScreen("loading-catalogue");
   }
 
   async function handleSignOut() {
@@ -1521,7 +1554,8 @@ export default function App() {
     setSelectedToWatch(prev => { const n = { ...prev }; delete n[movieId]; return n; });
     if (user) {
       const [type, tmdbId] = movieId.split("-");
-      await supabase.from("ratings").upsert({ user_id: user.id, tmdb_id: parseInt(tmdbId), media_type: type, score }, { onConflict: "user_id,tmdb_id,media_type" });
+      const { error: ratingErr } = await supabase.from("ratings").upsert({ user_id: user.id, tmdb_id: parseInt(tmdbId), media_type: type, score }, { onConflict: "user_id,tmdb_id,media_type" });
+      if (ratingErr) console.warn("Could not save rating:", ratingErr.message);
       await supabase.from("watchlist").delete().eq("user_id", user.id).eq("tmdb_id", parseInt(tmdbId)).eq("media_type", type);
     }
   }
