@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.19
+
+- **Home (desktop):** Hide **`topbar-brand-cluster`** inside **`home-header`** when **`home-topbar`** is visible — removes duplicate community/ratings next to the tagline. Mobile unchanged (no top home bar).
+
 ## 1.0.18
 
 - **Community stats (marketing):** Next to the wordmark in **top bars** and **home hero** — two lines (**community** = `profiles` count, **ratings** = `ratings` row count). Fetched once via Supabase RPC **`get_public_site_stats`** (apply migration **`20260407140000_get_public_site_stats.sql`**). Compact format (e.g. `1.2k`) when large; hidden until first successful load.

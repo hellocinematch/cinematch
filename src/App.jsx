@@ -926,6 +926,8 @@ const styles = `
     .home-header { padding:18px 32px 10px; display:block; }
     /* Desktop: tagline-only strip hidden on More/Friends (logo + avatar stay in home-topbar). */
     .home-header--no-picks-tagline { display:none; }
+    /* Logo + community stats live in home-topbar; hide duplicate cluster here (stats are siblings of .app-brand). */
+    .home-header .topbar-brand-cluster { display:none; }
     .home-header .app-brand,
     .home-header .avatar-wrap { display:none; }
     .home-greeting { font-size:56px; }
