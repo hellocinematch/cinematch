@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.16
+
+- **Mobile overflow:** Remove **`100vw` / `86vw`** from header and splash logos (use **`%` / `100%`** so sizing tracks the `.app` shell — iOS Safari often treats `100vw` wider than the painted column). **`minmax(0, …)`** on top bar grids, **`min-width: 0`** on home hero / section headers, **`overflow-wrap`** on tagline and section meta, and **bottom nav** centered with **`left:0; right:0`** instead of **`translateX(-50%)`** to avoid subpixel horizontal pan.
+
 ## 1.0.15
 
 - **Detail (desktop):** Poster stays **one grid-card wide**; **title, prediction, synopsis, where to watch** use a **wider column** (two Discover cards + gap, same math as `.disc-grid`). **Slider + rating buttons** capped at **380px** centered. Mobile: unchanged full-width flow (rules scoped to `min-width: 900px`).

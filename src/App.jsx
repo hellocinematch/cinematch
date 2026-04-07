@@ -460,12 +460,12 @@ const styles = `
   .splash { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; animation:fadeIn 0.8s ease; }
   .splash-logo { line-height:0; display:flex; justify-content:center; align-items:center; margin-bottom:32px; width:100%; }
   .app-brand.brand-logo { display:block; max-width:100%; object-fit:contain; object-position:left center; }
-  .app-brand-button { display:block; line-height:0; padding:0; margin:0; border:none; background:none; cursor:pointer; font:inherit; color:inherit; text-align:left; }
+  .app-brand-button { display:block; line-height:0; padding:0; margin:0; border:none; background:none; cursor:pointer; font:inherit; color:inherit; text-align:left; max-width:100%; min-width:0; }
   .app-brand-button:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:4px; }
-  /* Mobile-first header sizing by width to prevent right-side overflow with wide logo/tagline assets. */
-  .app-brand.brand-logo--header { width:min(220px, calc(100vw - 124px)); height:auto; }
+  /* Use % of grid cell — 100vw on iOS can be wider than the layout and reintroduces horizontal pan. */
+  .app-brand.brand-logo--header { width:min(220px, 100%); max-width:100%; height:auto; }
   /* Taller on splash so wordmark + tagline stay readable (full logo viewBox 400×120). */
-  .app-brand.brand-logo--splash { width:min(86vw, 380px); height:auto; object-position:center center; }
+  .app-brand.brand-logo--splash { width:min(86%, 380px); max-width:100%; height:auto; object-position:center center; }
   .home-header .app-brand { margin-bottom:10px; }
   .discover-header { padding:16px 24px 12px; }
   .mood-header { padding:16px 24px 16px; }
@@ -579,7 +579,7 @@ const styles = `
   /* Shared top chrome on Discover / Mood / Profile / Detail / Rated (not on Home — Home uses home-header + tagline). */
   .page-topbar {
     display:grid;
-    grid-template-columns:auto 1fr auto;
+    grid-template-columns:minmax(0, auto) 1fr auto;
     align-items:center;
     gap:20px;
     padding:14px 20px;
@@ -594,12 +594,13 @@ const styles = `
   .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
   .home-topnav { display:flex; gap:3px; padding:4px; background:#141414; border-radius:11px; border:1px solid #222; width:100%; max-width:620px; }
   .home-topnav .home-segment { flex:1; }
-  .home-header { padding:48px 24px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; }
+  .home-header { padding:48px 24px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; min-width:0; }
   /* More / Friends: tighter mobile hero without tagline (wordmark + avatar only). */
   .home-header--no-picks-tagline { padding-top:28px; padding-bottom:12px; }
-  .home-hero-copy { padding:0; display:inline-block; max-width:100%; }
-  .home-greeting { font-family:'DM Sans',sans-serif; font-size:52px; font-weight:600; color:#f0ebe0; margin-top:2px; line-height:1.02; letter-spacing:-0.6px; }
-  .home-subtitle { font-family:'DM Serif Display',serif; font-size:42px; font-weight:400; color:#cdcdc8; margin-top:8px; line-height:1.1; max-width:960px; letter-spacing:-0.2px; }
+  .home-hero { min-width:0; }
+  .home-hero-copy { padding:0; display:block; max-width:100%; min-width:0; }
+  .home-greeting { font-family:'DM Sans',sans-serif; font-size:52px; font-weight:600; color:#f0ebe0; margin-top:2px; line-height:1.02; letter-spacing:-0.6px; overflow-wrap:anywhere; }
+  .home-subtitle { font-family:'DM Serif Display',serif; font-size:42px; font-weight:400; color:#cdcdc8; margin-top:8px; line-height:1.1; max-width:100%; letter-spacing:-0.2px; overflow-wrap:anywhere; }
   .home-segments { display:flex; margin:0 24px 22px; padding:4px; background:#141414; border-radius:11px; border:1px solid #222; gap:3px; }
   .home-segment { flex:1; text-align:center; padding:11px 6px; font-size:13px; font-family:'DM Sans',sans-serif; color:#888; cursor:pointer; border-radius:8px; border:none; background:transparent; transition:all 0.2s; }
   .home-segment:hover { color:#bbb; }
@@ -615,9 +616,9 @@ const styles = `
   .avatar-menu-btn.danger { color:#f09a9a; }
   .avatar-menu-btn.danger:hover { background:#2a1818; }
   .section { padding:0 0 30px; min-width:0; }
-  .section-header { padding:0 24px; display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px; }
-  .section-title { font-family:'DM Serif Display',serif; font-size:22px; color:#ddd7cd; min-width:0; }
-  .section-meta { font-size:12px; color:#555; letter-spacing:1px; text-transform:uppercase; }
+  .section-header { padding:0 24px; display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px; min-width:0; }
+  .section-title { font-family:'DM Serif Display',serif; font-size:22px; color:#ddd7cd; min-width:0; flex:1 1 auto; }
+  .section-meta { font-size:12px; color:#555; letter-spacing:1px; text-transform:uppercase; min-width:0; flex:0 1 auto; overflow-wrap:anywhere; text-align:right; }
   .top-picks-block { margin-top:24px; }
   .top-picks-block:first-of-type { margin-top:0; }
   .top-picks-block .section-header { margin-bottom:10px; }
@@ -642,7 +643,7 @@ const styles = `
   .empty-box { margin:0 24px; padding:24px; border:1px dashed #222; border-radius:10px; text-align:center; }
   .empty-text { font-size:13px; color:#444; }
 
-  .bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:var(--shell); box-sizing:border-box; background:rgba(10,10,10,0.95); border-top:1px solid #1a1a1a; display:flex; padding:12px 0 calc(20px + env(safe-area-inset-bottom,0px)); padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px); backdrop-filter:blur(20px); z-index:100; }
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; margin-left:auto; margin-right:auto; width:100%; max-width:var(--shell); box-sizing:border-box; background:rgba(10,10,10,0.95); border-top:1px solid #1a1a1a; display:flex; padding:12px 0 calc(20px + env(safe-area-inset-bottom,0px)); padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px); backdrop-filter:blur(20px); z-index:100; }
   .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; opacity:0.4; transition:opacity 0.2s; }
   .nav-item.active { opacity:1; }
   .nav-icon { font-size:20px; }
@@ -659,7 +660,7 @@ const styles = `
   .app-footer-tmdb { font-size:10px; color:#444; text-align:center; line-height:1.45; margin-top:10px; max-width:520px; margin-left:auto; margin-right:auto; }
   .app-footer-tmdb a { color:#6a7a8a; }
   .legal-shell { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:calc(24px + env(safe-area-inset-bottom,0px)); animation:fadeIn 0.3s ease; }
-  .legal-topbar { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; padding:14px 20px; padding-top:max(14px, env(safe-area-inset-top,0px)); border-bottom:1px solid #1a1a1a; position:sticky; top:0; background:#0a0a0a; z-index:40; }
+  .legal-topbar { display:grid; grid-template-columns:minmax(0, auto) 1fr auto; align-items:center; gap:12px; padding:14px 20px; padding-top:max(14px, env(safe-area-inset-top,0px)); border-bottom:1px solid #1a1a1a; position:sticky; top:0; background:#0a0a0a; z-index:40; }
   .legal-back { background:none; border:none; color:#888; font-size:14px; cursor:pointer; font-family:'DM Sans',sans-serif; padding:6px 0; }
   .legal-back:hover { color:#ccc; }
   .legal-topbar-title { font-family:'DM Serif Display',serif; font-size:18px; color:#ddd7cd; text-align:center; }
@@ -866,7 +867,7 @@ const styles = `
   @media (min-width: 900px) {
     .app { --shell:1120px; }
     .app-brand.brand-logo--header { width:320px; }
-    .home-topbar { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:20px; padding:14px 32px; border-bottom:1px solid #1a1a1a; }
+    .home-topbar { display:grid; grid-template-columns:minmax(0, auto) 1fr auto; align-items:center; gap:20px; padding:14px 32px; border-bottom:1px solid #1a1a1a; }
     .home-topbar .app-brand { margin:0; }
     .home-topbar .avatar-wrap { justify-self:end; align-self:center; }
     .page-topbar { padding:14px 32px; padding-top:max(14px, env(safe-area-inset-top, 0px)); }
