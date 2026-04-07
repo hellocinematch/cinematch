@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.13
+
+- **Onboarding / rate-more:** Responsive layout — no `flex:1` stretch between card and controls; poster uses **16:9** + **viewport-capped height** (`vh` + `clamp`); card and rating block **max-width** and centered on larger screens; **safe-area** padding; scroll the step on short viewports.
+
 ## 1.0.12
 
 - **Onboarding:** **Sign up** with an active session now uses **`loading-catalogue` → pref** (same as sign-in) so the **catalogue is loaded** before cinema prefs; avoids **empty `obMovies`** and a blank rating step. **Continue** is disabled until the catalogue is ready. **Email-confirm-only** signups (no session) show a notice instead of a broken pref screen. Fallback **“Preparing titles…”** if onboarding opens before titles are ready; tighter onboarding metadata checks and try/catch on post-login routing.

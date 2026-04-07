@@ -528,26 +528,26 @@ const styles = `
   .pref-btn:hover { background:#f0d880; }
   .pref-btn:disabled { opacity:0.4; cursor:default; }
 
-  .onboarding { height:100vh; display:flex; flex-direction:column; background:#0a0a0a; animation:fadeIn 0.5s ease; }
-  .ob-header { padding:52px 24px 16px; display:flex; flex-direction:column; gap:6px; }
+  .onboarding { min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; background:#0a0a0a; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .ob-header { padding:max(48px, env(safe-area-inset-top, 0px)) 20px 12px; display:flex; flex-direction:column; gap:6px; width:100%; max-width:min(100%, 440px); margin:0 auto; box-sizing:border-box; }
   .ob-step { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#e8c96a; }
-  .ob-title { font-family:'DM Serif Display',serif; font-size:26px; color:#f0ebe0; line-height:1.2; }
+  .ob-title { font-family:'DM Serif Display',serif; font-size:clamp(22px, 4.2vw, 28px); color:#f0ebe0; line-height:1.2; }
   .ob-subtitle { font-size:13px; color:#666; margin-top:2px; }
-  .ob-dots { display:flex; gap:6px; padding:0 24px; margin-bottom:12px; }
+  .ob-dots { display:flex; gap:6px; padding:0 20px; margin:0 auto 12px; width:100%; max-width:min(100%, 440px); box-sizing:border-box; }
   .ob-dot { height:3px; border-radius:2px; transition:all 0.3s; background:#222; flex:1; }
   .ob-dot.active { background:#e8c96a; }
   .ob-dot.done { background:#666; }
-  .card-area { flex:1; padding:0 24px; display:flex; flex-direction:column; min-height:0; }
-  .movie-card { background:#141414; border-radius:16px; overflow:hidden; border:1px solid #222; flex:1; display:flex; flex-direction:column; max-height:380px; animation:slideUp 0.4s ease; }
-  .card-poster { flex:1; position:relative; overflow:hidden; min-height:180px; }
+  .card-area { flex:0 1 auto; padding:0 20px; display:flex; flex-direction:column; align-items:center; width:100%; min-height:0; box-sizing:border-box; }
+  .movie-card { width:100%; max-width:min(100%, 400px); background:#141414; border-radius:16px; overflow:hidden; border:1px solid #222; flex:none; display:flex; flex-direction:column; animation:slideUp 0.4s ease; box-sizing:border-box; }
+  .card-poster { flex:none; position:relative; overflow:hidden; width:100%; aspect-ratio:16/9; max-height:min(48vh, 260px); }
   .card-poster img { width:100%; height:100%; object-fit:cover; }
-  .card-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:64px; background:#1a1a1a; }
+  .card-poster-fallback { width:100%; height:100%; min-height:120px; display:flex; align-items:center; justify-content:center; font-size:clamp(40px, 12vw, 64px); background:#1a1a1a; }
   .card-type-badge { position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.75); border:1px solid #333; padding:3px 8px; border-radius:10px; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#aaa; }
   .card-lang-badge { position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.75); border:1px solid #555; padding:3px 8px; border-radius:10px; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#e8c96a; }
   .card-info { padding:12px 16px; }
-  .card-title { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; line-height:1.1; }
+  .card-title { font-family:'DM Serif Display',serif; font-size:clamp(18px, 3.8vw, 22px); color:#f0ebe0; line-height:1.1; }
   .card-year { font-size:12px; color:#555; margin-top:2px; }
-  .rating-area { padding:12px 24px 20px; }
+  .rating-area { width:100%; max-width:min(100%, 400px); margin:0 auto; padding:12px 20px max(20px, env(safe-area-inset-bottom, 0px)); flex-shrink:0; box-sizing:border-box; }
   .rating-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .rating-q { font-size:13px; color:#aaa; }
   .rating-val { font-family:'DM Serif Display',serif; font-size:28px; color:#e8c96a; min-width:36px; text-align:right; }
@@ -560,6 +560,18 @@ const styles = `
   .btn-confirm:not(:disabled):hover { background:#f0d880; }
   .btn-skip { background:#1a1a1a; color:#666; border:1px solid #2a2a2a; padding:13px 16px; font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; border-radius:2px; transition:all 0.2s; white-space:nowrap; }
   .btn-skip:hover { border-color:#444; color:#aaa; }
+
+  @media (min-width: 600px) {
+    .ob-header { max-width: 480px; padding-left: 24px; padding-right: 24px; }
+    .ob-dots { max-width: 480px; padding-left: 24px; padding-right: 24px; }
+    .card-area { padding: 0 24px; }
+    .movie-card { max-width: 440px; }
+    .card-poster { max-height: min(34vh, 340px); }
+    .rating-area { max-width: 440px; padding-left: 24px; padding-right: 24px; }
+  }
+  @media (min-width: 900px) {
+    .card-poster { max-height: min(28vh, 360px); }
+  }
 
   .home { min-height:100vh; min-height:100dvh; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-y:auto; min-width:0; }
   .home-topbar { display:none; }
