@@ -704,7 +704,7 @@ const styles = `
   .search-submit-btn { position:absolute; left:8px; top:50%; transform:translateY(-50%); width:28px; height:28px; border:none; background:transparent; color:#888; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; }
   .search-submit-btn:active { opacity:0.8; }
   .search-submit-btn .search-icon { position:static; transform:none; font-size:16px; }
-  .search-input { width:100%; min-width:0; background:#141414; border:1px solid #2a2a2a; border-radius:10px; padding:12px 16px 12px 42px; font-family:'DM Sans',sans-serif; font-size:14px; color:#f0ebe0; outline:none; transition:border-color 0.2s; }
+  .search-input { width:100%; min-width:0; background:#141414; border:1px solid #2a2a2a; border-radius:10px; padding:12px 16px 12px 42px; font-family:'DM Sans',sans-serif; font-size:16px; line-height:1.2; color:#f0ebe0; outline:none; transition:border-color 0.2s; -webkit-appearance:none; appearance:none; }
   .search-input::placeholder { color:#444; }
   .search-input:focus { border-color:#555; }
   .search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:16px; pointer-events:none; }
