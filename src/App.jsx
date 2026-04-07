@@ -708,7 +708,7 @@ const styles = `
   .filter-pill:not(.active):hover { border-color:#555; color:#ccc; }
   .search-status { padding:8px 24px; font-size:12px; color:#666; overflow-wrap:anywhere; word-break:break-word; }
   .disc-grid { padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
-  .disc-card { cursor:pointer; transition:transform 0.2s; }
+  .disc-card { cursor:pointer; transition:transform 0.2s; min-width:0; }
   .disc-card:hover { transform:translateY(-3px); }
   .disc-poster { width:100%; aspect-ratio:2/3; border-radius:12px; overflow:hidden; position:relative; border:1px solid #1e1e1e; background:#1a1a1a; }
   .disc-poster img { width:100%; height:100%; object-fit:cover; }
@@ -718,8 +718,8 @@ const styles = `
   .disc-rated-badge { color:#88cc88; }
   .disc-pred-badge { color:#e8c96a; }
   .disc-unseen-badge { color:#555; font-size:10px; font-family:'DM Sans',sans-serif; }
-  .disc-title { font-size:13px; color:#ccc; margin-top:8px; line-height:1.3; font-weight:500; }
-  .disc-meta { font-size:11px; color:#555; margin-top:2px; }
+  .disc-title { font-size:13px; color:#ccc; margin-top:8px; line-height:1.3; font-weight:500; overflow-wrap:anywhere; word-break:break-word; }
+  .disc-meta { font-size:11px; color:#555; margin-top:2px; overflow-wrap:anywhere; word-break:break-word; }
   .disc-empty { padding:48px 24px; text-align:center; }
   .disc-empty-text { font-size:14px; color:#444; }
 

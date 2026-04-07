@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.28
+
+- **Discover typing overflow fix (mobile):** Harden result cards against intrinsic-width growth while typing. `disc-card` now has `min-width:0`; `disc-title` and `disc-meta` hard-wrap long/unbroken text. This prevents horizontal pan when search results appear.
+
 ## 1.0.27
 
 - **Mobile overflow (home/login path):** Hide `public-site-stats` inside mobile `home-header` (logo remains). This removes immediate horizontal overflow on login/home without changing desktop stats placement.
