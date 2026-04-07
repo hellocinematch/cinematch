@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.23
+
+- **Profile sync fix (cross-device):** Preference saves now upsert **all three profile arrays together** (`streaming_provider_ids`, `show_genre_ids`, `show_region_keys`) on every save to prevent partial writes from wiping the other fields.
+
 ## 1.0.22
 
 - **Profile settings sync:** Remove localStorage fallback for streaming/genre/region preferences. App now always loads these from `profiles` in Supabase (DB is the single source of truth across devices). Saves still upsert to `profiles`.

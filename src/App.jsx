@@ -1448,26 +1448,30 @@ export default function App() {
     }
   }
 
+  async function persistProfileSettings(next) {
+    if (!user) return;
+    const payload = {
+      id: user.id,
+      streaming_provider_ids: Array.isArray(next.streaming_provider_ids) ? next.streaming_provider_ids : selectedStreamingProviderIds,
+      show_genre_ids: Array.isArray(next.show_genre_ids) ? next.show_genre_ids : showGenreIds,
+      show_region_keys: Array.isArray(next.show_region_keys) ? next.show_region_keys : showRegionKeys,
+    };
+    const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "id" });
+    if (error) console.warn("Could not save profile settings:", error.message);
+  }
+
   async function persistStreamingProviders(ids) {
     if (!user) return;
     const clean = [...new Set(ids.filter(n => typeof n === "number"))].sort((a, b) => a - b);
     setSelectedStreamingProviderIds(clean);
-    const { error } = await supabase.from("profiles").upsert(
-      { id: user.id, streaming_provider_ids: clean },
-      { onConflict: "id" },
-    );
-    if (error) console.warn("Could not save streaming providers to profile:", error.message);
+    await persistProfileSettings({ streaming_provider_ids: clean });
   }
 
   async function persistShowGenreIds(ids) {
     if (!user) return;
     const clean = [...new Set(ids.filter(n => typeof n === "number"))].sort((a, b) => a - b);
     setShowGenreIds(clean);
-    const { error } = await supabase.from("profiles").upsert(
-      { id: user.id, show_genre_ids: clean },
-      { onConflict: "id" },
-    );
-    if (error) console.warn("Could not save genre preferences:", error.message);
+    await persistProfileSettings({ show_genre_ids: clean });
   }
 
   async function persistShowRegionKeys(keys) {
@@ -1475,11 +1479,7 @@ export default function App() {
     const allowed = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
     const clean = [...new Set(keys.filter(k => typeof k === "string" && allowed.has(k)))].sort();
     setShowRegionKeys(clean);
-    const { error } = await supabase.from("profiles").upsert(
-      { id: user.id, show_region_keys: clean },
-      { onConflict: "id" },
-    );
-    if (error) console.warn("Could not save region preferences:", error.message);
+    await persistProfileSettings({ show_region_keys: clean });
   }
 
   function toggleShowGenre(genreId) {
