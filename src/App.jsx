@@ -756,6 +756,8 @@ const styles = `
   .wtw-link:hover { text-decoration:underline; }
 
   .detail { min-height:100vh; min-height:100dvh; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-y:auto; min-width:0; position:relative; }
+  /* Desktop: same column width as one card in Discover grid (see .disc-grid breakpoints). */
+  .detail-inner { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
   .d-poster { height:320px; position:relative; overflow:hidden; }
   .d-poster img { width:100%; height:100%; object-fit:cover; }
   .d-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:100px; background:#141414; }
@@ -889,6 +891,18 @@ const styles = `
     .strip-genre { font-size:12px; }
     .filter-row { padding-left:32px; padding-right:32px; }
     .disc-grid { padding:0 32px; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
+    /* One discover-column width: (shell − grid padding − gaps) / columns */
+    .detail-inner {
+      max-width:calc((min(100%, var(--shell)) - 64px - 48px) / 4);
+    }
+    .detail-inner .d-poster {
+      height:auto;
+      aspect-ratio:2/3;
+      border-radius:12px;
+      border:1px solid #1e1e1e;
+      box-sizing:border-box;
+    }
+    .detail-inner .d-body { padding-left:16px; padding-right:16px; }
     .profile-top,
     .profile-settings,
     .profile-section,
@@ -905,6 +919,9 @@ const styles = `
     .strip-card { width:198px; }
     .strip-poster { width:198px; height:276px; }
     .disc-grid { grid-template-columns:repeat(5, minmax(0, 1fr)); gap:18px; }
+    .detail-inner {
+      max-width:calc((min(100%, var(--shell)) - 64px - 72px) / 5);
+    }
   }
 
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
@@ -2806,6 +2823,7 @@ export default function App() {
               <div />
               <AccountAvatarMenu />
             </div>
+            <div className="detail-inner">
             <div className="d-poster">
               {movie.backdrop || movie.poster ? <img src={movie.backdrop || movie.poster} alt={movie.title} /> : <div className="d-poster-fallback">🎬</div>}
               <div className="d-overlay" />
@@ -2905,6 +2923,7 @@ export default function App() {
                   </div>
                 </div>
               ) : null}
+            </div>
             </div>
           </div>
         );
