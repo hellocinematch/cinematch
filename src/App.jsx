@@ -2108,6 +2108,7 @@ export default function App() {
         poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
         backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
         tmdbRating: Math.round((item.vote_average || 0) * 10) / 10 || 7,
+        voteCount: Number(item.vote_count || 0),
         genreIds: item.genre_ids || [],
         language: item.original_language || "en",
         popularity: item.popularity,
@@ -2145,7 +2146,7 @@ export default function App() {
       let scored = [];
       if (user) {
         const { data, error } = await supabase.functions.invoke("match", {
-          body: { action: "mood", userRatings, catalogue, movies: combined },
+          body: { action: "mood", userRatings, catalogue, movies: combined, vibe },
         });
         if (!error && data?.scored?.length) scored = data.scored;
         else {

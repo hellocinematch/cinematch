@@ -25,6 +25,7 @@ type Movie = Record<string, unknown> & {
   id: string;
   tmdbRating?: number;
   popularity?: number;
+  voteCount?: number;
 };
 
 type RatingsMap = Record<string, number>;
@@ -80,6 +81,58 @@ function predictRatingRange(movieId: string, neighbors: Neighbor[]): Pred | null
 }
 
 type Rec = Pred & { movie: Movie };
+
+function percentile(sortedAsc: number[], p: number): number {
+  if (sortedAsc.length === 0) return 0;
+  const idx = Math.max(0, Math.min(sortedAsc.length - 1, Math.floor((sortedAsc.length - 1) * p)));
+  return sortedAsc[idx] ?? 0;
+}
+
+function rankMoodByVibe(items: Rec[], vibe: string[]): Rec[] {
+  if (items.length === 0) return [];
+  const wantsHidden = vibe.includes("hidden");
+  const wantsAcclaimed = vibe.includes("acclaimed");
+  if (!wantsHidden && !wantsAcclaimed) {
+    return [...items].sort((a, b) => b.predicted - a.predicted);
+  }
+
+  const voteCounts = items
+    .map((r) => Number(r.movie.voteCount ?? 0))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  const p90Votes = percentile(voteCounts, 0.9);
+  const p30Votes = percentile(voteCounts, 0.3);
+
+  const scored = items.map((r) => {
+    const tmdb = Number(r.movie.tmdbRating ?? r.predicted ?? 0);
+    const voteCount = Number(r.movie.voteCount ?? 0);
+    const popularity = Number(r.movie.popularity ?? 0);
+    const popTerm = Math.log1p(Math.max(1, popularity));
+    const neighborCount = Number(r.neighborCount ?? 0);
+
+    if (wantsHidden) {
+      // Hidden gem: strong quality, low exposure, and ideally only 1-2 loving neighbors.
+      let s = (r.predicted * 2.2 + tmdb) / popTerm;
+      if (neighborCount >= 1 && neighborCount <= 2 && r.predicted >= 7.5) s += 2.0;
+      if (neighborCount > 2) s -= 0.5;
+      if (tmdb >= 7.5) s += 0.8;
+      if (voteCount <= p30Votes) s += 1.1;
+      if (voteCount > p90Votes) s -= 0.8;
+      return { rec: r, score: s };
+    }
+
+    // Critically acclaimed: broad validation + many neighbors.
+    let s = (r.predicted * popTerm) + (tmdb * 0.8);
+    if (neighborCount >= 3 && r.predicted >= 8) s += 1.5;
+    if (tmdb >= 8.0) s += 1.0;
+    if (voteCount >= p90Votes) s += 1.2;
+    return { rec: r, score: s };
+  });
+
+  return scored
+    .sort((a, b) => b.score - a.score || b.rec.predicted - a.rec.predicted)
+    .map((x) => x.rec);
+}
 
 function buildRecWithPrediction(movie: Movie, neighbors: Neighbor[]): Rec {
   const pred = predictRatingRange(movie.id, neighbors);
@@ -385,8 +438,11 @@ Deno.serve(async (req: Request) => {
 
     if (action === "mood") {
       const movies = (body.movies as Movie[]) || [];
+      const vibe = Array.isArray(body.vibe)
+        ? (body.vibe as unknown[]).filter((v): v is string => typeof v === "string")
+        : [];
       const seen = new Set(Object.keys(userRatings));
-      const scored = movies
+      const scoredPool = movies
         .filter((m) => !seen.has(m.id))
         .map((m) => {
           const pred = predictRatingRange(m.id, neighbors);
@@ -401,8 +457,8 @@ Deno.serve(async (req: Request) => {
               neighborCount: 0,
             };
         })
-        .sort((a, b) => b.predicted - a.predicted)
-        .slice(0, 5);
+      ;
+      const scored = rankMoodByVibe(scoredPool, vibe).slice(0, 5);
       return new Response(JSON.stringify({ scored }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

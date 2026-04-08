@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.6
+
+- **Mood acclaimed vs hidden logic:** Pass selected vibes into the Edge `match` mood action and rank candidates differently by vibe using neighbor counts + TMDB vote stats. **Critically acclaimed** now favors broadly validated titles (higher neighbor support / vote-count strength), while **Hidden gem** favors high-quality, lower-exposure picks (1-2 neighbor loves + lower vote-count percentile).
+
 ## 1.1.5
 
 - **Mood quick watch:** When only **Quick watch** is selected (or combined with **Critically acclaimed**), use `sort_by=vote_average.desc` and a `vote_count` floor so TMDB ordering diverges from **Critically acclaimed** alone (`popularity.desc` + `vote_average.gte`), which often returned the same top picks for sub‑105‑minute blockbusters.
