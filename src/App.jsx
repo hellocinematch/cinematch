@@ -2338,6 +2338,7 @@ export default function App() {
       }
       if (wantsHidden) {
         combined = [...combined]
+          .filter((m) => Number(m.voteCount || 0) >= 100)
           .sort((a, b) => (Number(b.hiddenBaseScore || 0) - Number(a.hiddenBaseScore || 0)))
           .slice(0, 50);
       }
