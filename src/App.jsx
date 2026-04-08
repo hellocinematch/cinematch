@@ -358,9 +358,10 @@ function passesShowRegionsFilter(movie, showRegionKeys) {
     ? selectedNonCountryGated.some(option => option.languages.includes(lang))
     : false;
   if (selectedCountryGated.length > 0) {
-    // If TMDB provides country metadata, enforce hollywood/indian by country; otherwise fall back to language.
+    // For hollywood/indian, unknown-country rows should not pass on language alone.
+    // Only allow unknown-country rows when another non-country region selection matches by language.
     if (hasCountry) return countryMatch || languageMatchNonGated;
-    return languageMatch;
+    return languageMatchNonGated;
   }
   return languageMatch;
 }
