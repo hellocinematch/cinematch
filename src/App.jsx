@@ -2077,6 +2077,7 @@ export default function App() {
       params.set("vote_count.gte", "80");
     } else if (vibe.includes("acclaimed")) {
       params.set("vote_average.gte", "7.5");
+      params.set("vote_count.gte", "200");
     }
     if (vibe.includes("very_recent")) params.set("primary_release_date.gte", `${currentYear - 1}-01-01`);
     if (vibe.includes("recent")) params.set("primary_release_date.gte", `${currentYear - 3}-01-01`);
