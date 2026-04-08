@@ -86,6 +86,11 @@ function buildWatchlistFromRows(watchlistData, catalogue) {
 }
 
 function normalizeTMDBItem(item, type) {
+  const originCountries = Array.isArray(item.origin_country)
+    ? item.origin_country.filter(c => typeof c === "string").map(c => c.toUpperCase())
+    : Array.isArray(item.production_countries)
+      ? item.production_countries.map(c => c?.iso_3166_1).filter(c => typeof c === "string").map(c => c.toUpperCase())
+      : [];
   return {
     id: `${type}-${item.id}`,
     tmdbId: item.id,
@@ -100,6 +105,7 @@ function normalizeTMDBItem(item, type) {
     tmdbRating: Math.round(item.vote_average * 10) / 10,
     popularity: item.popularity,
     language: item.original_language || "en",
+    originCountries,
   };
 }
 
@@ -196,6 +202,11 @@ async function fetchCatalogue() {
     tmdbRating: Math.round(item.vote_average * 10) / 10,
     popularity: item.popularity,
     language: item.original_language || "en",
+    originCountries: Array.isArray(item.origin_country)
+      ? item.origin_country.filter(c => typeof c === "string").map(c => c.toUpperCase())
+      : Array.isArray(item.production_countries)
+        ? item.production_countries.map(c => c?.iso_3166_1).filter(c => typeof c === "string").map(c => c.toUpperCase())
+        : [],
   });
   const movies = [
     ...filterDefaultExcludedGenres(popMovies.results || []).map(m => normalize(m, "movie")),
@@ -235,6 +246,11 @@ async function fetchRegionalTitles(langCode) {
       tmdbRating: Math.round(item.vote_average * 10) / 10,
       popularity: item.popularity,
       language: item.original_language || langCode,
+      originCountries: Array.isArray(item.origin_country)
+        ? item.origin_country.filter(c => typeof c === "string").map(c => c.toUpperCase())
+        : Array.isArray(item.production_countries)
+          ? item.production_countries.map(c => c?.iso_3166_1).filter(c => typeof c === "string").map(c => c.toUpperCase())
+          : [],
     });
     return [
       ...filterDefaultExcludedGenres(movies.results || []).slice(0, 15).map(m => normalize(m, "movie")),
@@ -312,10 +328,36 @@ function passesShowGenresFilter(movie, showGenreIds) {
 function passesShowRegionsFilter(movie, showRegionKeys) {
   if (!showRegionKeys || showRegionKeys.length === 0) return true;
   const lang = String(movie?.language || "").toLowerCase();
-  if (!lang) return false;
-  return PROFILE_REGION_OPTIONS
-    .filter(option => showRegionKeys.includes(option.id))
-    .some(option => option.languages.includes(lang));
+  const originCountries = Array.isArray(movie?.originCountries)
+    ? movie.originCountries.map(c => String(c).toUpperCase())
+    : [];
+  const selected = PROFILE_REGION_OPTIONS.filter(option => showRegionKeys.includes(option.id));
+  if (selected.length === 0) return true;
+  const languageMatch = lang
+    ? selected.some(option => option.languages.includes(lang))
+    : false;
+
+  // Country gates tighten ambiguous metadata (e.g., English-language titles outside Hollywood markets).
+  const HOLLYWOOD_COUNTRIES = new Set(["US", "GB", "CA", "AU", "NZ"]);
+  const INDIAN_COUNTRIES = new Set(["IN"]);
+  const hasCountry = originCountries.length > 0;
+  const countryMatch = selected.some(option => {
+    if (option.id === "hollywood") return originCountries.some(c => HOLLYWOOD_COUNTRIES.has(c));
+    if (option.id === "indian") return originCountries.some(c => INDIAN_COUNTRIES.has(c));
+    return false;
+  });
+
+  const selectedCountryGated = selected.filter(option => option.id === "hollywood" || option.id === "indian");
+  const selectedNonCountryGated = selected.filter(option => option.id !== "hollywood" && option.id !== "indian");
+  const languageMatchNonGated = lang
+    ? selectedNonCountryGated.some(option => option.languages.includes(lang))
+    : false;
+  if (selectedCountryGated.length > 0) {
+    // If TMDB provides country metadata, enforce hollywood/indian by country; otherwise fall back to language.
+    if (hasCountry) return countryMatch || languageMatchNonGated;
+    return languageMatch;
+  }
+  return languageMatch;
 }
 
 function passesProfileFilters(movie, showGenreIds, showRegionKeys) {
@@ -1784,6 +1826,11 @@ export default function App() {
           tmdbRating: Math.round(item.vote_average * 10) / 10,
           genreIds: item.genre_ids || [],
           language: item.original_language || "en",
+          originCountries: Array.isArray(item.origin_country)
+            ? item.origin_country.filter(c => typeof c === "string").map(c => c.toUpperCase())
+            : Array.isArray(item.production_countries)
+              ? item.production_countries.map(c => c?.iso_3166_1).filter(c => typeof c === "string").map(c => c.toUpperCase())
+              : [],
         });
         const filterType = activeFilter === "Movies" ? "movie" : activeFilter === "TV Shows" ? "tv" : null;
         const searches = filterType
@@ -2157,6 +2204,11 @@ export default function App() {
         genreIds: item.genre_ids || [],
         language: item.original_language || "en",
         popularity: item.popularity,
+        originCountries: Array.isArray(item.origin_country)
+          ? item.origin_country.filter(c => typeof c === "string").map(c => c.toUpperCase())
+          : Array.isArray(item.production_countries)
+            ? item.production_countries.map(c => c?.iso_3166_1).filter(c => typeof c === "string").map(c => c.toUpperCase())
+            : [],
       });
       let combined = [
         ...allMovieResults.slice(0, 10).map(m => normalize(m, "movie")),
