@@ -2036,7 +2036,9 @@ export default function App() {
 
     if (genre.length > 0) params.set("with_genres", genre.join("|"));
     // TMDB has no "critics" / "hidden gem" lists — approximate with discover filters.
-    if (vibe.includes("short")) params.set("with_runtime.lte", "105");
+    const wantsShort = vibe.includes("short");
+    const wantsClassic = vibe.includes("classic");
+    if (wantsShort) params.set("with_runtime.lte", "90"); // quick-watch movies: under 90m
     if (vibe.includes("hidden")) {
       // Acclaimed = popular + high rating; hidden = lower popularity among solid-rated titles (different sort + pool).
       params.set("sort_by", "popularity.asc");
@@ -2044,19 +2046,14 @@ export default function App() {
       params.set("vote_count.gte", "80");
     } else if (vibe.includes("acclaimed")) {
       params.set("vote_average.gte", "7.5");
-      if (vibe.includes("short")) {
-        // Short + acclaimed: avoid same page as acclaimed-only (popularity.desc + long runtimes still dominate).
-        params.set("sort_by", "vote_average.desc");
-        params.set("vote_count.gte", "80");
-      }
-    } else if (vibe.includes("short")) {
-      // Quick watch alone: not popularity-first (matches acclaimed too often); prefer well-rated shorter titles.
-      params.set("sort_by", "vote_average.desc");
-      params.set("vote_count.gte", "100");
     }
     if (vibe.includes("very_recent")) params.set("primary_release_date.gte", `${currentYear - 1}-01-01`);
     if (vibe.includes("recent")) params.set("primary_release_date.gte", `${currentYear - 3}-01-01`);
-    if (vibe.includes("classic")) params.set("primary_release_date.lte", "2000-12-31");
+    if (wantsClassic) {
+      // Classic = at least 15 years old and broadly validated.
+      params.set("primary_release_date.lte", `${currentYear - 15}-12-31`);
+      params.set("vote_count.gte", "250");
+    }
     if (vibe.includes("family")) params.set("with_genres", [...(genre.length ? genre : []), "10751"].join("|"));
 
     try {
@@ -2074,6 +2071,13 @@ export default function App() {
 
         const engTv = tmdbTvParamsFromMovieParams(engParams);
         const regTv = tmdbTvParamsFromMovieParams(regParams);
+        if (wantsShort) {
+          // Quick-watch TV: favor short episodes and ended shows.
+          engTv.set("with_runtime.lte", "24");
+          regTv.set("with_runtime.lte", "24");
+          engTv.set("with_status", "3");
+          regTv.set("with_status", "3");
+        }
         const [engMovies, engTV, regMovies, regTV] = await Promise.all([
           fetchTMDB(`/discover/movie?${engParams.toString()}`),
           fetchTMDB(`/discover/tv?${engTv.toString()}`),
@@ -2093,6 +2097,10 @@ export default function App() {
         }
       } else {
         const tvParams = tmdbTvParamsFromMovieParams(params);
+        if (wantsShort) {
+          tvParams.set("with_runtime.lte", "24");
+          tvParams.set("with_status", "3");
+        }
         const [movieData, tvData] = await Promise.all([
           fetchTMDB(`/discover/movie?${params.toString()}`),
           fetchTMDB(`/discover/tv?${tvParams.toString()}`),

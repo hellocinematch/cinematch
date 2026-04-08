@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.7
+
+- **Mood classic ranking:** Add classic-specific edge ranking on top of the 15+ year TMDB pool. Classics now prioritize top-quality titles (top ~15% TMDB vote average in the candidate set), require stronger vote-count validation, and boost "foundational" picks when many nearest neighbors rate them highly.
+
 ## 1.1.6
 
 - **Mood acclaimed vs hidden logic:** Pass selected vibes into the Edge `match` mood action and rank candidates differently by vibe using neighbor counts + TMDB vote stats. **Critically acclaimed** now favors broadly validated titles (higher neighbor support / vote-count strength), while **Hidden gem** favors high-quality, lower-exposure picks (1-2 neighbor loves + lower vote-count percentile).

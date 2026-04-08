@@ -92,7 +92,8 @@ function rankMoodByVibe(items: Rec[], vibe: string[]): Rec[] {
   if (items.length === 0) return [];
   const wantsHidden = vibe.includes("hidden");
   const wantsAcclaimed = vibe.includes("acclaimed");
-  if (!wantsHidden && !wantsAcclaimed) {
+  const wantsClassic = vibe.includes("classic");
+  if (!wantsHidden && !wantsAcclaimed && !wantsClassic) {
     return [...items].sort((a, b) => b.predicted - a.predicted);
   }
 
@@ -100,8 +101,14 @@ function rankMoodByVibe(items: Rec[], vibe: string[]): Rec[] {
     .map((r) => Number(r.movie.voteCount ?? 0))
     .filter((n) => Number.isFinite(n))
     .sort((a, b) => a - b);
+  const tmdbRatings = items
+    .map((r) => Number(r.movie.tmdbRating ?? r.predicted ?? 0))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
   const p90Votes = percentile(voteCounts, 0.9);
   const p30Votes = percentile(voteCounts, 0.3);
+  const p70Votes = percentile(voteCounts, 0.7);
+  const p85Tmdb = percentile(tmdbRatings, 0.85);
 
   const scored = items.map((r) => {
     const tmdb = Number(r.movie.tmdbRating ?? r.predicted ?? 0);
@@ -109,6 +116,21 @@ function rankMoodByVibe(items: Rec[], vibe: string[]): Rec[] {
     const popularity = Number(r.movie.popularity ?? 0);
     const popTerm = Math.log1p(Math.max(1, popularity));
     const neighborCount = Number(r.neighborCount ?? 0);
+
+    if (wantsClassic) {
+      // Classic: old-title filtering is done in TMDB query (15+ years). Rank by quality consensus + broad validation.
+      let s = r.predicted * 2.0 + tmdb * 1.2;
+      // Quality gate: top ~15% TMDB rating in current candidate pool.
+      if (tmdb >= p85Tmdb) s += 2.0;
+      else s -= 1.0;
+      // "Classic" should be broadly seen/validated (high vote count).
+      if (voteCount >= p70Votes) s += 1.5;
+      if (voteCount >= p90Votes) s += 0.8;
+      // Foundational classic for this taste profile: many neighbors rate highly.
+      if (neighborCount >= 4 && r.predicted >= 8) s += 2.0;
+      else if (neighborCount >= 3 && r.predicted >= 7.5) s += 1.0;
+      return { rec: r, score: s };
+    }
 
     if (wantsHidden) {
       // Hidden gem: strong quality, low exposure, and ideally only 1-2 loving neighbors.
