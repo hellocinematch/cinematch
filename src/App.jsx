@@ -361,6 +361,8 @@ function passesShowRegionsFilter(movie, showRegionKeys) {
     // For hollywood/indian, unknown-country rows should not pass on language alone.
     // Only allow unknown-country rows when another non-country region selection matches by language.
     if (hasCountry) return countryMatch || languageMatchNonGated;
+    // TMDB discover movie payloads often omit country-of-origin fields; allow movie fallback by language.
+    if (movie?.type === "movie") return languageMatch;
     return languageMatchNonGated;
   }
   return languageMatch;
