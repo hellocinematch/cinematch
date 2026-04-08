@@ -1156,6 +1156,25 @@ function formatScore(n) {
   return (Math.round(x * 10) / 10).toFixed(1);
 }
 
+function pickMoodMix(results, movieTarget = 7, tvTarget = 3) {
+  const list = Array.isArray(results) ? results : [];
+  if (list.length === 0) return [];
+  const movies = list.filter((r) => r?.movie?.type === "movie");
+  const tv = list.filter((r) => r?.movie?.type === "tv");
+  const picked = [...movies.slice(0, movieTarget), ...tv.slice(0, tvTarget)];
+  const used = new Set(picked.map((r) => r?.movie?.id).filter(Boolean));
+  const totalTarget = movieTarget + tvTarget;
+  if (picked.length >= totalTarget) return picked.slice(0, totalTarget);
+  for (const rec of list) {
+    const id = rec?.movie?.id;
+    if (!id || used.has(id)) continue;
+    picked.push(rec);
+    used.add(id);
+    if (picked.length >= totalTarget) break;
+  }
+  return picked;
+}
+
 /** Site-wide counts (not the signed-in user). Fetched via public RPC. */
 function PublicSiteStats({ community, ratings }) {
   if (community === undefined && ratings === undefined) return null;
@@ -2284,8 +2303,8 @@ export default function App() {
             neighborCount: 0,
           }));
         return wantsHidden
-          ? base.sort((a, b) => (Number(b.movie.hiddenBaseScore || 0) - Number(a.movie.hiddenBaseScore || 0))).slice(0, 5)
-          : base.sort((a, b) => b.predicted - a.predicted).slice(0, 5);
+          ? base.sort((a, b) => (Number(b.movie.hiddenBaseScore || 0) - Number(a.movie.hiddenBaseScore || 0)))
+          : base.sort((a, b) => b.predicted - a.predicted);
       }
       let scored = [];
       if (user && !wantsHidden) {
@@ -2300,7 +2319,7 @@ export default function App() {
       } else {
         scored = scoreMoodFromTmdb();
       }
-      setMoodResults(scored);
+      setMoodResults(pickMoodMix(scored, 7, 3));
     } catch (e) { console.error(e); setMoodResults([]); }
     setScreen("mood-results");
   }

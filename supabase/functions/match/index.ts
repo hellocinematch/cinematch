@@ -480,7 +480,7 @@ Deno.serve(async (req: Request) => {
             };
         })
       ;
-      const scored = rankMoodByVibe(scoredPool, vibe).slice(0, 5);
+      const scored = rankMoodByVibe(scoredPool, vibe).slice(0, 40);
       return new Response(JSON.stringify({ scored }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
