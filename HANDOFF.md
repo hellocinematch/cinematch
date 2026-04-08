@@ -1,5 +1,9 @@
 # Cinematch / Cinemastro — handoff for next chat
 
+## Active ingest handoff (read first for DB load)
+- MovieLens 32M ingest tracking doc: `docs/ml32m-ingest-handoff.md`
+- Current ingest status is maintained there (steps, progress, and next actions).
+
 **Focus:** Continue **next version of Cinemastro** (incremental features/polish). Prefer **small diffs** in `src/App.jsx` (very large file).
 
 ## Stack
