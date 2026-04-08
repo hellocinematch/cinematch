@@ -3055,9 +3055,11 @@ export default function App() {
                   </div>
                   <div className="mood-result-synopsis">{(rec.movie.synopsis || "").slice(0, 100)}…</div>
                   <div className="mood-result-actions">
-                    <button className={`btn-select-watch ${selectedToWatch[rec.movie.id] ? "selected" : ""}`}
-                      onClick={() => selectToWatch(rec.movie.id)}>
-                      {selectedToWatch[rec.movie.id] ? "✓ Selected to Watch" : "🎬 Select to Watch"}
+                    <button
+                      className={`btn-select-watch ${(inWatchlist(rec.movie.id) || selectedToWatch[rec.movie.id]) ? "selected" : ""}`}
+                      onClick={() => selectToWatch(rec.movie.id)}
+                    >
+                      {(inWatchlist(rec.movie.id) || selectedToWatch[rec.movie.id]) ? "✓ In Watchlist" : "🎬 Select to Watch"}
                     </button>
                     <button className="btn-detail" onClick={() => openDetail(rec.movie, rec)}>Details</button>
                   </div>
