@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2
+
+- **Home scrollport (iOS):** Make `.app` a column flex container and give `.home` `flex: 1 1 0` with `min-height: 0` so the main feed forms a bounded vertical scroller inside the fixed viewport shell (matching Mood/Profile behavior).
+
 ## 1.1.1
 
 - **Discover mobile parity:** Keep Discover as a full-height in-shell vertical scroller so mobile can reach the full result list consistently after search focus and results load.
