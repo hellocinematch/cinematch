@@ -361,9 +361,7 @@ const MOOD_CARDS = [
   }
 ];
 
-const MOOD_GENRE_IDS_FROM_PROFILE = new Set(MOOD_CARDS.find(c => c.id === "genre").options.map(o => o.id));
-
-function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults, showGenreIds }) {
+function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults }) {
   const tabs = [["🏠", "Home", "home"], ["🔍", "Discover", "discover"], ["🎭", "Mood", "mood"], ["👤", "Profile", "profile"]];
   return (
     <div className="bottom-nav">
@@ -374,8 +372,7 @@ function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelection
             setNavTab(tab);
             if (tab === "mood") {
               setMoodStep(0);
-              const gFromProfile = (showGenreIds || []).filter(id => MOOD_GENRE_IDS_FROM_PROFILE.has(id));
-              setMoodSelections({ region: [], indian_lang: [], genre: gFromProfile, vibe: [] });
+              setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
               setMoodResults([]);
               setScreen("mood-picker");
             } else {
@@ -2174,7 +2171,7 @@ export default function App() {
     ? ratedMovies.filter(({ movie }) => (movie.title || "").toLowerCase().includes(ratedSearchLower))
     : ratedMovies;
 
-  const navProps = { navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults, showGenreIds };
+  const navProps = { navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults };
 
   function AccountAvatarMenu() {
     return (

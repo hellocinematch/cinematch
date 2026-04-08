@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.3
+
+- **Mood genre step:** Stop pre-selecting chips from profile `show_genre_ids` when opening Mood, so the genre card starts empty like region and fine-tune—only explicit taps count.
+
 ## 1.1.2
 
 - **Home scrollport (iOS):** Make `.app` a column flex container and give `.home` `flex: 1 1 0` with `min-height: 0` so the main feed forms a bounded vertical scroller inside the fixed viewport shell (matching Mood/Profile behavior).
