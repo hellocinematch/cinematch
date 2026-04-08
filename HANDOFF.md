@@ -4,6 +4,10 @@
 - MovieLens 32M ingest tracking doc: `docs/ml32m-ingest-handoff.md`
 - Current ingest status is maintained there (steps, progress, and next actions).
 
+## Active mood feature handoff (read for product continuity)
+- Mood feature tracking doc: `docs/mood-feature-handoff.md`
+- Contains shipped Mood behavior, rules, caveats, and next tasks.
+
 **Focus:** Continue **next version of Cinemastro** (incremental features/polish). Prefer **small diffs** in `src/App.jsx` (very large file).
 
 ## Stack
