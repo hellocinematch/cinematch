@@ -125,6 +125,11 @@ function isAnimationIntentQuery(query) {
   return /(animation|animated|anime|cartoon|pixar|ghibli|disney)/i.test(String(query || ""));
 }
 
+function isDocumentaryLike(item) {
+  const text = `${item?.title || item?.name || ""} ${item?.synopsis || item?.overview || ""}`.toLowerCase();
+  return /(documentary|docuseries|docu-series|docu series|true story documentary|nature series|travel documentary)/i.test(text);
+}
+
 async function fetchInTheaters(regionKeys = []) {
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
@@ -2226,6 +2231,10 @@ export default function App() {
           ...(mFb.results || []).slice(0, 8).map(m => normalize(m, "movie")),
           ...(tFb.results || []).slice(0, 8).map(m => normalize(m, "tv")),
         ];
+      }
+      const documentarySelected = Array.isArray(genre) && genre.includes(99);
+      if (!documentarySelected) {
+        combined = combined.filter((m) => !isDocumentaryLike(m));
       }
       function scoreMoodFromTmdb() {
         const seen = new Set(Object.keys(userRatings));
