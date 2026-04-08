@@ -4,7 +4,6 @@ import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./l
 import { supabase } from "./supabase";
 
 // Shown on Profile as "Cinemastro v…". See CHANGELOG.md for release notes.
-// v1.0.4: Home tagline only on Picks segment; More/Friends omit hero line (mobile + desktop).
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;

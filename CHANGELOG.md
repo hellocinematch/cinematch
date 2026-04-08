@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+- **Mood relevance and clarity:** Added `Animation & Anime` as an explicit mood opt-in while keeping animation excluded by default. Tightened **Critically acclaimed** with an absolute `vote_count >= 200` floor to avoid low-sample titles.
+- **Prediction display polish:** Normalized predicted scores and ranges to one decimal place across Home, Mood, Discover, and Detail views.
+
 ## 1.1.9
 
 - **Mood animation opt-in:** Add a dedicated **Animation & Anime** vibe chip. Mood keeps animation excluded by default, but selecting this chip lifts the genre-16 exclusion for that mood run (including fallback discover fetches). Family-friendly remains a separate intent.
