@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.4
+
+- **Mood fine-tune:** Wire **Hidden gem** and **Quick watch** to TMDB discover (`sort_by=popularity.asc` + `vote_average` / `vote_count` floors for hidden; `with_runtime.lte` for short). Previously hidden had no effect, so it often matched **Critically acclaimed** (popularity + `vote_average.gte` only).
+
 ## 1.1.3
 
 - **Mood genre step:** Stop pre-selecting chips from profile `show_genre_ids` when opening Mood, so the genre card starts empty like region and fine-tune—only explicit taps count.

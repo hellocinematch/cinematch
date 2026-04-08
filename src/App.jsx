@@ -2035,7 +2035,16 @@ export default function App() {
     }
 
     if (genre.length > 0) params.set("with_genres", genre.join("|"));
-    if (vibe.includes("acclaimed")) params.set("vote_average.gte", "7.5");
+    // TMDB has no "critics" / "hidden gem" lists — approximate with discover filters.
+    if (vibe.includes("short")) params.set("with_runtime.lte", "105");
+    if (vibe.includes("hidden")) {
+      // Acclaimed = popular + high rating; hidden = lower popularity among solid-rated titles (different sort + pool).
+      params.set("sort_by", "popularity.asc");
+      params.set("vote_average.gte", vibe.includes("acclaimed") ? "7.5" : "7");
+      params.set("vote_count.gte", "80");
+    } else if (vibe.includes("acclaimed")) {
+      params.set("vote_average.gte", "7.5");
+    }
     if (vibe.includes("very_recent")) params.set("primary_release_date.gte", `${currentYear - 1}-01-01`);
     if (vibe.includes("recent")) params.set("primary_release_date.gte", `${currentYear - 3}-01-01`);
     if (vibe.includes("classic")) params.set("primary_release_date.lte", "2000-12-31");
