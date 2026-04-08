@@ -130,6 +130,37 @@ function isDocumentaryLike(item) {
   return /(documentary|docuseries|docu-series|docu series|true story documentary|nature series|travel documentary)/i.test(text);
 }
 
+function passesMoodRegionFilter(item, selectedRegions) {
+  if (!Array.isArray(selectedRegions) || selectedRegions.length === 0 || selectedRegions.includes("any")) return true;
+  const lang = String(item?.language || "").toLowerCase();
+  const originCountries = Array.isArray(item?.originCountries)
+    ? item.originCountries.map((c) => String(c).toUpperCase())
+    : [];
+  const hasOrigin = originCountries.length > 0;
+
+  const HOLLYWOOD_COUNTRIES = new Set(["US", "GB", "CA", "AU", "NZ"]);
+  const INDIAN_COUNTRIES = new Set(["IN"]);
+  const regionLanguages = new Map(MOOD_CARDS[0].options.map((o) => [o.id, o.languages || []]));
+
+  const languageMatch = selectedRegions.some((r) => (regionLanguages.get(r) || []).includes(lang));
+  const hollywoodSelected = selectedRegions.includes("en");
+  const indianSelected = selectedRegions.includes("indian");
+  const hollywoodCountryMatch = originCountries.some((c) => HOLLYWOOD_COUNTRIES.has(c));
+  const indianCountryMatch = originCountries.some((c) => INDIAN_COUNTRIES.has(c));
+  const nonCountryRegionSelected = selectedRegions.some((r) => !["en", "indian", "any"].includes(r));
+
+  // For hollywood/indian, enforce origin-country when present; otherwise allow language fallback.
+  if (hollywoodSelected || indianSelected) {
+    if (hasOrigin) {
+      if (hollywoodSelected && hollywoodCountryMatch) return true;
+      if (indianSelected && indianCountryMatch) return true;
+      return nonCountryRegionSelected ? languageMatch : false;
+    }
+    return languageMatch;
+  }
+  return languageMatch;
+}
+
 async function fetchInTheaters(regionKeys = []) {
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
@@ -2284,6 +2315,7 @@ export default function App() {
         ];
       }
       const documentarySelected = Array.isArray(genre) && genre.includes(99);
+      combined = combined.filter((m) => passesMoodRegionFilter(m, region));
       if (!documentarySelected) {
         combined = combined.filter((m) => !isDocumentaryLike(m));
       }
