@@ -2881,7 +2881,10 @@ export default function App() {
                 </div>
                 <div className="mood-result-info">
                   <div className="mood-result-title">{rec.movie.title}</div>
-                  <div className="mood-result-meta">{rec.movie.year} · Predicted {formatScore(rec.predicted)} ({formatScore(rec.low)}–{formatScore(rec.high)})</div>
+                  <div className="mood-result-meta">
+                    {rec.movie.year} · Predicted {formatScore(rec.predicted)} ({formatScore(rec.low)}–{formatScore(rec.high)})
+                    {Number.isFinite(Number(rec.movie.voteCount)) ? ` · ${formatPublicStat(Number(rec.movie.voteCount))} votes` : ""}
+                  </div>
                   <div className="mood-result-synopsis">{(rec.movie.synopsis || "").slice(0, 100)}…</div>
                   <div className="mood-result-actions">
                     <button className={`btn-select-watch ${selectedToWatch[rec.movie.id] ? "selected" : ""}`}
