@@ -145,7 +145,7 @@ function passesMoodRegionFilter(item, selectedRegions) {
   const languageMatch = selectedRegions.some((r) => (regionLanguages.get(r) || []).includes(lang));
   const hollywoodSelected = selectedRegions.includes("en");
   const indianSelected = selectedRegions.includes("indian");
-  const hollywoodCountryMatch = originCountries.some((c) => HOLLYWOOD_COUNTRIES.has(c));
+  const hollywoodCountryMatch = originCountries.length > 0 && originCountries.every((c) => HOLLYWOOD_COUNTRIES.has(c));
   const indianCountryMatch = originCountries.some((c) => INDIAN_COUNTRIES.has(c));
   const nonCountryRegionSelected = selectedRegions.some((r) => !["en", "indian", "any"].includes(r));
 
@@ -378,7 +378,7 @@ function passesShowRegionsFilter(movie, showRegionKeys) {
   const INDIAN_COUNTRIES = new Set(["IN"]);
   const hasCountry = originCountries.length > 0;
   const countryMatch = selected.some(option => {
-    if (option.id === "hollywood") return originCountries.some(c => HOLLYWOOD_COUNTRIES.has(c));
+    if (option.id === "hollywood") return originCountries.length > 0 && originCountries.every(c => HOLLYWOOD_COUNTRIES.has(c));
     if (option.id === "indian") return originCountries.some(c => INDIAN_COUNTRIES.has(c));
     return false;
   });
