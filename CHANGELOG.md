@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.5
+
+- **Mood quick watch:** When only **Quick watch** is selected (or combined with **Critically acclaimed**), use `sort_by=vote_average.desc` and a `vote_count` floor so TMDB ordering diverges from **Critically acclaimed** alone (`popularity.desc` + `vote_average.gte`), which often returned the same top picks for sub‑105‑minute blockbusters.
+
 ## 1.1.4
 
 - **Mood fine-tune:** Wire **Hidden gem** and **Quick watch** to TMDB discover (`sort_by=popularity.asc` + `vote_average` / `vote_count` floors for hidden; `with_runtime.lte` for short). Previously hidden had no effect, so it often matched **Critically acclaimed** (popularity + `vote_average.gte` only).

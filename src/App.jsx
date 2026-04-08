@@ -2044,6 +2044,15 @@ export default function App() {
       params.set("vote_count.gte", "80");
     } else if (vibe.includes("acclaimed")) {
       params.set("vote_average.gte", "7.5");
+      if (vibe.includes("short")) {
+        // Short + acclaimed: avoid same page as acclaimed-only (popularity.desc + long runtimes still dominate).
+        params.set("sort_by", "vote_average.desc");
+        params.set("vote_count.gte", "80");
+      }
+    } else if (vibe.includes("short")) {
+      // Quick watch alone: not popularity-first (matches acclaimed too often); prefer well-rated shorter titles.
+      params.set("sort_by", "vote_average.desc");
+      params.set("vote_count.gte", "100");
     }
     if (vibe.includes("very_recent")) params.set("primary_release_date.gte", `${currentYear - 1}-01-01`);
     if (vibe.includes("recent")) params.set("primary_release_date.gte", `${currentYear - 3}-01-01`);
