@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.8
+
+- **Default animation exclusion:** Exclude TMDB Animation genre (`16`) across core selection surfaces (home catalogue strips, in-theaters, streaming, onboarding regional picks, and mood discover). Discover search now also excludes animation by default; animation-intent queries (e.g. "anime", "cartoon", "animation") switch to animation-only results.
+
 ## 1.1.7
 
 - **Mood classic ranking:** Add classic-specific edge ranking on top of the 15+ year TMDB pool. Classics now prioritize top-quality titles (top ~15% TMDB vote average in the candidate set), require stronger vote-count validation, and boost "foundational" picks when many nearest neighbors rate them highly.

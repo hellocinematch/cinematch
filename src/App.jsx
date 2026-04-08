@@ -15,6 +15,7 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 const TMDB_IMG_HOST = "https://image.tmdb.org";
 const TMDB_IMG = `${TMDB_IMG_HOST}/t/p/w500`;
 const TMDB_IMG_BACKDROP = `${TMDB_IMG_HOST}/t/p/w780`;
+const DEFAULT_EXCLUDED_GENRE_IDS = [16]; // Animation
 
 const TMDB_HEADERS = {
   Authorization: `Bearer ${TMDB_TOKEN}`,
@@ -103,6 +104,22 @@ function normalizeTMDBItem(item, type) {
   };
 }
 
+function hasExcludedGenre(item, excludedGenreIds = DEFAULT_EXCLUDED_GENRE_IDS) {
+  const raw = item?.genre_ids ?? item?.genreIds ?? [];
+  if (!Array.isArray(raw) || raw.length === 0) return false;
+  const ids = new Set(raw.map((g) => Number(g)).filter((n) => Number.isFinite(n)));
+  return excludedGenreIds.some((id) => ids.has(id));
+}
+
+function filterDefaultExcludedGenres(items, allowAnimation = false) {
+  if (allowAnimation) return items;
+  return (items || []).filter((item) => !hasExcludedGenre(item));
+}
+
+function isAnimationIntentQuery(query) {
+  return /(animation|animated|anime|cartoon|pixar|ghibli|disney)/i.test(String(query || ""));
+}
+
 async function fetchInTheaters(regionKeys = []) {
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
@@ -118,12 +135,12 @@ async function fetchInTheaters(regionKeys = []) {
         fetchTMDB(`${base}&page=2`),
         fetchTMDB(`${base}&page=3`),
       ]);
-      const merged = [...(p1.results || []), ...(p2.results || []), ...(p3.results || [])];
+      const merged = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || []), ...(p3.results || [])]);
       const unique = [...new Map(merged.map(item => [item.id, item])).values()];
       if (unique.length > 0) return unique.slice(0, 15).map(m => normalizeTMDBItem(m, "movie"));
     }
     const data = await fetchTMDB("/movie/now_playing?language=en-US&page=1&region=US");
-    return (data.results || []).slice(0, 15).map(m => normalizeTMDBItem(m, "movie"));
+    return filterDefaultExcludedGenres(data.results || []).slice(0, 15).map(m => normalizeTMDBItem(m, "movie"));
   } catch {
     return [];
   }
@@ -150,8 +167,8 @@ async function fetchStreamingSplit(providerIds, regionKeys) {
       Promise.all(fetchPageNums.map(page => fetchTMDB(`${moviePathBase}&page=${page}`))),
       Promise.all(fetchPageNums.map(page => fetchTMDB(`${tvPathBase}&page=${page}`))),
     ]);
-    const movieResults = moviePages.flatMap(page => page.results || []);
-    const tvResults = tvPages.flatMap(page => page.results || []);
+    const movieResults = filterDefaultExcludedGenres(moviePages.flatMap(page => page.results || []));
+    const tvResults = filterDefaultExcludedGenres(tvPages.flatMap(page => page.results || []));
     const dedupeByTmdbId = (arr) => [...new Map(arr.map(item => [item.id, item])).values()];
     const movies = dedupeByTmdbId(movieResults).slice(0, 16).map(m => normalizeTMDBItem(m, "movie"));
     const shows = dedupeByTmdbId(tvResults).slice(0, 16).map(m => normalizeTMDBItem(m, "tv"));
@@ -181,8 +198,14 @@ async function fetchCatalogue() {
     popularity: item.popularity,
     language: item.original_language || "en",
   });
-  const movies = [...(popMovies.results || []).map(m => normalize(m, "movie")), ...(topMovies.results || []).map(m => normalize(m, "movie"))];
-  const shows = [...(popTV.results || []).map(m => normalize(m, "tv")), ...(topTV.results || []).map(m => normalize(m, "tv"))];
+  const movies = [
+    ...filterDefaultExcludedGenres(popMovies.results || []).map(m => normalize(m, "movie")),
+    ...filterDefaultExcludedGenres(topMovies.results || []).map(m => normalize(m, "movie")),
+  ];
+  const shows = [
+    ...filterDefaultExcludedGenres(popTV.results || []).map(m => normalize(m, "tv")),
+    ...filterDefaultExcludedGenres(topTV.results || []).map(m => normalize(m, "tv")),
+  ];
   const unique = (arr) => [...new Map(arr.map(m => [m.id, m])).values()].slice(0, 40);
   const allMovies = unique(movies), allShows = unique(shows);
   const combined = [];
@@ -215,8 +238,8 @@ async function fetchRegionalTitles(langCode) {
       language: item.original_language || langCode,
     });
     return [
-      ...(movies.results || []).slice(0, 15).map(m => normalize(m, "movie")),
-      ...(shows.results || []).slice(0, 10).map(m => normalize(m, "tv")),
+      ...filterDefaultExcludedGenres(movies.results || []).slice(0, 15).map(m => normalize(m, "movie")),
+      ...filterDefaultExcludedGenres(shows.results || []).slice(0, 10).map(m => normalize(m, "tv")),
     ];
   } catch { return []; }
 }
@@ -1764,7 +1787,12 @@ export default function App() {
         const combined = filterType
           ? (results[0].results || []).slice(0, 20).map(m => normalize(m, filterType))
           : [...(results[0].results || []).slice(0, 10).map(m => normalize(m, "movie")), ...(results[1].results || []).slice(0, 10).map(m => normalize(m, "tv"))];
-        setSearchResults(combined);
+        const wantsAnimationOnly = isAnimationIntentQuery(appliedSearchQuery);
+        setSearchResults(
+          wantsAnimationOnly
+            ? combined.filter((item) => hasExcludedGenre(item))
+            : filterDefaultExcludedGenres(combined),
+        );
       } catch (e) { console.error(e); }
       finally { setSearching(false); }
     })();
@@ -2014,6 +2042,7 @@ export default function App() {
     const { region, indian_lang, genre, vibe } = moodSelections;
     const currentYear = new Date().getFullYear();
     const params = new URLSearchParams({ language: "en-US", page: "1", sort_by: "popularity.desc" });
+    params.set("without_genres", DEFAULT_EXCLUDED_GENRE_IDS.join(","));
 
     let allLangs = [];
     if (region.length > 0 && !region.includes("any")) {
@@ -2127,8 +2156,8 @@ export default function App() {
       ];
       if (combined.length === 0) {
         const [mFb, tFb] = await Promise.all([
-          fetchTMDB("/discover/movie?language=en-US&page=1&sort_by=popularity.desc"),
-          fetchTMDB("/discover/tv?language=en-US&page=1&sort_by=popularity.desc"),
+          fetchTMDB(`/discover/movie?language=en-US&page=1&sort_by=popularity.desc&without_genres=${DEFAULT_EXCLUDED_GENRE_IDS.join(",")}`),
+          fetchTMDB(`/discover/tv?language=en-US&page=1&sort_by=popularity.desc&without_genres=${DEFAULT_EXCLUDED_GENRE_IDS.join(",")}`),
         ]);
         combined = [
           ...(mFb.results || []).slice(0, 8).map(m => normalize(m, "movie")),
