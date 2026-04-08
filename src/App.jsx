@@ -376,6 +376,7 @@ const MOOD_CARDS = [
       { id: "acclaimed", label: "🏆 Critically acclaimed" },
       { id: "hidden", label: "💎 Hidden gem" },
       { id: "family", label: "👨‍👩‍👧 Family friendly" },
+      { id: "animation_anime", label: "🎨 Animation & Anime" },
       { id: "very_recent", label: "🆕 Just released" },
       { id: "recent", label: "📅 Last 3 years" },
       { id: "classic", label: "🎬 Classic (pre-2000)" },
@@ -2042,7 +2043,8 @@ export default function App() {
     const { region, indian_lang, genre, vibe } = moodSelections;
     const currentYear = new Date().getFullYear();
     const params = new URLSearchParams({ language: "en-US", page: "1", sort_by: "popularity.desc" });
-    params.set("without_genres", DEFAULT_EXCLUDED_GENRE_IDS.join(","));
+    const wantsAnimation = vibe.includes("animation_anime");
+    if (!wantsAnimation) params.set("without_genres", DEFAULT_EXCLUDED_GENRE_IDS.join(","));
 
     let allLangs = [];
     if (region.length > 0 && !region.includes("any")) {
@@ -2155,9 +2157,12 @@ export default function App() {
         ...allTVResults.slice(0, 10).map(m => normalize(m, "tv")),
       ];
       if (combined.length === 0) {
+        const fallbackWithoutGenres = wantsAnimation
+          ? ""
+          : `&without_genres=${DEFAULT_EXCLUDED_GENRE_IDS.join(",")}`;
         const [mFb, tFb] = await Promise.all([
-          fetchTMDB(`/discover/movie?language=en-US&page=1&sort_by=popularity.desc&without_genres=${DEFAULT_EXCLUDED_GENRE_IDS.join(",")}`),
-          fetchTMDB(`/discover/tv?language=en-US&page=1&sort_by=popularity.desc&without_genres=${DEFAULT_EXCLUDED_GENRE_IDS.join(",")}`),
+          fetchTMDB(`/discover/movie?language=en-US&page=1&sort_by=popularity.desc${fallbackWithoutGenres}`),
+          fetchTMDB(`/discover/tv?language=en-US&page=1&sort_by=popularity.desc${fallbackWithoutGenres}`),
         ]);
         combined = [
           ...(mFb.results || []).slice(0, 8).map(m => normalize(m, "movie")),

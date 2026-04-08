@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.9
+
+- **Mood animation opt-in:** Add a dedicated **Animation & Anime** vibe chip. Mood keeps animation excluded by default, but selecting this chip lifts the genre-16 exclusion for that mood run (including fallback discover fetches). Family-friendly remains a separate intent.
+
 ## 1.1.8
 
 - **Default animation exclusion:** Exclude TMDB Animation genre (`16`) across core selection surfaces (home catalogue strips, in-theaters, streaming, onboarding regional picks, and mood discover). Discover search now also excludes animation by default; animation-intent queries (e.g. "anime", "cartoon", "animation") switch to animation-only results.
