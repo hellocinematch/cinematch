@@ -425,7 +425,8 @@ const MOOD_CARDS = [
       { id: "animation_anime", label: "🎨 Animation & Anime" },
       { id: "very_recent", label: "🆕 Just released" },
       { id: "recent", label: "📅 Last 3 years" },
-      { id: "classic", label: "🎬 Classic (pre-2000)" },
+      { id: "modern", label: "🗓️ Modern (3–15 years)" },
+      { id: "classic", label: "🎬 Classic (15+ years)" },
       { id: "short", label: "⚡ Quick watch" },
     ]
   }
@@ -2125,6 +2126,9 @@ export default function App() {
     if (genre.length > 0) params.set("with_genres", genre.join("|"));
     // TMDB has no "critics" / "hidden gem" lists — approximate with discover filters.
     const wantsShort = vibe.includes("short");
+    const wantsVeryRecent = vibe.includes("very_recent");
+    const wantsRecent = vibe.includes("recent");
+    const wantsModern = vibe.includes("modern");
     const wantsClassic = vibe.includes("classic");
     if (wantsShort) params.set("with_runtime.lte", "90"); // quick-watch movies: under 90m
     if (vibe.includes("hidden")) {
@@ -2136,9 +2140,15 @@ export default function App() {
       params.set("vote_average.gte", "7.5");
       params.set("vote_count.gte", "200");
     }
-    if (vibe.includes("very_recent")) params.set("primary_release_date.gte", `${currentYear - 1}-01-01`);
-    if (vibe.includes("recent")) params.set("primary_release_date.gte", `${currentYear - 3}-01-01`);
-    if (wantsClassic) {
+    // Era precedence (deterministic): modern (3–15y) > very_recent/recent > classic (15y+)
+    if (wantsModern) {
+      params.set("primary_release_date.gte", `${currentYear - 15}-01-01`);
+      params.set("primary_release_date.lte", `${currentYear - 3}-12-31`);
+    } else {
+      if (wantsVeryRecent) params.set("primary_release_date.gte", `${currentYear - 1}-01-01`);
+      else if (wantsRecent) params.set("primary_release_date.gte", `${currentYear - 3}-01-01`);
+    }
+    if (wantsClassic && !wantsModern && !wantsVeryRecent && !wantsRecent) {
       // Classic = at least 15 years old and broadly validated.
       params.set("primary_release_date.lte", `${currentYear - 15}-12-31`);
       params.set("vote_count.gte", "250");

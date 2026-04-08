@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- **Mood era options:** Added `Modern (3–15 years)` to the vibe card and renamed classic copy to `Classic (15+ years)` to match actual logic.
+- **Deterministic era precedence:** Mood date filters now resolve predictably as `Modern` > `Just released / Last 3 years` > `Classic`, preventing conflicting selections from producing ambiguous windows.
+
 ## 1.2.0
 
 - **Mood relevance and clarity:** Added `Animation & Anime` as an explicit mood opt-in while keeping animation excluded by default. Tightened **Critically acclaimed** with an absolute `vote_count >= 200` floor to avoid low-sample titles.
