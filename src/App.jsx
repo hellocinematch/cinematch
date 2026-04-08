@@ -156,7 +156,7 @@ function passesMoodRegionFilter(item, selectedRegions) {
       if (indianSelected && indianCountryMatch) return true;
       return nonCountryRegionSelected ? languageMatch : false;
     }
-    return languageMatch;
+    return nonCountryRegionSelected ? languageMatch : false;
   }
   return languageMatch;
 }
@@ -2313,6 +2313,23 @@ export default function App() {
           ...(mFb.results || []).slice(0, 8).map(m => normalize(m, "movie")),
           ...(tFb.results || []).slice(0, 8).map(m => normalize(m, "tv")),
         ];
+      }
+      const needsCountryHydration = Array.isArray(region) && (region.includes("en") || region.includes("indian"));
+      if (needsCountryHydration) {
+        combined = await Promise.all(combined.map(async (m) => {
+          if (Array.isArray(m.originCountries) && m.originCountries.length > 0) return m;
+          try {
+            const detail = await fetchTMDB(`/${m.type}/${m.tmdbId}?language=en-US`);
+            const originCountries = Array.isArray(detail?.origin_country)
+              ? detail.origin_country.filter(c => typeof c === "string").map(c => c.toUpperCase())
+              : Array.isArray(detail?.production_countries)
+                ? detail.production_countries.map(c => c?.iso_3166_1).filter(c => typeof c === "string").map(c => c.toUpperCase())
+                : [];
+            return { ...m, originCountries };
+          } catch {
+            return m;
+          }
+        }));
       }
       const documentarySelected = Array.isArray(genre) && genre.includes(99);
       combined = combined.filter((m) => passesMoodRegionFilter(m, region));
