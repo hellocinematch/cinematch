@@ -1103,6 +1103,12 @@ function formatPublicStat(n) {
   return `${(x / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
 }
 
+function formatScore(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  return (Math.round(x * 10) / 10).toFixed(1);
+}
+
 /** Site-wide counts (not the signed-in user). Fetched via public RPC. */
 function PublicSiteStats({ community, ratings }) {
   if (community === undefined && ratings === undefined) return null;
@@ -2555,12 +2561,12 @@ export default function App() {
                             <div className="strip-poster">
                               {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
                               <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                                {userRatings[rec.movie.id] ? `★ ${userRatings[rec.movie.id]}` : rec.predicted}
+                                {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
                               </div>
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">Movie · {rec.movie.year || "—"}</div>
-                            <div className="strip-range">{rec.low}–{rec.high}</div>
+                            <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
                           </div>
                         ))}
                       </div>
@@ -2588,12 +2594,12 @@ export default function App() {
                             <div className="strip-poster">
                               {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
                               <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                                {userRatings[rec.movie.id] ? `★ ${userRatings[rec.movie.id]}` : rec.predicted}
+                                {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
                               </div>
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{rec.movie.type === "movie" ? "Movie" : "TV"} · {rec.movie.year || "—"}</div>
-                            <div className="strip-range">{rec.low}–{rec.high}</div>
+                            <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
                           </div>
                         ))}
                       </div>
@@ -2630,7 +2636,7 @@ export default function App() {
                         <div className="strip-poster">
                           {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
                           <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                            {userRatings[rec.movie.id] ? `★ ${userRatings[rec.movie.id]}` : rec.predicted}
+                            {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
                           </div>
                         </div>
                         <div className="strip-title">{rec.movie.title}</div>
@@ -2654,7 +2660,7 @@ export default function App() {
                         <div className="strip-poster">
                           {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
                           <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                            {userRatings[rec.movie.id] ? `★ ${userRatings[rec.movie.id]}` : rec.predicted}
+                            {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
                           </div>
                         </div>
                         <div className="strip-title">{rec.movie.title}</div>
@@ -2783,7 +2789,7 @@ export default function App() {
                       <div className="disc-type">{m.type === "movie" ? "Movie" : "TV"}</div>
                       <div className="disc-badge">
                         {myRating ? <span className="disc-rated-badge">★ {myRating}</span>
-                          : rec ? <span className="disc-pred-badge">{rec.predicted}</span>
+                          : rec ? <span className="disc-pred-badge">{formatScore(rec.predicted)}</span>
                             : <span className="disc-unseen-badge">Unrated</span>}
                       </div>
                     </div>
@@ -2872,11 +2878,11 @@ export default function App() {
                     : <div className="mood-result-poster-fallback">🎬</div>}
                   <div className="mood-result-overlay" />
                   <div className="mood-result-type">{rec.movie.type === "movie" ? "Movie" : "TV"}</div>
-                  <div className="mood-result-badge">{rec.predicted}</div>
+                  <div className="mood-result-badge">{formatScore(rec.predicted)}</div>
                 </div>
                 <div className="mood-result-info">
                   <div className="mood-result-title">{rec.movie.title}</div>
-                  <div className="mood-result-meta">{rec.movie.year} · Predicted {rec.predicted} ({rec.low}–{rec.high})</div>
+                  <div className="mood-result-meta">{rec.movie.year} · Predicted {formatScore(rec.predicted)} ({formatScore(rec.low)}–{formatScore(rec.high)})</div>
                   <div className="mood-result-synopsis">{(rec.movie.synopsis || "").slice(0, 100)}…</div>
                   <div className="mood-result-actions">
                     <button className={`btn-select-watch ${selectedToWatch[rec.movie.id] ? "selected" : ""}`}
@@ -3123,8 +3129,8 @@ export default function App() {
                       <span className={confClass(prediction.confidence)}>{confLabel(prediction.confidence)}</span>
                     </div>
                     <div>
-                      <div className="d-pred-val">{prediction.predicted}</div>
-                      <div className="d-pred-range">{prediction.low}–{prediction.high}</div>
+                      <div className="d-pred-val">{formatScore(prediction.predicted)}</div>
+                      <div className="d-pred-range">{formatScore(prediction.low)}–{formatScore(prediction.high)}</div>
                       {movie.tmdbRating && <div className="d-tmdb">TMDB avg: {movie.tmdbRating}</div>}
                     </div>
                   </div>
@@ -3156,7 +3162,7 @@ export default function App() {
                     <div className="rated-box" style={{ marginTop: 20 }}>
                       <div className="rated-score">{myRating}</div>
                       <div className="rated-label">Your rating saved ✓</div>
-                      {prediction && <div className="rated-pred">Predicted was {prediction.predicted} ({prediction.low}–{prediction.high})</div>}
+                      {prediction && <div className="rated-pred">Predicted was {formatScore(prediction.predicted)} ({formatScore(prediction.low)}–{formatScore(prediction.high)})</div>}
                       <button type="button" className="btn-full btn-full-dark" style={{ marginTop: 16, width: "100%" }}
                         onClick={() => { setDetailEditRating(true); setDetailRating(myRating); setDetailTouched(true); }}>
                         Change rating
