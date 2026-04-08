@@ -2125,17 +2125,18 @@ export default function App() {
 
     if (genre.length > 0) params.set("with_genres", genre.join("|"));
     // TMDB has no "critics" / "hidden gem" lists — approximate with discover filters.
+    const wantsHidden = vibe.includes("hidden");
     const wantsShort = vibe.includes("short");
     const wantsVeryRecent = vibe.includes("very_recent");
     const wantsRecent = vibe.includes("recent");
     const wantsModern = vibe.includes("modern");
     const wantsClassic = vibe.includes("classic");
     if (wantsShort) params.set("with_runtime.lte", "90"); // quick-watch movies: under 90m
-    if (vibe.includes("hidden")) {
-      // Acclaimed = popular + high rating; hidden = lower popularity among solid-rated titles (different sort + pool).
-      params.set("sort_by", "popularity.asc");
-      params.set("vote_average.gte", vibe.includes("acclaimed") ? "7.5" : "7");
-      params.set("vote_count.gte", "80");
+    if (wantsHidden) {
+      // Hidden gems: high-rated, consensus-liquidity floor, then local score sorting.
+      params.set("sort_by", "vote_average.desc");
+      params.set("vote_average.gte", "7.5");
+      params.set("vote_count.gte", "100");
     } else if (vibe.includes("acclaimed")) {
       params.set("vote_average.gte", "7.5");
       params.set("vote_count.gte", "200");
@@ -2200,12 +2201,29 @@ export default function App() {
           tvParams.set("with_runtime.lte", "24");
           tvParams.set("with_status", "3");
         }
-        const [movieData, tvData] = await Promise.all([
-          fetchTMDB(`/discover/movie?${params.toString()}`),
-          fetchTMDB(`/discover/tv?${tvParams.toString()}`),
-        ]);
-        allMovieResults = (movieData.results || []).slice(0, 10);
-        allTVResults = (tvData.results || []).slice(0, 10);
+        if (wantsHidden) {
+          const movieP2 = new URLSearchParams(params); movieP2.set("page", "2");
+          const movieP3 = new URLSearchParams(params); movieP3.set("page", "3");
+          const tvP2 = new URLSearchParams(tvParams); tvP2.set("page", "2");
+          const tvP3 = new URLSearchParams(tvParams); tvP3.set("page", "3");
+          const [m1, m2, m3, t1, t2, t3] = await Promise.all([
+            fetchTMDB(`/discover/movie?${params.toString()}`),
+            fetchTMDB(`/discover/movie?${movieP2.toString()}`),
+            fetchTMDB(`/discover/movie?${movieP3.toString()}`),
+            fetchTMDB(`/discover/tv?${tvParams.toString()}`),
+            fetchTMDB(`/discover/tv?${tvP2.toString()}`),
+            fetchTMDB(`/discover/tv?${tvP3.toString()}`),
+          ]);
+          allMovieResults = [...(m1.results || []), ...(m2.results || []), ...(m3.results || [])].slice(0, 30);
+          allTVResults = [...(t1.results || []), ...(t2.results || []), ...(t3.results || [])].slice(0, 30);
+        } else {
+          const [movieData, tvData] = await Promise.all([
+            fetchTMDB(`/discover/movie?${params.toString()}`),
+            fetchTMDB(`/discover/tv?${tvParams.toString()}`),
+          ]);
+          allMovieResults = (movieData.results || []).slice(0, 10);
+          allTVResults = (tvData.results || []).slice(0, 10);
+        }
       }
       const normalize = (item, type) => ({
         id: `${type}-${item.id}`, tmdbId: item.id, type,
@@ -2219,6 +2237,7 @@ export default function App() {
         genreIds: item.genre_ids || [],
         language: item.original_language || "en",
         popularity: item.popularity,
+        hiddenBaseScore: (Math.round((item.vote_average || 0) * 10) / 10 * 2) - Number(item.popularity || 0),
         originCountries: Array.isArray(item.origin_country)
           ? item.origin_country.filter(c => typeof c === "string").map(c => c.toUpperCase())
           : Array.isArray(item.production_countries)
@@ -2246,11 +2265,16 @@ export default function App() {
       if (!documentarySelected) {
         combined = combined.filter((m) => !isDocumentaryLike(m));
       }
+      if (wantsHidden) {
+        combined = [...combined]
+          .sort((a, b) => (Number(b.hiddenBaseScore || 0) - Number(a.hiddenBaseScore || 0)))
+          .slice(0, 50);
+      }
       function scoreMoodFromTmdb() {
         const seen = new Set(Object.keys(userRatings));
         let pool = combined.filter(m => !seen.has(m.id));
         if (pool.length === 0) pool = combined.slice();
-        return pool
+        const base = pool
           .map(m => ({
             movie: m,
             predicted: m.tmdbRating,
@@ -2258,12 +2282,13 @@ export default function App() {
             high: Math.min(10, m.tmdbRating + 1),
             confidence: "low",
             neighborCount: 0,
-          }))
-          .sort((a, b) => b.predicted - a.predicted)
-          .slice(0, 5);
+          }));
+        return wantsHidden
+          ? base.sort((a, b) => (Number(b.movie.hiddenBaseScore || 0) - Number(a.movie.hiddenBaseScore || 0))).slice(0, 5)
+          : base.sort((a, b) => b.predicted - a.predicted).slice(0, 5);
       }
       let scored = [];
-      if (user) {
+      if (user && !wantsHidden) {
         const { data, error } = await supabase.functions.invoke("match", {
           body: { action: "mood", userRatings, catalogue, movies: combined, vibe },
         });
