@@ -194,29 +194,29 @@ function passesMoodRegionFilter(item, selectedRegions) {
 
 async function fetchInTheaters(regionKeys = []) {
   try {
+    const TARGET_COUNT = 15;
     const langCodes = getRegionLanguageCodes(regionKeys);
-    const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
     const now = formatIsoDate(new Date());
-    const newWindowStart = dateDaysAgo(14);
-    const stillWindowEnd = dateDaysAgo(15);
-    const stillWindowStart = dateDaysAgo(45);
-    const base = "/discover/movie?language=en-US&sort_by=popularity.desc&region=US&with_release_type=3";
-
-    const [newP1, newP2, stillP1, stillP2] = await Promise.all([
-      fetchTMDB(`${base}&primary_release_date.gte=${newWindowStart}&primary_release_date.lte=${now}${langQuery}&page=1`),
-      fetchTMDB(`${base}&primary_release_date.gte=${newWindowStart}&primary_release_date.lte=${now}${langQuery}&page=2`),
-      fetchTMDB(`${base}&primary_release_date.gte=${stillWindowStart}&primary_release_date.lte=${stillWindowEnd}${langQuery}&page=1`),
-      fetchTMDB(`${base}&primary_release_date.gte=${stillWindowStart}&primary_release_date.lte=${stillWindowEnd}${langQuery}&page=2`),
+    const [p1, p2] = await Promise.all([
+      fetchTMDB("/movie/now_playing?language=en-US&region=US&page=1"),
+      fetchTMDB("/movie/now_playing?language=en-US&region=US&page=2"),
     ]);
 
-    const merged = filterDefaultExcludedGenres([
-      ...(newP1.results || []),
-      ...(newP2.results || []),
-      ...(stillP1.results || []),
-      ...(stillP2.results || []),
-    ]);
-    const unique = [...new Map(merged.map((item) => [item.id, item])).values()];
-    return unique.slice(0, 15).map((m) => normalizeTMDBItem(m, "movie"));
+    const sortByPopularityVotesDate = (items) => [...items].sort((a, b) => {
+      const popDiff = Number(b?.popularity ?? 0) - Number(a?.popularity ?? 0);
+      if (popDiff !== 0) return popDiff;
+      const votesDiff = Number(b?.vote_count ?? 0) - Number(a?.vote_count ?? 0);
+      if (votesDiff !== 0) return votesDiff;
+      return Date.parse(b?.release_date || "1970-01-01") - Date.parse(a?.release_date || "1970-01-01");
+    });
+
+    const merged = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || [])])
+      // Exclude soon-to-release titles that TMDB may include in now_playing payloads.
+      .filter((item) => item?.release_date && item.release_date <= now)
+      .filter((item) => (langCodes.length > 0 ? langCodes.includes(String(item?.original_language || "").toLowerCase()) : true));
+
+    const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
+    return sortByPopularityVotesDate(deduped).slice(0, TARGET_COUNT).map((m) => normalizeTMDBItem(m, "movie"));
   } catch {
     return [];
   }
