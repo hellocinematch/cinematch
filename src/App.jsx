@@ -152,6 +152,19 @@ async function fetchTvDetailsById(ids = []) {
   return new Map(detailRows);
 }
 
+async function fetchMovieReleaseDatesById(ids = []) {
+  const uniqueIds = [...new Set((ids || []).filter((id) => Number.isFinite(Number(id))))].slice(0, 40);
+  const rows = await Promise.all(uniqueIds.map(async (id) => {
+    try {
+      const d = await fetchTMDB(`/movie/${id}/release_dates`);
+      return [id, d];
+    } catch {
+      return [id, null];
+    }
+  }));
+  return new Map(rows);
+}
+
 function isAnimationIntentQuery(query) {
   return /(animation|animated|anime|cartoon|pixar|ghibli|disney)/i.test(String(query || ""));
 }
@@ -195,6 +208,7 @@ function passesMoodRegionFilter(item, selectedRegions) {
 async function fetchInTheaters(regionKeys = []) {
   try {
     const TARGET_COUNT = 15;
+    const LIMITED_THEATRICAL_MAX_DAYS = 14;
     const langCodes = getRegionLanguageCodes(regionKeys);
     const now = formatIsoDate(new Date());
     const [p1, p2] = await Promise.all([
@@ -216,7 +230,22 @@ async function fetchInTheaters(regionKeys = []) {
       .filter((item) => (langCodes.length > 0 ? langCodes.includes(String(item?.original_language || "").toLowerCase()) : true));
 
     const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
-    return sortByPopularityVotesDate(deduped).slice(0, TARGET_COUNT).map((m) => normalizeTMDBItem(m, "movie"));
+    const releaseDatesMap = await fetchMovieReleaseDatesById(deduped.map((item) => item.id));
+    const withLimitedWindowGate = deduped.filter((item) => {
+      const releasePayload = releaseDatesMap.get(item.id);
+      const usDates = Array.isArray(releasePayload?.results)
+        ? releasePayload.results.find((r) => r?.iso_3166_1 === "US")?.release_dates || []
+        : [];
+      const limitedDates = usDates
+        .filter((r) => Number(r?.type) === 2 && typeof r?.release_date === "string")
+        .map((r) => r.release_date.slice(0, 10))
+        .filter(Boolean)
+        .sort();
+      if (limitedDates.length === 0) return true;
+      const newestLimited = limitedDates[limitedDates.length - 1];
+      return withinPastDays(newestLimited, LIMITED_THEATRICAL_MAX_DAYS);
+    });
+    return sortByPopularityVotesDate(withLimitedWindowGate).slice(0, TARGET_COUNT).map((m) => normalizeTMDBItem(m, "movie"));
   } catch {
     return [];
   }
