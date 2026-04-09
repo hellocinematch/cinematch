@@ -1638,16 +1638,14 @@ export default function App() {
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("match", {
-          body: {
-            action: "full",
-            userRatings,
-            catalogue: catalogueForRecs,
-            inTheaters: inTheatersForRecs,
-            streamingMovies: streamingMoviesForRecs,
-            streamingTV: streamingTVForRecs,
-            topPickOffset,
-          },
+        const { data, error } = await invokeMatch({
+          action: "full",
+          userRatings,
+          catalogue: catalogueForRecs,
+          inTheaters: inTheatersForRecs,
+          streamingMovies: streamingMoviesForRecs,
+          streamingTV: streamingTVForRecs,
+          topPickOffset,
         });
         if (cancelled) return;
         if (error) {
@@ -1753,6 +1751,18 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, [user, userRatings, catalogue]);
+
+  async function invokeMatch(body) {
+    const { data: sessData } = await supabase.auth.getSession();
+    const accessToken = sessData?.session?.access_token;
+    if (!accessToken) {
+      return { data: null, error: { message: "No auth session token available" } };
+    }
+    return supabase.functions.invoke("match", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body,
+    });
+  }
 
   async function loadUserData() {
     if (!user) return { ratingCount: 0 };
@@ -2166,9 +2176,7 @@ export default function App() {
     let pred = prediction;
     if (!pred && user && Object.keys(userRatings).length > 0) {
       try {
-        const { data, error } = await supabase.functions.invoke("match", {
-          body: { action: "predict", userRatings, catalogue, movieId: movie.id },
-        });
+        const { data, error } = await invokeMatch({ action: "predict", userRatings, catalogue, movieId: movie.id });
         if (!error && data?.prediction) pred = data.prediction;
       } catch (_) { /* optional prediction */ }
     }
@@ -2494,9 +2502,7 @@ export default function App() {
       }
       let scored = [];
       if (user && !wantsHidden) {
-        const { data, error } = await supabase.functions.invoke("match", {
-          body: { action: "mood", userRatings, catalogue, movies: combined, vibe },
-        });
+        const { data, error } = await invokeMatch({ action: "mood", userRatings, catalogue, movies: combined, vibe });
         if (!error && data?.scored?.length) scored = data.scored;
         else {
           if (error) console.warn("mood match function:", error.message);
