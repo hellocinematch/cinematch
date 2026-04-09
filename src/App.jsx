@@ -948,7 +948,9 @@ const styles = `
   .mood-results { height:100%; min-height:0; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
   .mood-results-back { background:none; border:none; color:#666; font-size:20px; cursor:pointer; padding:0; }
   .mood-results-title { font-family:'DM Serif Display',serif; font-size:26px; color:#f0ebe0; }
-  .mood-result-card { margin:0 24px 16px; border-radius:16px; overflow:hidden; border:1px solid #1e1e1e; background:#141414; }
+  /* Shared Mood results container; desktop layout is upgraded in the >=900px media query. */
+  .mood-results-grid { display:grid; grid-template-columns:1fr; gap:16px; padding:0 24px 16px; }
+  .mood-result-card { margin:0; border-radius:16px; overflow:hidden; border:1px solid #1e1e1e; background:#141414; }
   .mood-result-poster { height:180px; position:relative; overflow:hidden; }
   .mood-result-poster img { width:100%; height:100%; object-fit:cover; }
   .mood-result-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:64px; background:#1a1a1a; }
@@ -1179,6 +1181,14 @@ const styles = `
     .profile-section,
     .rated-search-wrap,
     .mood-results-header { padding-left:32px; padding-right:32px; }
+    /* Desktop Mood: denser two-column cards to reduce vertical scrolling without changing mobile UX. */
+    .mood-results-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; max-width:1120px; margin:0 auto; padding:10px 32px 18px; }
+    .mood-result-card { display:grid; grid-template-columns:minmax(0, 44%) minmax(0, 56%); min-height:220px; }
+    .mood-result-poster { height:100%; min-height:220px; }
+    .mood-result-info { display:flex; flex-direction:column; padding:14px 16px 12px; }
+    .mood-result-title { font-size:24px; }
+    .mood-result-synopsis { margin-top:7px; display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .mood-result-actions { margin-top:auto; padding-top:10px; }
     .empty-box,
     .no-recs { margin-left:32px; margin-right:32px; }
     /* Keep Home picks stacked (In Theaters then Streaming) to preserve original flow. */
@@ -3175,35 +3185,37 @@ export default function App() {
               <button className="mood-next" style={{ margin: "20px 24px 0", width: "calc(100% - 48px)" }} onClick={resetMood}>Try again</button>
             </div>
           ) : (
-            moodResults.map(rec => (
-              <div className="mood-result-card" key={rec.movie.id}>
-                <div className="mood-result-poster">
-                  {rec.movie.backdrop || rec.movie.poster
-                    ? <img src={rec.movie.backdrop || rec.movie.poster} alt={rec.movie.title} />
-                    : <div className="mood-result-poster-fallback">🎬</div>}
-                  <div className="mood-result-overlay" />
-                  <div className="mood-result-type">{rec.movie.type === "movie" ? "Movie" : "TV"}</div>
-                  <div className="mood-result-badge">{formatScore(rec.predicted)}</div>
-                </div>
-                <div className="mood-result-info">
-                  <div className="mood-result-title">{rec.movie.title}</div>
-                  <div className="mood-result-meta">
-                    {rec.movie.year} · Predicted {formatScore(rec.predicted)} ({formatScore(rec.low)}–{formatScore(rec.high)})
-                    {Number.isFinite(Number(rec.movie.voteCount)) ? ` · ${formatPublicStat(Number(rec.movie.voteCount))} votes` : ""}
+            <div className="mood-results-grid">
+              {moodResults.map(rec => (
+                <div className="mood-result-card" key={rec.movie.id}>
+                  <div className="mood-result-poster">
+                    {rec.movie.backdrop || rec.movie.poster
+                      ? <img src={rec.movie.backdrop || rec.movie.poster} alt={rec.movie.title} />
+                      : <div className="mood-result-poster-fallback">🎬</div>}
+                    <div className="mood-result-overlay" />
+                    <div className="mood-result-type">{rec.movie.type === "movie" ? "Movie" : "TV"}</div>
+                    <div className="mood-result-badge">{formatScore(rec.predicted)}</div>
                   </div>
-                  <div className="mood-result-synopsis">{(rec.movie.synopsis || "").slice(0, 100)}…</div>
-                  <div className="mood-result-actions">
-                    <button
-                      className={`btn-select-watch ${(inWatchlist(rec.movie.id) || selectedToWatch[rec.movie.id]) ? "selected" : ""}`}
-                      onClick={() => selectToWatch(rec.movie.id)}
-                    >
-                      {(inWatchlist(rec.movie.id) || selectedToWatch[rec.movie.id]) ? "✓ In Watchlist" : "🎬 Select to Watch"}
-                    </button>
-                    <button className="btn-detail" onClick={() => openDetail(rec.movie, rec)}>Details</button>
+                  <div className="mood-result-info">
+                    <div className="mood-result-title">{rec.movie.title}</div>
+                    <div className="mood-result-meta">
+                      {rec.movie.year} · Predicted {formatScore(rec.predicted)} ({formatScore(rec.low)}–{formatScore(rec.high)})
+                      {Number.isFinite(Number(rec.movie.voteCount)) ? ` · ${formatPublicStat(Number(rec.movie.voteCount))} votes` : ""}
+                    </div>
+                    <div className="mood-result-synopsis">{(rec.movie.synopsis || "").slice(0, 100)}…</div>
+                    <div className="mood-result-actions">
+                      <button
+                        className={`btn-select-watch ${(inWatchlist(rec.movie.id) || selectedToWatch[rec.movie.id]) ? "selected" : ""}`}
+                        onClick={() => selectToWatch(rec.movie.id)}
+                      >
+                        {(inWatchlist(rec.movie.id) || selectedToWatch[rec.movie.id]) ? "✓ In Watchlist" : "🎬 Select to Watch"}
+                      </button>
+                      <button className="btn-detail" onClick={() => openDetail(rec.movie, rec)}>Details</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
           <AppFooter
             onPrivacy={() => openLegalPage("privacy")}
