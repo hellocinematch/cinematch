@@ -1382,6 +1382,7 @@ export default function App() {
   const legalReturnScreenRef = useRef(null);
   const legalHistoryPushedRef = useRef(false);
   const screenRef = useRef(screen);
+  const attemptedRatedHydrationRef = useRef(new Set());
   useEffect(() => {
     screenRef.current = screen;
   }, [screen]);
@@ -1710,6 +1711,48 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, [user, catalogue]);
+
+  /**
+   * Rated list uses `catalogue` metadata; hydrate missing rated ids from TMDB so
+   * Profile "Rated N" and visible rated titles stay in sync across sessions.
+   */
+  useEffect(() => {
+    if (!user) return;
+    const known = new Set(catalogue.map((m) => m.id));
+    const missing = Object.keys(userRatings).filter((id) => (
+      !known.has(id) && !attemptedRatedHydrationRef.current.has(id)
+    ));
+    if (missing.length === 0) return;
+
+    const targets = missing.slice(0, 60);
+    targets.forEach((id) => attemptedRatedHydrationRef.current.add(id));
+
+    let cancelled = false;
+    (async () => {
+      const settled = await Promise.allSettled(
+        targets.map(async (id) => {
+          const [type, tmdbRaw] = id.split("-");
+          const tmdbId = Number(tmdbRaw);
+          if ((type !== "movie" && type !== "tv") || !Number.isFinite(tmdbId)) return null;
+          const data = await fetchTMDB(`/${type}/${tmdbId}?language=en-US`);
+          if (!data || data.success === false || !Number.isFinite(Number(data.id))) return null;
+          return normalizeTMDBItem(data, type);
+        }),
+      );
+      if (cancelled) return;
+      const fetched = settled
+        .filter((r) => r.status === "fulfilled" && r.value)
+        .map((r) => r.value);
+      if (fetched.length === 0) return;
+      setCatalogue((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const added = fetched.filter((m) => !seen.has(m.id));
+        if (added.length === 0) return prev;
+        return [...prev, ...added];
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [user, userRatings, catalogue]);
 
   async function loadUserData() {
     if (!user) return { ratingCount: 0 };
