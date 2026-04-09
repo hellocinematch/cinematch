@@ -2140,9 +2140,8 @@ export default function App() {
     let base;
     if (appliedSearchQuery.length >= 2) base = searchResults;
     else base = catalogue.filter(m => activeFilter === "All" ? true : activeFilter === "Movies" ? m.type === "movie" : m.type === "tv");
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return base;
-    return base.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [catalogue, appliedSearchQuery, searchResults, activeFilter, user, showGenreIds, showRegionKeys]);
+    return base;
+  }, [catalogue, appliedSearchQuery, searchResults, activeFilter]);
 
   async function addRating(movieId, score) {
     setUserRatings(prev => ({ ...prev, [movieId]: score }));
@@ -3355,7 +3354,7 @@ export default function App() {
                 ))}
               </div>
               <div className="profile-settings-label" style={{ marginTop: 20 }}>Genres to show</div>
-              <p className="settings-providers-hint">Recommendations and Discover use TMDB genres. A title appears if it has at least one of the genres you select. Leave none selected to show all genres — including animation.</p>
+              <p className="settings-providers-hint">Recommendations in Home use TMDB genres. A title appears if it has at least one of the genres you select. Leave none selected to show all genres — including animation.</p>
               <div className="settings-genre-actions">
                 <button type="button" className="settings-genre-action-btn" onClick={() => persistShowGenreIds(PROFILE_GENRE_OPTIONS.map(g => g.id))}>Select all</button>
                 <button type="button" className="settings-genre-action-btn" onClick={() => persistShowGenreIds([])}>Clear (all genres)</button>
@@ -3373,7 +3372,7 @@ export default function App() {
                 ))}
               </div>
               <div className="profile-settings-label" style={{ marginTop: 20 }}>Regions to show</div>
-              <p className="settings-providers-hint">Recommendations and Discover can be narrowed by original language buckets like Hollywood, Indian, and Asian cinema. Leave none selected to show all regions.</p>
+              <p className="settings-providers-hint">Recommendations in Home can be narrowed by original language buckets like Hollywood, Indian, and Asian cinema. Leave none selected to show all regions.</p>
               <div className="settings-genre-actions">
                 <button type="button" className="settings-genre-action-btn" onClick={() => persistShowRegionKeys(PROFILE_REGION_OPTIONS.map(r => r.id))}>Select all</button>
                 <button type="button" className="settings-genre-action-btn" onClick={() => persistShowRegionKeys([])}>Clear (all regions)</button>
