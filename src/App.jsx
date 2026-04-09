@@ -2582,6 +2582,18 @@ export default function App() {
       } else {
         scored = scoreMoodFromTmdb();
       }
+      if (scored.length < 10) {
+        // Safety net: if edge scoring comes back thin, top up locally from the same candidate pool.
+        const localBackfill = scoreMoodFromTmdb();
+        const seenRecIds = new Set(scored.map((r) => r?.movie?.id).filter(Boolean));
+        for (const rec of localBackfill) {
+          const id = rec?.movie?.id;
+          if (!id || seenRecIds.has(id)) continue;
+          scored.push(rec);
+          seenRecIds.add(id);
+          if (scored.length >= 10) break;
+        }
+      }
       setMoodResults(pickMoodMix(scored, 7, 3));
     } catch (e) { console.error(e); setMoodResults([]); }
     setScreen("mood-results");
