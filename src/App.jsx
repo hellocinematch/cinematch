@@ -121,6 +121,37 @@ function filterDefaultExcludedGenres(items, allowAnimation = false) {
   return (items || []).filter((item) => !hasExcludedGenre(item));
 }
 
+function formatIsoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function dateDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return formatIsoDate(d);
+}
+
+function withinPastDays(dateString, days) {
+  if (!dateString) return false;
+  const thenMs = Date.parse(dateString);
+  if (!Number.isFinite(thenMs)) return false;
+  const ageMs = Date.now() - thenMs;
+  return ageMs >= 0 && ageMs <= days * 24 * 60 * 60 * 1000;
+}
+
+async function fetchTvDetailsById(ids = []) {
+  const uniqueIds = [...new Set((ids || []).filter((id) => Number.isFinite(Number(id))))].slice(0, 30);
+  const detailRows = await Promise.all(uniqueIds.map(async (id) => {
+    try {
+      const d = await fetchTMDB(`/tv/${id}?language=en-US`);
+      return [id, d];
+    } catch {
+      return [id, null];
+    }
+  }));
+  return new Map(detailRows);
+}
+
 function isAnimationIntentQuery(query) {
   return /(animation|animated|anime|cartoon|pixar|ghibli|disney)/i.test(String(query || ""));
 }
@@ -164,24 +195,28 @@ function passesMoodRegionFilter(item, selectedRegions) {
 async function fetchInTheaters(regionKeys = []) {
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
-    if (langCodes.length > 0) {
-      const now = new Date();
-      const end = now.toISOString().slice(0, 10);
-      const startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - 210);
-      const start = startDate.toISOString().slice(0, 10);
-      const base = `/discover/movie?language=en-US&sort_by=popularity.desc&region=US&with_original_language=${langCodes.join("|")}&primary_release_date.gte=${start}&primary_release_date.lte=${end}`;
-      const [p1, p2, p3] = await Promise.all([
-        fetchTMDB(`${base}&page=1`),
-        fetchTMDB(`${base}&page=2`),
-        fetchTMDB(`${base}&page=3`),
-      ]);
-      const merged = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || []), ...(p3.results || [])]);
-      const unique = [...new Map(merged.map(item => [item.id, item])).values()];
-      if (unique.length > 0) return unique.slice(0, 15).map(m => normalizeTMDBItem(m, "movie"));
-    }
-    const data = await fetchTMDB("/movie/now_playing?language=en-US&page=1&region=US");
-    return filterDefaultExcludedGenres(data.results || []).slice(0, 15).map(m => normalizeTMDBItem(m, "movie"));
+    const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+    const now = formatIsoDate(new Date());
+    const newWindowStart = dateDaysAgo(14);
+    const stillWindowEnd = dateDaysAgo(15);
+    const stillWindowStart = dateDaysAgo(45);
+    const base = "/discover/movie?language=en-US&sort_by=popularity.desc&region=US&with_release_type=3";
+
+    const [newP1, newP2, stillP1, stillP2] = await Promise.all([
+      fetchTMDB(`${base}&primary_release_date.gte=${newWindowStart}&primary_release_date.lte=${now}${langQuery}&page=1`),
+      fetchTMDB(`${base}&primary_release_date.gte=${newWindowStart}&primary_release_date.lte=${now}${langQuery}&page=2`),
+      fetchTMDB(`${base}&primary_release_date.gte=${stillWindowStart}&primary_release_date.lte=${stillWindowEnd}${langQuery}&page=1`),
+      fetchTMDB(`${base}&primary_release_date.gte=${stillWindowStart}&primary_release_date.lte=${stillWindowEnd}${langQuery}&page=2`),
+    ]);
+
+    const merged = filterDefaultExcludedGenres([
+      ...(newP1.results || []),
+      ...(newP2.results || []),
+      ...(stillP1.results || []),
+      ...(stillP2.results || []),
+    ]);
+    const unique = [...new Map(merged.map((item) => [item.id, item])).values()];
+    return unique.slice(0, 15).map((m) => normalizeTMDBItem(m, "movie"));
   } catch {
     return [];
   }
@@ -193,26 +228,52 @@ async function fetchInTheaters(regionKeys = []) {
  */
 async function fetchStreamingSplit(providerIds, regionKeys) {
   try {
-    const y = new Date().getFullYear();
-    const seriesRecentCutoff = `${y - 2}-01-01`;
     const langCodes = getRegionLanguageCodes(regionKeys);
     const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
-    const providerQuery =
-      Array.isArray(providerIds) && providerIds.length > 0
-        ? `&with_watch_providers=${providerIds.join("|")}`
-        : "";
-    const moviePathBase = `/discover/movie?language=en-US&watch_region=US&with_watch_monetization_types=flatrate&sort_by=popularity.desc${providerQuery}${langQuery}`;
-    const tvPathBase = `/discover/tv?language=en-US&watch_region=US&with_watch_monetization_types=flatrate&sort_by=first_air_date.desc&first_air_date.gte=${seriesRecentCutoff}${providerQuery}${langQuery}`;
-    const fetchPageNums = langCodes.length > 0 ? [1, 2] : [1];
-    const [moviePages, tvPages] = await Promise.all([
-      Promise.all(fetchPageNums.map(page => fetchTMDB(`${moviePathBase}&page=${page}`))),
-      Promise.all(fetchPageNums.map(page => fetchTMDB(`${tvPathBase}&page=${page}`))),
+    // Keep function signature stable for existing call sites; this rule set does not rely on provider filters.
+    void providerIds;
+
+    const digitalStart = dateDaysAgo(90);
+    const digitalEnd = dateDaysAgo(46);
+    const tvNewSeriesStart = dateDaysAgo(180);
+    const excludedTrendingGenres = new Set([10767, 10763]); // Talk + News
+
+    const moviePathBase = `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&with_release_type=4&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}${langQuery}`;
+    const tvNewSeriesBase = `/discover/tv?language=en-US&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${langQuery}`;
+    const trendingTvBase = "/trending/tv/day?language=en-US";
+
+    const [moviePages, tvSeriesPages, tvTrendingPages] = await Promise.all([
+      Promise.all([1, 2].map((page) => fetchTMDB(`${moviePathBase}&page=${page}`))),
+      Promise.all([1, 2].map((page) => fetchTMDB(`${tvNewSeriesBase}&page=${page}`))),
+      Promise.all([1, 2].map((page) => fetchTMDB(`${trendingTvBase}&page=${page}`))),
     ]);
-    const movieResults = filterDefaultExcludedGenres(moviePages.flatMap(page => page.results || []));
-    const tvResults = filterDefaultExcludedGenres(tvPages.flatMap(page => page.results || []));
-    const dedupeByTmdbId = (arr) => [...new Map(arr.map(item => [item.id, item])).values()];
-    const movies = dedupeByTmdbId(movieResults).slice(0, 16).map(m => normalizeTMDBItem(m, "movie"));
-    const shows = dedupeByTmdbId(tvResults).slice(0, 16).map(m => normalizeTMDBItem(m, "tv"));
+
+    const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
+    const tvNewSeriesCandidates = tvSeriesPages.flatMap((page) => page.results || []);
+    const tvTrendingCandidates = tvTrendingPages
+      .flatMap((page) => page.results || [])
+      .filter((item) => {
+        const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
+        return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
+      });
+
+    const tvCandidates = [...new Map(
+      [...tvNewSeriesCandidates, ...tvTrendingCandidates].map((item) => [item.id, item]),
+    ).values()];
+
+    const tvDetailsMap = await fetchTvDetailsById(tvCandidates.map((item) => item.id));
+    const tvResults = tvCandidates.filter((item) => {
+      const detail = tvDetailsMap.get(item.id);
+      const seasons = Number(detail?.number_of_seasons ?? 0);
+      const isNewSeries = seasons === 1 && withinPastDays(item?.first_air_date, 180);
+      const isNewSeason = seasons > 1 && withinPastDays(detail?.last_air_date, 7);
+      const trendingEligible = tvTrendingCandidates.some((t) => t.id === item.id);
+      return isNewSeries || isNewSeason || trendingEligible;
+    });
+
+    const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
+    const movies = dedupeByTmdbId(movieResults).slice(0, 16).map((m) => normalizeTMDBItem(m, "movie"));
+    const shows = filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, 16).map((m) => normalizeTMDBItem(m, "tv"));
     return { movies, shows };
   } catch {
     return { movies: [], shows: [] };
