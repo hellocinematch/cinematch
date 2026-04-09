@@ -1290,6 +1290,16 @@ function formatScore(n) {
   return (Math.round(x * 10) / 10).toFixed(1);
 }
 
+function formatStripMediaMeta(movie, tvMetaByTmdbId) {
+  if (movie?.type !== "tv") return `Movie · ${movie?.year || "—"}`;
+  const meta = movie?.tmdbId != null ? tvMetaByTmdbId?.[movie.tmdbId] : null;
+  const latestYear = meta?.latestYear || movie?.year || "—";
+  if (Number.isFinite(Number(meta?.seasonCount)) && Number(meta.seasonCount) > 0) {
+    return `TV · ${latestYear} · S${Number(meta.seasonCount)}`;
+  }
+  return `TV · ${latestYear}`;
+}
+
 function pickMoodMix(results, movieTarget = 7, tvTarget = 3) {
   const list = Array.isArray(results) ? results : [];
   if (list.length === 0) return [];
@@ -1394,6 +1404,8 @@ export default function App() {
   const screenRef = useRef(screen);
   const attemptedRatedHydrationRef = useRef(new Set());
   const worthProviderCacheRef = useRef(new Map());
+  const tvStripMetaCacheRef = useRef(new Map());
+  const [tvStripMetaByTmdbId, setTvStripMetaByTmdbId] = useState({});
   useEffect(() => {
     screenRef.current = screen;
   }, [screen]);
@@ -2177,6 +2189,38 @@ export default function App() {
     void rebuildWorthLookStrip();
     return () => { cancelled = true; };
   }, [worthLookCandidates, selectedStreamingProviderIds]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tvCandidates = [
+      ...theaterRecs.map((r) => r.movie),
+      ...streamingRecs.map((r) => r.movie),
+      ...moreForYouStrip.map((r) => r.movie),
+      ...worthLookStrip.map((r) => r.movie),
+    ]
+      .filter((m) => m?.type === "tv" && Number.isFinite(Number(m?.tmdbId)));
+    const missingTmdbIds = [...new Set(tvCandidates.map((m) => Number(m.tmdbId)))]
+      .filter((id) => !tvStripMetaCacheRef.current.has(id))
+      .slice(0, 30);
+    if (missingTmdbIds.length === 0) return;
+    // Strip labels for long-running TV should show latest known year + season count, not first-air year only.
+    const hydrateTvStripMeta = async () => {
+      const details = await fetchTvDetailsById(missingTmdbIds);
+      for (const id of missingTmdbIds) {
+        const detail = details.get(id);
+        const latestYear = String(detail?.last_air_date || detail?.first_air_date || "").slice(0, 4) || null;
+        const seasonCount = Number(detail?.number_of_seasons || 0) || null;
+        tvStripMetaCacheRef.current.set(id, { latestYear, seasonCount });
+      }
+      if (!cancelled) {
+        const next = {};
+        tvStripMetaCacheRef.current.forEach((v, k) => { next[k] = v; });
+        setTvStripMetaByTmdbId(next);
+      }
+    };
+    void hydrateTvStripMeta();
+    return () => { cancelled = true; };
+  }, [theaterRecs, streamingRecs, moreForYouStrip, worthLookStrip]);
 
   const recMap = useMemo(() => ({
     ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),
@@ -2997,7 +3041,7 @@ export default function App() {
                               </div>
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
-                            <div className="strip-genre">Movie · {rec.movie.year || "—"}</div>
+                            <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
                             <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
                           </div>
                         ))}
@@ -3030,7 +3074,7 @@ export default function App() {
                               </div>
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
-                            <div className="strip-genre">{rec.movie.type === "movie" ? "Movie" : "TV"} · {rec.movie.year || "—"}</div>
+                            <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
                             <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
                           </div>
                         ))}
@@ -3072,7 +3116,7 @@ export default function App() {
                           </div>
                         </div>
                         <div className="strip-title">{rec.movie.title}</div>
-                        <div className="strip-genre">{rec.movie.type === "movie" ? "Movie" : "TV"} · {rec.movie.year}</div>
+                        <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
                       </div>
                     ))}
                   </div>
@@ -3096,7 +3140,7 @@ export default function App() {
                           </div>
                         </div>
                         <div className="strip-title">{rec.movie.title}</div>
-                        <div className="strip-genre">{rec.movie.type === "movie" ? "Movie" : "TV"} · {rec.movie.year}</div>
+                        <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
                       </div>
                     ))}
                   </div>
