@@ -1393,6 +1393,7 @@ export default function App() {
   const legalHistoryPushedRef = useRef(false);
   const screenRef = useRef(screen);
   const attemptedRatedHydrationRef = useRef(new Set());
+  const worthProviderCacheRef = useRef(new Map());
   useEffect(() => {
     screenRef.current = screen;
   }, [screen]);
@@ -2128,12 +2129,54 @@ export default function App() {
 
   const moreForYouIds = useMemo(() => new Set(moreForYouStrip.map(r => r.movie.id)), [moreForYouStrip]);
 
-  /** Strip 2: server “Worth a Look” minus overlap with strip 1; else next popularity chunk — keeps two rows like the original layout. */
-  const worthLookStrip = useMemo(() => {
+  /** Worth-a-look base pool: server picks first, fallback to unrated popular titles, both excluding strip-1 overlap. */
+  const worthLookCandidates = useMemo(() => {
     const fromServer = worthALookRecs.filter(r => !moreForYouIds.has(r.movie.id));
-    if (fromServer.length > 0) return fromServer.slice(0, 9);
-    return unratedPopularRecs.filter(r => !moreForYouIds.has(r.movie.id)).slice(0, 9);
+    if (fromServer.length > 0) return fromServer.slice(0, 30);
+    return unratedPopularRecs.filter(r => !moreForYouIds.has(r.movie.id)).slice(0, 30);
   }, [worthALookRecs, unratedPopularRecs, moreForYouIds]);
+  const [worthLookStrip, setWorthLookStrip] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const getFlatrateProviderIds = async (movie) => {
+      const key = `${movie.type}-${movie.tmdbId}`;
+      if (worthProviderCacheRef.current.has(key)) return worthProviderCacheRef.current.get(key);
+      const data = await fetchWatchProviders(movie.tmdbId, movie.type);
+      const ids = Array.isArray(data?.flatrate)
+        ? data.flatrate.map((p) => Number(p?.provider_id)).filter((n) => Number.isFinite(n))
+        : [];
+      worthProviderCacheRef.current.set(key, ids);
+      return ids;
+    };
+    const rebuildWorthLookStrip = async () => {
+      if (worthLookCandidates.length === 0) {
+        if (!cancelled) setWorthLookStrip([]);
+        return;
+      }
+      if (selectedStreamingProviderIds.length === 0) {
+        // Default length for this strip is 20 cards when no provider-priority split is needed.
+        if (!cancelled) setWorthLookStrip(worthLookCandidates.slice(0, 20));
+        return;
+      }
+      // Prioritize titles not currently included in selected subscriptions, then fill remaining slots.
+      const classified = await Promise.all(
+        worthLookCandidates.map(async (rec) => {
+          const providerIds = await getFlatrateProviderIds(rec.movie);
+          const hasSelectedProvider = providerIds.some((id) => selectedStreamingProviderIds.includes(id));
+          return { rec, outsideSelectedProviders: !hasSelectedProvider };
+        }),
+      );
+      const prioritized = [
+        ...classified.filter((x) => x.outsideSelectedProviders).map((x) => x.rec),
+        ...classified.filter((x) => !x.outsideSelectedProviders).map((x) => x.rec),
+      ];
+      // Keep a stable strip size after prioritization.
+      if (!cancelled) setWorthLookStrip(prioritized.slice(0, 20));
+    };
+    void rebuildWorthLookStrip();
+    return () => { cancelled = true; };
+  }, [worthLookCandidates, selectedStreamingProviderIds]);
 
   const recMap = useMemo(() => ({
     ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),

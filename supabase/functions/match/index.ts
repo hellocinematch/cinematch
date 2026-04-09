@@ -221,7 +221,8 @@ function computeWorthALook(
     .sort(byPop);
   const pool =
     unrated.length >= 6 ? unrated : catalogue.filter((m) => !moreIds.has(m.id)).sort(byPop);
-  return pool.slice(0, 12).map((m) => buildRecWithPrediction(m, neighbors));
+  // Keep a larger server buffer so client-side strip de-dupe/filtering can still render a full row.
+  return pool.slice(0, 30).map((m) => buildRecWithPrediction(m, neighbors));
 }
 
 function runFullMatch(
