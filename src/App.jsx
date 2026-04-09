@@ -2334,13 +2334,14 @@ export default function App() {
     const wantsRecent = vibe.includes("recent");
     const wantsModern = vibe.includes("modern");
     const wantsClassic = vibe.includes("classic");
+    const wantsAcclaimed = vibe.includes("acclaimed");
     if (wantsShort) params.set("with_runtime.lte", "90"); // quick-watch movies: under 90m
     if (wantsHidden) {
       // Hidden gems: high-rated, consensus-liquidity floor, then local score sorting.
       params.set("sort_by", "vote_average.desc");
       params.set("vote_average.gte", "7.5");
       params.set("vote_count.gte", "100");
-    } else if (vibe.includes("acclaimed")) {
+    } else if (wantsAcclaimed) {
       params.set("vote_average.gte", "7.5");
       params.set("vote_count.gte", "200");
     }
@@ -2381,22 +2382,56 @@ export default function App() {
           engTv.set("with_status", "3");
           regTv.set("with_status", "3");
         }
-        const [engMovies, engTV, regMovies, regTV] = await Promise.all([
-          fetchTMDB(`/discover/movie?${engParams.toString()}`),
-          fetchTMDB(`/discover/tv?${engTv.toString()}`),
-          fetchTMDB(`/discover/movie?${regParams.toString()}`),
-          fetchTMDB(`/discover/tv?${regTv.toString()}`),
-        ]);
-        // Interleave: 1 English, 1 Regional alternating
-        const eM = (engMovies.results || []).slice(0, 10);
-        const rM = (regMovies.results || []).slice(0, 10);
-        const eT = (engTV.results || []).slice(0, 10);
-        const rT = (regTV.results || []).slice(0, 10);
-        for (let i = 0; i < 10; i++) {
-          if (eM[i]) allMovieResults.push({ ...eM[i], _lang: "en" });
-          if (rM[i]) allMovieResults.push({ ...rM[i], _lang: "reg" });
-          if (eT[i]) allTVResults.push({ ...eT[i], _lang: "en" });
-          if (rT[i]) allTVResults.push({ ...rT[i], _lang: "reg" });
+        if (wantsAcclaimed) {
+          // Acclaimed can get over-pruned later; fetch deeper pages up front to widen candidate supply.
+          const engParamsP2 = new URLSearchParams(engParams); engParamsP2.set("page", "2");
+          const engParamsP3 = new URLSearchParams(engParams); engParamsP3.set("page", "3");
+          const regParamsP2 = new URLSearchParams(regParams); regParamsP2.set("page", "2");
+          const regParamsP3 = new URLSearchParams(regParams); regParamsP3.set("page", "3");
+          const engTvP2 = new URLSearchParams(engTv); engTvP2.set("page", "2");
+          const engTvP3 = new URLSearchParams(engTv); engTvP3.set("page", "3");
+          const regTvP2 = new URLSearchParams(regTv); regTvP2.set("page", "2");
+          const regTvP3 = new URLSearchParams(regTv); regTvP3.set("page", "3");
+          const [em1, em2, em3, et1, et2, et3, rm1, rm2, rm3, rt1, rt2, rt3] = await Promise.all([
+            fetchTMDB(`/discover/movie?${engParams.toString()}`),
+            fetchTMDB(`/discover/movie?${engParamsP2.toString()}`),
+            fetchTMDB(`/discover/movie?${engParamsP3.toString()}`),
+            fetchTMDB(`/discover/tv?${engTv.toString()}`),
+            fetchTMDB(`/discover/tv?${engTvP2.toString()}`),
+            fetchTMDB(`/discover/tv?${engTvP3.toString()}`),
+            fetchTMDB(`/discover/movie?${regParams.toString()}`),
+            fetchTMDB(`/discover/movie?${regParamsP2.toString()}`),
+            fetchTMDB(`/discover/movie?${regParamsP3.toString()}`),
+            fetchTMDB(`/discover/tv?${regTv.toString()}`),
+            fetchTMDB(`/discover/tv?${regTvP2.toString()}`),
+            fetchTMDB(`/discover/tv?${regTvP3.toString()}`),
+          ]);
+          allMovieResults = [
+            ...(em1.results || []), ...(em2.results || []), ...(em3.results || []),
+            ...(rm1.results || []), ...(rm2.results || []), ...(rm3.results || []),
+          ].slice(0, 60);
+          allTVResults = [
+            ...(et1.results || []), ...(et2.results || []), ...(et3.results || []),
+            ...(rt1.results || []), ...(rt2.results || []), ...(rt3.results || []),
+          ].slice(0, 60);
+        } else {
+          const [engMovies, engTV, regMovies, regTV] = await Promise.all([
+            fetchTMDB(`/discover/movie?${engParams.toString()}`),
+            fetchTMDB(`/discover/tv?${engTv.toString()}`),
+            fetchTMDB(`/discover/movie?${regParams.toString()}`),
+            fetchTMDB(`/discover/tv?${regTv.toString()}`),
+          ]);
+          // Interleave: 1 English, 1 Regional alternating
+          const eM = (engMovies.results || []).slice(0, 10);
+          const rM = (regMovies.results || []).slice(0, 10);
+          const eT = (engTV.results || []).slice(0, 10);
+          const rT = (regTV.results || []).slice(0, 10);
+          for (let i = 0; i < 10; i++) {
+            if (eM[i]) allMovieResults.push({ ...eM[i], _lang: "en" });
+            if (rM[i]) allMovieResults.push({ ...rM[i], _lang: "reg" });
+            if (eT[i]) allTVResults.push({ ...eT[i], _lang: "en" });
+            if (rT[i]) allTVResults.push({ ...rT[i], _lang: "reg" });
+          }
         }
       } else {
         const tvParams = tmdbTvParamsFromMovieParams(params);
@@ -2404,7 +2439,7 @@ export default function App() {
           tvParams.set("with_runtime.lte", "24");
           tvParams.set("with_status", "3");
         }
-        if (wantsHidden) {
+        if (wantsHidden || wantsAcclaimed) {
           const movieP2 = new URLSearchParams(params); movieP2.set("page", "2");
           const movieP3 = new URLSearchParams(params); movieP3.set("page", "3");
           const tvP2 = new URLSearchParams(tvParams); tvP2.set("page", "2");
@@ -2417,8 +2452,9 @@ export default function App() {
             fetchTMDB(`/discover/tv?${tvP2.toString()}`),
             fetchTMDB(`/discover/tv?${tvP3.toString()}`),
           ]);
-          allMovieResults = [...(m1.results || []), ...(m2.results || []), ...(m3.results || [])].slice(0, 30);
-          allTVResults = [...(t1.results || []), ...(t2.results || []), ...(t3.results || [])].slice(0, 30);
+          const perTypeCap = wantsAcclaimed ? 60 : 30;
+          allMovieResults = [...(m1.results || []), ...(m2.results || []), ...(m3.results || [])].slice(0, perTypeCap);
+          allTVResults = [...(t1.results || []), ...(t2.results || []), ...(t3.results || [])].slice(0, perTypeCap);
         } else {
           const [movieData, tvData] = await Promise.all([
             fetchTMDB(`/discover/movie?${params.toString()}`),
@@ -2491,6 +2527,32 @@ export default function App() {
           .filter((m) => Number(m.voteCount || 0) >= 100)
           .sort((a, b) => (Number(b.hiddenBaseScore || 0) - Number(a.hiddenBaseScore || 0)))
           .slice(0, 50);
+      }
+      if (wantsAcclaimed && combined.length < 10) {
+        // Refill pass: keep acclaimed intent but soften vote floor to avoid tiny result sets.
+        const refillParams = new URLSearchParams(params);
+        refillParams.set("vote_count.gte", "100");
+        const refillTvParams = tmdbTvParamsFromMovieParams(refillParams);
+        const refillMovieP2 = new URLSearchParams(refillParams); refillMovieP2.set("page", "2");
+        const refillTvP2 = new URLSearchParams(refillTvParams); refillTvP2.set("page", "2");
+        const [m1, m2, t1, t2] = await Promise.all([
+          fetchTMDB(`/discover/movie?${refillParams.toString()}`),
+          fetchTMDB(`/discover/movie?${refillMovieP2.toString()}`),
+          fetchTMDB(`/discover/tv?${refillTvParams.toString()}`),
+          fetchTMDB(`/discover/tv?${refillTvP2.toString()}`),
+        ]);
+        const refill = [
+          ...((m1.results || []).slice(0, 14)).map((m) => normalize(m, "movie")),
+          ...((m2.results || []).slice(0, 14)).map((m) => normalize(m, "movie")),
+          ...((t1.results || []).slice(0, 14)).map((m) => normalize(m, "tv")),
+          ...((t2.results || []).slice(0, 14)).map((m) => normalize(m, "tv")),
+        ];
+        const seenIds = new Set(combined.map((m) => m.id));
+        const refillFiltered = refill
+          .filter((m) => !seenIds.has(m.id))
+          .filter((m) => passesMoodRegionFilter(m, region))
+          .filter((m) => documentarySelected || !isDocumentaryLike(m));
+        combined = [...combined, ...refillFiltered].slice(0, 30);
       }
       function scoreMoodFromTmdb() {
         const seen = new Set(Object.keys(userRatings));
