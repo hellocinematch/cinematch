@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.22
+
+- **Confidence follow-up action:** Detail cards with **low/medium confidence** now show **“Rate more titles to improve”** plus a **Rate now** CTA. Tapping it opens a focused rating flow titled **“Rate Similar titles.”**
+- **Neighbor-overlap title queue:** The Rate now queue is now built from collaborative overlap around the current title: find users who rated that title, gather what else they rated, rank unseen candidates by overlap strength (with same-type boost), and surface those first; falls back to popular unseen titles when overlap is sparse.
+
 ## 1.2.21
 
 - **Your picks strips:** When **For you** or **Worth a Look** is short of the row cap, **backfill** from **unrated popular** catalogue titles (`appendPopularRows`). **No streaming providers:** append by popularity until 15 / 20. **With providers:** strip 1 only adds popular titles that **stream on selected services**; strip 2 only adds popular titles **not** on those services (same rule as CF Worth a Look). Rows carry **`kind`**: **✨ Pick** (CF / server-scored pool) vs **📈 Popular** (popularity filler), with compact styles and `aria-label` on cards.

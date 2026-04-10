@@ -1100,6 +1100,11 @@ const styles = `
   .d-pred-range-medium { color:#ad964d; }
   .d-pred-range-high { color:#8e7b44; }
   .d-tmdb { font-size:11px; color:#555; margin-top:3px; text-align:right; }
+  .d-pred-improve { margin-top:8px; font-size:11px; color:#7f7352; }
+  .d-rate-now-btn { margin-top:8px; background:#1b1b1b; border:1px solid #4f4324; color:#d4b761; border-radius:8px; padding:6px 10px; font-size:11px; font-family:'DM Sans',sans-serif; cursor:pointer; transition:all 0.2s; }
+  .d-rate-now-btn:hover:not(:disabled) { border-color:#8e7536; color:#e6c86a; }
+  .d-rate-now-btn:disabled { opacity:0.55; cursor:default; }
+  .d-pred-improve-err { margin-top:6px; font-size:10px; color:#aa6a6a; }
   .d-synopsis { font-size:14px; color:#888; line-height:1.7; margin-bottom:22px; }
   .d-rate-label { font-size:13px; color:#aaa; margin-bottom:10px; }
   .d-rate-row { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
@@ -1470,6 +1475,10 @@ export default function App() {
   const [detailRating, setDetailRating] = useState(7);
   const [detailTouched, setDetailTouched] = useState(false);
   const [detailEditRating, setDetailEditRating] = useState(false);
+  const [rateMoreMovies, setRateMoreMovies] = useState([]);
+  const [rateMoreContextMovieId, setRateMoreContextMovieId] = useState(null);
+  const [rateSimilarLoading, setRateSimilarLoading] = useState(false);
+  const [rateSimilarError, setRateSimilarError] = useState("");
   const [ratedSearchQuery, setRatedSearchQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
@@ -2502,6 +2511,8 @@ export default function App() {
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
   }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
   const FILTERS = ["All", "Movies", "TV Shows"];
+  const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
+  const rateMoreMovie = rateMoreQueue[obStep] ?? null;
 
   const discoverItems = useMemo(() => {
     let base;
@@ -2532,19 +2543,129 @@ export default function App() {
     }
   }
 
+  function startDefaultRateMore() {
+    setRateMoreMovies([]);
+    setRateMoreContextMovieId(null);
+    setRateSimilarError("");
+    setObStep(0);
+    setSliderVal(7);
+    setSliderTouched(false);
+    setScreen("rate-more");
+  }
+
+  async function fetchNeighborOverlapTitlesFor(movie, limit = ONBOARDING_COUNT) {
+    const tmdbId = Number(movie?.tmdbId);
+    const mediaType = movie?.type === "tv" ? "tv" : "movie";
+    if (!Number.isFinite(tmdbId)) return [];
+
+    const { data: seedRatings, error: seedErr } = await supabase
+      .from("ratings")
+      .select("user_id")
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", mediaType)
+      .limit(450);
+    if (seedErr) throw new Error(seedErr.message || "Could not load overlap users");
+
+    const overlapUserIds = [...new Set((seedRatings || []).map((r) => r.user_id).filter(Boolean))].slice(0, 300);
+    if (overlapUserIds.length === 0) return [];
+
+    const { data: overlapRatings, error: overlapErr } = await supabase
+      .from("ratings")
+      .select("user_id, tmdb_id, media_type, score")
+      .in("user_id", overlapUserIds)
+      .limit(20000);
+    if (overlapErr) throw new Error(overlapErr.message || "Could not load overlap ratings");
+
+    const ratedIds = new Set(Object.keys(userRatings));
+    const blockedIds = new Set([
+      ...ratedIds,
+      ...watchlist.map((m) => m.id),
+      `${mediaType}-${tmdbId}`,
+    ]);
+    const movieById = new Map(catalogueForRecs.map((m) => [m.id, m]));
+    const agg = new Map();
+
+    for (const row of overlapRatings || []) {
+      const rid = `${row.media_type}-${row.tmdb_id}`;
+      if (blockedIds.has(rid)) continue;
+      const m = movieById.get(rid);
+      if (!m || hasExcludedGenre(m)) continue;
+      let rec = agg.get(rid);
+      if (!rec) {
+        rec = { movie: m, userIds: new Set(), scoreSum: 0, scoreCount: 0 };
+        agg.set(rid, rec);
+      }
+      rec.userIds.add(row.user_id);
+      const s = Number(row.score);
+      if (Number.isFinite(s)) {
+        rec.scoreSum += s;
+        rec.scoreCount += 1;
+      }
+    }
+
+    return [...agg.values()]
+      .map((x) => {
+        const overlap = x.userIds.size;
+        const avgScore = x.scoreCount > 0 ? (x.scoreSum / x.scoreCount) : 0;
+        const sameTypeBoost = x.movie.type === mediaType ? 1.15 : 1;
+        const popularityBoost = Math.min(Number(x.movie.popularity) || 0, 100) * 0.015;
+        const rank = (overlap * 1.9 + avgScore * 0.65 + popularityBoost) * sameTypeBoost;
+        return { movie: x.movie, rank };
+      })
+      .sort((a, b) => b.rank - a.rank)
+      .slice(0, limit)
+      .map((x) => x.movie);
+  }
+
+  async function handleRateNowForPrediction(movie) {
+    setRateSimilarLoading(true);
+    setRateSimilarError("");
+    try {
+      let queue = await fetchNeighborOverlapTitlesFor(movie, ONBOARDING_COUNT);
+      if (queue.length === 0) {
+        const fallbackType = movie?.type === "tv" ? "tv" : "movie";
+        const blockedIds = new Set([...Object.keys(userRatings), ...watchlist.map((m) => m.id), movie?.id].filter(Boolean));
+        queue = catalogueForRecs
+          .filter((m) => m.type === fallbackType && !blockedIds.has(m.id))
+          .sort((a, b) => (Number(b.popularity) || 0) - (Number(a.popularity) || 0))
+          .slice(0, ONBOARDING_COUNT);
+      }
+      if (queue.length === 0) {
+        setRateSimilarError("No similar titles available right now.");
+        return;
+      }
+      setRateMoreMovies(queue);
+      setRateMoreContextMovieId(movie?.id || null);
+      setObStep(0);
+      setSliderVal(7);
+      setSliderTouched(false);
+      setScreen("rate-more");
+    } catch (e) {
+      console.error(e);
+      setRateSimilarError("Could not load similar titles right now.");
+    } finally {
+      setRateSimilarLoading(false);
+    }
+  }
+
   function advanceOb() {
     setSliderVal(7); setSliderTouched(false);
-    if (obStep < obMovies.length - 1) {
+    if (obStep < rateMoreQueue.length - 1) {
       setObStep(s => s + 1);
     } else {
       void markOnboardingComplete();
-      if (screen === "rate-more") { setNavTab("home"); setScreen("home"); }
+      if (screen === "rate-more") {
+        setRateMoreMovies([]);
+        setRateMoreContextMovieId(null);
+        setNavTab("home");
+        setScreen("home");
+      }
       else { setScreen("loading-recs"); setTimeout(() => { setNavTab("home"); setScreen("home"); }, 2200); }
     }
   }
 
   function confirmRating() {
-    if (obMovies[obStep]) addRating(obMovies[obStep].id, sliderVal);
+    if (rateMoreQueue[obStep]) addRating(rateMoreQueue[obStep].id, sliderVal);
     advanceOb();
   }
 
@@ -3379,7 +3500,7 @@ export default function App() {
               {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingMovieRecsResolved.length + streamingTvRecsResolved.length > 0 && (
                 <div className="no-recs" style={{ marginTop: 16, border: "none", padding: "12px 0 0" }}>
                   <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
-                  <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={() => setScreen("rate-more")}>Rate More Titles</button>
+                  <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={startDefaultRateMore}>Rate More Titles</button>
                 </div>
               )}
             </div>
@@ -3478,7 +3599,7 @@ export default function App() {
                   ) : (
                     <div className="no-recs">
                       <div className="no-recs-text">Rate more titles to unlock recommendations<br />and discovery picks.</div>
-                      <button className="btn-confirm" style={{ marginTop: 16, width: "100%" }} onClick={() => setScreen("rate-more")}>Rate More Titles</button>
+                      <button className="btn-confirm" style={{ marginTop: 16, width: "100%" }} onClick={startDefaultRateMore}>Rate More Titles</button>
                     </div>
                   )}
                 </div>
@@ -3504,23 +3625,23 @@ export default function App() {
       )}
 
       {/* RATE MORE */}
-      {screen === "rate-more" && obMovie && (
+      {screen === "rate-more" && rateMoreMovie && (
         <div className="onboarding">
           <div className="ob-header">
             <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div className="ob-step">Rating {obStep + 1}</div>
-            <div className="ob-title">Rate more titles</div>
-            <div className="ob-subtitle">Improve your recommendations</div>
+            <div className="ob-title">Rate Similar titles</div>
+            <div className="ob-subtitle">{rateMoreContextMovieId ? "Improve this prediction" : "Improve your recommendations"}</div>
           </div>
           <div className="card-area">
             <div className="movie-card" key={obStep}>
               <div className="card-poster">
-                {obMovie.poster ? <img src={obMovie.poster} alt={obMovie.title} /> : <div className="card-poster-fallback">🎬</div>}
-                <div className="card-type-badge">{obMovie.type === "movie" ? "Movie" : "TV Show"}</div>
+                {rateMoreMovie.poster ? <img src={rateMoreMovie.poster} alt={rateMoreMovie.title} /> : <div className="card-poster-fallback">🎬</div>}
+                <div className="card-type-badge">{rateMoreMovie.type === "movie" ? "Movie" : "TV Show"}</div>
               </div>
               <div className="card-info">
-                <div className="card-title">{obMovie.title}</div>
-                <div className="card-year">{obMovie.year}</div>
+                <div className="card-title">{rateMoreMovie.title}</div>
+                <div className="card-year">{rateMoreMovie.year}</div>
               </div>
             </div>
           </div>
@@ -3535,7 +3656,7 @@ export default function App() {
               <button className="btn-confirm" onClick={() => { confirmRating(); setSliderVal(7); setSliderTouched(false); }} disabled={!sliderTouched}>Confirm Rating</button>
               <button className="btn-skip" onClick={() => advanceOb()}>Skip</button>
             </div>
-            <button className="btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={() => { void markOnboardingComplete(); setNavTab("home"); setScreen("home"); }}>Done for now</button>
+            <button className="btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={() => { void markOnboardingComplete(); setRateMoreMovies([]); setRateMoreContextMovieId(null); setNavTab("home"); setScreen("home"); }}>Done for now</button>
           </div>
         </div>
       )}
@@ -3947,6 +4068,20 @@ export default function App() {
                       <div className="d-pred-label">Predicted rating for you</div>
                       <div className="d-pred-sub">Based on your tastometer</div>
                       <span className={confClass(prediction.confidence)}>{confLabel(prediction.confidence)}</span>
+                      {(prediction.confidence === "low" || prediction.confidence === "medium") && (
+                        <>
+                          <div className="d-pred-improve">Rate more titles to improve</div>
+                          <button
+                            type="button"
+                            className="d-rate-now-btn"
+                            disabled={rateSimilarLoading}
+                            onClick={() => { void handleRateNowForPrediction(movie); }}
+                          >
+                            {rateSimilarLoading ? "Loading..." : "Rate now"}
+                          </button>
+                          {rateSimilarError && <div className="d-pred-improve-err">{rateSimilarError}</div>}
+                        </>
+                      )}
                     </div>
                     <div>
                       <div className={`d-pred-val ${predValClass(prediction.confidence)}`}>{formatScore(prediction.predicted)}</div>
