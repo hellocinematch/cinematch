@@ -80,6 +80,24 @@ const MORE_TAB_OFF_SERVICE_MAX = 20;
 /** Strip 2 floor; also used to backfill strip 1 from scored theater / streaming / worth-a-look rows. */
 const MORE_TAB_OFF_SERVICE_PRED_MIN = 6.5;
 
+/**
+ * When CF `recommendations` is short, strip 2 would be empty after taking strip 1. The Edge function
+ * already returns `worthALookRecs` (catalogue + predictions); merge those in up to MORE_TAB_OFF_SERVICE_MAX.
+ */
+function fillWorthLookStripFromPool(strip1Ids, strip2, pool) {
+  const used = new Set([...strip1Ids, ...strip2.map((r) => r.movie.id)]);
+  const out = [...strip2];
+  const rest = pool
+    .filter((r) => r?.movie?.id && !used.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
+    .sort((a, b) => b.predicted - a.predicted);
+  for (const r of rest) {
+    if (out.length >= MORE_TAB_OFF_SERVICE_MAX) break;
+    out.push(r);
+    used.add(r.movie.id);
+  }
+  return out;
+}
+
 /** Home secondary nav: internal ids align with tab labels (Now Playing / Your picks / Friends). */
 const HOME_SEGMENT_NOW_PLAYING = "nowPlaying";
 const HOME_SEGMENT_YOUR_PICKS = "yourPicks";
@@ -2280,9 +2298,10 @@ export default function App() {
       if (selectedStreamingProviderIds.length === 0) {
         const strip1 = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
         const strip1Ids = new Set(strip1.map((r) => r.movie.id));
-        const strip2 = sorted
+        let strip2 = sorted
           .filter((r) => !strip1Ids.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
           .slice(0, MORE_TAB_OFF_SERVICE_MAX);
+        strip2 = fillWorthLookStripFromPool(strip1Ids, strip2, worthALookRecs);
         if (!cancelled) {
           setMoreStripsLoading(false);
           setMoreForYouStrip(strip1);
@@ -2334,6 +2353,19 @@ export default function App() {
           if (cancelled) return;
           const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
           if (!on) strip2.push(rec);
+        }
+        if (strip2.length < MORE_TAB_OFF_SERVICE_MAX) {
+          const used2 = new Set([...strip1Ids, ...strip2.map((r) => r.movie.id)]);
+          const pool2 = worthALookRecs
+            .filter((r) => r?.movie?.id && !used2.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
+            .sort((a, b) => b.predicted - a.predicted);
+          for (const rec of pool2) {
+            if (strip2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
+            const ids = await getFlatrateProviderIds(rec.movie);
+            if (cancelled) return;
+            const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
+            if (!on) strip2.push(rec);
+          }
         }
         if (!cancelled) {
           setMoreForYouStrip(strip1);

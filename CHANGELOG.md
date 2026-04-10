@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.20
+
+- **Your picks → Worth a Look:** When CF **`recommendations`** is shorter than the first strip (e.g. only a handful of neighbors), strip 2 was often empty. **Backfill** from Edge **`worthALookRecs`** (same `MORE_TAB_OFF_SERVICE_PRED_MIN` floor, deduped) up to **20** titles. **No streaming providers:** merge immediately. **With providers:** after scoring strip 2 from CF, continue through **`worthALookRecs`** with the same TMDB “not on selected services” rule until full or exhausted.
+
 ## 1.2.19
 
 - **Your picks loading UX:** Track **`match`** in-flight (`matchLoading`) and TMDB watch-provider resolution for More strips (`moreStripsLoading`). When both strips are still empty, show **“Loading recommendations…”** or **“Checking where titles stream for your picks…”** instead of the **Rate more titles** empty state. Match invoke clears loading in **`finally`**; effect cleanup clears loading when deps change. Provider-based strip rebuild uses **`try`/`finally`** so loading always clears.
