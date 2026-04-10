@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.21
+
+- **Your picks strips:** When **For you** or **Worth a Look** is short of the row cap, **backfill** from **unrated popular** catalogue titles (`appendPopularRows`). **No streaming providers:** append by popularity until 15 / 20. **With providers:** strip 1 only adds popular titles that **stream on selected services**; strip 2 only adds popular titles **not** on those services (same rule as CF Worth a Look). Rows carry **`kind`**: **✨ Pick** (CF / server-scored pool) vs **📈 Popular** (popularity filler), with compact styles and `aria-label` on cards.
+
 ## 1.2.20
 
 - **Your picks → Worth a Look:** When CF **`recommendations`** is shorter than the first strip (e.g. only a handful of neighbors), strip 2 was often empty. **Backfill** from Edge **`worthALookRecs`** (same `MORE_TAB_OFF_SERVICE_PRED_MIN` floor, deduped) up to **20** titles. **No streaming providers:** merge immediately. **With providers:** after scoring strip 2 from CF, continue through **`worthALookRecs`** with the same TMDB “not on selected services” rule until full or exhausted.

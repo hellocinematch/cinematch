@@ -98,6 +98,22 @@ function fillWorthLookStripFromPool(strip1Ids, strip2, pool) {
   return out;
 }
 
+function toPickRows(recs) {
+  return recs.map((r) => ({ rec: r, kind: "pick" }));
+}
+
+/** Top up a strip with unrated catalogue titles by TMDB popularity (kind `popular`). */
+function appendPopularRows(rows, unratedPopular, cap, extraUsedIds = null) {
+  const used = new Set(extraUsedIds ?? []);
+  for (const x of rows) used.add(x.rec.movie.id);
+  for (const rec of unratedPopular) {
+    if (rows.length >= cap) break;
+    if (!rec?.movie?.id || used.has(rec.movie.id)) continue;
+    rows.push({ rec, kind: "popular" });
+    used.add(rec.movie.id);
+  }
+}
+
 /** Home secondary nav: internal ids align with tab labels (Now Playing / Your picks / Friends). */
 const HOME_SEGMENT_NOW_PLAYING = "nowPlaying";
 const HOME_SEGMENT_YOUR_PICKS = "yourPicks";
@@ -925,6 +941,9 @@ const styles = `
   .strip-title { font-size:14px; color:#ccc; margin-top:9px; line-height:1.35; }
   .strip-genre { font-size:11px; color:#555; margin-top:2px; }
   .strip-range { font-size:10px; color:#666; margin-top:1px; }
+  .strip-row-kind { font-size:11px; margin-top:5px; letter-spacing:0.02em; }
+  .strip-row-kind--pick { color:#c9a227; }
+  .strip-row-kind--pop { color:#666; }
 
   .wl-card { flex-shrink:0; width:100px; cursor:pointer; transition:transform 0.2s; }
   .wl-card:hover { transform:translateY(-3px); }
@@ -2284,7 +2303,9 @@ export default function App() {
       if (recommendations.length === 0) {
         if (!cancelled) {
           setMoreStripsLoading(false);
-          setMoreForYouStrip(unratedPopularRecs.slice(0, MORE_TAB_ON_SERVICE_MAX));
+          setMoreForYouStrip(
+            unratedPopularRecs.slice(0, MORE_TAB_ON_SERVICE_MAX).map((r) => ({ rec: r, kind: "popular" })),
+          );
           setWorthLookStrip([]);
         }
         return;
@@ -2296,16 +2317,25 @@ export default function App() {
       const rotated = [...sorted.slice(start), ...sorted.slice(0, start)];
 
       if (selectedStreamingProviderIds.length === 0) {
-        const strip1 = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
-        const strip1Ids = new Set(strip1.map((r) => r.movie.id));
-        let strip2 = sorted
+        const strip1Recs = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
+        const strip1Ids = new Set(strip1Recs.map((r) => r.movie.id));
+        let strip2Recs = sorted
           .filter((r) => !strip1Ids.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
           .slice(0, MORE_TAB_OFF_SERVICE_MAX);
-        strip2 = fillWorthLookStripFromPool(strip1Ids, strip2, worthALookRecs);
+        strip2Recs = fillWorthLookStripFromPool(strip1Ids, strip2Recs, worthALookRecs);
+        const strip1Rows = toPickRows(strip1Recs);
+        appendPopularRows(strip1Rows, unratedPopularRecs, MORE_TAB_ON_SERVICE_MAX);
+        const strip2Rows = toPickRows(strip2Recs);
+        appendPopularRows(
+          strip2Rows,
+          unratedPopularRecs,
+          MORE_TAB_OFF_SERVICE_MAX,
+          new Set(strip1Rows.map((x) => x.rec.movie.id)),
+        );
         if (!cancelled) {
           setMoreStripsLoading(false);
-          setMoreForYouStrip(strip1);
-          setWorthLookStrip(strip2);
+          setMoreForYouStrip(strip1Rows);
+          setWorthLookStrip(strip2Rows);
         }
         return;
       }
@@ -2367,9 +2397,38 @@ export default function App() {
             if (!on) strip2.push(rec);
           }
         }
+
+        const strip1Rows = strip1.map((r) => ({ rec: r, kind: "pick" }));
+        const usedStrip1 = new Set(strip1Rows.map((x) => x.rec.movie.id));
+        for (const rec of unratedPopularRecs) {
+          if (strip1Rows.length >= MORE_TAB_ON_SERVICE_MAX) break;
+          if (usedStrip1.has(rec.movie.id)) continue;
+          const ids = await getFlatrateProviderIds(rec.movie);
+          if (cancelled) return;
+          if (ids.some((id) => selectedStreamingProviderIds.includes(id))) {
+            strip1Rows.push({ rec, kind: "popular" });
+            usedStrip1.add(rec.movie.id);
+          }
+        }
+
+        const strip1IdsAll = new Set(strip1Rows.map((x) => x.rec.movie.id));
+        const strip2Rows = strip2.map((r) => ({ rec: r, kind: "pick" }));
+        const usedStrip2 = new Set([...strip1IdsAll, ...strip2Rows.map((x) => x.rec.movie.id)]);
+        for (const rec of unratedPopularRecs) {
+          if (strip2Rows.length >= MORE_TAB_OFF_SERVICE_MAX) break;
+          if (usedStrip2.has(rec.movie.id)) continue;
+          const ids = await getFlatrateProviderIds(rec.movie);
+          if (cancelled) return;
+          const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
+          if (!on) {
+            strip2Rows.push({ rec, kind: "popular" });
+            usedStrip2.add(rec.movie.id);
+          }
+        }
+
         if (!cancelled) {
-          setMoreForYouStrip(strip1);
-          setWorthLookStrip(strip2);
+          setMoreForYouStrip(strip1Rows);
+          setWorthLookStrip(strip2Rows);
         }
       } finally {
         if (!cancelled) setMoreStripsLoading(false);
@@ -2397,8 +2456,8 @@ export default function App() {
     const tvCandidates = [
       ...theaterRecs.map((r) => r.movie),
       ...streamingRecs.map((r) => r.movie),
-      ...moreForYouStrip.map((r) => r.movie),
-      ...worthLookStrip.map((r) => r.movie),
+      ...moreForYouStrip.map((row) => row.rec.movie),
+      ...worthLookStrip.map((row) => row.rec.movie),
     ]
       .filter((m) => m?.type === "tv" && Number.isFinite(Number(m?.tmdbId)));
     const missingTmdbIds = [...new Set(tvCandidates.map((m) => Number(m.tmdbId)))]
@@ -2429,8 +2488,8 @@ export default function App() {
     ...Object.fromEntries(streamingMovieRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingTvRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(theaterRecs.map(r => [r.movie.id, r])),
-    ...Object.fromEntries(moreForYouStrip.map(r => [r.movie.id, r])),
-    ...Object.fromEntries(worthLookStrip.map(r => [r.movie.id, r])),
+    ...Object.fromEntries(moreForYouStrip.map((row) => [row.rec.movie.id, row.rec])),
+    ...Object.fromEntries(worthLookStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
   }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
   const FILTERS = ["All", "Movies", "TV Shows"];
@@ -3325,16 +3384,27 @@ export default function App() {
                     </div>
                   </div>
                   <div className="strip">
-                    {moreForYouStrip.map(rec => (
-                      <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                    {moreForYouStrip.map((row) => (
+                      <div
+                        className="strip-card"
+                        key={row.rec.movie.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
+                        onClick={() => openDetail(row.rec.movie, row.rec)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
+                      >
                         <div className="strip-poster">
-                          {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                          <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                            {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
+                          {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
+                          <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
+                            {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
                           </div>
                         </div>
-                        <div className="strip-title">{rec.movie.title}</div>
-                        <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                        <div className="strip-title">{row.rec.movie.title}</div>
+                        <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
+                        <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
+                          {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -3351,16 +3421,27 @@ export default function App() {
                     </div>
                   </div>
                   <div className="strip">
-                    {worthLookStrip.map(rec => (
-                      <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                    {worthLookStrip.map((row) => (
+                      <div
+                        className="strip-card"
+                        key={row.rec.movie.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
+                        onClick={() => openDetail(row.rec.movie, row.rec)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
+                      >
                         <div className="strip-poster">
-                          {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                          <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                            {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
+                          {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
+                          <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
+                            {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
                           </div>
                         </div>
-                        <div className="strip-title">{rec.movie.title}</div>
-                        <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                        <div className="strip-title">{row.rec.movie.title}</div>
+                        <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
+                        <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
+                          {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
+                        </div>
                       </div>
                     ))}
                   </div>
