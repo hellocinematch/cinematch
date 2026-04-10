@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.26
+
+- **Now Playing → Streaming (Movies):** When TMDB digital discover returns no rows (strict `with_release_type=4`, date window, or profile language filters), the app now falls back in order: same query without language filter, broader discover without release-type in the same date window, then **trending movies (week)** so the strip stays populated.
+
 ## 1.2.25
 
 - **Now Playing → Streaming:** Digital-release movie strip now uses `primary_release_date` through **today** (was capped at ~46 days ago), so fast-to-streaming titles are included and the row is less likely to be empty.

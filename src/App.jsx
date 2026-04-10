@@ -340,11 +340,47 @@ async function fetchStreamingMoviesOnly(regionKeys) {
     const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
     const digitalStart = dateDaysAgo(90);
     const digitalEnd = formatIsoDate(new Date());
-    const moviePathBase = `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&with_release_type=4&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}${langQuery}`;
-    const moviePages = await Promise.all([1, 2].map((page) => fetchTMDB(`${moviePathBase}&page=${page}`)));
-    const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
+    const digitalDiscoverBase =
+      `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&with_release_type=4&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}`;
+    const broadDateDiscoverBase =
+      `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}`;
+
     const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
-    return dedupeByTmdbId(movieResults).slice(0, 16).map((m) => normalizeTMDBItem(m, "movie"));
+
+    const discoverToMovies = async (pathNoPage) => {
+      const moviePages = await Promise.all([1, 2].map((page) => fetchTMDB(`${pathNoPage}&page=${page}`)));
+      if (moviePages.some(isTmdbApiErrorPayload)) return [];
+      const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
+      return dedupeByTmdbId(movieResults).slice(0, 16).map((m) => normalizeTMDBItem(m, "movie"));
+    };
+
+    const trendingToMovies = async () => {
+      const trendPages = await Promise.all([1, 2].map((page) => fetchTMDB(`/trending/movie/week?language=en-US&page=${page}`)));
+      if (trendPages.some(isTmdbApiErrorPayload)) return [];
+      const rows = filterDefaultExcludedGenres(trendPages.flatMap((p) => p.results || []));
+      return dedupeByTmdbId(rows).slice(0, 16).map((m) => normalizeTMDBItem(m, "movie"));
+    };
+
+    // 1) US digital-release window (primary intent for this strip).
+    let out = await discoverToMovies(`${digitalDiscoverBase}${langQuery}`);
+    if (out.length > 0) return out;
+
+    // 2) Profile language filters often return zero rows for US digital discover; strip is labeled "broad picks".
+    if (langQuery) {
+      out = await discoverToMovies(`${digitalDiscoverBase}`);
+      if (out.length > 0) return out;
+    }
+
+    // 3) Same date window without release-type gate (TMDB digital typing can be sparse in discover).
+    out = await discoverToMovies(`${broadDateDiscoverBase}${langQuery}`);
+    if (out.length > 0) return out;
+    if (langQuery) {
+      out = await discoverToMovies(`${broadDateDiscoverBase}`);
+      if (out.length > 0) return out;
+    }
+
+    // 4) Last resort so the row is never permanently empty when TMDB discover is thin.
+    return await trendingToMovies();
   } catch {
     return [];
   }
