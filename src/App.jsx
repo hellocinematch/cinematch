@@ -2294,6 +2294,16 @@ export default function App() {
 
   const streamingRecs = streamingTab === "movie" ? streamingMovieRecsResolved : streamingTvRecsResolved;
 
+  /**
+   * Movies fetch completes before TV; default streaming tab is Series. Users who switch to Movies often
+   * already have streamingMoviesReady=true, so the old !streamingMoviesReady skeleton never ran — empty strip.
+   * Also show skeleton while match is in flight and there are no movie rows yet (TMDB pool empty until match fills).
+   */
+  const showStreamingMovieSkeleton =
+    streamingTab === "movie" &&
+    (!streamingMoviesReady ||
+      (matchLoading && streamingMovieRecsResolved.length === 0));
+
   /** All streaming phases finished and TMDB returned nothing (avoid “couldn’t load” while movies or TV still fetching). */
   const homePicksLoadFailed = useMemo(
     () =>
@@ -3523,7 +3533,7 @@ export default function App() {
                         Movies
                       </button>
                     </div>
-                    {streamingTab === "movie" && !streamingMoviesReady ? (
+                    {showStreamingMovieSkeleton ? (
                       <SkeletonStrip />
                     ) : streamingTab === "tv" && !streamingTvReady ? (
                       <SkeletonStrip />
