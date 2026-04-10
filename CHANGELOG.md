@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.28
+
+- **Now Playing → What’s hot:** New row **between In Theaters and Streaming** with TMDB **trending movie + TV (day)**, interleaved (~18 titles). Titles are **not** removed just because they also appear in theaters or streaming — overlap is shown with a small **In theaters** pill when a card matches the current **In Theaters** list. Gives users something to scroll while the streaming strip finishes loading.
+
 ## 1.2.27
 
 - **Strip & Discover (movies):** When TMDB provides a full `release_date`, home strips and Discover now show a readable **release date** (e.g. `Apr 10, 2026`) instead of year only; year remains the fallback when no full date exists.

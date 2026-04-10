@@ -337,6 +337,39 @@ async function fetchInTheaters(regionKeys = []) {
   }
 }
 
+/** Now Playing — trending movies + TV (day), interleaved; not deduped against other strips. */
+async function fetchWhatsHotCatalog() {
+  try {
+    const excludedTrendingGenres = new Set([10767, 10763]); // Talk + News
+    const [m1, m2, t1, t2] = await Promise.all([
+      fetchTMDB("/trending/movie/day?language=en-US"),
+      fetchTMDB("/trending/movie/day?language=en-US&page=2"),
+      fetchTMDB("/trending/tv/day?language=en-US"),
+      fetchTMDB("/trending/tv/day?language=en-US&page=2"),
+    ]);
+    if ([m1, m2, t1, t2].some(isTmdbApiErrorPayload)) return [];
+    const movieRaw = filterDefaultExcludedGenres([...(m1.results || []), ...(m2.results || [])]);
+    const tvRaw = filterDefaultExcludedGenres([...(t1.results || []), ...(t2.results || [])]).filter((item) => {
+      const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
+      return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
+    });
+    const dedupeNorm = (normList) => [...new Map(normList.map((m) => [m.id, m])).values()];
+    const movies = dedupeNorm(movieRaw.map((item) => normalizeTMDBItem(item, "movie")));
+    const shows = dedupeNorm(tvRaw.map((item) => normalizeTMDBItem(item, "tv")));
+    const mixed = [];
+    const max = Math.max(movies.length, shows.length);
+    const cap = 18;
+    for (let i = 0; i < max && mixed.length < cap; i++) {
+      if (movies[i]) mixed.push(movies[i]);
+      if (mixed.length >= cap) break;
+      if (shows[i]) mixed.push(shows[i]);
+    }
+    return mixed;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Home Picks — subscription-style streaming (US TMDB). Not filtered by user-selected providers (faster, stable).
  * Phase 1: digital-release movies only (fast).
@@ -983,6 +1016,7 @@ const styles = `
   .strip-poster img { width:100%; height:100%; object-fit:cover; }
   .strip-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:40px; }
   .strip-badge { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.82); padding:4px 8px; border-radius:10px; font-size:12px; color:#e8c96a; font-family:'DM Serif Display',serif; z-index:2; }
+  .strip-hot-theater-pill { position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.78); color:#c9b87c; font-size:10px; font-weight:500; padding:3px 7px; border-radius:8px; z-index:2; font-family:'DM Sans',sans-serif; letter-spacing:0.02em; }
   .strip-title { font-size:14px; color:#ccc; margin-top:9px; line-height:1.35; }
   .strip-genre { font-size:11px; color:#555; margin-top:2px; }
   .strip-range { font-size:10px; color:#666; margin-top:1px; }
@@ -1568,6 +1602,8 @@ export default function App() {
   /** Two-phase streaming fetch: movies first, then TV (+ /tv/{id} details). */
   const [streamingMoviesReady, setStreamingMoviesReady] = useState(false);
   const [streamingTvReady, setStreamingTvReady] = useState(false);
+  const [whatsHot, setWhatsHot] = useState([]);
+  const [whatsHotReady, setWhatsHotReady] = useState(false);
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [homeSegment, setHomeSegment] = useState(HOME_SEGMENT_NOW_PLAYING);
@@ -1833,6 +1869,29 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user, showRegionKeys]);
 
+  useEffect(() => {
+    if (!user) {
+      setWhatsHot([]);
+      setWhatsHotReady(false);
+      return;
+    }
+    let cancelled = false;
+    setWhatsHotReady(false);
+    (async () => {
+      const rows = await fetchWhatsHotCatalog();
+      if (cancelled) return;
+      setWhatsHot(rows);
+      setCatalogue((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const added = rows.filter((m) => !seen.has(m.id));
+        if (added.length === 0) return prev;
+        return [...prev, ...added];
+      });
+      setWhatsHotReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
   const catalogueForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return catalogue;
     return catalogue.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
@@ -1852,6 +1911,22 @@ export default function App() {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingTV;
     return streamingTV.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
   }, [streamingTV, user, showGenreIds, showRegionKeys]);
+
+  const whatsHotForRecs = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return whatsHot;
+    return whatsHot.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [whatsHot, user, showGenreIds, showRegionKeys]);
+
+  const whatsHotRecsResolved = useMemo(
+    () => whatsHotForRecs.map(m => tmdbOnlyRec(m)),
+    [whatsHotForRecs],
+  );
+
+  /** Movie ids also on the In Theaters row — small pill on What's hot cards only (no cross-strip dedupe). */
+  const inTheaterIdsForWhatsHotPill = useMemo(
+    () => new Set(inTheatersForRecs.map(m => m.id)),
+    [inTheatersForRecs],
+  );
 
   /** Collaborative filtering runs in Edge Function `match` (neighbour ratings loaded server-side; not in the client bundle). */
   useEffect(() => {
@@ -2189,6 +2264,8 @@ export default function App() {
     setShowRegionKeys([]);
     setStreamingMovies([]);
     setStreamingTV([]);
+    setWhatsHot([]);
+    setWhatsHotReady(false);
     setStreamingMoviesReady(true);
     setStreamingTvReady(true);
     setCinemaPreference(null); setOtherCinema(null);
@@ -2557,6 +2634,7 @@ export default function App() {
     const tvCandidates = [
       ...theaterRecs.map((r) => r.movie),
       ...streamingRecs.map((r) => r.movie),
+      ...whatsHotRecsResolved.map((r) => r.movie),
       ...moreForYouStrip.map((row) => row.rec.movie),
       ...worthLookStrip.map((row) => row.rec.movie),
     ]
@@ -2582,17 +2660,18 @@ export default function App() {
     };
     void hydrateTvStripMeta();
     return () => { cancelled = true; };
-  }, [theaterRecs, streamingRecs, moreForYouStrip, worthLookStrip]);
+  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, moreForYouStrip, worthLookStrip]);
 
   const recMap = useMemo(() => ({
     ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingMovieRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingTvRecsResolved.map(r => [r.movie.id, r])),
+    ...Object.fromEntries(whatsHotRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(theaterRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(moreForYouStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(worthLookStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
-  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
+  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
   const FILTERS = ["All", "Movies", "TV Shows"];
   const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
@@ -3580,6 +3659,38 @@ export default function App() {
                   </div>
                   <div className="top-picks-block">
                     <div className="section-header">
+                      <div className="section-title">What&apos;s hot</div>
+                      <div className="section-meta">Trending today</div>
+                    </div>
+                    {!whatsHotReady ? (
+                      <SkeletonStrip />
+                    ) : whatsHotRecsResolved.length === 0 ? (
+                      <div className="empty-box">
+                        <div className="empty-text">No trending titles right now</div>
+                      </div>
+                    ) : (
+                      <div className="strip">
+                        {whatsHotRecsResolved.map((rec) => (
+                          <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                            <div className="strip-poster">
+                              {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
+                              {inTheaterIdsForWhatsHotPill.has(rec.movie.id) && (
+                                <div className="strip-hot-theater-pill">In theaters</div>
+                              )}
+                              <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
+                                {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
+                              </div>
+                            </div>
+                            <div className="strip-title">{rec.movie.title}</div>
+                            <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                            <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="top-picks-block">
+                    <div className="section-header">
                       <div className="section-title">Streaming</div>
                       <div className="section-meta">Broad picks (not your app list)</div>
                     </div>
@@ -3617,7 +3728,7 @@ export default function App() {
                   </div>
                 </>
               )}
-              {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingMovieRecsResolved.length + streamingTvRecsResolved.length > 0 && (
+              {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingMovieRecsResolved.length + streamingTvRecsResolved.length + whatsHotRecsResolved.length > 0 && (
                 <div className="no-recs" style={{ marginTop: 16, border: "none", padding: "12px 0 0" }}>
                   <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
                   <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={startDefaultRateMore}>Rate More Titles</button>
