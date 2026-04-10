@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.12
+
+- **Discover search depth:** Merge two TMDB search pages per medium (deduped by id) so titles ranked past the first ~10–20 can appear. **All** now shows up to **20 movies + 20 TV** (was 10+10). **Movies** / **TV Shows** show up to **40** from the merged pages. Failed TMDB responses show a clear message instead of looking like “no results.”
+
 ## 1.2.11
 
 - **Home streaming load UX:** Fetch streaming movies and series in two phases so movies can render first; show per-tab “Loading…” until each phase completes; only show the global “Couldn’t load picks” state after both phases finish with no titles (avoids false errors while TV is still loading).

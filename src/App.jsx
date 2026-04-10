@@ -40,6 +40,40 @@ async function fetchTMDB(path) {
   return res.json();
 }
 
+/** TMDB search returns ~20 hits per page; preserve order, drop duplicate ids across pages. */
+function dedupeTmdbSearchRows(ordered) {
+  const seen = new Set();
+  const out = [];
+  for (const item of ordered) {
+    if (item == null || item.id == null) continue;
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
+
+function isTmdbApiErrorPayload(json) {
+  return Boolean(json && json.success === false);
+}
+
+async function fetchTmdbSearchPages(mediaType, query, pageCount) {
+  const pages = await Promise.all(
+    Array.from({ length: pageCount }, (_, i) =>
+      fetchTMDB(`/search/${mediaType}?query=${encodeURIComponent(query)}&page=${i + 1}`),
+    ),
+  );
+  if (pages.some(isTmdbApiErrorPayload)) return { ok: false, rows: [] };
+  const rows = dedupeTmdbSearchRows(pages.flatMap((p) => p?.results || []));
+  return { ok: true, rows };
+}
+
+/** Discover: how many TMDB search pages to merge (broader tail than website #2 ≠ API #2). */
+const DISCOVER_SEARCH_PAGES = 2;
+const DISCOVER_ALL_CAP_MOVIES = 20;
+const DISCOVER_ALL_CAP_TV = 20;
+const DISCOVER_SINGLE_TYPE_CAP = 40;
+
 function getRegionLanguageCodes(regionKeys) {
   if (!Array.isArray(regionKeys) || regionKeys.length === 0) return [];
   return [...new Set(
@@ -1385,6 +1419,7 @@ export default function App() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [moodStep, setMoodStep] = useState(0);
   const [moodSelections, setMoodSelections] = useState({ region: [], indian_lang: [], genre: [], vibe: [] });
   const [moodResults, setMoodResults] = useState([]);
@@ -2068,8 +2103,14 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (appliedSearchQuery.length < 2) { setSearchResults([]); setSearching(false); return; }
+    if (appliedSearchQuery.length < 2) {
+      setSearchResults([]);
+      setSearchError("");
+      setSearching(false);
+      return;
+    }
     setSearching(true);
+    setSearchError("");
     (async () => {
       try {
         const normalize = (item, type) => ({
@@ -2089,21 +2130,43 @@ export default function App() {
               : [],
         });
         const filterType = activeFilter === "Movies" ? "movie" : activeFilter === "TV Shows" ? "tv" : null;
-        const searches = filterType
-          ? [fetchTMDB(`/search/${filterType}?query=${encodeURIComponent(appliedSearchQuery)}&page=1`)]
-          : [fetchTMDB(`/search/movie?query=${encodeURIComponent(appliedSearchQuery)}&page=1`), fetchTMDB(`/search/tv?query=${encodeURIComponent(appliedSearchQuery)}&page=1`)];
-        const results = await Promise.all(searches);
-        const combined = filterType
-          ? (results[0].results || []).slice(0, 20).map(m => normalize(m, filterType))
-          : [...(results[0].results || []).slice(0, 10).map(m => normalize(m, "movie")), ...(results[1].results || []).slice(0, 10).map(m => normalize(m, "tv"))];
+        let combined;
+        if (filterType) {
+          const { ok, rows } = await fetchTmdbSearchPages(filterType, appliedSearchQuery, DISCOVER_SEARCH_PAGES);
+          if (!ok) {
+            setSearchResults([]);
+            setSearchError("Could not search right now. Check your connection and try again.");
+            return;
+          }
+          combined = rows.slice(0, DISCOVER_SINGLE_TYPE_CAP).map((m) => normalize(m, filterType));
+        } else {
+          const [movieR, tvR] = await Promise.all([
+            fetchTmdbSearchPages("movie", appliedSearchQuery, DISCOVER_SEARCH_PAGES),
+            fetchTmdbSearchPages("tv", appliedSearchQuery, DISCOVER_SEARCH_PAGES),
+          ]);
+          if (!movieR.ok || !tvR.ok) {
+            setSearchResults([]);
+            setSearchError("Could not search right now. Check your connection and try again.");
+            return;
+          }
+          combined = [
+            ...movieR.rows.slice(0, DISCOVER_ALL_CAP_MOVIES).map((m) => normalize(m, "movie")),
+            ...tvR.rows.slice(0, DISCOVER_ALL_CAP_TV).map((m) => normalize(m, "tv")),
+          ];
+        }
         const wantsAnimationOnly = isAnimationIntentQuery(appliedSearchQuery);
         setSearchResults(
           wantsAnimationOnly
             ? combined.filter((item) => hasExcludedGenre(item))
             : filterDefaultExcludedGenres(combined),
         );
-      } catch (e) { console.error(e); }
-      finally { setSearching(false); }
+      } catch (e) {
+        console.error(e);
+        setSearchResults([]);
+        setSearchError("Search failed. Try again.");
+      } finally {
+        setSearching(false);
+      }
     })();
   }, [appliedSearchQuery, activeFilter]);
 
@@ -3273,7 +3336,7 @@ export default function App() {
                 e.preventDefault();
                 const q = searchQuery.trim();
                 setAppliedSearchQuery(q);
-                if (q.length < 2) setSearchResults([]);
+                if (q.length < 2) { setSearchResults([]); setSearchError(""); }
               }}
             >
               <button type="submit" className="search-submit-btn" aria-label="Search">
@@ -3294,11 +3357,19 @@ export default function App() {
             ))}
           </div>
           {searching && <div className="search-status">Searching…</div>}
-          {!searching && appliedSearchQuery.length >= 2 && (
+          {!searching && appliedSearchQuery.length >= 2 && !searchError && (
             <div className="search-status">{discoverItems.length} result{discoverItems.length !== 1 ? "s" : ""} for "{appliedSearchQuery}"</div>
           )}
           {discoverItems.length === 0 && !searching ? (
-            <div className="disc-empty"><div className="disc-empty-text">{appliedSearchQuery.length >= 2 ? `No results for "${appliedSearchQuery}"` : "Type a title and tap search"}</div></div>
+            <div className="disc-empty">
+              <div className="disc-empty-text">
+                {searchError
+                  ? searchError
+                  : appliedSearchQuery.length >= 2
+                    ? `No results for "${appliedSearchQuery}"`
+                    : "Type a title and tap search"}
+              </div>
+            </div>
           ) : (
             <div className="disc-grid">
               {discoverItems.map(m => {
