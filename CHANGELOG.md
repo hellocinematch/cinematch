@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.19
+
+- **Your picks loading UX:** Track **`match`** in-flight (`matchLoading`) and TMDB watch-provider resolution for More strips (`moreStripsLoading`). When both strips are still empty, show **“Loading recommendations…”** or **“Checking where titles stream for your picks…”** instead of the **Rate more titles** empty state. Match invoke clears loading in **`finally`**; effect cleanup clears loading when deps change. Provider-based strip rebuild uses **`try`/`finally`** so loading always clears.
+
 ## 1.2.18
 
 - **Tastometer copy:** Detail prediction subtitle **“Based on your tastometer”** (replaces taste-match count). Onboarding: **“Creating your tastometer.”** Post-onboarding load: **“Using your tastometer to predict”** with **“Scoring titles for you.”**

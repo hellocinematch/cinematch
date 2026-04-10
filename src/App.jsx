@@ -1412,6 +1412,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [catalogue, setCatalogue] = useState([]);
   const [matchData, setMatchData] = useState(null);
+  /** True while a `match` invoke is in flight (after debounce). Avoids “rate more” empty state during load. */
+  const [matchLoading, setMatchLoading] = useState(false);
   const [obStep, setObStep] = useState(0);
   const [sliderVal, setSliderVal] = useState(7);
   const [sliderTouched, setSliderTouched] = useState(false);
@@ -1728,9 +1730,11 @@ export default function App() {
   useEffect(() => {
     if (!user) {
       setMatchData(null);
+      setMatchLoading(false);
       return;
     }
     let cancelled = false;
+    setMatchLoading(true);
     const t = setTimeout(async () => {
       try {
         const { data, error } = await invokeMatch({
@@ -1751,11 +1755,14 @@ export default function App() {
         setMatchData(data);
       } catch (e) {
         if (!cancelled) console.error(e);
+      } finally {
+        if (!cancelled) setMatchLoading(false);
       }
     }, 350);
     return () => {
       cancelled = true;
       clearTimeout(t);
+      setMatchLoading(false);
     };
   }, [user, userRatings, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, topPickOffset]);
 
@@ -2239,6 +2246,8 @@ export default function App() {
   /** Strip 1: CF picks on selected streaming apps; strip 2: strong CF picks not on those apps. */
   const [moreForYouStrip, setMoreForYouStrip] = useState([]);
   const [worthLookStrip, setWorthLookStrip] = useState([]);
+  /** True while resolving TMDB watch providers for More strips (sequential fetches). */
+  const [moreStripsLoading, setMoreStripsLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -2256,6 +2265,7 @@ export default function App() {
     const rebuildMoreTabStrips = async () => {
       if (recommendations.length === 0) {
         if (!cancelled) {
+          setMoreStripsLoading(false);
           setMoreForYouStrip(unratedPopularRecs.slice(0, MORE_TAB_ON_SERVICE_MAX));
           setWorthLookStrip([]);
         }
@@ -2274,62 +2284,71 @@ export default function App() {
           .filter((r) => !strip1Ids.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
           .slice(0, MORE_TAB_OFF_SERVICE_MAX);
         if (!cancelled) {
+          setMoreStripsLoading(false);
           setMoreForYouStrip(strip1);
           setWorthLookStrip(strip2);
         }
         return;
       }
 
-      let strip1 = [];
-      for (const rec of rotated) {
-        if (strip1.length >= MORE_TAB_ON_SERVICE_MAX) break;
-        const ids = await getFlatrateProviderIds(rec.movie);
-        if (cancelled) return;
-        if (ids.some((id) => selectedStreamingProviderIds.includes(id))) strip1.push(rec);
-      }
-      if (strip1.length === 0 && sorted.length > 0) {
-        strip1 = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
-      } else if (strip1.length < MORE_TAB_ON_SERVICE_MAX && strip1.length > 0) {
-        const inStrip1 = new Set(strip1.map((r) => r.movie.id));
-        const merged = [...theaterRecs, ...streamingMovieRecsResolved, ...streamingTvRecsResolved, ...worthALookRecs];
-        const seen = new Set(inStrip1);
-        const backfillPool = [];
-        for (const rec of merged) {
-          if (!rec?.movie?.id || seen.has(rec.movie.id)) continue;
-          seen.add(rec.movie.id);
-          if (rec.predicted < MORE_TAB_OFF_SERVICE_PRED_MIN) continue;
-          backfillPool.push(rec);
-        }
-        backfillPool.sort((a, b) => b.predicted - a.predicted);
-        for (const rec of backfillPool) {
+      if (!cancelled) setMoreStripsLoading(true);
+      try {
+        let strip1 = [];
+        for (const rec of rotated) {
           if (strip1.length >= MORE_TAB_ON_SERVICE_MAX) break;
           const ids = await getFlatrateProviderIds(rec.movie);
           if (cancelled) return;
           if (ids.some((id) => selectedStreamingProviderIds.includes(id))) strip1.push(rec);
         }
-      }
+        if (strip1.length === 0 && sorted.length > 0) {
+          strip1 = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
+        } else if (strip1.length < MORE_TAB_ON_SERVICE_MAX && strip1.length > 0) {
+          const inStrip1 = new Set(strip1.map((r) => r.movie.id));
+          const merged = [...theaterRecs, ...streamingMovieRecsResolved, ...streamingTvRecsResolved, ...worthALookRecs];
+          const seen = new Set(inStrip1);
+          const backfillPool = [];
+          for (const rec of merged) {
+            if (!rec?.movie?.id || seen.has(rec.movie.id)) continue;
+            seen.add(rec.movie.id);
+            if (rec.predicted < MORE_TAB_OFF_SERVICE_PRED_MIN) continue;
+            backfillPool.push(rec);
+          }
+          backfillPool.sort((a, b) => b.predicted - a.predicted);
+          for (const rec of backfillPool) {
+            if (strip1.length >= MORE_TAB_ON_SERVICE_MAX) break;
+            const ids = await getFlatrateProviderIds(rec.movie);
+            if (cancelled) return;
+            if (ids.some((id) => selectedStreamingProviderIds.includes(id))) strip1.push(rec);
+          }
+        }
 
-      if (cancelled) return;
-
-      const strip1Ids = new Set(strip1.map((r) => r.movie.id));
-      const strip2 = [];
-      for (const rec of sorted) {
-        if (strip2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
-        if (strip1Ids.has(rec.movie.id)) continue;
-        if (rec.predicted < MORE_TAB_OFF_SERVICE_PRED_MIN) continue;
-        const ids = await getFlatrateProviderIds(rec.movie);
         if (cancelled) return;
-        const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
-        if (!on) strip2.push(rec);
-      }
-      if (!cancelled) {
-        setMoreForYouStrip(strip1);
-        setWorthLookStrip(strip2);
+
+        const strip1Ids = new Set(strip1.map((r) => r.movie.id));
+        const strip2 = [];
+        for (const rec of sorted) {
+          if (strip2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
+          if (strip1Ids.has(rec.movie.id)) continue;
+          if (rec.predicted < MORE_TAB_OFF_SERVICE_PRED_MIN) continue;
+          const ids = await getFlatrateProviderIds(rec.movie);
+          if (cancelled) return;
+          const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
+          if (!on) strip2.push(rec);
+        }
+        if (!cancelled) {
+          setMoreForYouStrip(strip1);
+          setWorthLookStrip(strip2);
+        }
+      } finally {
+        if (!cancelled) setMoreStripsLoading(false);
       }
     };
 
     void rebuildMoreTabStrips();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      setMoreStripsLoading(false);
+    };
   }, [
     recommendations,
     selectedStreamingProviderIds,
@@ -3317,10 +3336,20 @@ export default function App() {
               )}
               {moreForYouStrip.length === 0 && worthLookStrip.length === 0 && (
                 <div className="section">
-                  <div className="no-recs">
-                    <div className="no-recs-text">Rate more titles to unlock recommendations<br />and discovery picks.</div>
-                    <button className="btn-confirm" style={{ marginTop: 16, width: "100%" }} onClick={() => setScreen("rate-more")}>Rate More Titles</button>
-                  </div>
+                  {matchLoading || moreStripsLoading ? (
+                    <div className="empty-box">
+                      <div className="empty-text">
+                        {moreStripsLoading
+                          ? "Checking where titles stream for your picks…"
+                          : "Loading recommendations…"}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="no-recs">
+                      <div className="no-recs-text">Rate more titles to unlock recommendations<br />and discovery picks.</div>
+                      <button className="btn-confirm" style={{ marginTop: 16, width: "100%" }} onClick={() => setScreen("rate-more")}>Rate More Titles</button>
+                    </div>
+                  )}
                 </div>
               )}
             </>
