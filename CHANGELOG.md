@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.4
+
+- **Your picks + secondary region:** When a **home secondary region** is set in Profile, **For you** / **Worth a Look** (`match` catalogue) now **includes** titles from that secondary market even if **Regions to show** would exclude them (e.g. Hollywood-only regions + Indian secondary). **Genres to show** still applies to those adds. No secondary selected → unchanged behavior.
+
 ## 1.3.3
 
 - **Secondary Region block:** Removed **Load more**; each tab (**In Theaters**, **Streaming → Series/Movies**) shows at most **25** titles. TMDB secondary fetches now target up to 25 per pool so the strip can fill when data exists.

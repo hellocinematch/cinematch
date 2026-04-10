@@ -3,7 +3,7 @@ import packageJson from "../package.json";
 import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./legal.jsx";
 import { supabase } from "./supabase";
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.3 = Region block cap 25 / no Load more).
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.4 = Your picks merges secondary catalogue for match).
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
@@ -2133,11 +2133,6 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user, secondaryRegionKey]);
 
-  const catalogueForRecs = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return catalogue;
-    return catalogue.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [catalogue, user, showGenreIds, showRegionKeys]);
-
   const inTheatersForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return inTheaters;
     return inTheaters.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
@@ -2174,6 +2169,33 @@ export default function App() {
     () => dedupeMediaRowsById([...secondaryTheaterRows, ...secondaryStreamingMovieRows, ...secondaryStreamingTvRows]),
     [secondaryTheaterRows, secondaryStreamingMovieRows, secondaryStreamingTvRows],
   );
+
+  /**
+   * V1.3.4: When `secondary_region_key` is set, merge secondary shelf titles into the CF catalogue even if
+   * “Regions to show” would exclude them (e.g. Hollywood-only + Indian secondary). Genre filter still applies.
+   */
+  const catalogueForRecs = useMemo(() => {
+    if (!user) return catalogue;
+    const baseFiltered =
+      !showGenreIds.length && !showRegionKeys.length
+        ? catalogue
+        : catalogue.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+
+    if (!secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
+      return baseFiltered;
+    }
+
+    const seen = new Set(baseFiltered.map((m) => m.id));
+    const extras = [];
+    for (const m of secondaryStripCatalogRows) {
+      if (seen.has(m.id)) continue;
+      if (showGenreIds.length > 0 && !passesShowGenresFilter(m, showGenreIds)) continue;
+      seen.add(m.id);
+      extras.push(m);
+    }
+    return extras.length === 0 ? baseFiltered : [...baseFiltered, ...extras];
+  }, [catalogue, user, showGenreIds, showRegionKeys, secondaryRegionKey, secondaryStripCatalogRows]);
+
   const secondaryStripRecsAll = useMemo(
     () => secondaryStripCatalogRows.map((m) => tmdbOnlyRec(m)),
     [secondaryStripCatalogRows],
