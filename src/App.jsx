@@ -252,32 +252,42 @@ async function fetchInTheaters(regionKeys = []) {
 }
 
 /**
- * Subscription streaming in the US (TMDB discover).
- * @param {number[]|null|undefined} providerIds - TMDB watch provider_ids; pipe = OR. Empty/null = any flatrate service.
+ * Subscription streaming (US TMDB). Phase 1: digital-release movies only (fast).
+ * @param {number[]|null|undefined} providerIds - reserved; provider filters not applied in this path.
  */
-async function fetchStreamingSplit(providerIds, regionKeys) {
+async function fetchStreamingMoviesOnly(providerIds, regionKeys) {
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
     const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
-    // Keep function signature stable for existing call sites; this rule set does not rely on provider filters.
     void providerIds;
-
     const digitalStart = dateDaysAgo(90);
     const digitalEnd = dateDaysAgo(46);
+    const moviePathBase = `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&with_release_type=4&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}${langQuery}`;
+    const moviePages = await Promise.all([1, 2].map((page) => fetchTMDB(`${moviePathBase}&page=${page}`)));
+    const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
+    const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
+    return dedupeByTmdbId(movieResults).slice(0, 16).map((m) => normalizeTMDBItem(m, "movie"));
+  } catch {
+    return [];
+  }
+}
+
+/** Phase 2: TV discover + trending + per-show /tv/{id} details (slower). */
+async function fetchStreamingTVOnly(providerIds, regionKeys) {
+  try {
+    const langCodes = getRegionLanguageCodes(regionKeys);
+    const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+    void providerIds;
     const tvNewSeriesStart = dateDaysAgo(180);
     const excludedTrendingGenres = new Set([10767, 10763]); // Talk + News
-
-    const moviePathBase = `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&with_release_type=4&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}${langQuery}`;
     const tvNewSeriesBase = `/discover/tv?language=en-US&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${langQuery}`;
     const trendingTvBase = "/trending/tv/day?language=en-US";
 
-    const [moviePages, tvSeriesPages, tvTrendingPages] = await Promise.all([
-      Promise.all([1, 2].map((page) => fetchTMDB(`${moviePathBase}&page=${page}`))),
+    const [tvSeriesPages, tvTrendingPages] = await Promise.all([
       Promise.all([1, 2].map((page) => fetchTMDB(`${tvNewSeriesBase}&page=${page}`))),
       Promise.all([1, 2].map((page) => fetchTMDB(`${trendingTvBase}&page=${page}`))),
     ]);
 
-    const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
     const tvNewSeriesCandidates = tvSeriesPages.flatMap((page) => page.results || []);
     const tvTrendingCandidates = tvTrendingPages
       .flatMap((page) => page.results || [])
@@ -301,11 +311,9 @@ async function fetchStreamingSplit(providerIds, regionKeys) {
     });
 
     const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
-    const movies = dedupeByTmdbId(movieResults).slice(0, 16).map((m) => normalizeTMDBItem(m, "movie"));
-    const shows = filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, 16).map((m) => normalizeTMDBItem(m, "tv"));
-    return { movies, shows };
+    return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, 16).map((m) => normalizeTMDBItem(m, "tv"));
   } catch {
-    return { movies: [], shows: [] };
+    return [];
   }
 }
 
@@ -1384,6 +1392,9 @@ export default function App() {
   const [inTheaters, setInTheaters] = useState([]);
   const [streamingMovies, setStreamingMovies] = useState([]);
   const [streamingTV, setStreamingTV] = useState([]);
+  /** Two-phase streaming fetch: movies first, then TV (+ /tv/{id} details). */
+  const [streamingMoviesReady, setStreamingMoviesReady] = useState(false);
+  const [streamingTvReady, setStreamingTvReady] = useState(false);
   const [streamingTab, setStreamingTab] = useState("movie"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [homeSegment, setHomeSegment] = useState("picks"); // "picks" | "more" | "friends"
@@ -1607,27 +1618,45 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user, showRegionKeys]);
 
-  /** Home streaming strip: TMDB discover with optional with_watch_providers (OR). No selection = all flatrate US. */
+  /** Home streaming strip: phase 1 = movies (fast), phase 2 = TV + detail calls (slower). */
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
+      setStreamingMoviesReady(false);
+      setStreamingTvReady(false);
+      const ids = selectedStreamingProviderIds.length > 0 ? selectedStreamingProviderIds : null;
+      let sm = [];
       try {
-        const ids = selectedStreamingProviderIds.length > 0 ? selectedStreamingProviderIds : null;
-        const { movies: sm, shows: st } = await fetchStreamingSplit(ids, showRegionKeys);
-        if (cancelled) return;
-        setStreamingMovies(sm);
-        setStreamingTV(st);
-        setCatalogue(prev => {
-          const combined = [...sm, ...st];
-          const seen = new Set(prev.map(m => m.id));
-          const added = combined.filter(m => !seen.has(m.id));
-          if (added.length === 0) return prev;
-          return [...prev, ...added];
-        });
+        sm = await fetchStreamingMoviesOnly(ids, showRegionKeys);
       } catch (e) {
         console.error(e);
       }
+      if (cancelled) return;
+      setStreamingMovies(sm);
+      setStreamingMoviesReady(true);
+      setCatalogue((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const added = sm.filter((m) => !seen.has(m.id));
+        if (added.length === 0) return prev;
+        return [...prev, ...added];
+      });
+
+      let st = [];
+      try {
+        st = await fetchStreamingTVOnly(ids, showRegionKeys);
+      } catch (e) {
+        console.error(e);
+      }
+      if (cancelled) return;
+      setStreamingTV(st);
+      setStreamingTvReady(true);
+      setCatalogue((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const added = st.filter((m) => !seen.has(m.id));
+        if (added.length === 0) return prev;
+        return [...prev, ...added];
+      });
     })();
     return () => { cancelled = true; };
   }, [user, selectedStreamingProviderIds, showRegionKeys]);
@@ -1983,6 +2012,8 @@ export default function App() {
     setShowRegionKeys([]);
     setStreamingMovies([]);
     setStreamingTV([]);
+    setStreamingMoviesReady(true);
+    setStreamingTvReady(true);
     setCinemaPreference(null); setOtherCinema(null);
     setScreen("splash"); setNavTab("home");
   }
@@ -2113,6 +2144,17 @@ export default function App() {
   }, [matchData?.streamingTvRecs, streamingTVForRecs]);
 
   const streamingRecs = streamingTab === "movie" ? streamingMovieRecsResolved : streamingTvRecsResolved;
+
+  /** All streaming phases finished and TMDB returned nothing (avoid “couldn’t load” while movies or TV still fetching). */
+  const homePicksLoadFailed = useMemo(
+    () =>
+      theaterRecs.length === 0 &&
+      streamingMoviesReady &&
+      streamingTvReady &&
+      streamingMovies.length === 0 &&
+      streamingTV.length === 0,
+    [theaterRecs.length, streamingMovies, streamingTV, streamingMoviesReady, streamingTvReady],
+  );
 
   const worthALookRecs = matchData?.worthALookRecs ?? [];
 
@@ -3011,7 +3053,7 @@ export default function App() {
 
           {homeSegment === "picks" && (
             <div className="section">
-              {theaterRecs.length === 0 && streamingRecs.length === 0 ? (
+              {homePicksLoadFailed ? (
                 <div className="no-recs">
                   <div className="no-recs-text">Couldn&apos;t load picks right now.<br />Check your connection and try again.</div>
                 </div>
@@ -3061,7 +3103,11 @@ export default function App() {
                         Series
                       </button>
                     </div>
-                    {streamingRecs.length === 0 ? (
+                    {streamingTab === "movie" && !streamingMoviesReady ? (
+                      <div className="empty-box"><div className="empty-text">Loading movies…</div></div>
+                    ) : streamingTab === "tv" && !streamingTvReady ? (
+                      <div className="empty-box"><div className="empty-text">Loading series…</div></div>
+                    ) : streamingRecs.length === 0 ? (
                       <div className="empty-box"><div className="empty-text">No streaming {streamingTab === "movie" ? "movies" : "series"} right now</div></div>
                     ) : (
                       <div className="strip">
@@ -3083,7 +3129,7 @@ export default function App() {
                   </div>
                 </>
               )}
-              {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingRecs.length > 0 && (
+              {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingMovieRecsResolved.length + streamingTvRecsResolved.length > 0 && (
                 <div className="no-recs" style={{ marginTop: 16, border: "none", padding: "12px 0 0" }}>
                   <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
                   <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={() => setScreen("rate-more")}>Rate More Titles</button>

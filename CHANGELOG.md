@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.11
+
+- **Home streaming load UX:** Fetch streaming movies and series in two phases so movies can render first; show per-tab “Loading…” until each phase completes; only show the global “Couldn’t load picks” state after both phases finish with no titles (avoids false errors while TV is still loading).
+
 ## 1.2.1
 
 - **Mood era options:** Added `Modern (3–15 years)` to the vibe card and renamed classic copy to `Classic (15+ years)` to match actual logic.
