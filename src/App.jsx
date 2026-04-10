@@ -70,8 +70,8 @@ async function fetchTmdbSearchPages(mediaType, query, pageCount) {
 
 /** Discover: how many TMDB search pages to merge (broader tail than website #2 ≠ API #2). */
 const DISCOVER_SEARCH_PAGES = 2;
-const DISCOVER_ALL_CAP_MOVIES = 20;
-const DISCOVER_ALL_CAP_TV = 20;
+const DISCOVER_ALL_CAP_MOVIES = 40;
+const DISCOVER_ALL_CAP_TV = 40;
 const DISCOVER_SINGLE_TYPE_CAP = 40;
 
 function getRegionLanguageCodes(regionKeys) {
