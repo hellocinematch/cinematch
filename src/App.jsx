@@ -80,6 +80,11 @@ const MORE_TAB_OFF_SERVICE_MAX = 20;
 /** Strip 2 floor; also used to backfill strip 1 from scored theater / streaming / worth-a-look rows. */
 const MORE_TAB_OFF_SERVICE_PRED_MIN = 6.5;
 
+/** Home secondary nav: internal ids align with tab labels (Now Playing / Your picks / Friends). */
+const HOME_SEGMENT_NOW_PLAYING = "nowPlaying";
+const HOME_SEGMENT_YOUR_PICKS = "yourPicks";
+const HOME_SEGMENT_FRIENDS = "friends";
+
 function getRegionLanguageCodes(regionKeys) {
   if (!Array.isArray(regionKeys) || regionKeys.length === 0) return [];
   return [...new Set(
@@ -846,7 +851,7 @@ const styles = `
   .home-topnav .home-segment { flex:1; }
   .home-header { padding:48px 24px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; min-width:0; }
   /* More / Friends: tighter mobile hero without tagline (wordmark + avatar only). */
-  .home-header--no-picks-tagline { padding-top:28px; padding-bottom:12px; }
+  .home-header--no-hero-tagline { padding-top:28px; padding-bottom:12px; }
   .home-hero { min-width:0; display:flex; flex-direction:column; gap:10px; align-items:flex-start; }
   .home-hero-copy { padding:0; display:block; max-width:100%; min-width:0; }
   .home-greeting { font-family:'DM Sans',sans-serif; font-size:52px; font-weight:600; color:#f0ebe0; margin-top:2px; line-height:1.02; letter-spacing:-0.6px; overflow-wrap:anywhere; }
@@ -1188,7 +1193,7 @@ const styles = `
     .home-desktop-nav-row .home-topnav { max-width:620px; }
     .home-header { padding:18px 32px 10px; display:block; }
     /* Desktop: tagline-only strip hidden on More/Friends (logo + avatar stay in home-topbar). */
-    .home-header--no-picks-tagline { display:none; }
+    .home-header--no-hero-tagline { display:none; }
     /* Logo + community stats live in home-topbar; hide duplicate cluster here (stats are siblings of .app-brand). */
     .home-header .topbar-brand-cluster { display:none; }
     .home-header .app-brand,
@@ -1436,7 +1441,7 @@ export default function App() {
   const [streamingTvReady, setStreamingTvReady] = useState(false);
   const [streamingTab, setStreamingTab] = useState("movie"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
-  const [homeSegment, setHomeSegment] = useState("picks"); // "picks" | "more" | "friends"
+  const [homeSegment, setHomeSegment] = useState(HOME_SEGMENT_NOW_PLAYING);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [profileSettingsError, setProfileSettingsError] = useState("");
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
@@ -2430,7 +2435,7 @@ export default function App() {
       try {
         const { data, error } = await invokeMatch({ action: "predict", userRatings, catalogue, movieId: movie.id });
         if (!error && data?.prediction) pred = data.prediction;
-      } catch (_) { /* optional prediction */ }
+      } catch { /* optional prediction */ }
     }
     detailReturnScreenRef.current = screenRef.current;
     history.pushState({ cinemastroDetail: true }, "", window.location.href);
@@ -3114,10 +3119,10 @@ export default function App() {
             <div />
             <AccountAvatarMenu />
           </div>
-          <div className={`home-header ${homeSegment !== "picks" ? "home-header--no-picks-tagline" : ""}`}>
+          <div className={`home-header ${homeSegment !== HOME_SEGMENT_NOW_PLAYING ? "home-header--no-hero-tagline" : ""}`}>
             <div className="home-hero">
               <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-              {homeSegment === "picks" && (
+              {homeSegment === HOME_SEGMENT_NOW_PLAYING && (
                 <div className="home-hero-copy">
                   <div className="home-subtitle">Movies and Shows - Picked for your TASTE!</div>
                 </div>
@@ -3127,11 +3132,11 @@ export default function App() {
           </div>
           <div className="section-divider" style={{ margin: "0 24px 10px", borderTop: "1px solid #1a1a1a" }} />
           <div className="home-desktop-nav-row">
-            <div className="home-topnav" role="tablist" aria-label="Home sections desktop">
+            <div className="home-topnav" role="tablist" aria-label="Now Playing, Your picks, Friends">
               {[
-                ["picks", "Picks"],
-                ["more", "More"],
-                ["friends", "Friends"],
+                [HOME_SEGMENT_NOW_PLAYING, "Now Playing"],
+                [HOME_SEGMENT_YOUR_PICKS, "Your picks"],
+                [HOME_SEGMENT_FRIENDS, "Friends"],
               ].map(([id, label]) => (
                 <button
                   key={`desktop-${id}`}
@@ -3146,11 +3151,11 @@ export default function App() {
               ))}
             </div>
           </div>
-          <div className="home-segments" role="tablist" aria-label="Home sections">
+          <div className="home-segments" role="tablist" aria-label="Now Playing, Your picks, Friends">
             {[
-              ["picks", "Picks"],
-              ["more", "More"],
-              ["friends", "Friends"],
+              [HOME_SEGMENT_NOW_PLAYING, "Now Playing"],
+              [HOME_SEGMENT_YOUR_PICKS, "Your picks"],
+              [HOME_SEGMENT_FRIENDS, "Friends"],
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -3165,7 +3170,7 @@ export default function App() {
             ))}
           </div>
 
-          {homeSegment === "picks" && (
+          {homeSegment === HOME_SEGMENT_NOW_PLAYING && (
             <div className="section">
               {homePicksLoadFailed ? (
                 <div className="no-recs">
@@ -3252,12 +3257,12 @@ export default function App() {
             </div>
           )}
 
-          {homeSegment === "more" && (
+          {homeSegment === HOME_SEGMENT_YOUR_PICKS && (
             <>
               {moreForYouStrip.length > 0 && (
                 <div className="section">
                   <div className="section-header">
-                    <div className="section-title">🔥 Your picks</div>
+                    <div className="section-title">🔥 For you</div>
                     <div
                       className="section-meta"
                       style={{ cursor: recommendations.length > 0 ? "pointer" : undefined }}
@@ -3321,7 +3326,7 @@ export default function App() {
             </>
           )}
 
-          {homeSegment === "friends" && (
+          {homeSegment === HOME_SEGMENT_FRIENDS && (
             <div className="friends-placeholder">
               <div className="friends-placeholder-title">Friends</div>
               <p className="friends-placeholder-text">Groups, shared lists, and watching with people you know will show up here.</p>

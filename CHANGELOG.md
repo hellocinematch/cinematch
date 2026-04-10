@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.17
+
+- **Home segments (internal):** Rename state ids from legacy `picks` / `more` to `nowPlaying` / `yourPicks` (with named constants) so code matches **Now Playing** / **Your picks** tab labels; rename header helper class to `home-header--no-hero-tagline`. ESLint: optional `catch` binding in `openDetail`.
+
 ## 1.2.16
 
 - **More → Your picks:** Raise on-service cap to **15**. When provider-filtered CF leaves gaps, **backfill** from theater + home streaming strips + worth-a-look candidates with **predicted ≥ 6.5** that still match the user’s selected streaming providers (deduped, sorted by prediction).
