@@ -3063,7 +3063,7 @@ export default function App() {
             <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
             <div className="ob-step">Step {obStep + 1} of {obMovies.length}</div>
             <div className="ob-title">Rate what you've seen</div>
-            <div className="ob-subtitle">We'll find your taste matches</div>
+            <div className="ob-subtitle">Creating your tastometer</div>
           </div>
           <div className="ob-dots">
             {obMovies.map((_, i) => (
@@ -3106,8 +3106,8 @@ export default function App() {
       {screen === "loading-recs" && (
         <div className="loading">
           <div className="loading-ring" />
-          <div className="loading-title">Finding your matches</div>
-          <div className="loading-sub">Running taste analysis…</div>
+          <div className="loading-title">Using your tastometer to predict</div>
+          <div className="loading-sub">Scoring titles for you</div>
         </div>
       )}
 
@@ -3785,7 +3785,7 @@ export default function App() {
                   <div className="d-pred-box">
                     <div>
                       <div className="d-pred-label">Predicted rating for you</div>
-                      <div className="d-pred-sub">Based on {prediction.neighborCount} taste {prediction.neighborCount === 1 ? "match" : "matches"}</div>
+                      <div className="d-pred-sub">Based on your tastometer</div>
                       <span className={confClass(prediction.confidence)}>{confLabel(prediction.confidence)}</span>
                     </div>
                     <div>

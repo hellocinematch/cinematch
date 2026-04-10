@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.18
+
+- **Tastometer copy:** Detail prediction subtitle **“Based on your tastometer”** (replaces taste-match count). Onboarding: **“Creating your tastometer.”** Post-onboarding load: **“Using your tastometer to predict”** with **“Scoring titles for you.”**
+
 ## 1.2.17
 
 - **Home segments (internal):** Rename state ids from legacy `picks` / `more` to `nowPlaying` / `yourPicks` (with named constants) so code matches **Now Playing** / **Your picks** tab labels; rename header helper class to `home-header--no-hero-tagline`. ESLint: optional `catch` binding in `openDetail`.
