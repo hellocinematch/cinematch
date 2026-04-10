@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- **“In theaters” pill:** TMDB `now_playing` can still list older titles while metadata shows the original year (e.g. 2014). The pill now requires **plausibly current** release metadata (calendar year within two years of today, and full `release_date` not more than ~two years in the past). Applies to **What’s hot** and the **secondary Region** strip.
+
 ## 1.3.0
 
 - **V1.3.0 — Home “second region” strip:** Hollywood / US remains primary for In Theaters, What’s hot, and Streaming. Profile adds **optional single secondary** (`profiles.secondary_region_key`: indian | asian | latam | european). When set, **Now Playing** shows a fourth block titled **Indian / Asian / Latin · Iberian / European** with meta **Theaters & streaming**: merged **theatrical + streaming movies + TV** for that TMDB market (parallel fetch, theaters-first merge, up to **40** titles, **20** visible then **Load more**). Cards use the same small **In theaters** pill as What’s hot when the title is in that market’s theatrical list.

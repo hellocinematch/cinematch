@@ -225,6 +225,26 @@ function withinPastDays(dateString, days) {
   return ageMs >= 0 && ageMs <= days * 24 * 60 * 60 * 1000;
 }
 
+/**
+ * V1.3.1: “In theaters” pill guard — TMDB `now_playing` can include legacy titles (re-runs, data quirks)
+ * while `movie.year` / `releaseDate` stay the original theatrical date. Hide the pill when that metadata
+ * is clearly not a current run.
+ */
+function qualifiesForTheatricalPillMovie(movie) {
+  const cy = new Date().getFullYear();
+  const y = Number.parseInt(String(movie?.year ?? ""), 10);
+  if (Number.isFinite(y) && y < cy - 2) return false;
+  const rd = movie?.releaseDate;
+  if (typeof rd === "string" && rd.length >= 10) {
+    const t = Date.parse(rd.slice(0, 10));
+    if (Number.isFinite(t)) {
+      const twoYearsMs = 730 * 24 * 60 * 60 * 1000;
+      if (Date.now() - t > twoYearsMs) return false;
+    }
+  }
+  return true;
+}
+
 async function fetchTvDetailsById(ids = []) {
   const uniqueIds = [...new Set((ids || []).filter((id) => Number.isFinite(Number(id))))].slice(0, 30);
   const detailRows = await Promise.all(uniqueIds.map(async (id) => {
@@ -3951,7 +3971,7 @@ export default function App() {
                           <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                             <div className="strip-poster">
                               {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                              {inTheaterIdsForWhatsHotPill.has(rec.movie.id) && (
+                              {inTheaterIdsForWhatsHotPill.has(rec.movie.id) && qualifiesForTheatricalPillMovie(rec.movie) && (
                                 <div className="strip-hot-theater-pill">In theaters</div>
                               )}
                               <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
@@ -4022,7 +4042,7 @@ export default function App() {
                               <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                                 <div className="strip-poster">
                                   {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                                  {secondaryTheaterIds.has(rec.movie.id) && (
+                                  {secondaryTheaterIds.has(rec.movie.id) && qualifiesForTheatricalPillMovie(rec.movie) && (
                                     <div className="strip-hot-theater-pill">In theaters</div>
                                   )}
                                   <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
