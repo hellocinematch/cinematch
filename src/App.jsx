@@ -75,8 +75,9 @@ const DISCOVER_ALL_CAP_TV = 40;
 const DISCOVER_SINGLE_TYPE_CAP = 40;
 
 /** More tab: CF picks on selected streaming apps vs strong CF picks not on those apps. */
-const MORE_TAB_ON_SERVICE_MAX = 9;
+const MORE_TAB_ON_SERVICE_MAX = 15;
 const MORE_TAB_OFF_SERVICE_MAX = 20;
+/** Strip 2 floor; also used to backfill strip 1 from scored theater / streaming / worth-a-look rows. */
 const MORE_TAB_OFF_SERVICE_PRED_MIN = 6.5;
 
 function getRegionLanguageCodes(regionKeys) {
@@ -2283,8 +2284,26 @@ export default function App() {
       }
       if (strip1.length === 0 && sorted.length > 0) {
         strip1 = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
+      } else if (strip1.length < MORE_TAB_ON_SERVICE_MAX && strip1.length > 0) {
+        const inStrip1 = new Set(strip1.map((r) => r.movie.id));
+        const merged = [...theaterRecs, ...streamingMovieRecsResolved, ...streamingTvRecsResolved, ...worthALookRecs];
+        const seen = new Set(inStrip1);
+        const backfillPool = [];
+        for (const rec of merged) {
+          if (!rec?.movie?.id || seen.has(rec.movie.id)) continue;
+          seen.add(rec.movie.id);
+          if (rec.predicted < MORE_TAB_OFF_SERVICE_PRED_MIN) continue;
+          backfillPool.push(rec);
+        }
+        backfillPool.sort((a, b) => b.predicted - a.predicted);
+        for (const rec of backfillPool) {
+          if (strip1.length >= MORE_TAB_ON_SERVICE_MAX) break;
+          const ids = await getFlatrateProviderIds(rec.movie);
+          if (cancelled) return;
+          if (ids.some((id) => selectedStreamingProviderIds.includes(id))) strip1.push(rec);
+        }
       }
-      if (!cancelled) setMoreForYouStrip(strip1);
+
       if (cancelled) return;
 
       const strip1Ids = new Set(strip1.map((r) => r.movie.id));
@@ -2298,12 +2317,24 @@ export default function App() {
         const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
         if (!on) strip2.push(rec);
       }
-      if (!cancelled) setWorthLookStrip(strip2);
+      if (!cancelled) {
+        setMoreForYouStrip(strip1);
+        setWorthLookStrip(strip2);
+      }
     };
 
     void rebuildMoreTabStrips();
     return () => { cancelled = true; };
-  }, [recommendations, selectedStreamingProviderIds, topPickOffset, unratedPopularRecs]);
+  }, [
+    recommendations,
+    selectedStreamingProviderIds,
+    topPickOffset,
+    unratedPopularRecs,
+    theaterRecs,
+    streamingMovieRecsResolved,
+    streamingTvRecsResolved,
+    worthALookRecs,
+  ]);
 
   useEffect(() => {
     let cancelled = false;

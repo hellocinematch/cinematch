@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.16
+
+- **More → Your picks:** Raise on-service cap to **15**. When provider-filtered CF leaves gaps, **backfill** from theater + home streaming strips + worth-a-look candidates with **predicted ≥ 6.5** that still match the user’s selected streaming providers (deduped, sorted by prediction).
+
 ## 1.2.15
 
 - **Home streaming strip:** Fetches a **broad** US streaming pool (same TMDB paths as before). It does **not** use profile **streaming provider** selection and no longer **re-fetches** when those providers change — personalization by provider stays on **More → Your picks**. Home label updated to reflect this.
