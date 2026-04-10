@@ -339,7 +339,7 @@ async function fetchStreamingMoviesOnly(regionKeys) {
     const langCodes = getRegionLanguageCodes(regionKeys);
     const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
     const digitalStart = dateDaysAgo(90);
-    const digitalEnd = dateDaysAgo(46);
+    const digitalEnd = formatIsoDate(new Date());
     const moviePathBase = `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&with_release_type=4&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}${langQuery}`;
     const moviePages = await Promise.all([1, 2].map((page) => fetchTMDB(`${moviePathBase}&page=${page}`)));
     const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
@@ -1512,7 +1512,7 @@ export default function App() {
   /** Two-phase streaming fetch: movies first, then TV (+ /tv/{id} details). */
   const [streamingMoviesReady, setStreamingMoviesReady] = useState(false);
   const [streamingTvReady, setStreamingTvReady] = useState(false);
-  const [streamingTab, setStreamingTab] = useState("movie"); // "movie" | "tv"
+  const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [homeSegment, setHomeSegment] = useState(HOME_SEGMENT_NOW_PLAYING);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
@@ -3516,11 +3516,11 @@ export default function App() {
                       <div className="section-meta">Broad picks (not your app list)</div>
                     </div>
                     <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
-                      <button type="button" className={`filter-pill ${streamingTab === "movie" ? "active" : ""}`} onClick={() => setStreamingTab("movie")}>
-                        Movies
-                      </button>
                       <button type="button" className={`filter-pill ${streamingTab === "tv" ? "active" : ""}`} onClick={() => setStreamingTab("tv")}>
                         Series
+                      </button>
+                      <button type="button" className={`filter-pill ${streamingTab === "movie" ? "active" : ""}`} onClick={() => setStreamingTab("movie")}>
+                        Movies
                       </button>
                     </div>
                     {streamingTab === "movie" && !streamingMoviesReady ? (

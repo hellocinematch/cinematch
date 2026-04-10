@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.25
+
+- **Now Playing → Streaming:** Digital-release movie strip now uses `primary_release_date` through **today** (was capped at ~46 days ago), so fast-to-streaming titles are included and the row is less likely to be empty.
+- **Now Playing → Streaming tabs:** **Series** is the default tab and appears first; **Movies** second.
+
 ## 1.2.24
 
 - **Loading UX polish:** Added shimmering strip skeleton placeholders so recommendation rows are visible immediately while data is loading, instead of showing blank space.
