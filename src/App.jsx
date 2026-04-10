@@ -3,7 +3,7 @@ import packageJson from "../package.json";
 import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./legal.jsx";
 import { supabase } from "./supabase";
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md for release notes.
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md for release notes (v1.3.0 = secondary Region strip + DB column).
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
@@ -465,6 +465,197 @@ async function fetchStreamingTVOnly(regionKeys) {
 
     const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
     return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, 16).map((m) => normalizeTMDBItem(m, "tv"));
+  } catch {
+    return [];
+  }
+}
+
+/* ─── V1.3.0: Secondary “Region” home strip (Hollywood / US remains primary Now Playing + Streaming). ─── */
+
+/** V1.3.0: Page size for first paint + each “Load more”; hard cap {@link SECONDARY_STRIP_MAX}. */
+const SECONDARY_STRIP_PAGE = 20;
+/** V1.3.0: Max titles merged (theaters + streaming movies + TV) before pagination clips. */
+const SECONDARY_STRIP_MAX = 40;
+/** V1.3.0: Profile keys allowed for {@link profiles.secondary_region_key}; excludes hollywood (primary). */
+const V130_SECONDARY_REGION_IDS = ["indian", "asian", "latam", "european"];
+
+/** V1.3.0: Home section title — plain region words (friend-testing copy). */
+const V130_SECONDARY_HOME_TITLE = {
+  indian: "Indian",
+  asian: "Asian",
+  latam: "Latin / Iberian",
+  european: "European",
+};
+
+/**
+ * V1.3.0: Map profile secondary key → TMDB theatrical / discover `region` (single ISO market anchor per bucket).
+ * Asian→KR, Latin→MX, European→GB are pragmatic defaults; refine per market after user research.
+ */
+function secondaryMarketTmdbRegion(regionKey) {
+  const map = { indian: "IN", asian: "KR", latam: "MX", european: "GB" };
+  return map[regionKey] || "US";
+}
+
+/** V1.3.0: Merge theaters first (by popularity), then streaming movies, then TV; dedupe; cap. */
+function mergeSecondaryStripCatalog(theaters, streamingMovies, streamingTv, maxTotal) {
+  const byPop = (a, b) => (Number(b?.popularity) || 0) - (Number(a?.popularity) || 0);
+  const tSorted = [...theaters].sort(byPop);
+  const mSorted = [...streamingMovies].sort(byPop);
+  const tvSorted = [...streamingTv].sort(byPop);
+  const out = [];
+  const seen = new Set();
+  for (const m of tSorted) {
+    if (out.length >= maxTotal) break;
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+  for (const m of mSorted) {
+    if (out.length >= maxTotal) break;
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+  for (const m of tvSorted) {
+    if (out.length >= maxTotal) break;
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+  return out;
+}
+
+/** V1.3.0: Now playing for a non-US TMDB region (mirrors primary US theatrical flow; limited window uses that region’s release rows). */
+async function fetchInTheatersForMarket(tmdbRegionIso, langCodes = []) {
+  try {
+    const TARGET_COUNT = 22;
+    const LIMITED_THEATRICAL_MAX_DAYS = 14;
+    const now = formatIsoDate(new Date());
+    const reg = encodeURIComponent(tmdbRegionIso);
+    const [p1, p2] = await Promise.all([
+      fetchTMDB(`/movie/now_playing?language=en-US&region=${reg}&page=1`),
+      fetchTMDB(`/movie/now_playing?language=en-US&region=${reg}&page=2`),
+    ]);
+
+    const sortByPop = (items) => [...items].sort((a, b) => {
+      const popDiff = Number(b?.popularity ?? 0) - Number(a?.popularity ?? 0);
+      if (popDiff !== 0) return popDiff;
+      const votesDiff = Number(b?.vote_count ?? 0) - Number(a?.vote_count ?? 0);
+      if (votesDiff !== 0) return votesDiff;
+      return Date.parse(b?.release_date || "1970-01-01") - Date.parse(a?.release_date || "1970-01-01");
+    });
+
+    const merged = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || [])])
+      .filter((item) => item?.release_date && item.release_date <= now)
+      .filter((item) =>
+        langCodes.length > 0 ? langCodes.includes(String(item?.original_language || "").toLowerCase()) : true,
+      );
+
+    const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
+    const releaseDatesMap = await fetchMovieReleaseDatesById(deduped.map((item) => item.id));
+    const withLimitedWindowGate = deduped.filter((item) => {
+      const releasePayload = releaseDatesMap.get(item.id);
+      const regionRows = Array.isArray(releasePayload?.results)
+        ? releasePayload.results.find((r) => r?.iso_3166_1 === tmdbRegionIso)?.release_dates || []
+        : [];
+      const limitedDates = regionRows
+        .filter((r) => Number(r?.type) === 2 && typeof r?.release_date === "string")
+        .map((r) => r.release_date.slice(0, 10))
+        .filter(Boolean)
+        .sort();
+      if (limitedDates.length === 0) return true;
+      const newestLimited = limitedDates[limitedDates.length - 1];
+      return withinPastDays(newestLimited, LIMITED_THEATRICAL_MAX_DAYS);
+    });
+    return sortByPop(withLimitedWindowGate).slice(0, TARGET_COUNT).map((m) => normalizeTMDBItem(m, "movie"));
+  } catch {
+    return [];
+  }
+}
+
+/** V1.3.0: Streaming movies discover for secondary TMDB region (same fallbacks as US, different `region=`). */
+async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery) {
+  try {
+    const reg = encodeURIComponent(tmdbRegionIso);
+    const digitalStart = dateDaysAgo(90);
+    const digitalEnd = formatIsoDate(new Date());
+    const digitalDiscoverBase =
+      `/discover/movie?language=en-US&region=${reg}&sort_by=popularity.desc&with_release_type=4&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}`;
+    const broadDateDiscoverBase =
+      `/discover/movie?language=en-US&region=${reg}&sort_by=popularity.desc&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}`;
+
+    const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
+
+    const discoverToMovies = async (pathNoPage) => {
+      const moviePages = await Promise.all([1, 2].map((page) => fetchTMDB(`${pathNoPage}&page=${page}`)));
+      if (moviePages.some(isTmdbApiErrorPayload)) return [];
+      const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
+      return dedupeByTmdbId(movieResults).slice(0, 18).map((m) => normalizeTMDBItem(m, "movie"));
+    };
+
+    const trendingToMovies = async () => {
+      const trendPages = await Promise.all([1, 2].map((page) => fetchTMDB(`/trending/movie/week?language=en-US&page=${page}`)));
+      if (trendPages.some(isTmdbApiErrorPayload)) return [];
+      const rows = filterDefaultExcludedGenres(trendPages.flatMap((p) => p.results || []));
+      return dedupeByTmdbId(rows).slice(0, 18).map((m) => normalizeTMDBItem(m, "movie"));
+    };
+
+    let out = await discoverToMovies(`${digitalDiscoverBase}${langQuery}`);
+    if (out.length > 0) return out;
+    if (langQuery) {
+      out = await discoverToMovies(`${digitalDiscoverBase}`);
+      if (out.length > 0) return out;
+    }
+    out = await discoverToMovies(`${broadDateDiscoverBase}${langQuery}`);
+    if (out.length > 0) return out;
+    if (langQuery) {
+      out = await discoverToMovies(`${broadDateDiscoverBase}`);
+      if (out.length > 0) return out;
+    }
+    return await trendingToMovies();
+  } catch {
+    return [];
+  }
+}
+
+/** V1.3.0: Streaming TV for secondary region — regional discover + global trending day (same shape as primary strip). */
+async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery) {
+  try {
+    const reg = encodeURIComponent(tmdbRegionIso);
+    const tvNewSeriesStart = dateDaysAgo(180);
+    const excludedTrendingGenres = new Set([10767, 10763]);
+    const tvNewSeriesBase = `/discover/tv?language=en-US&region=${reg}&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${langQuery}`;
+    const trendingTvBase = "/trending/tv/day?language=en-US";
+
+    const [tvSeriesPages, tvTrendingPages] = await Promise.all([
+      Promise.all([1, 2].map((page) => fetchTMDB(`${tvNewSeriesBase}&page=${page}`))),
+      Promise.all([1, 2].map((page) => fetchTMDB(`${trendingTvBase}&page=${page}`))),
+    ]);
+
+    const tvNewSeriesCandidates = tvSeriesPages.flatMap((page) => page.results || []);
+    const tvTrendingCandidates = tvTrendingPages
+      .flatMap((page) => page.results || [])
+      .filter((item) => {
+        const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
+        return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
+      });
+
+    const tvCandidates = [...new Map(
+      [...tvNewSeriesCandidates, ...tvTrendingCandidates].map((item) => [item.id, item]),
+    ).values()];
+
+    const tvDetailsMap = await fetchTvDetailsById(tvCandidates.map((item) => item.id));
+    const tvResults = tvCandidates.filter((item) => {
+      const detail = tvDetailsMap.get(item.id);
+      const seasons = Number(detail?.number_of_seasons ?? 0);
+      const isNewSeries = seasons === 1 && withinPastDays(item?.first_air_date, 180);
+      const isNewSeason = seasons > 1 && withinPastDays(detail?.last_air_date, 7);
+      const trendingEligible = tvTrendingCandidates.some((t) => t.id === item.id);
+      return isNewSeries || isNewSeason || trendingEligible;
+    });
+
+    const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
+    return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, 18).map((m) => normalizeTMDBItem(m, "tv"));
   } catch {
     return [];
   }
@@ -1613,6 +1804,18 @@ export default function App() {
   const [showGenreIds, setShowGenreIds] = useState([]);
   /** Region buckets to include (Settings). Empty = all regions. Logged-out users ignore. */
   const [showRegionKeys, setShowRegionKeys] = useState([]);
+  /**
+   * V1.3.0: Optional single secondary market for the home “Region” strip (below Streaming).
+   * Persisted in `profiles.secondary_region_key`. Hollywood / US stays primary for main strips.
+   */
+  const [secondaryRegionKey, setSecondaryRegionKey] = useState(null);
+  /** V1.3.0: Normalized rows merged from secondary theaters + streaming (movies/TV), max {@link SECONDARY_STRIP_MAX}. */
+  const [secondaryStripRows, setSecondaryStripRows] = useState([]);
+  /** V1.3.0: `movie.id` set for “In theaters” pill on secondary strip cards. */
+  const [secondaryTheaterIds, setSecondaryTheaterIds] = useState(() => new Set());
+  const [secondaryStripReady, setSecondaryStripReady] = useState(true);
+  /** V1.3.0: Visible window for horizontal strip; grows via “Load more” up to {@link SECONDARY_STRIP_MAX}. */
+  const [secondaryStripVisibleCount, setSecondaryStripVisibleCount] = useState(SECONDARY_STRIP_PAGE);
   /** Public marketing counts (RPC). Undefined until first successful fetch. */
   const [siteStats, setSiteStats] = useState(null);
 
@@ -1892,6 +2095,42 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user]);
 
+  /** V1.3.0: Fetch secondary-market theaters + streaming (parallel), merge into strip + catalogue. */
+  useEffect(() => {
+    if (!user || !secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
+      setSecondaryStripRows([]);
+      setSecondaryTheaterIds(new Set());
+      setSecondaryStripReady(true);
+      return;
+    }
+    let cancelled = false;
+    setSecondaryStripReady(false);
+    setSecondaryStripVisibleCount(SECONDARY_STRIP_PAGE);
+    (async () => {
+      const tmdbReg = secondaryMarketTmdbRegion(secondaryRegionKey);
+      const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
+      const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+      const [theaters, sm, st] = await Promise.all([
+        fetchInTheatersForMarket(tmdbReg, langCodes),
+        fetchStreamingMoviesForMarket(tmdbReg, langQuery),
+        fetchStreamingTVForMarket(tmdbReg, langQuery),
+      ]);
+      if (cancelled) return;
+      const merged = mergeSecondaryStripCatalog(theaters, sm, st, SECONDARY_STRIP_MAX);
+      const tIds = new Set(theaters.map((m) => m.id));
+      setSecondaryStripRows(merged);
+      setSecondaryTheaterIds(tIds);
+      setCatalogue((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const added = merged.filter((m) => !seen.has(m.id));
+        if (added.length === 0) return prev;
+        return [...prev, ...added];
+      });
+      setSecondaryStripReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, [user, secondaryRegionKey]);
+
   const catalogueForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return catalogue;
     return catalogue.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
@@ -1927,6 +2166,17 @@ export default function App() {
     () => new Set(inTheatersForRecs.map(m => m.id)),
     [inTheatersForRecs],
   );
+
+  /** V1.3.0: Secondary strip predictions for catalogue titles (full merged list, up to cap). */
+  const secondaryStripRecsAll = useMemo(
+    () => secondaryStripRows.map((m) => tmdbOnlyRec(m)),
+    [secondaryStripRows],
+  );
+  /** V1.3.0: Slice shown in UI; grows with “Load more”. */
+  const secondaryStripRecsVisible = useMemo(() => {
+    const n = Math.min(secondaryStripVisibleCount, SECONDARY_STRIP_MAX, secondaryStripRecsAll.length);
+    return secondaryStripRecsAll.slice(0, n);
+  }, [secondaryStripRecsAll, secondaryStripVisibleCount]);
 
   /** Collaborative filtering runs in Edge Function `match` (neighbour ratings loaded server-side; not in the client bundle). */
   useEffect(() => {
@@ -2085,7 +2335,7 @@ export default function App() {
 
     const { data: profileRow } = await supabase
       .from("profiles")
-      .select("streaming_provider_ids, show_genre_ids, show_region_keys")
+      .select("streaming_provider_ids, show_genre_ids, show_region_keys, secondary_region_key")
       .eq("id", user.id)
       .maybeSingle();
     const allowedRegions = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
@@ -2103,6 +2353,10 @@ export default function App() {
       Array.isArray(profileRow?.show_region_keys)
         ? profileRow.show_region_keys.filter(k => typeof k === "string" && allowedRegions.has(k))
         : [],
+    );
+    const sk = profileRow?.secondary_region_key;
+    setSecondaryRegionKey(
+      typeof sk === "string" && V130_SECONDARY_REGION_IDS.includes(sk) ? sk : null,
     );
     return { ratingCount: ratingsData?.length ?? 0 };
   }
@@ -2167,6 +2421,23 @@ export default function App() {
       setProfileSettingsError(`Could not save regions: ${error.message}`);
       console.warn("Could not save region preferences:", error.message);
     }
+  }
+
+  /** V1.3.0: Single secondary market for home Region strip; `null` hides the strip. */
+  async function persistSecondaryRegionKey(key) {
+    if (!user) return;
+    const clean = key != null && V130_SECONDARY_REGION_IDS.includes(key) ? key : null;
+    setProfileSettingsError("");
+    const { error } = await supabase
+      .from("profiles")
+      .update({ secondary_region_key: clean })
+      .eq("id", user.id);
+    if (error) {
+      setProfileSettingsError(`Could not save secondary region: ${error.message}`);
+      console.warn("Could not save secondary_region_key:", error.message);
+      return;
+    }
+    setSecondaryRegionKey(clean);
   }
 
   function toggleShowGenre(genreId) {
@@ -2262,6 +2533,10 @@ export default function App() {
     setSelectedStreamingProviderIds([]);
     setShowGenreIds([]);
     setShowRegionKeys([]);
+    setSecondaryRegionKey(null);
+    setSecondaryStripRows([]);
+    setSecondaryTheaterIds(new Set());
+    setSecondaryStripVisibleCount(SECONDARY_STRIP_PAGE);
     setStreamingMovies([]);
     setStreamingTV([]);
     setWhatsHot([]);
@@ -2635,6 +2910,7 @@ export default function App() {
       ...theaterRecs.map((r) => r.movie),
       ...streamingRecs.map((r) => r.movie),
       ...whatsHotRecsResolved.map((r) => r.movie),
+      ...secondaryStripRecsAll.map((r) => r.movie),
       ...moreForYouStrip.map((row) => row.rec.movie),
       ...worthLookStrip.map((row) => row.rec.movie),
     ]
@@ -2660,18 +2936,19 @@ export default function App() {
     };
     void hydrateTvStripMeta();
     return () => { cancelled = true; };
-  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, moreForYouStrip, worthLookStrip]);
+  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, secondaryStripRecsAll, moreForYouStrip, worthLookStrip]);
 
   const recMap = useMemo(() => ({
     ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingMovieRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingTvRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(whatsHotRecsResolved.map(r => [r.movie.id, r])),
+    ...Object.fromEntries(secondaryStripRecsAll.map((r) => [r.movie.id, r])),
     ...Object.fromEntries(theaterRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(moreForYouStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(worthLookStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
-  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
+  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, secondaryStripRecsAll, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
   const FILTERS = ["All", "Movies", "TV Shows"];
   const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
@@ -3726,9 +4003,60 @@ export default function App() {
                       </div>
                     )}
                   </div>
+                  {secondaryRegionKey && (
+                    <div className="top-picks-block">
+                      <div className="section-header">
+                        <div className="section-title">{V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region"}</div>
+                        <div className="section-meta">Theaters &amp; streaming</div>
+                      </div>
+                      {!secondaryStripReady ? (
+                        <SkeletonStrip />
+                      ) : secondaryStripRecsVisible.length === 0 ? (
+                        <div className="empty-box">
+                          <div className="empty-text">Nothing in this market right now</div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="strip">
+                            {secondaryStripRecsVisible.map((rec) => (
+                              <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                                <div className="strip-poster">
+                                  {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
+                                  {secondaryTheaterIds.has(rec.movie.id) && (
+                                    <div className="strip-hot-theater-pill">In theaters</div>
+                                  )}
+                                  <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
+                                    {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
+                                  </div>
+                                </div>
+                                <div className="strip-title">{rec.movie.title}</div>
+                                <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                                <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
+                              </div>
+                            ))}
+                          </div>
+                          {secondaryStripRecsAll.length > secondaryStripRecsVisible.length &&
+                            secondaryStripVisibleCount < SECONDARY_STRIP_MAX && (
+                            <button
+                              type="button"
+                              className="btn-confirm"
+                              style={{ marginTop: 12, width: "100%" }}
+                              onClick={() =>
+                                setSecondaryStripVisibleCount((c) =>
+                                  Math.min(c + SECONDARY_STRIP_PAGE, SECONDARY_STRIP_MAX, secondaryStripRecsAll.length),
+                                )
+                              }
+                            >
+                              Load more
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
-              {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingMovieRecsResolved.length + streamingTvRecsResolved.length + whatsHotRecsResolved.length > 0 && (
+              {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingMovieRecsResolved.length + streamingTvRecsResolved.length + whatsHotRecsResolved.length + secondaryStripRecsAll.length > 0 && (
                 <div className="no-recs" style={{ marginTop: 16, border: "none", padding: "12px 0 0" }}>
                   <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
                   <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={startDefaultRateMore}>Rate More Titles</button>
@@ -4248,6 +4576,30 @@ export default function App() {
                     onClick={() => toggleShowRegion(r.id)}
                   >
                     {r.label}
+                  </button>
+                ))}
+              </div>
+              {/* V1.3.0: Optional second home-market strip (Now Playing); primary flow stays US / Hollywood. */}
+              <div className="profile-settings-label" style={{ marginTop: 20 }}>Home — second region (optional)</div>
+              <p className="settings-providers-hint">
+                Adds one extra row on Now Playing: theaters + streaming for that market. Hollywood stays primary above. “None” hides the strip.
+              </p>
+              <div className="settings-provider-grid">
+                <button
+                  type="button"
+                  className={`settings-provider-pill ${secondaryRegionKey == null ? "selected" : ""}`}
+                  onClick={() => persistSecondaryRegionKey(null)}
+                >
+                  None
+                </button>
+                {PROFILE_REGION_OPTIONS.filter((r) => r.id !== "hollywood").map((r) => (
+                  <button
+                    key={`v13-sec-${r.id}`}
+                    type="button"
+                    className={`settings-provider-pill ${secondaryRegionKey === r.id ? "selected" : ""}`}
+                    onClick={() => persistSecondaryRegionKey(r.id)}
+                  >
+                    {V130_SECONDARY_HOME_TITLE[r.id] ?? r.label}
                   </button>
                 ))}
               </div>

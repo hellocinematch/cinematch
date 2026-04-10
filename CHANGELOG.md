@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+
+- **V1.3.0 — Home “second region” strip:** Hollywood / US remains primary for In Theaters, What’s hot, and Streaming. Profile adds **optional single secondary** (`profiles.secondary_region_key`: indian | asian | latam | european). When set, **Now Playing** shows a fourth block titled **Indian / Asian / Latin · Iberian / European** with meta **Theaters & streaming**: merged **theatrical + streaming movies + TV** for that TMDB market (parallel fetch, theaters-first merge, up to **40** titles, **20** visible then **Load more**). Cards use the same small **In theaters** pill as What’s hot when the title is in that market’s theatrical list.
+- **DB:** New column `profiles.secondary_region_key` (see `supabase/migrations/20260410120000_profiles_secondary_region_key.sql`).
+
 ## 1.2.28
 
 - **Now Playing → What’s hot:** New row **between In Theaters and Streaming** with TMDB **trending movie + TV (day)**, interleaved (~18 titles). Titles are **not** removed just because they also appear in theaters or streaming — overlap is shown with a small **In theaters** pill when a card matches the current **In Theaters** list. Gives users something to scroll while the streaming strip finishes loading.
