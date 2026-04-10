@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.5
+
+- **Auth (Sign in / Sign up / Forgot password / Update password):** If a Supabase auth call **throws** (e.g. flaky network on mobile Safari), the primary button no longer stays stuck on **“Please wait…”** — loading state is cleared in **`finally`**, and a short error message is shown when the request fails unexpectedly.
+
 ## 1.3.4
 
 - **Your picks + secondary region:** When a **home secondary region** is set in Profile, **For you** / **Worth a Look** (`match` catalogue) now **includes** titles from that secondary market even if **Regions to show** would exclude them (e.g. Hollywood-only regions + Indian secondary). **Genres to show** still applies to those adds. No secondary selected → unchanged behavior.

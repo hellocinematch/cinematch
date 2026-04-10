@@ -3,7 +3,7 @@ import packageJson from "../package.json";
 import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./legal.jsx";
 import { supabase } from "./supabase";
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.4 = Your picks merges secondary catalogue for match).
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.5 = auth loading always clears; catch network throws).
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
@@ -2495,8 +2495,16 @@ export default function App() {
 
   async function handleSignUp() {
     setAuthError(""); setAuthLoading(true);
-    const { data, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword, options: { data: { name: authName } } });
-    setAuthLoading(false);
+    let data;
+    let error;
+    try {
+      ({ data, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword, options: { data: { name: authName } } }));
+    } catch (e) {
+      setAuthError(e?.message || "Sign up failed. Check your connection and try again.");
+      return;
+    } finally {
+      setAuthLoading(false);
+    }
     if (error) { setAuthError(error.message); return; }
     if (data.user) {
       await supabase.from("profiles").update({ name: authName }).eq("id", data.user.id);
@@ -2513,8 +2521,16 @@ export default function App() {
 
   async function handleSignIn() {
     setAuthError(""); setAuthLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
-    setAuthLoading(false);
+    let data;
+    let error;
+    try {
+      ({ data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword }));
+    } catch (e) {
+      setAuthError(e?.message || "Sign in failed. Check your connection and try again.");
+      return;
+    } finally {
+      setAuthLoading(false);
+    }
     if (error) { setAuthError(error.message); return; }
     if (data.user) { setUser(data.user); setScreen("loading-catalogue"); }
   }
@@ -2528,10 +2544,17 @@ export default function App() {
       return;
     }
     setAuthLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: passwordRecoveryRedirectTo(),
-    });
-    setAuthLoading(false);
+    let error;
+    try {
+      ({ error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: passwordRecoveryRedirectTo(),
+      }));
+    } catch (e) {
+      setAuthError(e?.message || "Could not send reset email. Check your connection and try again.");
+      return;
+    } finally {
+      setAuthLoading(false);
+    }
     if (error) {
       setAuthError(error.message);
       return;
@@ -2548,8 +2571,15 @@ export default function App() {
       return;
     }
     setAuthLoading(true);
-    const { error } = await supabase.auth.updateUser({ password: nextPassword });
-    setAuthLoading(false);
+    let error;
+    try {
+      ({ error } = await supabase.auth.updateUser({ password: nextPassword }));
+    } catch (e) {
+      setAuthError(e?.message || "Could not update password. Check your connection and try again.");
+      return;
+    } finally {
+      setAuthLoading(false);
+    }
     if (error) {
       setAuthError(error.message);
       return;
