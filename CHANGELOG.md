@@ -1,8 +1,12 @@
 # Changelog
 
+## 1.3.3
+
+- **Secondary Region block:** Removed **Load more**; each tab (**In Theaters**, **Streaming → Series/Movies**) shows at most **25** titles. TMDB secondary fetches now target up to 25 per pool so the strip can fill when data exists.
+
 ## 1.3.2
 
-- **Secondary Region row (Now Playing):** **In Theaters** and **Streaming** top-level tabs; under Streaming, **Series** and **Movies** (same pattern as the primary Streaming block). Removed per-poster “In theaters” pills — the tab indicates context. Pagination (**Load more**) applies per active tab; catalogue still unions all fetched titles for ratings / detail.
+- **Secondary Region row (Now Playing):** **In Theaters** and **Streaming** top-level tabs; under Streaming, **Series** and **Movies** (same pattern as the primary Streaming block). Removed per-poster “In theaters” pills — the tab indicates context. Catalogue still unions all fetched titles for ratings / detail.
 
 ## 1.3.1
 

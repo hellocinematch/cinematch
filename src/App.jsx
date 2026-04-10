@@ -3,7 +3,7 @@ import packageJson from "../package.json";
 import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./legal.jsx";
 import { supabase } from "./supabase";
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.2 = secondary Region tabs In theaters / Streaming + Movies|Series).
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.3 = Region block cap 25 / no Load more).
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
@@ -492,10 +492,8 @@ async function fetchStreamingTVOnly(regionKeys) {
 
 /* ─── V1.3.0: Secondary “Region” home strip (Hollywood / US remains primary Now Playing + Streaming). ─── */
 
-/** V1.3.0: Page size for first paint + each “Load more”; hard cap {@link SECONDARY_STRIP_MAX}. */
-const SECONDARY_STRIP_PAGE = 20;
-/** V1.3.0: Max titles merged (theaters + streaming movies + TV) before pagination clips. */
-const SECONDARY_STRIP_MAX = 40;
+/** V1.3.3: Max titles per Region-block tab (no “Load more”; tabs scope the list). */
+const SECONDARY_STRIP_TAB_CAP = 25;
 /** V1.3.0: Profile keys allowed for {@link profiles.secondary_region_key}; excludes hollywood (primary). */
 const V130_SECONDARY_REGION_IDS = ["indian", "asian", "latam", "european"];
 
@@ -528,7 +526,7 @@ const SECONDARY_BLOCK_STREAMING = "streaming";
 /** V1.3.0: Now playing for a non-US TMDB region (mirrors primary US theatrical flow; limited window uses that region’s release rows). */
 async function fetchInTheatersForMarket(tmdbRegionIso, langCodes = []) {
   try {
-    const TARGET_COUNT = 22;
+    const TARGET_COUNT = SECONDARY_STRIP_TAB_CAP;
     const LIMITED_THEATRICAL_MAX_DAYS = 14;
     const now = formatIsoDate(new Date());
     const reg = encodeURIComponent(tmdbRegionIso);
@@ -590,14 +588,14 @@ async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery) {
       const moviePages = await Promise.all([1, 2].map((page) => fetchTMDB(`${pathNoPage}&page=${page}`)));
       if (moviePages.some(isTmdbApiErrorPayload)) return [];
       const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
-      return dedupeByTmdbId(movieResults).slice(0, 18).map((m) => normalizeTMDBItem(m, "movie"));
+      return dedupeByTmdbId(movieResults).slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => normalizeTMDBItem(m, "movie"));
     };
 
     const trendingToMovies = async () => {
       const trendPages = await Promise.all([1, 2].map((page) => fetchTMDB(`/trending/movie/week?language=en-US&page=${page}`)));
       if (trendPages.some(isTmdbApiErrorPayload)) return [];
       const rows = filterDefaultExcludedGenres(trendPages.flatMap((p) => p.results || []));
-      return dedupeByTmdbId(rows).slice(0, 18).map((m) => normalizeTMDBItem(m, "movie"));
+      return dedupeByTmdbId(rows).slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => normalizeTMDBItem(m, "movie"));
     };
 
     let out = await discoverToMovies(`${digitalDiscoverBase}${langQuery}`);
@@ -655,7 +653,7 @@ async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery) {
     });
 
     const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
-    return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, 18).map((m) => normalizeTMDBItem(m, "tv"));
+    return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => normalizeTMDBItem(m, "tv"));
   } catch {
     return [];
   }
@@ -1818,8 +1816,6 @@ export default function App() {
   /** V1.3.2: Under Streaming: “Movies” | “Series” (same pattern as primary Streaming strip). */
   const [secondaryBlockStreamingTab, setSecondaryBlockStreamingTab] = useState("tv");
   const [secondaryStripReady, setSecondaryStripReady] = useState(true);
-  /** V1.3.0: Visible window for horizontal strip; grows via “Load more” up to {@link SECONDARY_STRIP_MAX}. */
-  const [secondaryStripVisibleCount, setSecondaryStripVisibleCount] = useState(SECONDARY_STRIP_PAGE);
   /** Public marketing counts (RPC). Undefined until first successful fetch. */
   const [siteStats, setSiteStats] = useState(null);
 
@@ -2112,7 +2108,6 @@ export default function App() {
     }
     let cancelled = false;
     setSecondaryStripReady(false);
-    setSecondaryStripVisibleCount(SECONDARY_STRIP_PAGE);
     (async () => {
       const tmdbReg = secondaryMarketTmdbRegion(secondaryRegionKey);
       const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
@@ -2137,11 +2132,6 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, [user, secondaryRegionKey]);
-
-  /** V1.3.2: Reset pagination when switching Region-block tabs. */
-  useEffect(() => {
-    setSecondaryStripVisibleCount(SECONDARY_STRIP_PAGE);
-  }, [secondaryBlockSegment, secondaryBlockStreamingTab, secondaryRegionKey]);
 
   const catalogueForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return catalogue;
@@ -2193,12 +2183,11 @@ export default function App() {
     if (secondaryBlockSegment === SECONDARY_BLOCK_THEATERS) return secondaryTheaterRows;
     return secondaryBlockStreamingTab === "movie" ? secondaryStreamingMovieRows : secondaryStreamingTvRows;
   }, [secondaryBlockSegment, secondaryBlockStreamingTab, secondaryTheaterRows, secondaryStreamingMovieRows, secondaryStreamingTvRows]);
-  /** V1.3.2: Slice shown in UI; grows with “Load more”. */
-  const secondaryStripRecsVisible = useMemo(() => {
-    const src = secondaryActiveRawRows;
-    const n = Math.min(secondaryStripVisibleCount, SECONDARY_STRIP_MAX, src.length);
-    return src.slice(0, n).map((m) => tmdbOnlyRec(m));
-  }, [secondaryActiveRawRows, secondaryStripVisibleCount]);
+  /** V1.3.3: Fixed cap per tab — no Load more (tabs replace pagination). */
+  const secondaryStripRecsVisible = useMemo(
+    () => secondaryActiveRawRows.slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => tmdbOnlyRec(m)),
+    [secondaryActiveRawRows],
+  );
 
   /** Collaborative filtering runs in Edge Function `match` (neighbour ratings loaded server-side; not in the client bundle). */
   useEffect(() => {
@@ -2561,7 +2550,6 @@ export default function App() {
     setSecondaryStreamingTvRows([]);
     setSecondaryBlockSegment(SECONDARY_BLOCK_THEATERS);
     setSecondaryBlockStreamingTab("tv");
-    setSecondaryStripVisibleCount(SECONDARY_STRIP_PAGE);
     setStreamingMovies([]);
     setStreamingTV([]);
     setWhatsHot([]);
@@ -4097,21 +4085,6 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          {secondaryActiveRawRows.length > secondaryStripRecsVisible.length &&
-                            secondaryStripVisibleCount < SECONDARY_STRIP_MAX && (
-                            <button
-                              type="button"
-                              className="btn-confirm"
-                              style={{ marginTop: 12, width: "100%" }}
-                              onClick={() =>
-                                setSecondaryStripVisibleCount((c) =>
-                                  Math.min(c + SECONDARY_STRIP_PAGE, SECONDARY_STRIP_MAX, secondaryActiveRawRows.length),
-                                )
-                              }
-                            >
-                              Load more
-                            </button>
-                          )}
                         </>
                       )}
                     </div>
