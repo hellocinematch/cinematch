@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.27
+
+- **Strip & Discover (movies):** When TMDB provides a full `release_date`, home strips and Discover now show a readable **release date** (e.g. `Apr 10, 2026`) instead of year only; year remains the fallback when no full date exists.
+
 ## 1.2.26
 
 - **Now Playing → Streaming (Movies):** When TMDB digital discover returns no rows (strict `with_release_type=4`, date window, or profile language filters), the app now falls back in order: same query without language filter, broader discover without release-type in the same date window, then **trending movies (week)** so the strip stays populated.

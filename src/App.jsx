@@ -164,6 +164,12 @@ function buildWatchlistFromRows(watchlistData, catalogue) {
   }).filter(Boolean);
 }
 
+/** YYYY-MM-DD from TMDB when present (movies: release_date; TV: first_air_date). */
+function tmdbReleaseDateString(item) {
+  const raw = item?.release_date || item?.first_air_date || "";
+  return raw.length >= 10 ? raw.slice(0, 10) : null;
+}
+
 function normalizeTMDBItem(item, type) {
   const originCountries = Array.isArray(item.origin_country)
     ? item.origin_country.filter(c => typeof c === "string").map(c => c.toUpperCase())
@@ -176,6 +182,7 @@ function normalizeTMDBItem(item, type) {
     type,
     title: item.title || item.name,
     year: (item.release_date || item.first_air_date || "").slice(0, 4),
+    releaseDate: tmdbReleaseDateString(item),
     genre: type === "movie" ? "Movie" : "TV Show",
     genreIds: item.genre_ids || [],
     synopsis: item.overview || "",
@@ -441,6 +448,7 @@ async function fetchCatalogue() {
     id: `${type}-${item.id}`, tmdbId: item.id, type,
     title: item.title || item.name,
     year: (item.release_date || item.first_air_date || "").slice(0, 4),
+    releaseDate: tmdbReleaseDateString(item),
     genre: type === "movie" ? "Movie" : "TV Show",
     genreIds: item.genre_ids || [],
     synopsis: item.overview || "",
@@ -485,6 +493,7 @@ async function fetchRegionalTitles(langCode) {
       id: `${type}-${item.id}`, tmdbId: item.id, type,
       title: item.title || item.name,
       year: (item.release_date || item.first_air_date || "").slice(0, 4),
+      releaseDate: tmdbReleaseDateString(item),
       genre: type === "movie" ? "Movie" : "TV Show",
       genreIds: item.genre_ids || [],
       synopsis: item.overview || "",
@@ -1444,8 +1453,19 @@ function formatScore(n) {
   return (Math.round(x * 10) / 10).toFixed(1);
 }
 
+function formatMovieReleaseLine(movie) {
+  const rd = movie?.releaseDate;
+  if (rd && /^\d{4}-\d{2}-\d{2}$/.test(rd)) {
+    const d = new Date(`${rd}T12:00:00`);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+  }
+  return movie?.year || "—";
+}
+
 function formatStripMediaMeta(movie, tvMetaByTmdbId) {
-  if (movie?.type !== "tv") return `Movie · ${movie?.year || "—"}`;
+  if (movie?.type !== "tv") return `Movie · ${formatMovieReleaseLine(movie)}`;
   const meta = movie?.tmdbId != null ? tvMetaByTmdbId?.[movie.tmdbId] : null;
   const latestYear = meta?.latestYear || movie?.year || "—";
   if (Number.isFinite(Number(meta?.seasonCount)) && Number(meta.seasonCount) > 0) {
@@ -2239,6 +2259,7 @@ export default function App() {
           id: `${type}-${item.id}`, tmdbId: item.id, type,
           title: item.title || item.name,
           year: (item.release_date || item.first_air_date || "").slice(0, 4),
+          releaseDate: tmdbReleaseDateString(item),
           synopsis: item.overview || "",
           poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
           backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
@@ -3054,6 +3075,7 @@ export default function App() {
         id: `${type}-${item.id}`, tmdbId: item.id, type,
         title: item.title || item.name,
         year: (item.release_date || item.first_air_date || "").slice(0, 4),
+        releaseDate: tmdbReleaseDateString(item),
         synopsis: item.overview || "",
         poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
         backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
@@ -3824,7 +3846,9 @@ export default function App() {
                       </div>
                     </div>
                     <div className="disc-title">{m.title}</div>
-                    <div className="disc-meta">{m.type === "movie" ? "Movie" : "TV"} · {m.year}</div>
+                    <div className="disc-meta">
+                      {m.type === "movie" ? `Movie · ${formatMovieReleaseLine(m)}` : `TV · ${m.year}`}
+                    </div>
                   </div>
                 );
               })}
