@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.24
+
+- **Loading UX polish:** Added shimmering strip skeleton placeholders so recommendation rows are visible immediately while data is loading, instead of showing blank space.
+- **Your picks responsiveness:** Low-latency placeholders now render for both **For you** and **Worth a Look** while match/provider work is in flight.
+- **Now Playing streaming row:** Movies/Series loading states now use strip skeletons for smoother perceived performance.
+
 ## 1.2.23
 
 - **Rate now return path:** After using **Rate now** from a title’s detail prediction card, completing or exiting the rating flow now returns users to that same detail page (context-preserving) instead of redirecting to Your picks. Generic “Rate More Titles” entry points keep returning home.

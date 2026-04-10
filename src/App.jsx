@@ -944,6 +944,21 @@ const styles = `
   .strip-row-kind { font-size:11px; margin-top:5px; letter-spacing:0.02em; }
   .strip-row-kind--pick { color:#c9a227; }
   .strip-row-kind--pop { color:#666; }
+  .strip-card-skeleton { flex-shrink:0; width:152px; }
+  .skel-poster { width:152px; height:212px; border-radius:12px; border:1px solid #1e1e1e; position:relative; overflow:hidden; background:#141414; }
+  .skel-line { height:11px; border-radius:6px; margin-top:8px; position:relative; overflow:hidden; background:#191919; }
+  .skel-line-title { width:88%; margin-top:9px; }
+  .skel-line-meta { width:62%; }
+  .skel-line-kind { width:46%; }
+  .skel-poster::before, .skel-line::before {
+    content:"";
+    position:absolute;
+    inset:0;
+    transform:translateX(-100%);
+    background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 45%, transparent 100%);
+    animation:shimmer 1.35s ease-in-out infinite;
+    pointer-events:none;
+  }
 
   .wl-card { flex-shrink:0; width:100px; cursor:pointer; transition:transform 0.2s; }
   .wl-card:hover { transform:translateY(-3px); }
@@ -1313,6 +1328,7 @@ const styles = `
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
   @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
   @keyframes spin { to{transform:rotate(360deg)} }
+  @keyframes shimmer { 100% { transform:translateX(100%); } }
 `;
 
 // ---------------------------------------------------------------------------
@@ -2513,6 +2529,22 @@ export default function App() {
   const FILTERS = ["All", "Movies", "TV Shows"];
   const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
+  const yourPicksLoading = matchLoading || moreStripsLoading;
+
+  function SkeletonStrip({ count = 7, showKind = false }) {
+    return (
+      <div className="strip" aria-hidden="true">
+        {Array.from({ length: count }).map((_, idx) => (
+          <div className="strip-card-skeleton" key={`sk-${idx}`}>
+            <div className="skel-poster" />
+            <div className="skel-line skel-line-title" />
+            <div className="skel-line skel-line-meta" />
+            {showKind && <div className="skel-line skel-line-kind" />}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   const discoverItems = useMemo(() => {
     let base;
@@ -3492,9 +3524,9 @@ export default function App() {
                       </button>
                     </div>
                     {streamingTab === "movie" && !streamingMoviesReady ? (
-                      <div className="empty-box"><div className="empty-text">Loading movies…</div></div>
+                      <SkeletonStrip />
                     ) : streamingTab === "tv" && !streamingTvReady ? (
-                      <div className="empty-box"><div className="empty-text">Loading series…</div></div>
+                      <SkeletonStrip />
                     ) : streamingRecs.length === 0 ? (
                       <div className="empty-box"><div className="empty-text">No streaming {streamingTab === "movie" ? "movies" : "series"} right now</div></div>
                     ) : (
@@ -3528,7 +3560,7 @@ export default function App() {
 
           {homeSegment === HOME_SEGMENT_YOUR_PICKS && (
             <>
-              {moreForYouStrip.length > 0 && (
+              {(moreForYouStrip.length > 0 || yourPicksLoading) && (
                 <div className="section">
                   <div className="section-header">
                     <div className="section-title">🔥 For you</div>
@@ -3542,34 +3574,38 @@ export default function App() {
                         : "Popular — rate for personal picks"}
                     </div>
                   </div>
-                  <div className="strip">
-                    {moreForYouStrip.map((row) => (
-                      <div
-                        className="strip-card"
-                        key={row.rec.movie.id}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
-                        onClick={() => openDetail(row.rec.movie, row.rec)}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
-                      >
-                        <div className="strip-poster">
-                          {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
-                          <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                            {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
+                  {moreForYouStrip.length > 0 ? (
+                    <div className="strip">
+                      {moreForYouStrip.map((row) => (
+                        <div
+                          className="strip-card"
+                          key={row.rec.movie.id}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
+                          onClick={() => openDetail(row.rec.movie, row.rec)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
+                        >
+                          <div className="strip-poster">
+                            {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
+                            <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
+                              {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
+                            </div>
+                          </div>
+                          <div className="strip-title">{row.rec.movie.title}</div>
+                          <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
+                          <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
+                            {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
                           </div>
                         </div>
-                        <div className="strip-title">{row.rec.movie.title}</div>
-                        <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                        <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
-                          {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <SkeletonStrip showKind />
+                  )}
                 </div>
               )}
-              {worthLookStrip.length > 0 && (
+              {(worthLookStrip.length > 0 || yourPicksLoading) && (
                 <div className="section">
                   <div className="section-header">
                     <div className="section-title">✨ Worth a Look</div>
@@ -3579,49 +3615,43 @@ export default function App() {
                         : "Strong predictions — beyond the first strip"}
                     </div>
                   </div>
-                  <div className="strip">
-                    {worthLookStrip.map((row) => (
-                      <div
-                        className="strip-card"
-                        key={row.rec.movie.id}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
-                        onClick={() => openDetail(row.rec.movie, row.rec)}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
-                      >
-                        <div className="strip-poster">
-                          {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
-                          <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                            {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
+                  {worthLookStrip.length > 0 ? (
+                    <div className="strip">
+                      {worthLookStrip.map((row) => (
+                        <div
+                          className="strip-card"
+                          key={row.rec.movie.id}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
+                          onClick={() => openDetail(row.rec.movie, row.rec)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
+                        >
+                          <div className="strip-poster">
+                            {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
+                            <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
+                              {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
+                            </div>
+                          </div>
+                          <div className="strip-title">{row.rec.movie.title}</div>
+                          <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
+                          <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
+                            {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
                           </div>
                         </div>
-                        <div className="strip-title">{row.rec.movie.title}</div>
-                        <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                        <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
-                          {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {moreForYouStrip.length === 0 && worthLookStrip.length === 0 && (
-                <div className="section">
-                  {matchLoading || moreStripsLoading ? (
-                    <div className="empty-box">
-                      <div className="empty-text">
-                        {moreStripsLoading
-                          ? "Checking where titles stream for your picks…"
-                          : "Loading recommendations…"}
-                      </div>
+                      ))}
                     </div>
                   ) : (
-                    <div className="no-recs">
-                      <div className="no-recs-text">Rate more titles to unlock recommendations<br />and discovery picks.</div>
-                      <button className="btn-confirm" style={{ marginTop: 16, width: "100%" }} onClick={startDefaultRateMore}>Rate More Titles</button>
-                    </div>
+                    <SkeletonStrip showKind />
                   )}
+                </div>
+              )}
+              {moreForYouStrip.length === 0 && worthLookStrip.length === 0 && !yourPicksLoading && (
+                <div className="section">
+                  <div className="no-recs">
+                    <div className="no-recs-text">Rate more titles to unlock recommendations<br />and discovery picks.</div>
+                    <button className="btn-confirm" style={{ marginTop: 16, width: "100%" }} onClick={startDefaultRateMore}>Rate More Titles</button>
+                  </div>
                 </div>
               )}
             </>
