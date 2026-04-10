@@ -2648,6 +2648,29 @@ export default function App() {
     }
   }
 
+  function exitRateMoreFlow() {
+    const contextMovieId = rateMoreContextMovieId;
+    setRateMoreMovies([]);
+    setRateMoreContextMovieId(null);
+    setRateSimilarError("");
+    if (contextMovieId) {
+      const contextMovie = catalogue.find((m) => m.id === contextMovieId) || selectedMovie?.movie;
+      if (contextMovie) {
+        setDetailEditRating(false);
+        setDetailTouched(false);
+        setDetailRating(7);
+        setSelected((prev) => {
+          if (prev?.movie?.id === contextMovieId) return prev;
+          return { movie: contextMovie, prediction: recMap[contextMovieId] || null };
+        });
+        setScreen("detail");
+        return;
+      }
+    }
+    setNavTab("home");
+    setScreen("home");
+  }
+
   function advanceOb() {
     setSliderVal(7); setSliderTouched(false);
     if (obStep < rateMoreQueue.length - 1) {
@@ -2655,10 +2678,7 @@ export default function App() {
     } else {
       void markOnboardingComplete();
       if (screen === "rate-more") {
-        setRateMoreMovies([]);
-        setRateMoreContextMovieId(null);
-        setNavTab("home");
-        setScreen("home");
+        exitRateMoreFlow();
       }
       else { setScreen("loading-recs"); setTimeout(() => { setNavTab("home"); setScreen("home"); }, 2200); }
     }
@@ -3656,7 +3676,7 @@ export default function App() {
               <button className="btn-confirm" onClick={() => { confirmRating(); setSliderVal(7); setSliderTouched(false); }} disabled={!sliderTouched}>Confirm Rating</button>
               <button className="btn-skip" onClick={() => advanceOb()}>Skip</button>
             </div>
-            <button className="btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={() => { void markOnboardingComplete(); setRateMoreMovies([]); setRateMoreContextMovieId(null); setNavTab("home"); setScreen("home"); }}>Done for now</button>
+            <button className="btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={() => { void markOnboardingComplete(); exitRateMoreFlow(); }}>Done for now</button>
           </div>
         </div>
       )}

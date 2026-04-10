@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.23
+
+- **Rate now return path:** After using **Rate now** from a title’s detail prediction card, completing or exiting the rating flow now returns users to that same detail page (context-preserving) instead of redirecting to Your picks. Generic “Rate More Titles” entry points keep returning home.
+
 ## 1.2.22
 
 - **Confidence follow-up action:** Detail cards with **low/medium confidence** now show **“Rate more titles to improve”** plus a **Rate now** CTA. Tapping it opens a focused rating flow titled **“Rate Similar titles.”**
