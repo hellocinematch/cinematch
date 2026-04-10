@@ -74,6 +74,11 @@ const DISCOVER_ALL_CAP_MOVIES = 40;
 const DISCOVER_ALL_CAP_TV = 40;
 const DISCOVER_SINGLE_TYPE_CAP = 40;
 
+/** More tab: CF picks on selected streaming apps vs strong CF picks not on those apps. */
+const MORE_TAB_ON_SERVICE_MAX = 9;
+const MORE_TAB_OFF_SERVICE_MAX = 20;
+const MORE_TAB_OFF_SERVICE_PRED_MIN = 6.5;
+
 function getRegionLanguageCodes(regionKeys) {
   if (!Array.isArray(regionKeys) || regionKeys.length === 0) return [];
   return [...new Set(
@@ -286,14 +291,13 @@ async function fetchInTheaters(regionKeys = []) {
 }
 
 /**
- * Subscription streaming (US TMDB). Phase 1: digital-release movies only (fast).
- * @param {number[]|null|undefined} providerIds - reserved; provider filters not applied in this path.
+ * Home Picks — subscription-style streaming (US TMDB). Not filtered by user-selected providers (faster, stable).
+ * Phase 1: digital-release movies only (fast).
  */
-async function fetchStreamingMoviesOnly(providerIds, regionKeys) {
+async function fetchStreamingMoviesOnly(regionKeys) {
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
     const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
-    void providerIds;
     const digitalStart = dateDaysAgo(90);
     const digitalEnd = dateDaysAgo(46);
     const moviePathBase = `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&with_release_type=4&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}${langQuery}`;
@@ -306,12 +310,11 @@ async function fetchStreamingMoviesOnly(providerIds, regionKeys) {
   }
 }
 
-/** Phase 2: TV discover + trending + per-show /tv/{id} details (slower). */
-async function fetchStreamingTVOnly(providerIds, regionKeys) {
+/** Phase 2: TV discover + trending + per-show /tv/{id} details (slower). Not provider-filtered. */
+async function fetchStreamingTVOnly(regionKeys) {
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
     const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
-    void providerIds;
     const tvNewSeriesStart = dateDaysAgo(180);
     const excludedTrendingGenres = new Set([10767, 10763]); // Talk + News
     const tvNewSeriesBase = `/discover/tv?language=en-US&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${langQuery}`;
@@ -1653,17 +1656,16 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user, showRegionKeys]);
 
-  /** Home streaming strip: phase 1 = movies (fast), phase 2 = TV + detail calls (slower). */
+  /** Home streaming strip: phase 1 = movies (fast), phase 2 = TV + detail calls (slower). Ignores profile streaming provider selection (see More tab). */
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       setStreamingMoviesReady(false);
       setStreamingTvReady(false);
-      const ids = selectedStreamingProviderIds.length > 0 ? selectedStreamingProviderIds : null;
       let sm = [];
       try {
-        sm = await fetchStreamingMoviesOnly(ids, showRegionKeys);
+        sm = await fetchStreamingMoviesOnly(showRegionKeys);
       } catch (e) {
         console.error(e);
       }
@@ -1679,7 +1681,7 @@ export default function App() {
 
       let st = [];
       try {
-        st = await fetchStreamingTVOnly(ids, showRegionKeys);
+        st = await fetchStreamingTVOnly(showRegionKeys);
       } catch (e) {
         console.error(e);
       }
@@ -1694,7 +1696,7 @@ export default function App() {
       });
     })();
     return () => { cancelled = true; };
-  }, [user, selectedStreamingProviderIds, showRegionKeys]);
+  }, [user, showRegionKeys]);
 
   const catalogueForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return catalogue;
@@ -2221,37 +2223,15 @@ export default function App() {
 
   const worthALookRecs = matchData?.worthALookRecs ?? [];
 
-  const morePicks = useMemo(() => {
-    const recs = recommendations;
-    if (recs.length === 0) return [];
-    const n = recs.length;
-    const start = topPickOffset % n;
-    const out = [];
-    for (let i = 0; i < Math.min(9, n); i++) out.push(recs[(start + i) % n]);
-    return out;
-  }, [recommendations, topPickOffset]);
-
-  /** Unrated catalogue titles sorted by TMDB popularity (for two-strip More tab when CF/match is thin). */
+  /** Unrated catalogue titles sorted by TMDB popularity (More tab fallback when CF is empty). */
   const unratedPopularRecs = useMemo(() => {
     const seen = new Set(Object.keys(userRatings));
     const byPop = (a, b) => (b.popularity || 0) - (a.popularity || 0);
     return catalogueForRecs.filter(m => !seen.has(m.id)).sort(byPop).map(m => tmdbOnlyRec(m));
   }, [userRatings, catalogueForRecs]);
 
-  /** Strip 1: personalised rotation when we have CF recs; otherwise first popularity chunk (same heading as before). */
-  const moreForYouStrip = useMemo(() => {
-    if (morePicks.length > 0) return morePicks;
-    return unratedPopularRecs.slice(0, 9);
-  }, [morePicks, unratedPopularRecs]);
-
-  const moreForYouIds = useMemo(() => new Set(moreForYouStrip.map(r => r.movie.id)), [moreForYouStrip]);
-
-  /** Worth-a-look base pool: server picks first, fallback to unrated popular titles, both excluding strip-1 overlap. */
-  const worthLookCandidates = useMemo(() => {
-    const fromServer = worthALookRecs.filter(r => !moreForYouIds.has(r.movie.id));
-    if (fromServer.length > 0) return fromServer.slice(0, 30);
-    return unratedPopularRecs.filter(r => !moreForYouIds.has(r.movie.id)).slice(0, 30);
-  }, [worthALookRecs, unratedPopularRecs, moreForYouIds]);
+  /** Strip 1: CF picks on selected streaming apps; strip 2: strong CF picks not on those apps. */
+  const [moreForYouStrip, setMoreForYouStrip] = useState([]);
   const [worthLookStrip, setWorthLookStrip] = useState([]);
 
   useEffect(() => {
@@ -2266,34 +2246,64 @@ export default function App() {
       worthProviderCacheRef.current.set(key, ids);
       return ids;
     };
-    const rebuildWorthLookStrip = async () => {
-      if (worthLookCandidates.length === 0) {
-        if (!cancelled) setWorthLookStrip([]);
+
+    const rebuildMoreTabStrips = async () => {
+      if (recommendations.length === 0) {
+        if (!cancelled) {
+          setMoreForYouStrip(unratedPopularRecs.slice(0, MORE_TAB_ON_SERVICE_MAX));
+          setWorthLookStrip([]);
+        }
         return;
       }
+
+      const sorted = [...recommendations].sort((a, b) => b.predicted - a.predicted);
+      const n = sorted.length;
+      const start = topPickOffset % n;
+      const rotated = [...sorted.slice(start), ...sorted.slice(0, start)];
+
       if (selectedStreamingProviderIds.length === 0) {
-        // Default length for this strip is 20 cards when no provider-priority split is needed.
-        if (!cancelled) setWorthLookStrip(worthLookCandidates.slice(0, 20));
+        const strip1 = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
+        const strip1Ids = new Set(strip1.map((r) => r.movie.id));
+        const strip2 = sorted
+          .filter((r) => !strip1Ids.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
+          .slice(0, MORE_TAB_OFF_SERVICE_MAX);
+        if (!cancelled) {
+          setMoreForYouStrip(strip1);
+          setWorthLookStrip(strip2);
+        }
         return;
       }
-      // Prioritize titles not currently included in selected subscriptions, then fill remaining slots.
-      const classified = await Promise.all(
-        worthLookCandidates.map(async (rec) => {
-          const providerIds = await getFlatrateProviderIds(rec.movie);
-          const hasSelectedProvider = providerIds.some((id) => selectedStreamingProviderIds.includes(id));
-          return { rec, outsideSelectedProviders: !hasSelectedProvider };
-        }),
-      );
-      const prioritized = [
-        ...classified.filter((x) => x.outsideSelectedProviders).map((x) => x.rec),
-        ...classified.filter((x) => !x.outsideSelectedProviders).map((x) => x.rec),
-      ];
-      // Keep a stable strip size after prioritization.
-      if (!cancelled) setWorthLookStrip(prioritized.slice(0, 20));
+
+      let strip1 = [];
+      for (const rec of rotated) {
+        if (strip1.length >= MORE_TAB_ON_SERVICE_MAX) break;
+        const ids = await getFlatrateProviderIds(rec.movie);
+        if (cancelled) return;
+        if (ids.some((id) => selectedStreamingProviderIds.includes(id))) strip1.push(rec);
+      }
+      if (strip1.length === 0 && sorted.length > 0) {
+        strip1 = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
+      }
+      if (!cancelled) setMoreForYouStrip(strip1);
+      if (cancelled) return;
+
+      const strip1Ids = new Set(strip1.map((r) => r.movie.id));
+      const strip2 = [];
+      for (const rec of sorted) {
+        if (strip2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
+        if (strip1Ids.has(rec.movie.id)) continue;
+        if (rec.predicted < MORE_TAB_OFF_SERVICE_PRED_MIN) continue;
+        const ids = await getFlatrateProviderIds(rec.movie);
+        if (cancelled) return;
+        const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
+        if (!on) strip2.push(rec);
+      }
+      if (!cancelled) setWorthLookStrip(strip2);
     };
-    void rebuildWorthLookStrip();
+
+    void rebuildMoreTabStrips();
     return () => { cancelled = true; };
-  }, [worthLookCandidates, selectedStreamingProviderIds]);
+  }, [recommendations, selectedStreamingProviderIds, topPickOffset, unratedPopularRecs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3166,7 +3176,7 @@ export default function App() {
                   <div className="top-picks-block">
                     <div className="section-header">
                       <div className="section-title">Streaming</div>
-                      <div className="section-meta">Subscription</div>
+                      <div className="section-meta">Broad picks (not your app list)</div>
                     </div>
                     <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
                       <button type="button" className={`filter-pill ${streamingTab === "movie" ? "active" : ""}`} onClick={() => setStreamingTab("movie")}>
@@ -3216,13 +3226,15 @@ export default function App() {
               {moreForYouStrip.length > 0 && (
                 <div className="section">
                   <div className="section-header">
-                    <div className="section-title">🔥 More For You</div>
+                    <div className="section-title">🔥 Your picks</div>
                     <div
                       className="section-meta"
-                      style={{ cursor: morePicks.length > 0 ? "pointer" : undefined }}
-                      onClick={() => morePicks.length > 0 && setTopPickOffset(p => p + 3)}
+                      style={{ cursor: recommendations.length > 0 ? "pointer" : undefined }}
+                      onClick={() => recommendations.length > 0 && setTopPickOffset(p => p + 3)}
                     >
-                      {morePicks.length > 0 ? "↻ Refresh" : "Popular — rate for personal picks"}
+                      {recommendations.length > 0
+                        ? "↻ Refresh"
+                        : "Popular — rate for personal picks"}
                     </div>
                   </div>
                   <div className="strip">
@@ -3246,7 +3258,9 @@ export default function App() {
                   <div className="section-header">
                     <div className="section-title">✨ Worth a Look</div>
                     <div className="section-meta">
-                      {worthALookRecs.length > 0 ? "Popular picks" : "More popular titles"}
+                      {selectedStreamingProviderIds.length > 0
+                        ? "Strong predictions — not on your selected services"
+                        : "Strong predictions — beyond the first strip"}
                     </div>
                   </div>
                   <div className="strip">

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.15
+
+- **Home streaming strip:** Fetches a **broad** US streaming pool (same TMDB paths as before). It does **not** use profile **streaming provider** selection and no longer **re-fetches** when those providers change — personalization by provider stays on **More → Your picks**. Home label updated to reflect this.
+
+## 1.2.14
+
+- **More tab:** First strip (**Your picks**) shows collaborative picks that stream on the user’s **selected** subscription providers (when set); falls back to top CF picks if none match. Second strip (**Worth a Look**) shows other **high-predicted** CF titles **not** on those providers (or beyond the first strip when no providers are selected). Cold start with no CF still uses popularity fallback for the first strip.
+
 ## 1.2.13
 
 - **Discover recency sort:** Sort Discover results by release year descending so newer titles appear first; entries without a year remain at the end.
