@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.13
+
+- **Discover recency sort:** Sort Discover results by release year descending so newer titles appear first; entries without a year remain at the end.
+- **Discover All breadth:** Keep the full two-page fetch on **All** (up to 40 movies + 40 TV) instead of trimming the blended list.
+
 ## 1.2.12
 
 - **Discover search depth:** Merge two TMDB search pages per medium (deduped by id) so titles ranked past the first ~10–20 can appear. **All** now shows up to **20 movies + 20 TV** (was 10+10). **Movies** / **TV Shows** show up to **40** from the merged pages. Failed TMDB responses show a clear message instead of looking like “no results.”
