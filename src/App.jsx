@@ -1086,10 +1086,19 @@ const styles = `
   .d-genre-text { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666; }
   .d-title { font-family:'DM Serif Display',serif; font-size:32px; color:#f0ebe0; line-height:1.1; margin-top:6px; }
   .d-pred-box { background:#141414; border:1px solid #222; border-radius:12px; padding:16px 20px; margin:18px 0; display:flex; justify-content:space-between; align-items:center; }
+  .d-pred-box-low { border-style:dashed; border-color:#6c5a2c; }
+  .d-pred-box-medium { border-style:solid; border-color:#7e6931; }
+  .d-pred-box-high { border-style:solid; border-color:#b18f36; }
   .d-pred-label { font-size:12px; color:#666; }
   .d-pred-sub { font-size:11px; color:#444; margin-top:3px; }
   .d-pred-val { font-family:'DM Serif Display',serif; font-size:38px; color:#e8c96a; line-height:1; text-align:right; }
+  .d-pred-val-low { color:#b89f5a; }
+  .d-pred-val-medium { color:#d8ba63; }
+  .d-pred-val-high { color:#f1cf70; }
   .d-pred-range { font-size:12px; color:#a89040; margin-top:2px; text-align:right; }
+  .d-pred-range-low { color:#b39b53; }
+  .d-pred-range-medium { color:#ad964d; }
+  .d-pred-range-high { color:#8e7b44; }
   .d-tmdb { font-size:11px; color:#555; margin-top:3px; text-align:right; }
   .d-synopsis { font-size:14px; color:#888; line-height:1.7; margin-bottom:22px; }
   .d-rate-label { font-size:13px; color:#aaa; margin-bottom:10px; }
@@ -2973,6 +2982,15 @@ export default function App() {
   const inWatchlist = (id) => watchlist.some(m => m.id === id);
   const confClass = (c) => c === "high" ? "conf-high" : c === "medium" ? "conf-medium" : "conf-low";
   const confLabel = (c) => c === "high" ? "✓✓ High confidence" : c === "medium" ? "✓ Medium confidence" : "~ Low confidence";
+  const predBoxClass = (c) => c === "high" ? "d-pred-box-high" : c === "medium" ? "d-pred-box-medium" : "d-pred-box-low";
+  const predValClass = (c) => c === "high" ? "d-pred-val-high" : c === "medium" ? "d-pred-val-medium" : "d-pred-val-low";
+  const predRangeClass = (c) => c === "high" ? "d-pred-range-high" : c === "medium" ? "d-pred-range-medium" : "d-pred-range-low";
+  const shouldShowPredRange = (pred) => {
+    if (!pred) return false;
+    if (pred.confidence !== "high") return true;
+    const width = Math.abs(Number(pred.high) - Number(pred.low));
+    return Number.isFinite(width) && width > 0.4;
+  };
   const obMovie = obMovies[obStep];
   const userInitial = user?.user_metadata?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "?";
   const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "there";
@@ -3924,15 +3942,19 @@ export default function App() {
                 </div>
                 <div className="d-title">{movie.title}</div>
                 {prediction && (
-                  <div className="d-pred-box">
+                  <div className={`d-pred-box ${predBoxClass(prediction.confidence)}`}>
                     <div>
                       <div className="d-pred-label">Predicted rating for you</div>
                       <div className="d-pred-sub">Based on your tastometer</div>
                       <span className={confClass(prediction.confidence)}>{confLabel(prediction.confidence)}</span>
                     </div>
                     <div>
-                      <div className="d-pred-val">{formatScore(prediction.predicted)}</div>
-                      <div className="d-pred-range">{formatScore(prediction.low)}–{formatScore(prediction.high)}</div>
+                      <div className={`d-pred-val ${predValClass(prediction.confidence)}`}>{formatScore(prediction.predicted)}</div>
+                      {shouldShowPredRange(prediction) && (
+                        <div className={`d-pred-range ${predRangeClass(prediction.confidence)}`}>
+                          {formatScore(prediction.low)}–{formatScore(prediction.high)}
+                        </div>
+                      )}
                       {movie.tmdbRating && <div className="d-tmdb">TMDB avg: {movie.tmdbRating}</div>}
                     </div>
                   </div>
