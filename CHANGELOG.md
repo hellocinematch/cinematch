@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+- **Secondary Region row (Now Playing):** **In Theaters** and **Streaming** top-level tabs; under Streaming, **Series** and **Movies** (same pattern as the primary Streaming block). Removed per-poster “In theaters” pills — the tab indicates context. Pagination (**Load more**) applies per active tab; catalogue still unions all fetched titles for ratings / detail.
+
 ## 1.3.1
 
 - **“In theaters” pill:** TMDB `now_playing` can still list older titles while metadata shows the original year (e.g. 2014). The pill now requires **plausibly current** release metadata (calendar year within two years of today, and full `release_date` not more than ~two years in the past). Applies to **What’s hot** and the **secondary Region** strip.

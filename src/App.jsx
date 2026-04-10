@@ -3,7 +3,7 @@ import packageJson from "../package.json";
 import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./legal.jsx";
 import { supabase } from "./supabase";
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md for release notes (v1.3.0 = secondary Region strip + DB column).
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.2 = secondary Region tabs In theaters / Streaming + Movies|Series).
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
@@ -516,34 +516,14 @@ function secondaryMarketTmdbRegion(regionKey) {
   return map[regionKey] || "US";
 }
 
-/** V1.3.0: Merge theaters first (by popularity), then streaming movies, then TV; dedupe; cap. */
-function mergeSecondaryStripCatalog(theaters, streamingMovies, streamingTv, maxTotal) {
-  const byPop = (a, b) => (Number(b?.popularity) || 0) - (Number(a?.popularity) || 0);
-  const tSorted = [...theaters].sort(byPop);
-  const mSorted = [...streamingMovies].sort(byPop);
-  const tvSorted = [...streamingTv].sort(byPop);
-  const out = [];
-  const seen = new Set();
-  for (const m of tSorted) {
-    if (out.length >= maxTotal) break;
-    if (seen.has(m.id)) continue;
-    seen.add(m.id);
-    out.push(m);
-  }
-  for (const m of mSorted) {
-    if (out.length >= maxTotal) break;
-    if (seen.has(m.id)) continue;
-    seen.add(m.id);
-    out.push(m);
-  }
-  for (const m of tvSorted) {
-    if (out.length >= maxTotal) break;
-    if (seen.has(m.id)) continue;
-    seen.add(m.id);
-    out.push(m);
-  }
-  return out;
+/** V1.3.2: Dedupe normalized catalogue rows by `id` (secondary block catalogue union). */
+function dedupeMediaRowsById(rows) {
+  return [...new Map((rows || []).map((m) => [m.id, m])).values()];
 }
+
+/** V1.3.2: Top-level tabs on the secondary Region home block. */
+const SECONDARY_BLOCK_THEATERS = "theaters";
+const SECONDARY_BLOCK_STREAMING = "streaming";
 
 /** V1.3.0: Now playing for a non-US TMDB region (mirrors primary US theatrical flow; limited window uses that region’s release rows). */
 async function fetchInTheatersForMarket(tmdbRegionIso, langCodes = []) {
@@ -1829,10 +1809,14 @@ export default function App() {
    * Persisted in `profiles.secondary_region_key`. Hollywood / US stays primary for main strips.
    */
   const [secondaryRegionKey, setSecondaryRegionKey] = useState(null);
-  /** V1.3.0: Normalized rows merged from secondary theaters + streaming (movies/TV), max {@link SECONDARY_STRIP_MAX}. */
-  const [secondaryStripRows, setSecondaryStripRows] = useState([]);
-  /** V1.3.0: `movie.id` set for “In theaters” pill on secondary strip cards. */
-  const [secondaryTheaterIds, setSecondaryTheaterIds] = useState(() => new Set());
+  /** V1.3.2: Secondary market — split pools (tabs); union goes to catalogue via {@link dedupeMediaRowsById}. */
+  const [secondaryTheaterRows, setSecondaryTheaterRows] = useState([]);
+  const [secondaryStreamingMovieRows, setSecondaryStreamingMovieRows] = useState([]);
+  const [secondaryStreamingTvRows, setSecondaryStreamingTvRows] = useState([]);
+  /** V1.3.2: “In theaters” | “Streaming” on the Region block (below primary Streaming). */
+  const [secondaryBlockSegment, setSecondaryBlockSegment] = useState(SECONDARY_BLOCK_THEATERS);
+  /** V1.3.2: Under Streaming: “Movies” | “Series” (same pattern as primary Streaming strip). */
+  const [secondaryBlockStreamingTab, setSecondaryBlockStreamingTab] = useState("tv");
   const [secondaryStripReady, setSecondaryStripReady] = useState(true);
   /** V1.3.0: Visible window for horizontal strip; grows via “Load more” up to {@link SECONDARY_STRIP_MAX}. */
   const [secondaryStripVisibleCount, setSecondaryStripVisibleCount] = useState(SECONDARY_STRIP_PAGE);
@@ -2115,11 +2099,14 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user]);
 
-  /** V1.3.0: Fetch secondary-market theaters + streaming (parallel), merge into strip + catalogue. */
+  /** V1.3.0: Fetch secondary-market theaters + streaming (parallel); V1.3.2: keep pools separate for tabs. */
   useEffect(() => {
     if (!user || !secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
-      setSecondaryStripRows([]);
-      setSecondaryTheaterIds(new Set());
+      setSecondaryTheaterRows([]);
+      setSecondaryStreamingMovieRows([]);
+      setSecondaryStreamingTvRows([]);
+      setSecondaryBlockSegment(SECONDARY_BLOCK_THEATERS);
+      setSecondaryBlockStreamingTab("tv");
       setSecondaryStripReady(true);
       return;
     }
@@ -2136,13 +2123,13 @@ export default function App() {
         fetchStreamingTVForMarket(tmdbReg, langQuery),
       ]);
       if (cancelled) return;
-      const merged = mergeSecondaryStripCatalog(theaters, sm, st, SECONDARY_STRIP_MAX);
-      const tIds = new Set(theaters.map((m) => m.id));
-      setSecondaryStripRows(merged);
-      setSecondaryTheaterIds(tIds);
+      const mergedCatalog = dedupeMediaRowsById([...theaters, ...sm, ...st]);
+      setSecondaryTheaterRows(theaters);
+      setSecondaryStreamingMovieRows(sm);
+      setSecondaryStreamingTvRows(st);
       setCatalogue((prev) => {
         const seen = new Set(prev.map((m) => m.id));
-        const added = merged.filter((m) => !seen.has(m.id));
+        const added = mergedCatalog.filter((m) => !seen.has(m.id));
         if (added.length === 0) return prev;
         return [...prev, ...added];
       });
@@ -2150,6 +2137,11 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, [user, secondaryRegionKey]);
+
+  /** V1.3.2: Reset pagination when switching Region-block tabs. */
+  useEffect(() => {
+    setSecondaryStripVisibleCount(SECONDARY_STRIP_PAGE);
+  }, [secondaryBlockSegment, secondaryBlockStreamingTab, secondaryRegionKey]);
 
   const catalogueForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return catalogue;
@@ -2187,16 +2179,26 @@ export default function App() {
     [inTheatersForRecs],
   );
 
-  /** V1.3.0: Secondary strip predictions for catalogue titles (full merged list, up to cap). */
-  const secondaryStripRecsAll = useMemo(
-    () => secondaryStripRows.map((m) => tmdbOnlyRec(m)),
-    [secondaryStripRows],
+  /** V1.3.2: All secondary-market titles (for recMap, TV meta, cold-start CTA). */
+  const secondaryStripCatalogRows = useMemo(
+    () => dedupeMediaRowsById([...secondaryTheaterRows, ...secondaryStreamingMovieRows, ...secondaryStreamingTvRows]),
+    [secondaryTheaterRows, secondaryStreamingMovieRows, secondaryStreamingTvRows],
   );
-  /** V1.3.0: Slice shown in UI; grows with “Load more”. */
+  const secondaryStripRecsAll = useMemo(
+    () => secondaryStripCatalogRows.map((m) => tmdbOnlyRec(m)),
+    [secondaryStripCatalogRows],
+  );
+  /** V1.3.2: Raw rows for the active In theaters / Streaming → Movies|Series tab. */
+  const secondaryActiveRawRows = useMemo(() => {
+    if (secondaryBlockSegment === SECONDARY_BLOCK_THEATERS) return secondaryTheaterRows;
+    return secondaryBlockStreamingTab === "movie" ? secondaryStreamingMovieRows : secondaryStreamingTvRows;
+  }, [secondaryBlockSegment, secondaryBlockStreamingTab, secondaryTheaterRows, secondaryStreamingMovieRows, secondaryStreamingTvRows]);
+  /** V1.3.2: Slice shown in UI; grows with “Load more”. */
   const secondaryStripRecsVisible = useMemo(() => {
-    const n = Math.min(secondaryStripVisibleCount, SECONDARY_STRIP_MAX, secondaryStripRecsAll.length);
-    return secondaryStripRecsAll.slice(0, n);
-  }, [secondaryStripRecsAll, secondaryStripVisibleCount]);
+    const src = secondaryActiveRawRows;
+    const n = Math.min(secondaryStripVisibleCount, SECONDARY_STRIP_MAX, src.length);
+    return src.slice(0, n).map((m) => tmdbOnlyRec(m));
+  }, [secondaryActiveRawRows, secondaryStripVisibleCount]);
 
   /** Collaborative filtering runs in Edge Function `match` (neighbour ratings loaded server-side; not in the client bundle). */
   useEffect(() => {
@@ -2554,8 +2556,11 @@ export default function App() {
     setShowGenreIds([]);
     setShowRegionKeys([]);
     setSecondaryRegionKey(null);
-    setSecondaryStripRows([]);
-    setSecondaryTheaterIds(new Set());
+    setSecondaryTheaterRows([]);
+    setSecondaryStreamingMovieRows([]);
+    setSecondaryStreamingTvRows([]);
+    setSecondaryBlockSegment(SECONDARY_BLOCK_THEATERS);
+    setSecondaryBlockStreamingTab("tv");
     setSecondaryStripVisibleCount(SECONDARY_STRIP_PAGE);
     setStreamingMovies([]);
     setStreamingTV([]);
@@ -4029,11 +4034,51 @@ export default function App() {
                         <div className="section-title">{V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region"}</div>
                         <div className="section-meta">Theaters &amp; streaming</div>
                       </div>
+                      <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
+                        <button
+                          type="button"
+                          className={`filter-pill ${secondaryBlockSegment === SECONDARY_BLOCK_THEATERS ? "active" : ""}`}
+                          onClick={() => setSecondaryBlockSegment(SECONDARY_BLOCK_THEATERS)}
+                        >
+                          In Theaters
+                        </button>
+                        <button
+                          type="button"
+                          className={`filter-pill ${secondaryBlockSegment === SECONDARY_BLOCK_STREAMING ? "active" : ""}`}
+                          onClick={() => setSecondaryBlockSegment(SECONDARY_BLOCK_STREAMING)}
+                        >
+                          Streaming
+                        </button>
+                      </div>
+                      {secondaryBlockSegment === SECONDARY_BLOCK_STREAMING && (
+                        <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
+                          <button
+                            type="button"
+                            className={`filter-pill ${secondaryBlockStreamingTab === "tv" ? "active" : ""}`}
+                            onClick={() => setSecondaryBlockStreamingTab("tv")}
+                          >
+                            Series
+                          </button>
+                          <button
+                            type="button"
+                            className={`filter-pill ${secondaryBlockStreamingTab === "movie" ? "active" : ""}`}
+                            onClick={() => setSecondaryBlockStreamingTab("movie")}
+                          >
+                            Movies
+                          </button>
+                        </div>
+                      )}
                       {!secondaryStripReady ? (
                         <SkeletonStrip />
-                      ) : secondaryStripRecsVisible.length === 0 ? (
+                      ) : secondaryActiveRawRows.length === 0 ? (
                         <div className="empty-box">
-                          <div className="empty-text">Nothing in this market right now</div>
+                          <div className="empty-text">
+                            {secondaryBlockSegment === SECONDARY_BLOCK_THEATERS
+                              ? "No theatrical releases in this market right now"
+                              : secondaryBlockStreamingTab === "movie"
+                                ? "No streaming movies in this market right now"
+                                : "No streaming series in this market right now"}
+                          </div>
                         </div>
                       ) : (
                         <>
@@ -4042,9 +4087,6 @@ export default function App() {
                               <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                                 <div className="strip-poster">
                                   {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                                  {secondaryTheaterIds.has(rec.movie.id) && qualifiesForTheatricalPillMovie(rec.movie) && (
-                                    <div className="strip-hot-theater-pill">In theaters</div>
-                                  )}
                                   <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
                                     {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
                                   </div>
@@ -4055,7 +4097,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          {secondaryStripRecsAll.length > secondaryStripRecsVisible.length &&
+                          {secondaryActiveRawRows.length > secondaryStripRecsVisible.length &&
                             secondaryStripVisibleCount < SECONDARY_STRIP_MAX && (
                             <button
                               type="button"
@@ -4063,7 +4105,7 @@ export default function App() {
                               style={{ marginTop: 12, width: "100%" }}
                               onClick={() =>
                                 setSecondaryStripVisibleCount((c) =>
-                                  Math.min(c + SECONDARY_STRIP_PAGE, SECONDARY_STRIP_MAX, secondaryStripRecsAll.length),
+                                  Math.min(c + SECONDARY_STRIP_PAGE, SECONDARY_STRIP_MAX, secondaryActiveRawRows.length),
                                 )
                               }
                             >
@@ -4602,7 +4644,7 @@ export default function App() {
               {/* V1.3.0: Optional second home-market strip (Now Playing); primary flow stays US / Hollywood. */}
               <div className="profile-settings-label" style={{ marginTop: 20 }}>Home — second region (optional)</div>
               <p className="settings-providers-hint">
-                Adds one extra row on Now Playing: theaters + streaming for that market. Hollywood stays primary above. “None” hides the strip.
+                Adds a Region block on Now Playing with <strong>In Theaters</strong> / <strong>Streaming</strong> tabs; under Streaming, <strong>Series</strong> and <strong>Movies</strong>. Primary US strips stay above. “None” hides the block.
               </p>
               <div className="settings-provider-grid">
                 <button
