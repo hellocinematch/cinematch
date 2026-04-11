@@ -12,7 +12,14 @@ const MIN_NEIGHBOR_OVERLAP = 1;
 const MIN_NEIGHBORS = 1;
 const MIN_MOVIE_RATINGS = 1;
 
-/** v1 caps: keep edge CPU + DB reads bounded. Tune as data grows. */
+/**
+ * v1 caps: keep edge CPU + DB reads bounded.
+ *
+ * Suggestion (only if CF still feels thin after catalogue + client work): raise one or more of
+ * MAX_SEED_TITLE_KEYS, MAX_CANDIDATES_FROM_OVERLAP, MAX_NEIGHBORS_FULL_FETCH, MAX_ROWS_FULL_RATINGS
+ * for richer neighbor overlap and fuller neighbor rating maps — at the cost of slower invocations and
+ * more Supabase rows. Does not fix titles missing from the client `catalogue` payload.
+ */
 const MAX_SEED_TITLE_KEYS = 100;
 const MAX_TMDB_IDS_PER_CHUNK = 120;
 const MAX_ROWS_OVERLAP_PER_CHUNK = 6000;
@@ -221,8 +228,9 @@ function computeWorthALook(
     .sort(byPop);
   const pool =
     unrated.length >= 6 ? unrated : catalogue.filter((m) => !moreIds.has(m.id)).sort(byPop);
-  // Keep a larger server buffer so client-side strip de-dupe/filtering can still render a full row.
-  return pool.slice(0, 30).map((m) => buildRecWithPrediction(m, neighbors));
+  /** Buffer for client strips after de-dupe / streaming filters (was 30). */
+  const WORTH_A_LOOK_SERVER_CAP = 48;
+  return pool.slice(0, WORTH_A_LOOK_SERVER_CAP).map((m) => buildRecWithPrediction(m, neighbors));
 }
 
 function runFullMatch(

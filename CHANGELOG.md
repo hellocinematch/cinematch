@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.8
+
+- **Your picks — For you / Worth a Look:** Strips stay populated from the same **`match`** scored pools when strict CF **`recommendations`** is empty: merged **worth-a-look + theater + streaming** predictions, **`topUpYourPicksStrips`** so a strip is not left empty when data exists, and a **Refresh** control whenever any strip source exists. Cards show **predicted range** (low–high) and a short **confidence** line.
+- **Edge `match`:** **`worthALookRecs`** catalogue buffer increased (**30 → 48**) for client de-dupe / filters. Comments document optional tuning of **neighbor / overlap fetch caps** if results are still insufficient (tradeoff: DB + latency).
+
 ## 1.3.7
 
 - **iPhone / slow networks:** Initial catalogue bootstrap uses **2 TMDB calls** (movie + TV **popular** only) so **sign-in and first route** unblock sooner; **top_rated** lists load **in the background** and merge into `catalogue` / `obCatalogue`.
