@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.10 = Your picks: fill For you row when streaming filter is sparse).
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.11 = Your picks: stable strip pool, no flash-shrink).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -69,6 +69,9 @@ async function fetchTmdbSearchPages(mediaType, query, pageCount) {
   const rows = dedupeTmdbSearchRows(pages.flatMap((p) => p?.results || []));
   return { ok: true, rows };
 }
+
+/** Avoid `?? []` on match payloads — a new array every render retriggers memos/effects and can flash strips. */
+const EMPTY_MATCH_RECS = [];
 
 /** Discover: how many TMDB search pages to merge (broader tail than website #2 ≠ API #2). */
 const DISCOVER_SEARCH_PAGES = 2;
@@ -2881,7 +2884,7 @@ export default function App() {
     return mixed.slice(0, ONBOARDING_COUNT);
   }, [obCatalogue, otherCinema]);
 
-  const recommendations = matchData?.recommendations ?? [];
+  const recommendations = matchData?.recommendations ?? EMPTY_MATCH_RECS;
 
   const theaterRecs = useMemo(() => {
     const fromMatch = matchData?.theaterRecs;
@@ -2924,7 +2927,7 @@ export default function App() {
     [theaterRecs.length, streamingMovies, streamingTV, streamingMoviesReady, streamingTvReady],
   );
 
-  const worthALookRecs = matchData?.worthALookRecs ?? [];
+  const worthALookRecs = matchData?.worthALookRecs ?? EMPTY_MATCH_RECS;
 
   /**
    * Unrated titles with Edge predictions when strict CF `recommendations` is empty (worth-a-look + home rows).
@@ -2947,12 +2950,23 @@ export default function App() {
     return [...byId.values()].sort((a, b) => b.predicted - a.predicted);
   }, [userRatings, worthALookRecs, theaterRecs, streamingMovieRecsResolved, streamingTvRecsResolved]);
 
-  /** Strip source: primary CF list when present, else scored catalogue / shelf rows from `match`. */
+  /**
+   * Scored rows for Your picks strips: **CF recommendations first**, then worth-a-look / theater / streaming extras
+   * (deduped). Otherwise a short CF list replaces a fuller pre-match pool and strips **flash then shrink**.
+   */
   const yourPicksStripSorted = useMemo(() => {
-    if (recommendations.length > 0) {
-      return [...recommendations].sort((a, b) => b.predicted - a.predicted);
+    const primary =
+      recommendations.length > 0
+        ? [...recommendations].sort((a, b) => b.predicted - a.predicted)
+        : [];
+    const seen = new Set(primary.map((r) => r.movie.id));
+    const out = [...primary];
+    for (const r of mergedFallbackPool) {
+      if (!r?.movie?.id || seen.has(r.movie.id)) continue;
+      seen.add(r.movie.id);
+      out.push(r);
     }
-    return mergedFallbackPool;
+    return out;
   }, [recommendations, mergedFallbackPool]);
 
   const hasYourPicksStripSource = yourPicksStripSorted.length > 0;
@@ -3095,7 +3109,6 @@ export default function App() {
       setMoreStripsLoading(false);
     };
   }, [
-    recommendations,
     yourPicksStripSorted,
     selectedStreamingProviderIds,
     topPickOffset,

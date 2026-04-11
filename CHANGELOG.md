@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.11
+
+- **Your picks:** **Strip source** is now CF **`recommendations` first**, then **worth-a-look + theater + streaming** predictions **deduped**, so a small CF list no longer **replaces** a larger pre-match pool (fixes **full row for a moment then only a couple of cards**). **`match`** optional arrays use a **stable empty reference** (`EMPTY_MATCH_RECS`) so memos/effects are not retriggered every render when data is missing.
+
 ## 1.3.10
 
 - **Your picks:** With **streaming providers** selected, **For you** first keeps titles on those services, then **pads to the row cap** with the next-best predictions from the same scored list (so the strip is not stuck at 1–2 cards when few catalogue titles match the provider filter). **`topUpYourPicksStrips`** now grows **partial** strips toward caps, not only empty ones.
