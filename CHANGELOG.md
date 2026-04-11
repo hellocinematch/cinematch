@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.7
+
+- **iPhone / slow networks:** Initial catalogue bootstrap uses **2 TMDB calls** (movie + TV **popular** only) so **sign-in and first route** unblock sooner; **top_rated** lists load **in the background** and merge into `catalogue` / `obCatalogue`.
+- **Fonts:** Google Fonts load from **`index.html`** with **preconnect** (removed `@import` from the giant inline style block) so text styling can start earlier and the main thread does less work during hydration.
+- **Code splitting:** Legal pages (**Privacy / Terms / About**) are **`React.lazy`**-loaded; **`AppFooter`** lives in **`src/appFooter.jsx`** so the lazy chunk is not pulled into the main bundle.
+- **Home streaming strip:** Fetch starts after a **short defer** (with **ready** flags cleared immediately so skeletons show) so the first TMDB wave isn’t competing with catalogue bootstrap on cellular.
+
 ## 1.3.6
 
 - **Post-login / cold load:** First catalogue bootstrap is tracked explicitly (`catalogueBootstrapDone`) with a **~22s safety timer** so users are **not stuck** on **“Loading Cinemastro…”** if TMDB never returns. Returning users can reach **Home** even when the catalogue array is still empty after a failed fetch; new users on **pref-primary** see **try again** instead of an endless “Loading catalogue…”.

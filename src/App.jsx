@@ -1,12 +1,14 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 import packageJson from "../package.json";
-import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./legal.jsx";
+import { AppFooter } from "./appFooter.jsx";
 import { supabase } from "./supabase";
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.6 = post-login not blocked on TMDB; bootstrap safety timeout).
-const APP_VERSION = packageJson.version;
+const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
+const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
+const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.7 = iPhone load: fonts in HTML, split TMDB bootstrap, lazy legal).
+const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -124,6 +126,8 @@ const CATALOGUE_BOOTSTRAP_SAFETY_MS = 22_000;
 /** Defer non-critical home fetches so first paint / post-login routing wins on slow mobile networks. */
 const WHATS_HOT_FETCH_DEFER_MS = 450;
 const SECONDARY_STRIP_FETCH_DEFER_MS = 550;
+/** Primary home streaming strip: defer so TMDB catalogue + theaters win the first bytes on cellular. */
+const STREAMING_HOME_FETCH_DEFER_MS = 200;
 
 function getRegionLanguageCodes(regionKeys) {
   if (!Array.isArray(regionKeys) || regionKeys.length === 0) return [];
@@ -665,14 +669,8 @@ async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery) {
   }
 }
 
-async function fetchCatalogue() {
-  const [popMovies, topMovies, popTV, topTV] = await Promise.all([
-    fetchTMDB("/movie/popular?language=en-US&page=1"),
-    fetchTMDB("/movie/top_rated?language=en-US&page=1"),
-    fetchTMDB("/tv/popular?language=en-US&page=1"),
-    fetchTMDB("/tv/top_rated?language=en-US&page=1"),
-  ]);
-  const normalize = (item, type) => ({
+function normalizeCatalogueItem(item, type) {
+  return {
     id: `${type}-${item.id}`, tmdbId: item.id, type,
     title: item.title || item.name,
     year: (item.release_date || item.first_air_date || "").slice(0, 4),
@@ -690,14 +688,18 @@ async function fetchCatalogue() {
       : Array.isArray(item.production_countries)
         ? item.production_countries.map(c => c?.iso_3166_1).filter(c => typeof c === "string").map(c => c.toUpperCase())
         : [],
-  });
+  };
+}
+
+/** Build interleaved catalogue from any subset of TMDB list responses (missing lists treated as empty). */
+function catalogueFromTmdbPages(popMovies, topMovies, popTV, topTV) {
   const movies = [
-    ...filterDefaultExcludedGenres(popMovies.results || []).map(m => normalize(m, "movie")),
-    ...filterDefaultExcludedGenres(topMovies.results || []).map(m => normalize(m, "movie")),
+    ...filterDefaultExcludedGenres(popMovies?.results || []).map(m => normalizeCatalogueItem(m, "movie")),
+    ...filterDefaultExcludedGenres(topMovies?.results || []).map(m => normalizeCatalogueItem(m, "movie")),
   ];
   const shows = [
-    ...filterDefaultExcludedGenres(popTV.results || []).map(m => normalize(m, "tv")),
-    ...filterDefaultExcludedGenres(topTV.results || []).map(m => normalize(m, "tv")),
+    ...filterDefaultExcludedGenres(popTV?.results || []).map(m => normalizeCatalogueItem(m, "tv")),
+    ...filterDefaultExcludedGenres(topTV?.results || []).map(m => normalizeCatalogueItem(m, "tv")),
   ];
   const unique = (arr) => [...new Map(arr.map(m => [m.id, m])).values()].slice(0, 40);
   const allMovies = unique(movies), allShows = unique(shows);
@@ -708,6 +710,46 @@ async function fetchCatalogue() {
     if (allShows[i]) combined.push(allShows[i]);
   }
   return combined;
+}
+
+function mergeUniqueCatalogueRows(base, extras) {
+  const seen = new Set(base.map((m) => m.id));
+  const out = [...base];
+  for (const m of extras) {
+    if (!m?.id || seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+  return out;
+}
+
+/** Fast path: 2 TMDB calls (popular only) — unblocks bootstrap on slow mobile networks. */
+async function fetchCataloguePhasePopular() {
+  const [popMovies, popTV] = await Promise.all([
+    fetchTMDB("/movie/popular?language=en-US&page=1"),
+    fetchTMDB("/tv/popular?language=en-US&page=1"),
+  ]);
+  return catalogueFromTmdbPages(popMovies, null, popTV, null);
+}
+
+/** Background enrichment: top_rated lists (2 more TMDB calls). */
+async function fetchCataloguePhaseTopRated() {
+  const [topMovies, topTV] = await Promise.all([
+    fetchTMDB("/movie/top_rated?language=en-US&page=1"),
+    fetchTMDB("/tv/top_rated?language=en-US&page=1"),
+  ]);
+  return catalogueFromTmdbPages(null, topMovies, null, topTV);
+}
+
+/** One-shot full catalogue (e.g. manual retry). */
+async function fetchCatalogue() {
+  const [popMovies, topMovies, popTV, topTV] = await Promise.all([
+    fetchTMDB("/movie/popular?language=en-US&page=1"),
+    fetchTMDB("/movie/top_rated?language=en-US&page=1"),
+    fetchTMDB("/tv/popular?language=en-US&page=1"),
+    fetchTMDB("/tv/top_rated?language=en-US&page=1"),
+  ]);
+  return catalogueFromTmdbPages(popMovies, topMovies, popTV, topTV);
 }
 
 // Fetch regional titles for onboarding
@@ -1001,7 +1043,6 @@ function passwordRecoveryRedirectTo() {
 // Styles
 // ---------------------------------------------------------------------------
 const styles = `
-  ${FONTS}
   * { box-sizing: border-box; margin: 0; padding: 0; }
   /* iOS focus hardening: keep Safari from inflating text/zooming inputs on focus. */
   html, body { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
@@ -1748,6 +1789,15 @@ function TopbarBrandCluster({ onPress, community, ratings }) {
   );
 }
 
+function LegalLazyFallback() {
+  return (
+    <div className="loading" style={{ height: "100%", minHeight: "100dvh" }}>
+      <div className="loading-ring" />
+      <div className="loading-sub" style={{ marginTop: 12 }}>Loading…</div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
@@ -2003,7 +2053,7 @@ export default function App() {
     }, CATALOGUE_BOOTSTRAP_SAFETY_MS);
     (async () => {
       try {
-        const [data, theaters] = await Promise.all([fetchCatalogue(), fetchInTheaters([])]);
+        const [data, theaters] = await Promise.all([fetchCataloguePhasePopular(), fetchInTheaters([])]);
         if (cancelled) return;
         const seen = new Set(data.map(m => m.id));
         const addedTheaters = theaters.filter(m => !seen.has(m.id));
@@ -2011,6 +2061,16 @@ export default function App() {
         setCatalogue(merged);
         setObCatalogue(data);
         setInTheaters(theaters);
+        void (async () => {
+          try {
+            const enrich = await fetchCataloguePhaseTopRated();
+            if (cancelled || enrich.length === 0) return;
+            setCatalogue((prev) => mergeUniqueCatalogueRows(prev, enrich));
+            setObCatalogue((prev) => mergeUniqueCatalogueRows(prev, enrich));
+          } catch (e) {
+            console.error(e);
+          }
+        })();
       } catch (e) {
         console.error(e);
       } finally {
@@ -2053,42 +2113,47 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    (async () => {
-      setStreamingMoviesReady(false);
-      setStreamingTvReady(false);
-      let sm = [];
-      try {
-        sm = await fetchStreamingMoviesOnly(showRegionKeys);
-      } catch (e) {
-        console.error(e);
-      }
-      if (cancelled) return;
-      setStreamingMovies(sm);
-      setStreamingMoviesReady(true);
-      setCatalogue((prev) => {
-        const seen = new Set(prev.map((m) => m.id));
-        const added = sm.filter((m) => !seen.has(m.id));
-        if (added.length === 0) return prev;
-        return [...prev, ...added];
-      });
+    setStreamingMoviesReady(false);
+    setStreamingTvReady(false);
+    const defer = setTimeout(() => {
+      (async () => {
+        let sm = [];
+        try {
+          sm = await fetchStreamingMoviesOnly(showRegionKeys);
+        } catch (e) {
+          console.error(e);
+        }
+        if (cancelled) return;
+        setStreamingMovies(sm);
+        setStreamingMoviesReady(true);
+        setCatalogue((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const added = sm.filter((m) => !seen.has(m.id));
+          if (added.length === 0) return prev;
+          return [...prev, ...added];
+        });
 
-      let st = [];
-      try {
-        st = await fetchStreamingTVOnly(showRegionKeys);
-      } catch (e) {
-        console.error(e);
-      }
-      if (cancelled) return;
-      setStreamingTV(st);
-      setStreamingTvReady(true);
-      setCatalogue((prev) => {
-        const seen = new Set(prev.map((m) => m.id));
-        const added = st.filter((m) => !seen.has(m.id));
-        if (added.length === 0) return prev;
-        return [...prev, ...added];
-      });
-    })();
-    return () => { cancelled = true; };
+        let st = [];
+        try {
+          st = await fetchStreamingTVOnly(showRegionKeys);
+        } catch (e) {
+          console.error(e);
+        }
+        if (cancelled) return;
+        setStreamingTV(st);
+        setStreamingTvReady(true);
+        setCatalogue((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const added = st.filter((m) => !seen.has(m.id));
+          if (added.length === 0) return prev;
+          return [...prev, ...added];
+        });
+      })();
+    }, STREAMING_HOME_FETCH_DEFER_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(defer);
+    };
   }, [user, showRegionKeys]);
 
   useEffect(() => {
@@ -4781,9 +4846,21 @@ export default function App() {
         </div>
       )}
 
-      {screen === "privacy" && <LegalPagePrivacy onBack={closeLegalPage} />}
-      {screen === "terms" && <LegalPageTerms onBack={closeLegalPage} />}
-      {screen === "about" && <LegalPageAbout onBack={closeLegalPage} />}
+      {screen === "privacy" && (
+        <Suspense fallback={<LegalLazyFallback />}>
+          <LegalPagePrivacy onBack={closeLegalPage} />
+        </Suspense>
+      )}
+      {screen === "terms" && (
+        <Suspense fallback={<LegalLazyFallback />}>
+          <LegalPageTerms onBack={closeLegalPage} />
+        </Suspense>
+      )}
+      {screen === "about" && (
+        <Suspense fallback={<LegalLazyFallback />}>
+          <LegalPageAbout onBack={closeLegalPage} />
+        </Suspense>
+      )}
 
       {/* DETAIL */}
         {screen === "detail" && selectedMovie && (() => {
