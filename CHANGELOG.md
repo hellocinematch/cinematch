@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.10
+
+- **Your picks:** With **streaming providers** selected, **For you** first keeps titles on those services, then **pads to the row cap** with the next-best predictions from the same scored list (so the strip is not stuck at 1–2 cards when few catalogue titles match the provider filter). **`topUpYourPicksStrips`** now grows **partial** strips toward caps, not only empty ones.
+
 ## 1.3.9
 
 - **Build:** `topUpYourPicksStrips` reassigned `strip1Recs` / `strip2` after `const` declarations; switched to **`let`** so **`npm run build`** (Vite / Rolldown) succeeds on Vercel.

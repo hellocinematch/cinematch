@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.9 = build fix: let strip vars for top-up destructure).
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.10 = Your picks: fill For you row when streaming filter is sparse).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -100,27 +100,23 @@ function fillWorthLookStripFromPool(strip1Ids, strip2, pool) {
   return out;
 }
 
-/** When filters or floors leave a strip empty, fill from the same scored pool (Edge `match` predictions). */
+/** Grow strips toward row caps from the scored pool (predictions only). Fills partial rows, not only empty strips. */
 function topUpYourPicksStrips(strip1, strip2, pool) {
   const used = new Set([...strip1, ...strip2].map((r) => r.movie.id));
   let out1 = [...strip1];
   let out2 = [...strip2];
-  if (out1.length === 0) {
-    for (const r of pool) {
-      if (out1.length >= MORE_TAB_ON_SERVICE_MAX) break;
-      if (!used.has(r.movie.id)) {
-        out1.push(r);
-        used.add(r.movie.id);
-      }
+  for (const r of pool) {
+    if (out1.length >= MORE_TAB_ON_SERVICE_MAX) break;
+    if (!used.has(r.movie.id)) {
+      out1.push(r);
+      used.add(r.movie.id);
     }
   }
-  if (out2.length === 0) {
-    for (const r of pool) {
-      if (out2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
-      if (!used.has(r.movie.id)) {
-        out2.push(r);
-        used.add(r.movie.id);
-      }
+  for (const r of pool) {
+    if (out2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
+    if (!used.has(r.movie.id)) {
+      out2.push(r);
+      used.add(r.movie.id);
     }
   }
   if (out2.length === 0 && out1.length > 1) {
@@ -3042,6 +3038,15 @@ export default function App() {
             if (cancelled) return;
             if (ids.some((id) => selectedStreamingProviderIds.includes(id))) strip1.push(rec);
           }
+        }
+
+        // On-service matches alone are often < row cap; append next-best predictions so "For you" still fills (may not stream on selected apps).
+        const strip1IdsForPad = new Set(strip1.map((r) => r.movie.id));
+        for (const rec of sorted) {
+          if (strip1.length >= MORE_TAB_ON_SERVICE_MAX) break;
+          if (strip1IdsForPad.has(rec.movie.id)) continue;
+          strip1.push(rec);
+          strip1IdsForPad.add(rec.movie.id);
         }
 
         if (cancelled) return;
