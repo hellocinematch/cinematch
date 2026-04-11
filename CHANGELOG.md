@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.9
+
+- **Build:** `topUpYourPicksStrips` reassigned `strip1Recs` / `strip2` after `const` declarations; switched to **`let`** so **`npm run build`** (Vite / Rolldown) succeeds on Vercel.
+
 ## 1.3.8
 
 - **Your picks — For you / Worth a Look:** Strips stay populated from the same **`match`** scored pools when strict CF **`recommendations`** is empty: merged **worth-a-look + theater + streaming** predictions, **`topUpYourPicksStrips`** so a strip is not left empty when data exists, and a **Refresh** control whenever any strip source exists. Cards show **predicted range** (low–high) and a short **confidence** line.

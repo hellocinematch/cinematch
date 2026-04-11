@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.8 = Your picks: non-empty strips, prediction range + confidence on cards, wider worth-a-look buffer).
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.9 = build fix: let strip vars for top-up destructure).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -2996,7 +2996,7 @@ export default function App() {
       const rotated = [...sorted.slice(start), ...sorted.slice(0, start)];
 
       if (selectedStreamingProviderIds.length === 0) {
-        const strip1Recs = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
+        let strip1Recs = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
         const strip1Ids = new Set(strip1Recs.map((r) => r.movie.id));
         let strip2Recs = sorted
           .filter((r) => !strip1Ids.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
@@ -3047,7 +3047,7 @@ export default function App() {
         if (cancelled) return;
 
         const strip1Ids = new Set(strip1.map((r) => r.movie.id));
-        const strip2 = [];
+        let strip2 = [];
         for (const rec of sorted) {
           if (strip2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
           if (strip1Ids.has(rec.movie.id)) continue;
