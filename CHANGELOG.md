@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.6
+
+- **Post-login / cold load:** First catalogue bootstrap is tracked explicitly (`catalogueBootstrapDone`) with a **~22s safety timer** so users are **not stuck** on **“Loading Cinemastro…”** if TMDB never returns. Returning users can reach **Home** even when the catalogue array is still empty after a failed fetch; new users on **pref-primary** see **try again** instead of an endless “Loading catalogue…”.
+- **Loading screen:** After **10s** on the post-login loading screen, a short **slow-network** hint is shown.
+- **Mobile-friendly sequencing:** **What’s hot** and **secondary Region** TMDB fetches start after a **brief defer** so sign-in routing and first paint are less likely to compete with that work on slow devices.
+
 ## 1.3.5
 
 - **Auth (Sign in / Sign up / Forgot password / Update password):** If a Supabase auth call **throws** (e.g. flaky network on mobile Safari), the primary button no longer stays stuck on **“Please wait…”** — loading state is cleared in **`finally`**, and a short error message is shown when the request fails unexpectedly.

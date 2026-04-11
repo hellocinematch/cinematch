@@ -3,7 +3,7 @@ import packageJson from "../package.json";
 import { AppFooter, LegalPagePrivacy, LegalPageTerms, LegalPageAbout } from "./legal.jsx";
 import { supabase } from "./supabase";
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.5 = auth loading always clears; catch network throws).
+// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.6 = post-login not blocked on TMDB; bootstrap safety timeout).
 const APP_VERSION = packageJson.version;
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');`;
@@ -118,6 +118,12 @@ function appendPopularRows(rows, unratedPopular, cap, extraUsedIds = null) {
 const HOME_SEGMENT_NOW_PLAYING = "nowPlaying";
 const HOME_SEGMENT_YOUR_PICKS = "yourPicks";
 const HOME_SEGMENT_FRIENDS = "friends";
+
+/** First TMDB catalogue fetch: post-login routing waits for this (or safety timeout), not for catalogue.length > 0. */
+const CATALOGUE_BOOTSTRAP_SAFETY_MS = 22_000;
+/** Defer non-critical home fetches so first paint / post-login routing wins on slow mobile networks. */
+const WHATS_HOT_FETCH_DEFER_MS = 450;
+const SECONDARY_STRIP_FETCH_DEFER_MS = 550;
 
 function getRegionLanguageCodes(regionKeys) {
   if (!Array.isArray(regionKeys) || regionKeys.length === 0) return [];
@@ -1757,6 +1763,10 @@ export default function App() {
   const [authNotice, setAuthNotice] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [catalogue, setCatalogue] = useState([]);
+  /** After first bootstrap attempt finishes or safety timeout — avoids infinite "Loading Cinemastro…" when TMDB hangs. */
+  const [catalogueBootstrapDone, setCatalogueBootstrapDone] = useState(false);
+  const [catalogueRetryBusy, setCatalogueRetryBusy] = useState(false);
+  const [loadingCatalogueSlowHint, setLoadingCatalogueSlowHint] = useState(false);
   const [matchData, setMatchData] = useState(null);
   /** True while a `match` invoke is in flight (after debounce). Avoids “rate more” empty state during load. */
   const [matchLoading, setMatchLoading] = useState(false);
@@ -1988,6 +1998,9 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    const safety = setTimeout(() => {
+      if (!cancelled) setCatalogueBootstrapDone(true);
+    }, CATALOGUE_BOOTSTRAP_SAFETY_MS);
     (async () => {
       try {
         const [data, theaters] = await Promise.all([fetchCatalogue(), fetchInTheaters([])]);
@@ -2000,9 +2013,15 @@ export default function App() {
         setInTheaters(theaters);
       } catch (e) {
         console.error(e);
+      } finally {
+        clearTimeout(safety);
+        if (!cancelled) setCatalogueBootstrapDone(true);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(safety);
+    };
   }, []);
 
   /**
@@ -2080,19 +2099,24 @@ export default function App() {
     }
     let cancelled = false;
     setWhatsHotReady(false);
-    (async () => {
-      const rows = await fetchWhatsHotCatalog();
-      if (cancelled) return;
-      setWhatsHot(rows);
-      setCatalogue((prev) => {
-        const seen = new Set(prev.map((m) => m.id));
-        const added = rows.filter((m) => !seen.has(m.id));
-        if (added.length === 0) return prev;
-        return [...prev, ...added];
-      });
-      setWhatsHotReady(true);
-    })();
-    return () => { cancelled = true; };
+    const defer = setTimeout(() => {
+      (async () => {
+        const rows = await fetchWhatsHotCatalog();
+        if (cancelled) return;
+        setWhatsHot(rows);
+        setCatalogue((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const added = rows.filter((m) => !seen.has(m.id));
+          if (added.length === 0) return prev;
+          return [...prev, ...added];
+        });
+        setWhatsHotReady(true);
+      })();
+    }, WHATS_HOT_FETCH_DEFER_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(defer);
+    };
   }, [user]);
 
   /** V1.3.0: Fetch secondary-market theaters + streaming (parallel); V1.3.2: keep pools separate for tabs. */
@@ -2108,29 +2132,34 @@ export default function App() {
     }
     let cancelled = false;
     setSecondaryStripReady(false);
-    (async () => {
-      const tmdbReg = secondaryMarketTmdbRegion(secondaryRegionKey);
-      const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
-      const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
-      const [theaters, sm, st] = await Promise.all([
-        fetchInTheatersForMarket(tmdbReg, langCodes),
-        fetchStreamingMoviesForMarket(tmdbReg, langQuery),
-        fetchStreamingTVForMarket(tmdbReg, langQuery),
-      ]);
-      if (cancelled) return;
-      const mergedCatalog = dedupeMediaRowsById([...theaters, ...sm, ...st]);
-      setSecondaryTheaterRows(theaters);
-      setSecondaryStreamingMovieRows(sm);
-      setSecondaryStreamingTvRows(st);
-      setCatalogue((prev) => {
-        const seen = new Set(prev.map((m) => m.id));
-        const added = mergedCatalog.filter((m) => !seen.has(m.id));
-        if (added.length === 0) return prev;
-        return [...prev, ...added];
-      });
-      setSecondaryStripReady(true);
-    })();
-    return () => { cancelled = true; };
+    const defer = setTimeout(() => {
+      (async () => {
+        const tmdbReg = secondaryMarketTmdbRegion(secondaryRegionKey);
+        const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
+        const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+        const [theaters, sm, st] = await Promise.all([
+          fetchInTheatersForMarket(tmdbReg, langCodes),
+          fetchStreamingMoviesForMarket(tmdbReg, langQuery),
+          fetchStreamingTVForMarket(tmdbReg, langQuery),
+        ]);
+        if (cancelled) return;
+        const mergedCatalog = dedupeMediaRowsById([...theaters, ...sm, ...st]);
+        setSecondaryTheaterRows(theaters);
+        setSecondaryStreamingMovieRows(sm);
+        setSecondaryStreamingTvRows(st);
+        setCatalogue((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const added = mergedCatalog.filter((m) => !seen.has(m.id));
+          if (added.length === 0) return prev;
+          return [...prev, ...added];
+        });
+        setSecondaryStripReady(true);
+      })();
+    }, SECONDARY_STRIP_FETCH_DEFER_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(defer);
+    };
   }, [user, secondaryRegionKey]);
 
   const inTheatersForRecs = useMemo(() => {
@@ -2252,7 +2281,7 @@ export default function App() {
   }, [user, userRatings, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, topPickOffset]);
 
   useEffect(() => {
-    if (screen !== "loading-catalogue" || catalogue.length === 0 || !user) return;
+    if (screen !== "loading-catalogue" || !user || !catalogueBootstrapDone) return;
     let cancelled = false;
     (async () => {
       try {
@@ -2283,7 +2312,16 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [screen, catalogue, user]);
+  }, [screen, catalogue, user, catalogueBootstrapDone]);
+
+  useEffect(() => {
+    if (screen !== "loading-catalogue") {
+      setLoadingCatalogueSlowHint(false);
+      return;
+    }
+    const t = setTimeout(() => setLoadingCatalogueSlowHint(true), 10_000);
+    return () => clearTimeout(t);
+  }, [screen]);
 
   /** Re-merge watchlist when catalogue grows (streaming, search) so posters resolve from full movie rows. */
   useEffect(() => {
@@ -2610,6 +2648,23 @@ export default function App() {
     setStreamingTvReady(true);
     setCinemaPreference(null); setOtherCinema(null);
     setScreen("splash"); setNavTab("home");
+  }
+
+  async function retryInitialCatalogueFetch() {
+    setCatalogueRetryBusy(true);
+    try {
+      const [data, theaters] = await Promise.all([fetchCatalogue(), fetchInTheaters([])]);
+      const seen = new Set(data.map(m => m.id));
+      const addedTheaters = theaters.filter(m => !seen.has(m.id));
+      const merged = [...data, ...addedTheaters];
+      setCatalogue(merged);
+      setObCatalogue(data);
+      setInTheaters(theaters);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCatalogueRetryBusy(false);
+    }
   }
 
   // Handle cinema preference confirmation
@@ -3790,7 +3845,24 @@ export default function App() {
             </div>
           </div>
           {catalogue.length === 0 && (
-            <p className="pref-sub" style={{ marginTop: 16, color: "#888" }}>Loading catalogue…</p>
+            <p className="pref-sub" style={{ marginTop: 16, color: "#888" }}>
+              {catalogueBootstrapDone
+                ? (
+                  <>
+                    Couldn’t load titles. Check your connection, then{" "}
+                    <button
+                      type="button"
+                      className="auth-link-btn"
+                      disabled={catalogueRetryBusy}
+                      onClick={() => void retryInitialCatalogueFetch()}
+                    >
+                      {catalogueRetryBusy ? "Retrying…" : "try again"}
+                    </button>
+                    .
+                  </>
+                )
+                : "Loading catalogue…"}
+            </p>
           )}
           <button className="pref-btn" disabled={!cinemaPreference || catalogue.length === 0} onClick={confirmPrimaryPreference}>
             Continue →
@@ -3826,6 +3898,11 @@ export default function App() {
           <div className="loading-ring" />
           <div className="loading-title">Loading Cinemastro…</div>
           <div className="loading-sub">Fetching your profile</div>
+          {loadingCatalogueSlowHint && (
+            <div className="loading-sub" style={{ marginTop: 14, maxWidth: 280, textAlign: "center", lineHeight: 1.45 }}>
+              This is taking longer than usual — often a slow network. It should continue automatically; you can also close and reopen the app.
+            </div>
+          )}
         </div>
       )}
 
