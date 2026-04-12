@@ -130,8 +130,12 @@ function topUpYourPicksStrips(strip1, strip2, pool) {
   return [out1, out2];
 }
 
-function toPickRows(recs) {
-  return recs.map((r) => ({ rec: r, kind: "pick" }));
+/** ✨ Pick = CF `recommendations` from match; 📈 Popular = worth-a-look / theater / streaming / top-up pool. */
+function toYourPicksStripRows(recs, cfRecommendationIdSet) {
+  return recs.map((r) => ({
+    rec: r,
+    kind: r?.movie?.id && cfRecommendationIdSet.has(r.movie.id) ? "pick" : "popular",
+  }));
 }
 
 /** Home secondary nav: internal ids align with tab labels (Now Playing / Your picks / Friends). */
@@ -2991,6 +2995,9 @@ export default function App() {
     };
 
     const rebuildMoreTabStrips = async () => {
+      const cfRecommendationIdSet = new Set(
+        recommendations.map((r) => r.movie.id).filter(Boolean),
+      );
       const sorted = yourPicksStripSorted;
       if (sorted.length === 0) {
         if (!cancelled) {
@@ -3013,8 +3020,8 @@ export default function App() {
           .slice(0, MORE_TAB_OFF_SERVICE_MAX);
         strip2Recs = fillWorthLookStripFromPool(strip1Ids, strip2Recs, worthALookRecs);
         ;[strip1Recs, strip2Recs] = topUpYourPicksStrips(strip1Recs, strip2Recs, sorted);
-        const strip1Rows = toPickRows(strip1Recs);
-        const strip2Rows = toPickRows(strip2Recs);
+        const strip1Rows = toYourPicksStripRows(strip1Recs, cfRecommendationIdSet);
+        const strip2Rows = toYourPicksStripRows(strip2Recs, cfRecommendationIdSet);
         if (!cancelled) {
           setMoreStripsLoading(false);
           setMoreForYouStrip(strip1Rows);
@@ -3091,8 +3098,8 @@ export default function App() {
         }
 
         ;[strip1, strip2] = topUpYourPicksStrips(strip1, strip2, sorted);
-        const strip1Rows = strip1.map((r) => ({ rec: r, kind: "pick" }));
-        const strip2Rows = strip2.map((r) => ({ rec: r, kind: "pick" }));
+        const strip1Rows = toYourPicksStripRows(strip1, cfRecommendationIdSet);
+        const strip2Rows = toYourPicksStripRows(strip2, cfRecommendationIdSet);
 
         if (!cancelled) {
           setMoreForYouStrip(strip1Rows);
@@ -3110,6 +3117,7 @@ export default function App() {
     };
   }, [
     yourPicksStripSorted,
+    recommendations,
     selectedStreamingProviderIds,
     topPickOffset,
     theaterRecs,

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.0
+
+- **Your picks (For you / Worth a Look):** Row badges distinguish **✨ Pick** (titles in **`match` `recommendations`** — collaborative picks) from **📈 Popular** (worth-a-look / theater / streaming / pad pool scored rows not in that CF list).
+
 ## 1.3.11
 
 - **Your picks:** **Strip source** is now CF **`recommendations` first**, then **worth-a-look + theater + streaming** predictions **deduped**, so a small CF list no longer **replaces** a larger pre-match pool (fixes **full row for a moment then only a couple of cards**). **`match`** optional arrays use a **stable empty reference** (`EMPTY_MATCH_RECS`) so memos/effects are not retriggered every render when data is missing.
