@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0
+
+- **Navigation / Safari:** Title **detail** and **legal** overlays now use **distinct URLs** (`?detail=movie-769`, `?legal=privacy`, etc.) on `history.pushState` so **iOS edge swipe** and **Mac trackpad back** can pop the overlay reliably (same-URL `pushState` worked with toolbar ← but not gestures). **Go home** and in-app back when no stack entry use **`replaceState`** to strip those query keys. **Cold loads** with `?detail=` or `?legal=` open the right screen once the user reaches a main surface (home / discover / profile / rated / mood results) and the title resolves from catalogue + strips.
+
 ## 2.0.8
 
 - **Your picks / Worth a Look:** When **streaming providers** are selected in Profile, **Worth a Look** (strip 2) no longer receives titles that **are** on those services. The earlier TMDB flatrate pass was correct, but **top-up** and **rebalance** filled strip 2 from the scored pool **without** re-checking providers; rebalance could also move an **on-service** title from **For you** into strip 2. Strip 2 growth now uses **`topUpYourPicksStripsRespectingStreaming`** (provider-aware top-up + off-service-only rebalance).

@@ -229,6 +229,35 @@ function toYourPicksStripRows(recs, cfRecommendationIdSet) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// SPA URL overlays (v2.1.0)
+// ---------------------------------------------------------------------------
+// `history.pushState` with an unchanged URL works with Safari’s toolbar ← back,
+// but iOS edge-swipe and Mac trackpad “back” often need a distinct URL per step.
+// We use short query keys; `popstate` still drives closing detail/legal.
+const SPA_QS_DETAIL = "detail";
+const SPA_QS_LEGAL = "legal";
+const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about"]);
+/** Only hydrate `?detail=` / `?legal=` after primary nav is up — avoids racing splash/auth/onboarding. */
+const SPA_DEEPLINK_READY_SCREENS = new Set(["home", "discover", "profile", "rated", "mood-results"]);
+
+/** One overlay at a time: title id (`movie-769`) or legal screen id (`privacy`). */
+function spaUrlForOverlay(overlay) {
+  const u = new URL(window.location.href);
+  u.searchParams.delete(SPA_QS_DETAIL);
+  u.searchParams.delete(SPA_QS_LEGAL);
+  if (overlay.detail) u.searchParams.set(SPA_QS_DETAIL, overlay.detail);
+  else if (overlay.legal) u.searchParams.set(SPA_QS_LEGAL, overlay.legal);
+  return `${u.pathname}${u.search}${u.hash}`;
+}
+
+function spaUrlWithoutOverlays() {
+  const u = new URL(window.location.href);
+  u.searchParams.delete(SPA_QS_DETAIL);
+  u.searchParams.delete(SPA_QS_LEGAL);
+  return `${u.pathname}${u.search}${u.hash}`;
+}
+
 /** Home secondary nav: internal ids align with tab labels (Now Playing / Your picks / Friends). */
 const HOME_SEGMENT_NOW_PLAYING = "nowPlaying";
 const HOME_SEGMENT_YOUR_PICKS = "yourPicks";
@@ -2006,6 +2035,9 @@ export default function App() {
   const detailHistoryPushedRef = useRef(false);
   const legalReturnScreenRef = useRef(null);
   const legalHistoryPushedRef = useRef(false);
+  /** True after we applied `?detail=` from the address bar (no extra pushState). */
+  const deepLinkDetailAppliedRef = useRef(false);
+  const deepLinkLegalAppliedRef = useRef(false);
   const screenRef = useRef(screen);
   const attemptedRatedHydrationRef = useRef(new Set());
   const worthProviderCacheRef = useRef(new Map());
@@ -2411,6 +2443,25 @@ export default function App() {
     }
     return extras.length === 0 ? baseFiltered : [...baseFiltered, ...extras];
   }, [catalogue, user, showGenreIds, showRegionKeys, secondaryRegionKey, secondaryStripCatalogRows]);
+
+  /** For `?detail=` deep links: resolve media id once catalogue / strips are hydrated. */
+  const movieLookupById = useMemo(() => {
+    const map = new Map();
+    const add = (rows) => {
+      for (const m of rows || []) {
+        if (m?.id) map.set(m.id, m);
+      }
+    };
+    add(catalogue);
+    add(watchlist);
+    add(catalogueForRecs);
+    add(inTheatersForRecs);
+    add(streamingMoviesForRecs);
+    add(streamingTVForRecs);
+    add(secondaryStripCatalogRows);
+    add(whatsHotForRecs);
+    return map;
+  }, [catalogue, watchlist, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, secondaryStripCatalogRows, whatsHotForRecs]);
 
   const secondaryStripRecsAll = useMemo(
     () => secondaryStripCatalogRows.map((m) => tmdbOnlyRec(m)),
@@ -3478,14 +3529,7 @@ export default function App() {
     if (contextMovieId) {
       const contextMovie = catalogue.find((m) => m.id === contextMovieId) || selectedMovie?.movie;
       if (contextMovie) {
-        setDetailEditRating(false);
-        setDetailTouched(false);
-        setDetailRating(7);
-        setSelected((prev) => {
-          if (prev?.movie?.id === contextMovieId) return prev;
-          return { movie: contextMovie, prediction: recMap[contextMovieId] || null };
-        });
-        setScreen("detail");
+        void openDetail(contextMovie, recMap[contextMovieId] || null);
         return;
       }
     }
@@ -3520,8 +3564,13 @@ export default function App() {
       } catch { /* optional prediction */ }
     }
     detailReturnScreenRef.current = screenRef.current;
-    history.pushState({ cinemastroDetail: true }, "", window.location.href);
-    detailHistoryPushedRef.current = true;
+    // Distinct URL per detail step so iOS edge-swipe / Mac trackpad back can popstate (v2.1.0).
+    if (opts.skipHistoryPush) {
+      detailHistoryPushedRef.current = false;
+    } else {
+      history.pushState({ cinemastroDetail: true }, "", spaUrlForOverlay({ detail: movie.id }));
+      detailHistoryPushedRef.current = true;
+    }
     setSelected({ movie, prediction: pred });
     if (opts.startEditing && userRatings[movie.id] != null) {
       setDetailEditRating(true);
@@ -3540,14 +3589,16 @@ export default function App() {
       history.back();
       return;
     }
+    history.replaceState(null, "", spaUrlWithoutOverlays());
     setDetailEditRating(false);
     setSelected(null);
     setScreen(navTab === "mood" ? "mood-results" : navTab);
   }
 
   function openLegalPage(target) {
+    if (!SPA_LEGAL_SCREENS.has(target)) return;
     legalReturnScreenRef.current = screenRef.current;
-    history.pushState({ cinemastroLegal: true }, "", window.location.href);
+    history.pushState({ cinemastroLegal: true }, "", spaUrlForOverlay({ legal: target }));
     legalHistoryPushedRef.current = true;
     setScreen(target);
   }
@@ -3557,6 +3608,7 @@ export default function App() {
       history.back();
       return;
     }
+    history.replaceState(null, "", spaUrlWithoutOverlays());
     const ret = legalReturnScreenRef.current;
     legalReturnScreenRef.current = null;
     setScreen(ret ?? "home");
@@ -3565,6 +3617,9 @@ export default function App() {
   function goHome() {
     const s = screenRef.current;
     if (s === "onboarding" || s === "rate-more") void markOnboardingComplete();
+    history.replaceState(null, "", spaUrlWithoutOverlays());
+    detailHistoryPushedRef.current = false;
+    legalHistoryPushedRef.current = false;
     setNavTab("home");
     setScreen("home");
     setSelected(null);
@@ -3600,6 +3655,32 @@ export default function App() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  /** Open detail from shared / bookmarked `?detail=movie-769` once we can resolve the row. */
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    const detailId = u.searchParams.get(SPA_QS_DETAIL);
+    if (!detailId || deepLinkDetailAppliedRef.current) return;
+    if (!SPA_DEEPLINK_READY_SCREENS.has(screen)) return;
+    const movie = movieLookupById.get(detailId);
+    if (!movie) return;
+    deepLinkDetailAppliedRef.current = true;
+    void openDetail(movie, null, { skipHistoryPush: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- openDetail omitted (hoisted); single apply gated by ref
+  }, [movieLookupById, screen]);
+
+  /** `?legal=privacy` etc. when not showing a detail link. */
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    if (u.searchParams.get(SPA_QS_DETAIL)) return;
+    const legal = u.searchParams.get(SPA_QS_LEGAL);
+    if (!legal || !SPA_LEGAL_SCREENS.has(legal) || deepLinkLegalAppliedRef.current) return;
+    if (!SPA_DEEPLINK_READY_SCREENS.has(screen)) return;
+    deepLinkLegalAppliedRef.current = true;
+    legalReturnScreenRef.current = "home";
+    legalHistoryPushedRef.current = false;
+    setScreen(legal);
+  }, [screen]);
 
   async function toggleWatchlist(movie) {
     const alreadySaved = watchlist.find(m => m.id === movie.id);
