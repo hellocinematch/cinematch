@@ -140,6 +140,12 @@ function mediaIdKey(movie) {
   return null;
 }
 
+/** Cinemastro personal prediction exists only when neighbours rated this title (`predict` / strip Rec with real overlap). */
+function hasPersonalPrediction(pred) {
+  if (!pred) return false;
+  return Number(pred.neighborCount ?? 0) >= 1;
+}
+
 /**
  * ✨ Pick = strict CF list only (`match` `recommendations` from `getRecommendations`).
  * 📈 Popular = worth-a-look / theater / streaming pool and client `tmdbOnlyRec` fallbacks (same strip, different source).
@@ -4974,7 +4980,7 @@ export default function App() {
                   {movie.year && <span className="d-genre-text">{movie.year}</span>}
                 </div>
                 <div className="d-title">{movie.title}</div>
-                {prediction && (
+                {hasPersonalPrediction(prediction) && (
                   <div className={`d-pred-box ${predBoxClass(prediction.confidence)}`}>
                     <div>
                       <div className="d-pred-label">Predicted rating for you</div>
@@ -5006,7 +5012,7 @@ export default function App() {
                     </div>
                   </div>
                 )}
-                {!prediction && (
+                {!hasPersonalPrediction(prediction) && (
                   <div>
                     {movie.tmdbRating && (
                       <div className="d-pred-box" style={{ marginBottom: 10 }}>
@@ -5033,7 +5039,7 @@ export default function App() {
                     <div className="rated-box" style={{ marginTop: 20 }}>
                       <div className="rated-score">{myRating}</div>
                       <div className="rated-label">Your rating saved ✓</div>
-                      {prediction && <div className="rated-pred">Predicted was {formatScore(prediction.predicted)} ({formatScore(prediction.low)}–{formatScore(prediction.high)})</div>}
+                      {hasPersonalPrediction(prediction) && <div className="rated-pred">Predicted was {formatScore(prediction.predicted)} ({formatScore(prediction.low)}–{formatScore(prediction.high)})</div>}
                       <button type="button" className="btn-full btn-full-dark" style={{ marginTop: 16, width: "100%" }}
                         onClick={() => { setDetailEditRating(true); setDetailRating(myRating); setDetailTouched(true); }}>
                         Change rating

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.5
+
+- **Title detail:** **Predicted rating for you** (numeric + range) only when **`neighborCount` ≥ 1** — i.e. a real neighbour-based score from `match`. If the only signal is the TMDB fallback (`neighborCount` 0), show **TMDB Average Rating** + **TBD** / **Rate more titles to unlock** instead of reusing TMDB as “predicted for you.”
+
 ## 2.0.4
 
 - **Your picks badges:** **✨ Pick** again uses only the strict **`match` `recommendations`** (CF neighbour list). Unioning worth-a-look / theater / streaming ids made **every** strip row a Pick.
