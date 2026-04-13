@@ -1294,18 +1294,28 @@ const styles = `
   .strip-poster img { width:100%; height:100%; object-fit:cover; }
   .strip-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:40px; }
   .strip-badge { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.82); padding:4px 8px; border-radius:10px; font-size:12px; color:#e8c96a; font-family:'DM Serif Display',serif; z-index:2; }
+  /* Your picks only: icon-only Pick ✨ vs Popular 📈; mirrors score badge contrast (lower-left vs lower-right). */
+  .strip-kind-icon {
+    position:absolute; bottom:6px; left:6px; z-index:2;
+    background:rgba(0,0,0,0.82); padding:3px 7px; border-radius:10px;
+    font-size:13px; line-height:1.2;
+    pointer-events:none;
+  }
+  .strip-kind-icon--pick { color:#c9a227; }
+  .strip-kind-icon--pop { color:#888; }
   .strip-hot-theater-pill { position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.78); color:#c9b87c; font-size:10px; font-weight:500; padding:3px 7px; border-radius:8px; z-index:2; font-family:'DM Sans',sans-serif; letter-spacing:0.02em; }
   .strip-title { font-size:14px; color:#ccc; margin-top:9px; line-height:1.35; }
   .strip-genre { font-size:11px; color:#555; margin-top:2px; }
-  .strip-row-kind { font-size:11px; margin-top:5px; letter-spacing:0.02em; }
-  .strip-row-kind--pick { color:#c9a227; }
-  .strip-row-kind--pop { color:#666; }
   .strip-card-skeleton { flex-shrink:0; width:152px; }
   .skel-poster { width:152px; height:212px; border-radius:12px; border:1px solid #1e1e1e; position:relative; overflow:hidden; background:#141414; }
+  /* Placeholder pill where Pick/Popular icon will appear (Your picks skeleton). */
+  .skel-kind-icon {
+    position:absolute; bottom:6px; left:6px; z-index:2;
+    width:30px; height:22px; border-radius:10px; background:#1f1f1f;
+  }
   .skel-line { height:11px; border-radius:6px; margin-top:8px; position:relative; overflow:hidden; background:#191919; }
   .skel-line-title { width:88%; margin-top:9px; }
   .skel-line-meta { width:62%; }
-  .skel-line-kind { width:46%; }
   .skel-poster::before, .skel-line::before {
     content:"";
     position:absolute;
@@ -3228,15 +3238,17 @@ export default function App() {
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
   const yourPicksLoading = matchLoading || moreStripsLoading;
 
+  /** Loading placeholders for horizontal strips; `showKind` adds lower-left pill (Your picks ✨/📈). */
   function SkeletonStrip({ count = 7, showKind = false }) {
     return (
       <div className="strip" aria-hidden="true">
         {Array.from({ length: count }).map((_, idx) => (
           <div className="strip-card-skeleton" key={`sk-${idx}`}>
-            <div className="skel-poster" />
+            <div className="skel-poster">
+              {showKind && <div className="skel-kind-icon" />}
+            </div>
             <div className="skel-line skel-line-title" />
             <div className="skel-line skel-line-meta" />
-            {showKind && <div className="skel-line skel-line-kind" />}
           </div>
         ))}
       </div>
@@ -4382,7 +4394,7 @@ export default function App() {
 
           {homeSegment === HOME_SEGMENT_YOUR_PICKS && (
             <>
-              {/* Your picks strips: badge = score or TMDB; Pick/Popular label — no range/confidence here (detail screen only). */}
+              {/* Your picks strips: score badge bottom-right; ✨/📈 icon-only pill bottom-left; no range/confidence (detail only). */}
               {(hasYourPicksStripSource || yourPicksLoading) && (
                 <div className="section">
                   <div className="section-header">
@@ -4411,15 +4423,19 @@ export default function App() {
                         >
                           <div className="strip-poster">
                             {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
+                            <span
+                              className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
+                              aria-hidden
+                              title={row.kind === "pick" ? "Personal pick" : "Popular pool"}
+                            >
+                              {row.kind === "pick" ? "✨" : "📈"}
+                            </span>
                             <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
                               {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
                             </div>
                           </div>
                           <div className="strip-title">{row.rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                          <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
-                            {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
-                          </div>
                         </div>
                       ))}
                     </div>
@@ -4452,15 +4468,19 @@ export default function App() {
                         >
                           <div className="strip-poster">
                             {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
+                            <span
+                              className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
+                              aria-hidden
+                              title={row.kind === "pick" ? "Personal pick" : "Popular pool"}
+                            >
+                              {row.kind === "pick" ? "✨" : "📈"}
+                            </span>
                             <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
                               {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
                             </div>
                           </div>
                           <div className="strip-title">{row.rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                          <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
-                            {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
-                          </div>
                         </div>
                       ))}
                     </div>

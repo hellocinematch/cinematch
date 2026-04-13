@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.7
+
+- **Your picks (For you / Worth a Look):** **Pick** vs **Popular** shown as **icon-only** pills (**✨** / **📈**) on the **lower-left** of the poster (same dark pill treatment as the score on the lower-right). Loading skeleton uses a small placeholder in that corner instead of a text line below the title.
+
 ## 2.0.6
 
 - **Home strips (Now Playing + Your picks):** Removed per-card **predicted low–high range** and **confidence** lines. The **poster badge** still shows the single score (or your rating); **range and confidence** remain on **title detail** only.
