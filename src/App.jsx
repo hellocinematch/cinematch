@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". See CHANGELOG.md (v1.3.11 = Your picks: stable strip pool, no flash-shrink).
+// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md.
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -1297,7 +1297,6 @@ const styles = `
   .strip-hot-theater-pill { position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.78); color:#c9b87c; font-size:10px; font-weight:500; padding:3px 7px; border-radius:8px; z-index:2; font-family:'DM Sans',sans-serif; letter-spacing:0.02em; }
   .strip-title { font-size:14px; color:#ccc; margin-top:9px; line-height:1.35; }
   .strip-genre { font-size:11px; color:#555; margin-top:2px; }
-  .strip-range { font-size:10px; color:#666; margin-top:1px; }
   .strip-row-kind { font-size:11px; margin-top:5px; letter-spacing:0.02em; }
   .strip-row-kind--pick { color:#c9a227; }
   .strip-row-kind--pop { color:#666; }
@@ -3854,7 +3853,6 @@ export default function App() {
   const inWatchlist = (id) => watchlist.some(m => m.id === id);
   const confClass = (c) => c === "high" ? "conf-high" : c === "medium" ? "conf-medium" : "conf-low";
   const confLabel = (c) => c === "high" ? "✓✓ High confidence" : c === "medium" ? "✓ Medium confidence" : "~ Low confidence";
-  const stripConfShort = (c) => (c === "high" ? "High confidence" : c === "medium" ? "Medium" : "Low confidence");
   const predBoxClass = (c) => c === "high" ? "d-pred-box-high" : c === "medium" ? "d-pred-box-medium" : "d-pred-box-low";
   const predValClass = (c) => c === "high" ? "d-pred-val-high" : c === "medium" ? "d-pred-val-medium" : "d-pred-val-low";
   const predRangeClass = (c) => c === "high" ? "d-pred-range-high" : c === "medium" ? "d-pred-range-medium" : "d-pred-range-low";
@@ -4201,6 +4199,7 @@ export default function App() {
                 </div>
               ) : (
                 <>
+                  {/* Horizontal strips: show predicted score on the poster badge only; range + confidence live on title detail. */}
                   <div className="top-picks-block">
                     <div className="section-header">
                       <div className="section-title">In Theaters</div>
@@ -4226,7 +4225,6 @@ export default function App() {
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
-                            <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
                           </div>
                         ))}
                       </div>
@@ -4258,7 +4256,6 @@ export default function App() {
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
-                            <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
                           </div>
                         ))}
                       </div>
@@ -4295,7 +4292,6 @@ export default function App() {
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
-                            <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
                           </div>
                         ))}
                       </div>
@@ -4366,7 +4362,6 @@ export default function App() {
                                 </div>
                                 <div className="strip-title">{rec.movie.title}</div>
                                 <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
-                                <div className="strip-range">{formatScore(rec.low)}–{formatScore(rec.high)}</div>
                               </div>
                             ))}
                           </div>
@@ -4387,6 +4382,7 @@ export default function App() {
 
           {homeSegment === HOME_SEGMENT_YOUR_PICKS && (
             <>
+              {/* Your picks strips: badge = score or TMDB; Pick/Popular label — no range/confidence here (detail screen only). */}
               {(hasYourPicksStripSource || yourPicksLoading) && (
                 <div className="section">
                   <div className="section-header">
@@ -4421,8 +4417,6 @@ export default function App() {
                           </div>
                           <div className="strip-title">{row.rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                          <div className="strip-range">{formatScore(row.rec.low)}–{formatScore(row.rec.high)}</div>
-                          <div className="strip-range" style={{ color: "#888" }}>{stripConfShort(row.rec.confidence)}</div>
                           <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
                             {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
                           </div>
@@ -4464,8 +4458,6 @@ export default function App() {
                           </div>
                           <div className="strip-title">{row.rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                          <div className="strip-range">{formatScore(row.rec.low)}–{formatScore(row.rec.high)}</div>
-                          <div className="strip-range" style={{ color: "#888" }}>{stripConfShort(row.rec.confidence)}</div>
                           <div className={`strip-row-kind ${row.kind === "pick" ? "strip-row-kind--pick" : "strip-row-kind--pop"}`}>
                             {row.kind === "pick" ? "✨ Pick" : "📈 Popular"}
                           </div>

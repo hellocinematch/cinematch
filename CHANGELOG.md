@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.6
+
+- **Home strips (Now Playing + Your picks):** Removed per-card **predicted low–high range** and **confidence** lines. The **poster badge** still shows the single score (or your rating); **range and confidence** remain on **title detail** only.
+
 ## 2.0.5
 
 - **Title detail:** **Predicted rating for you** (numeric + range) only when **`neighborCount` ≥ 1** — i.e. a real neighbour-based score from `match`. If the only signal is the TMDB fallback (`neighborCount` 0), show **TMDB Average Rating** + **TBD** / **Rate more titles to unlock** instead of reusing TMDB as “predicted for you.”
