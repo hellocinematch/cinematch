@@ -79,7 +79,13 @@ const DISCOVER_ALL_CAP_MOVIES = 40;
 const DISCOVER_ALL_CAP_TV = 40;
 const DISCOVER_SINGLE_TYPE_CAP = 40;
 
-/** More tab: CF picks on selected streaming apps vs strong CF picks not on those apps. */
+/**
+ * More tab “Your picks”: strip 1 **For you**, strip 2 **Worth a Look**.
+ * With **no** streaming filter: both strips are filled from the scored pool (prediction order).
+ * With **selected** providers: strip 1 favors titles on those TMDB **flatrate** ids; strip 2 must be
+ * **off** those services only. Strip-2 top-up/rebalance must stay provider-aware — see
+ * `topUpYourPicksStripsRespectingStreaming`.
+ */
 const MORE_TAB_ON_SERVICE_MAX = 15;
 const MORE_TAB_OFF_SERVICE_MAX = 20;
 /** Strip 2 floor; also used to backfill strip 1 from scored theater / streaming / worth-a-look rows. */
@@ -103,7 +109,10 @@ function fillWorthLookStripFromPool(strip1Ids, strip2, pool) {
   return out;
 }
 
-/** Grow strips toward row caps from the scored pool (predictions only). Fills partial rows, not only empty strips. */
+/**
+ * Grow strips toward row caps from the scored pool (predictions only). Fills partial rows, not only empty strips.
+ * Used when **no** streaming providers are selected — strip 2 has no “off service” rule.
+ */
 function topUpYourPicksStrips(strip1, strip2, pool) {
   const used = new Set([...strip1, ...strip2].map((r) => r.movie.id));
   let out1 = [...strip1];
@@ -126,6 +135,68 @@ function topUpYourPicksStrips(strip1, strip2, pool) {
     const weakest = [...out1].sort((a, b) => a.predicted - b.predicted)[0];
     out1 = out1.filter((r) => r.movie.id !== weakest.movie.id);
     out2 = [weakest];
+  }
+  return [out1, out2];
+}
+
+/**
+ * Streaming-filter variant of `topUpYourPicksStrips`.
+ *
+ * Strip 1 top-up: unchanged (same pool walk as the sync helper).
+ * Strip 2 top-up: each candidate must be **not** on any selected provider (`flatrate` vs profile ids);
+ * on-service titles stay out of strip 2 (they belong in **For you** or elsewhere).
+ * Rebalance (empty strip 2): move the **lowest-predicted strip-1 row that is off-service**, not the
+ * global weakest — moving an on-service title would violate Worth a Look.
+ *
+ * Returns `null` if `isCancelled()` is true after an await (effect teardown).
+ */
+async function topUpYourPicksStripsRespectingStreaming(
+  strip1,
+  strip2,
+  pool,
+  selectedStreamingProviderIds,
+  getFlatrateProviderIds,
+  isCancelled,
+) {
+  const used = new Set([...strip1, ...strip2].map((r) => r.movie.id));
+  let out1 = [...strip1];
+  let out2 = [...strip2];
+  for (const r of pool) {
+    if (isCancelled()) return null;
+    if (out1.length >= MORE_TAB_ON_SERVICE_MAX) break;
+    if (!used.has(r.movie.id)) {
+      out1.push(r);
+      used.add(r.movie.id);
+    }
+  }
+  for (const r of pool) {
+    if (isCancelled()) return null;
+    if (out2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
+    if (used.has(r.movie.id)) continue;
+    const ids = await getFlatrateProviderIds(r.movie);
+    if (isCancelled()) return null;
+    const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
+    if (!on) {
+      out2.push(r);
+      used.add(r.movie.id);
+    }
+  }
+  if (out2.length === 0 && out1.length > 1) {
+    const sortedByWeak = [...out1].sort((a, b) => a.predicted - b.predicted);
+    let move = null;
+    for (const r of sortedByWeak) {
+      const ids = await getFlatrateProviderIds(r.movie);
+      if (isCancelled()) return null;
+      const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
+      if (!on) {
+        move = r;
+        break;
+      }
+    }
+    if (move) {
+      out1 = out1.filter((r) => r.movie.id !== move.movie.id);
+      out2 = [move];
+    }
   }
   return [out1, out2];
 }
@@ -3040,7 +3111,7 @@ export default function App() {
 
   const hasYourPicksStripSource = yourPicksStripSorted.length > 0;
 
-  /** Strip 1: CF picks on selected streaming apps; strip 2: strong CF picks not on those apps. */
+  /** Strip 1 For you / strip 2 Worth a Look — ordering and provider split built in `rebuildMoreTabStrips`. */
   const [moreForYouStrip, setMoreForYouStrip] = useState([]);
   const [worthLookStrip, setWorthLookStrip] = useState([]);
   /** True while resolving TMDB watch providers for More strips (sequential fetches). */
@@ -3159,7 +3230,17 @@ export default function App() {
           }
         }
 
-        ;[strip1, strip2] = topUpYourPicksStrips(strip1, strip2, sorted);
+        // Provider-selected mode: sync top-up ignores flatrate; use provider-aware helper for strip 2 + rebalance.
+        const topped = await topUpYourPicksStripsRespectingStreaming(
+          strip1,
+          strip2,
+          sorted,
+          selectedStreamingProviderIds,
+          getFlatrateProviderIds,
+          () => cancelled,
+        );
+        if (cancelled || topped == null) return;
+        ;[strip1, strip2] = topped;
         const strip1Rows = toYourPicksStripRows(strip1, cfRecommendationPickIdSet);
         const strip2Rows = toYourPicksStripRows(strip2, cfRecommendationPickIdSet);
 

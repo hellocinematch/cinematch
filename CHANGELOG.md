@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.8
+
+- **Your picks / Worth a Look:** When **streaming providers** are selected in Profile, **Worth a Look** (strip 2) no longer receives titles that **are** on those services. The earlier TMDB flatrate pass was correct, but **top-up** and **rebalance** filled strip 2 from the scored pool **without** re-checking providers; rebalance could also move an **on-service** title from **For you** into strip 2. Strip 2 growth now uses **`topUpYourPicksStripsRespectingStreaming`** (provider-aware top-up + off-service-only rebalance).
+
 ## 2.0.7
 
 - **Your picks (For you / Worth a Look):** **Pick** vs **Popular** shown as **icon-only** pills (**✨** / **📈**) on the **lower-left** of the poster (same dark pill treatment as the score on the lower-right). Loading skeleton uses a small placeholder in that corner instead of a text line below the title.
