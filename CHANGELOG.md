@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1
+
+- **Title detail (mobile):** Horizontal layout now follows the same **20px + safe-area** gutters as home **strips** and **section headers** — poster is **slightly inset** with rounded corners; body copy and controls align to the same edge. Desktop (≥900px) layout unchanged.
+
 ## 2.1.0
 
 - **Navigation / Safari:** Title **detail** and **legal** overlays now use **distinct URLs** (`?detail=movie-769`, `?legal=privacy`, etc.) on `history.pushState` so **iOS edge swipe** and **Mac trackpad back** can pop the overlay reliably (same-URL `pushState` worked with toolbar ← but not gestures). **Go home** and in-app back when no stack entry use **`replaceState`** to strip those query keys. **Cold loads** with `?detail=` or `?legal=` open the right screen once the user reaches a main surface (home / discover / profile / rated / mood results) and the title resolves from catalogue + strips.

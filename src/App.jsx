@@ -1705,6 +1705,22 @@ const styles = `
     .page-topbar .app-brand.brand-logo--header { width:min(176px, 100%); }
     /* Mobile stability: stats beside logo can reintroduce tiny horizontal pan on some Safari widths. */
     .page-topbar .public-site-stats { display:none; }
+    /* Title detail: same horizontal rhythm as home strips / section headers + safe-area (TMDB-like gutter). */
+    .detail { padding-bottom:max(80px, calc(80px + env(safe-area-inset-bottom, 0px))); }
+    .detail-poster-wrap {
+      padding-left:max(20px, env(safe-area-inset-left, 0px));
+      padding-right:max(20px, env(safe-area-inset-right, 0px));
+      box-sizing:border-box;
+    }
+    .detail-poster-wrap .d-poster {
+      border-radius:12px;
+      border:1px solid #1e1e1e;
+      box-sizing:border-box;
+    }
+    .detail-content-wrap .d-body {
+      padding-left:max(20px, env(safe-area-inset-left, 0px));
+      padding-right:max(20px, env(safe-area-inset-right, 0px));
+    }
   }
 
   /* Desktop/tablet: let app breathe beyond the mobile shell while keeping phone UX unchanged. */
