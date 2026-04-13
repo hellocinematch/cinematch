@@ -141,13 +141,13 @@ function mediaIdKey(movie) {
 }
 
 /**
- * ✨ Pick = title appears in **any** Edge `match` rec array (recommendations, worth-a-look, theater, streaming).
- * 📈 Popular = client-only `tmdbOnlyRec` rows when the server did not return that pool (neighborCount is often 0 on server rows too).
+ * ✨ Pick = strict CF list only (`match` `recommendations` from `getRecommendations`).
+ * 📈 Popular = worth-a-look / theater / streaming pool and client `tmdbOnlyRec` fallbacks (same strip, different source).
  */
-function toYourPicksStripRows(recs, serverPickIdSet) {
+function toYourPicksStripRows(recs, cfRecommendationIdSet) {
   return recs.map((r) => {
     const id = mediaIdKey(r?.movie);
-    const kind = id && serverPickIdSet.has(id) ? "pick" : "popular";
+    const kind = id && cfRecommendationIdSet.has(id) ? "pick" : "popular";
     return { rec: r, kind };
   });
 }
@@ -2973,24 +2973,15 @@ export default function App() {
 
   const worthALookRecs = matchData?.worthALookRecs ?? EMPTY_MATCH_RECS;
 
-  /** Union of media ids from Edge `match` payloads — used for Pick vs Popular (server rows vs client `tmdbOnlyRec`). */
-  const serverPickIdSet = useMemo(() => {
+  /** Strict CF neighbour picks only — not worth-a-look / theater / streaming pools (otherwise every strip row became Pick). */
+  const cfRecommendationPickIdSet = useMemo(() => {
     const s = new Set();
-    const add = (arr) => {
-      if (!Array.isArray(arr)) return;
-      for (const r of arr) {
-        const k = mediaIdKey(r?.movie);
-        if (k) s.add(k);
-      }
-    };
-    if (!matchData) return s;
-    add(matchData.recommendations);
-    add(matchData.worthALookRecs);
-    add(matchData.theaterRecs);
-    add(matchData.streamingMovieRecs);
-    add(matchData.streamingTvRecs);
+    for (const r of recommendations) {
+      const k = mediaIdKey(r?.movie);
+      if (k) s.add(k);
+    }
     return s;
-  }, [matchData]);
+  }, [recommendations]);
 
   /**
    * Unrated titles with Edge predictions when strict CF `recommendations` is empty (worth-a-look + home rows).
@@ -3076,8 +3067,8 @@ export default function App() {
           .slice(0, MORE_TAB_OFF_SERVICE_MAX);
         strip2Recs = fillWorthLookStripFromPool(strip1Ids, strip2Recs, worthALookRecs);
         ;[strip1Recs, strip2Recs] = topUpYourPicksStrips(strip1Recs, strip2Recs, sorted);
-        const strip1Rows = toYourPicksStripRows(strip1Recs, serverPickIdSet);
-        const strip2Rows = toYourPicksStripRows(strip2Recs, serverPickIdSet);
+        const strip1Rows = toYourPicksStripRows(strip1Recs, cfRecommendationPickIdSet);
+        const strip2Rows = toYourPicksStripRows(strip2Recs, cfRecommendationPickIdSet);
         if (!cancelled) {
           setMoreStripsLoading(false);
           setMoreForYouStrip(strip1Rows);
@@ -3154,8 +3145,8 @@ export default function App() {
         }
 
         ;[strip1, strip2] = topUpYourPicksStrips(strip1, strip2, sorted);
-        const strip1Rows = toYourPicksStripRows(strip1, serverPickIdSet);
-        const strip2Rows = toYourPicksStripRows(strip2, serverPickIdSet);
+        const strip1Rows = toYourPicksStripRows(strip1, cfRecommendationPickIdSet);
+        const strip2Rows = toYourPicksStripRows(strip2, cfRecommendationPickIdSet);
 
         if (!cancelled) {
           setMoreForYouStrip(strip1Rows);
@@ -3173,7 +3164,7 @@ export default function App() {
     };
   }, [
     yourPicksStripSorted,
-    serverPickIdSet,
+    cfRecommendationPickIdSet,
     selectedStreamingProviderIds,
     topPickOffset,
     theaterRecs,

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.4
+
+- **Your picks badges:** **✨ Pick** again uses only the strict **`match` `recommendations`** (CF neighbour list). Unioning worth-a-look / theater / streaming ids made **every** strip row a Pick.
+
 ## 2.0.3
 
 - **Match / Edge auth:** `invokeMatch` now **refreshes the session** when the access token is missing/expiring soon and **retries once** after a **401** from the `match` function. Stale `getSession()` tokens often caused **Invalid JWT** at the Edge gateway and inside `getUser()`.
