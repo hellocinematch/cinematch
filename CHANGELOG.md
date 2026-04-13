@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1
+
+- **Your picks badges:** **✨ Pick** now means either the strict **`match` `recommendations`** list **or** any title with **neighbor-based scores** (`neighborCount` ≥ 1). **📈 Popular** is reserved for **TMDB-only** filler rows with **no** neighbor overlap. IDs for the CF list use **`mediaIdKey`** so labels stay correct after JSON. (Earlier 2.0.0 logic labeled most neighbor-scored strips as Popular because only the small `recommendations` array counted as Pick.)
+
 ## 2.0.0
 
 - **Your picks (For you / Worth a Look):** Row badges distinguish **✨ Pick** (titles in **`match` `recommendations`** — collaborative picks) from **📈 Popular** (worth-a-look / theater / streaming / pad pool scored rows not in that CF list).

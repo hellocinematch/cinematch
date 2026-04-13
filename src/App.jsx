@@ -130,12 +130,28 @@ function topUpYourPicksStrips(strip1, strip2, pool) {
   return [out1, out2];
 }
 
-/** ✨ Pick = CF `recommendations` from match; 📈 Popular = worth-a-look / theater / streaming / top-up pool. */
+/** Stable id for catalogue rows (handles `id` vs type+tmdbId after JSON). */
+function mediaIdKey(movie) {
+  if (!movie) return null;
+  if (movie.id != null && movie.id !== "") return String(movie.id);
+  const tid = movie.tmdbId;
+  const ty = movie.type;
+  if (tid != null && ty) return `${ty}-${tid}`;
+  return null;
+}
+
+/**
+ * ✨ Pick = strict CF `recommendations` list **or** any neighbor-scored title (`neighborCount` ≥ 1).
+ * 📈 Popular = TMDB-only / popularity filler rows with no neighbor overlap (matches legacy “popular backfill”).
+ */
 function toYourPicksStripRows(recs, cfRecommendationIdSet) {
-  return recs.map((r) => ({
-    rec: r,
-    kind: r?.movie?.id && cfRecommendationIdSet.has(r.movie.id) ? "pick" : "popular",
-  }));
+  return recs.map((r) => {
+    const id = mediaIdKey(r?.movie);
+    const inCfList = Boolean(id && cfRecommendationIdSet.has(id));
+    const collaborative = Number(r?.neighborCount ?? 0) >= 1;
+    const kind = inCfList || collaborative ? "pick" : "popular";
+    return { rec: r, kind };
+  });
 }
 
 /** Home secondary nav: internal ids align with tab labels (Now Playing / Your picks / Friends). */
@@ -2996,7 +3012,7 @@ export default function App() {
 
     const rebuildMoreTabStrips = async () => {
       const cfRecommendationIdSet = new Set(
-        recommendations.map((r) => r.movie.id).filter(Boolean),
+        recommendations.map((r) => mediaIdKey(r?.movie)).filter(Boolean),
       );
       const sorted = yourPicksStripSorted;
       if (sorted.length === 0) {
