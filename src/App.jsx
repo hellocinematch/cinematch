@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md.
+// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.0.0: community avg RPC + badges).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -209,6 +209,18 @@ function mediaIdKey(movie) {
   const ty = movie.type;
   if (tid != null && ty) return `${ty}-${tid}`;
   return null;
+}
+
+/** v3.0.0: Parse catalogue id (`movie-123`, `tv-456`) for `get_cinemastro_title_avgs` RPC payloads. */
+function parseMediaKey(id) {
+  if (id == null || id === "") return null;
+  const s = String(id);
+  const i = s.indexOf("-");
+  if (i <= 0) return null;
+  const type = s.slice(0, i);
+  const tmdbId = parseInt(s.slice(i + 1), 10);
+  if (!Number.isFinite(tmdbId) || (type !== "movie" && type !== "tv")) return null;
+  return { type, tmdbId };
 }
 
 /** Cinemastro personal prediction exists only when neighbours rated this title (`predict` / strip Rec with real overlap). */
@@ -1394,6 +1406,8 @@ const styles = `
   .strip-poster img { width:100%; height:100%; object-fit:cover; }
   .strip-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:40px; }
   .strip-badge { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.82); padding:4px 8px; border-radius:10px; font-size:12px; color:#e8c96a; font-family:'DM Serif Display',serif; z-index:2; }
+  /* v3.0.0: Cinemastro community avg — Option B gold edge; TMDB uses base .strip-badge only. */
+  .strip-badge.strip-badge--cinemastro { border:1px solid rgba(201,162,39,0.65); box-shadow:0 0 0 1px rgba(232,201,106,0.1); }
   /* Your picks only: icon-only Pick ✨ vs Popular 📈; mirrors score badge contrast (lower-left vs lower-right). */
   .strip-kind-icon {
     position:absolute; bottom:6px; left:6px; z-index:2;
@@ -1488,6 +1502,7 @@ const styles = `
   .disc-type { position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.75); border:1px solid #333; padding:2px 7px; border-radius:8px; font-size:9px; letter-spacing:1px; text-transform:uppercase; color:#aaa; }
   .disc-rated-badge { color:#88cc88; }
   .disc-pred-badge { color:#e8c96a; }
+  .disc-community-badge--cinemastro { border:1px solid rgba(201,162,39,0.55); border-radius:8px; padding:2px 6px; display:inline-block; }
   .disc-unseen-badge { color:#555; font-size:10px; font-family:'DM Sans',sans-serif; }
   .disc-title { font-size:13px; color:#ccc; margin-top:8px; line-height:1.3; font-weight:500; overflow-wrap:anywhere; word-break:break-word; }
   .disc-meta { font-size:11px; color:#555; margin-top:2px; overflow-wrap:anywhere; word-break:break-word; }
@@ -1525,6 +1540,7 @@ const styles = `
   .mood-result-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:64px; background:#1a1a1a; }
   .mood-result-overlay { position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 60%); }
   .mood-result-badge { position:absolute; top:12px; right:12px; background:rgba(0,0,0,0.75); border:1px solid #e8c96a; padding:5px 10px; border-radius:16px; font-family:'DM Serif Display',serif; font-size:16px; color:#e8c96a; }
+  .mood-result-badge.mood-result-badge--cinemastro { box-shadow:0 0 0 2px rgba(201,162,39,0.45); border-color:#c9a227; }
   .mood-result-type { position:absolute; top:12px; left:12px; background:rgba(0,0,0,0.7); border:1px solid #333; padding:3px 8px; border-radius:8px; font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#aaa; }
   .mood-result-info { padding:14px 16px; }
   .mood-result-title { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; line-height:1.1; }
@@ -1567,6 +1583,8 @@ const styles = `
   .d-genre-text { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666; }
   .d-title { font-family:'DM Serif Display',serif; font-size:32px; color:#f0ebe0; line-height:1.1; margin-top:6px; }
   .d-pred-box { background:#141414; border:1px solid #222; border-radius:12px; padding:16px 20px; margin:18px 0; display:flex; justify-content:space-between; align-items:center; }
+  /* v3.0.0: Detail community score — gold edge when source is Cinemastro aggregate. */
+  .d-community-box--cinemastro { border-color:rgba(201,162,39,0.55); box-shadow:0 0 0 1px rgba(232,201,106,0.08); }
   .d-pred-box-low { border-style:dashed; border-color:#6c5a2c; }
   .d-pred-box-medium { border-style:solid; border-color:#7e6931; }
   .d-pred-box-high { border-style:solid; border-color:#b18f36; }
@@ -1890,6 +1908,49 @@ function formatScore(n) {
   return (Math.round(x * 10) / 10).toFixed(1);
 }
 
+/**
+ * v3.0.0: Poster / Discover / mood badge — prefer Cinemastro avg (`cinemastroAvgByKey`), else TMDB, else predicted.
+ * `pillClass` adds gold-edge treatment for Cinemastro (Option B); TMDB keeps the neutral dark pill.
+ */
+function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
+  if (userRating != null && Number.isFinite(Number(userRating))) {
+    return {
+      text: `★ ${formatScore(userRating)}`,
+      title: "Your rating",
+      color: "#88cc88",
+      pillClass: "",
+    };
+  }
+  const key = mediaIdKey(movie);
+  const c = key != null ? cinemastroAvgByKey[key] : undefined;
+  if (typeof c === "number" && Number.isFinite(c)) {
+    return {
+      text: formatScore(c),
+      title: "Cinemastro rating",
+      color: "#e8c96a",
+      pillClass: "strip-badge--cinemastro",
+    };
+  }
+  const tmdb = movie?.tmdbRating;
+  if (tmdb != null && Number.isFinite(Number(tmdb))) {
+    return {
+      text: formatScore(Number(tmdb)),
+      title: "TMDB average",
+      color: "#e8c96a",
+      pillClass: "",
+    };
+  }
+  if (predicted != null && Number.isFinite(Number(predicted))) {
+    return {
+      text: formatScore(predicted),
+      title: "Predicted for you",
+      color: "#e8c96a",
+      pillClass: "",
+    };
+  }
+  return { text: "—", title: "", color: "#e8c96a", pillClass: "" };
+}
+
 function formatMovieReleaseLine(movie) {
   const rd = movie?.releaseDate;
   if (rd && /^\d{4}-\d{2}-\d{2}$/.test(rd)) {
@@ -2045,6 +2106,8 @@ export default function App() {
   const [secondaryStripReady, setSecondaryStripReady] = useState(true);
   /** Public marketing counts (RPC). Undefined until first successful fetch. */
   const [siteStats, setSiteStats] = useState(null);
+  /** v3.0.0: `movie-${tmdbId}` → avg score from `get_cinemastro_title_avgs` (badges prefer this over TMDB). */
+  const [cinemastroAvgByKey, setCinemastroAvgByKey] = useState({});
 
   /** Browser Back should return to the in-app screen that opened detail, not leave the site (SPA history). */
   const detailReturnScreenRef = useRef(null);
@@ -3420,6 +3483,121 @@ export default function App() {
     });
   }, [catalogue, appliedSearchQuery, searchResults, activeFilter]);
 
+  const titleKeysForCinemastroFetch = useMemo(() => {
+    const s = new Set();
+    const addMovie = (m) => {
+      const k = mediaIdKey(m);
+      if (k) s.add(k);
+    };
+    const addRec = (r) => {
+      if (r?.movie) addMovie(r.movie);
+    };
+    for (const m of catalogue) addMovie(m);
+    for (const id of Object.keys(userRatings)) s.add(id);
+    for (const r of theaterRecs) addRec(r);
+    for (const r of whatsHotRecsResolved) addRec(r);
+    for (const r of streamingMovieRecsResolved) addRec(r);
+    for (const r of streamingTvRecsResolved) addRec(r);
+    for (const r of secondaryStripRecsAll) addRec(r);
+    for (const row of moreForYouStrip) addRec(row.rec);
+    for (const row of worthLookStrip) addRec(row.rec);
+    for (const m of discoverItems) addMovie(m);
+    for (const r of moodResults) addRec(r);
+    if (selectedMovie?.movie) addMovie(selectedMovie.movie);
+    for (const m of watchlist) addMovie(m);
+    return [...s];
+  }, [
+    catalogue,
+    userRatings,
+    theaterRecs,
+    whatsHotRecsResolved,
+    streamingMovieRecsResolved,
+    streamingTvRecsResolved,
+    secondaryStripRecsAll,
+    moreForYouStrip,
+    worthLookStrip,
+    discoverItems,
+    moodResults,
+    selectedMovie,
+    watchlist,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const keys = titleKeysForCinemastroFetch;
+    if (!keys.length) return undefined;
+
+    const chunk = (arr, n) => {
+      const out = [];
+      for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+      return out;
+    };
+
+    const run = async () => {
+      const merged = {};
+      for (const part of chunk(keys, 120)) {
+        const payload = [];
+        const seenSig = new Set();
+        for (const key of part) {
+          const p = parseMediaKey(key);
+          if (!p) continue;
+          const sig = `${p.type}:${p.tmdbId}`;
+          if (seenSig.has(sig)) continue;
+          seenSig.add(sig);
+          payload.push({ tmdb_id: p.tmdbId, media_type: p.type });
+        }
+        if (!payload.length) continue;
+        const { data, error } = await supabase.rpc("get_cinemastro_title_avgs", { p_titles: payload });
+        if (cancelled) return;
+        if (error) {
+          console.warn("get_cinemastro_title_avgs:", error.message);
+          continue;
+        }
+        const rows = Array.isArray(data) ? data : [];
+        for (const row of rows) {
+          if (row?.tmdb_id == null || row?.media_type == null) continue;
+          const k = `${String(row.media_type)}-${String(row.tmdb_id)}`;
+          merged[k] = Number(row.avg_score);
+        }
+      }
+      if (!cancelled && Object.keys(merged).length) {
+        setCinemastroAvgByKey((prev) => ({ ...prev, ...merged }));
+      }
+    };
+
+    const t = setTimeout(run, 320);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [titleKeysForCinemastroFetch]);
+
+  async function refreshCinemastroAvgForMediaId(movieId) {
+    const p = parseMediaKey(movieId);
+    if (!p) return;
+    const { data, error } = await supabase.rpc("get_cinemastro_title_avgs", {
+      p_titles: [{ tmdb_id: p.tmdbId, media_type: p.type }],
+    });
+    if (error || !data?.length) return;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.tmdb_id == null || row?.media_type == null) return;
+    const k = `${String(row.media_type)}-${String(row.tmdb_id)}`;
+    setCinemastroAvgByKey((prev) => ({ ...prev, [k]: Number(row.avg_score) }));
+  }
+
+  function StripPosterBadge({ movie, predicted }) {
+    const bd = stripBadgeDisplay(movie, userRatings[movie.id], predicted, cinemastroAvgByKey);
+    return (
+      <div
+        className={`strip-badge${bd.pillClass ? ` ${bd.pillClass}` : ""}`}
+        style={{ color: bd.color }}
+        title={bd.title || undefined}
+      >
+        {bd.text}
+      </div>
+    );
+  }
+
   async function addRating(movieId, score) {
     setUserRatings(prev => ({ ...prev, [movieId]: score }));
     setWatchlist(prev => prev.filter(m => m.id !== movieId));
@@ -3428,6 +3606,7 @@ export default function App() {
       const [type, tmdbId] = movieId.split("-");
       const { error: ratingErr } = await supabase.from("ratings").upsert({ user_id: user.id, tmdb_id: parseInt(tmdbId), media_type: type, score }, { onConflict: "user_id,tmdb_id,media_type" });
       if (ratingErr) console.warn("Could not save rating:", ratingErr.message);
+      else void refreshCinemastroAvgForMediaId(movieId);
       await supabase.from("watchlist").delete().eq("user_id", user.id).eq("tmdb_id", parseInt(tmdbId)).eq("media_type", type);
     }
   }
@@ -3580,7 +3759,7 @@ export default function App() {
       } catch { /* optional prediction */ }
     }
     detailReturnScreenRef.current = screenRef.current;
-    // Distinct URL per detail step so iOS edge-swipe / Mac trackpad back can popstate (v2.1.0).
+    // Distinct URL per detail step so iOS edge-swipe / Mac trackpad back can popstate (v2.1.0). Community avg on detail from v3.0.0 RPC.
     if (opts.skipHistoryPush) {
       detailHistoryPushedRef.current = false;
     } else {
@@ -4409,9 +4588,7 @@ export default function App() {
                           <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                             <div className="strip-poster">
                               {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                              <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                                {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
-                              </div>
+                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} />
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -4440,9 +4617,7 @@ export default function App() {
                               {inTheaterIdsForWhatsHotPill.has(rec.movie.id) && qualifiesForTheatricalPillMovie(rec.movie) && (
                                 <div className="strip-hot-theater-pill">In theaters</div>
                               )}
-                              <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                                {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
-                              </div>
+                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} />
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -4476,9 +4651,7 @@ export default function App() {
                           <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                             <div className="strip-poster">
                               {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                              <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                                {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
-                              </div>
+                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} />
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -4546,9 +4719,7 @@ export default function App() {
                               <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                                 <div className="strip-poster">
                                   {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                                  <div className="strip-badge" style={{ color: userRatings[rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                                    {userRatings[rec.movie.id] ? `★ ${formatScore(userRatings[rec.movie.id])}` : formatScore(rec.predicted)}
-                                  </div>
+                                  <StripPosterBadge movie={rec.movie} predicted={rec.predicted} />
                                 </div>
                                 <div className="strip-title">{rec.movie.title}</div>
                                 <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -4608,9 +4779,7 @@ export default function App() {
                             >
                               {row.kind === "pick" ? "✨" : "📈"}
                             </span>
-                            <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                              {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
-                            </div>
+                            <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} />
                           </div>
                           <div className="strip-title">{row.rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
@@ -4653,9 +4822,7 @@ export default function App() {
                             >
                               {row.kind === "pick" ? "✨" : "📈"}
                             </span>
-                            <div className="strip-badge" style={{ color: userRatings[row.rec.movie.id] ? "#88cc88" : "#e8c96a" }}>
-                              {userRatings[row.rec.movie.id] ? `★ ${formatScore(userRatings[row.rec.movie.id])}` : formatScore(row.rec.predicted)}
-                            </div>
+                            <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} />
                           </div>
                           <div className="strip-title">{row.rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
@@ -4786,6 +4953,7 @@ export default function App() {
               {discoverItems.map(m => {
                 const rec = recMap[m.id];
                 const myRating = userRatings[m.id];
+                const discBd = stripBadgeDisplay(m, myRating, rec?.predicted ?? null, cinemastroAvgByKey);
                 return (
                   <div className="disc-card" key={m.id} onClick={() => openDetail(m, rec)}>
                     <div className="disc-poster">
@@ -4793,8 +4961,16 @@ export default function App() {
                       <div className="disc-type">{m.type === "movie" ? "Movie" : "TV"}</div>
                       <div className="disc-badge">
                         {myRating ? <span className="disc-rated-badge">★ {myRating}</span>
-                          : rec ? <span className="disc-pred-badge">{formatScore(rec.predicted)}</span>
-                            : <span className="disc-unseen-badge">Unrated</span>}
+                          : discBd.text === "—"
+                            ? <span className="disc-unseen-badge">Unrated</span>
+                            : (
+                              <span
+                                className={`disc-pred-badge${discBd.pillClass === "strip-badge--cinemastro" ? " disc-community-badge--cinemastro" : ""}`}
+                                title={discBd.title || undefined}
+                              >
+                                {discBd.text}
+                              </span>
+                            )}
                       </div>
                     </div>
                     <div className="disc-title">{m.title}</div>
@@ -4885,7 +5061,17 @@ export default function App() {
                       : <div className="mood-result-poster-fallback">🎬</div>}
                     <div className="mood-result-overlay" />
                     <div className="mood-result-type">{rec.movie.type === "movie" ? "Movie" : "TV"}</div>
-                    <div className="mood-result-badge">{formatScore(rec.predicted)}</div>
+                    {(() => {
+                      const mbd = stripBadgeDisplay(rec.movie, userRatings[rec.movie.id], rec.predicted, cinemastroAvgByKey);
+                      return (
+                        <div
+                          className={`mood-result-badge${mbd.pillClass === "strip-badge--cinemastro" ? " mood-result-badge--cinemastro" : ""}`}
+                          title={mbd.title || undefined}
+                        >
+                          {mbd.text}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="mood-result-info">
                     <div className="mood-result-title">{rec.movie.title}</div>
@@ -5147,9 +5333,14 @@ export default function App() {
       )}
 
       {/* DETAIL */}
-        {screen === "detail" && selectedMovie && (() => {
+      {screen === "detail" && selectedMovie && (() => {
         const { movie, prediction } = selectedMovie;
         const myRating = userRatings[movie.id];
+        const detailMediaKey = mediaIdKey(movie);
+        const detailCinemastroAvg = detailMediaKey != null ? cinemastroAvgByKey[detailMediaKey] : undefined;
+        const detailHasCinemastro = typeof detailCinemastroAvg === "number" && Number.isFinite(detailCinemastroAvg);
+        const detailTmdbNum = movie.tmdbRating != null && Number.isFinite(Number(movie.tmdbRating)) ? Number(movie.tmdbRating) : null;
+        const detailShowCommunity = detailHasCinemastro || detailTmdbNum != null;
         return (
           <div className="detail">
             <div className="page-topbar">
@@ -5170,6 +5361,22 @@ export default function App() {
                   {movie.year && <span className="d-genre-text">{movie.year}</span>}
                 </div>
                 <div className="d-title">{movie.title}</div>
+                {detailShowCommunity && (
+                  <div
+                    className={`d-pred-box${detailHasCinemastro ? " d-community-box d-community-box--cinemastro" : ""}`}
+                    style={{ marginBottom: 10 }}
+                  >
+                    <div>
+                      <div className="d-pred-label">{detailHasCinemastro ? "Cinemastro rating" : "TMDB average"}</div>
+                      <div className="d-pred-sub">
+                        {detailHasCinemastro ? "From people on Cinemastro" : "From the broader community (TMDB)"}
+                      </div>
+                    </div>
+                    <div className="d-pred-val" style={{ fontSize: 32 }}>
+                      {detailHasCinemastro ? formatScore(detailCinemastroAvg) : formatScore(detailTmdbNum)}
+                    </div>
+                  </div>
+                )}
                 {hasPersonalPrediction(prediction) && (
                   <div className={`d-pred-box ${predBoxClass(prediction.confidence)}`}>
                     <div>
@@ -5198,28 +5405,16 @@ export default function App() {
                           {formatScore(prediction.low)}–{formatScore(prediction.high)}
                         </div>
                       )}
-                      {movie.tmdbRating && <div className="d-tmdb">TMDB avg: {movie.tmdbRating}</div>}
                     </div>
                   </div>
                 )}
                 {!hasPersonalPrediction(prediction) && (
-                  <div>
-                    {movie.tmdbRating && (
-                      <div className="d-pred-box" style={{ marginBottom: 10 }}>
-                        <div>
-                          <div className="d-pred-label">TMDB Average Rating</div>
-                          <div className="d-pred-sub">From the broader community</div>
-                        </div>
-                        <div className="d-pred-val" style={{ fontSize: 32 }}>{movie.tmdbRating}</div>
-                      </div>
-                    )}
-                    <div className="d-pred-box">
-                      <div>
-                        <div className="d-pred-label">Predicted Rating for You</div>
-                        <div className="d-pred-sub">Rate more titles to unlock</div>
-                      </div>
-                      <div className="d-pred-val" style={{ fontSize: 32, color: "#555" }}>TBD</div>
+                  <div className="d-pred-box">
+                    <div>
+                      <div className="d-pred-label">Predicted Rating for You</div>
+                      <div className="d-pred-sub">Rate more titles to unlock</div>
                     </div>
+                    <div className="d-pred-val" style={{ fontSize: 32, color: "#555" }}>TBD</div>
                   </div>
                 )}
                 <div className="d-synopsis">{movie.synopsis}</div>

@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.0
+
+- **Community score (Cinemastro vs TMDB):** Batch RPC **`get_cinemastro_title_avgs`** returns average **`public.ratings`** score per title (no count shown). **Home strips**, **Discover** cards, and **mood results** badges prefer **Cinemastro** when data exists; otherwise **TMDB**, then predicted. **Cinemastro** uses the same pill as TMDB with a **subtle gold border** (Option B). **Title detail** shows one community block (**Cinemastro** or **TMDB**, labeled); **predicted for you** unchanged. Apply the migration in Supabase before shipping the client.
+
 ## 2.1.1
 
 - **Title detail (mobile):** Horizontal layout now follows the same **20px + safe-area** gutters as home **strips** and **section headers** — poster is **slightly inset** with rounded corners; body copy and controls align to the same edge. Desktop (≥900px) layout unchanged.
