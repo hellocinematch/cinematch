@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.3
+
+- **Match / Edge auth:** `invokeMatch` now **refreshes the session** when the access token is missing/expiring soon and **retries once** after a **401** from the `match` function. Stale `getSession()` tokens often caused **Invalid JWT** at the Edge gateway and inside `getUser()`.
+
+## 2.0.2
+
+- **Your picks badges:** **✨ Pick** if the title id appears in **any** Edge `match` rec list (`recommendations`, `worthALookRecs`, `theaterRecs`, `streamingMovieRecs`, `streamingTvRecs`). **📈 Popular** only for **client `tmdbOnlyRec`** rows when the server did not return that pool. (v2.0.1 used `neighborCount` ≥ 1, but the Edge function often emits **0** when `predictRatingRange` has no per-title overlap, so everything looked Popular.)
+
 ## 2.0.1
 
 - **Your picks badges:** **✨ Pick** now means either the strict **`match` `recommendations`** list **or** any title with **neighbor-based scores** (`neighborCount` ≥ 1). **📈 Popular** is reserved for **TMDB-only** filler rows with **no** neighbor overlap. IDs for the CF list use **`mediaIdKey`** so labels stay correct after JSON. (Earlier 2.0.0 logic labeled most neighbor-scored strips as Popular because only the small `recommendations` array counted as Pick.)

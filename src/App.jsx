@@ -141,15 +141,13 @@ function mediaIdKey(movie) {
 }
 
 /**
- * ✨ Pick = strict CF `recommendations` list **or** any neighbor-scored title (`neighborCount` ≥ 1).
- * 📈 Popular = TMDB-only / popularity filler rows with no neighbor overlap (matches legacy “popular backfill”).
+ * ✨ Pick = title appears in **any** Edge `match` rec array (recommendations, worth-a-look, theater, streaming).
+ * 📈 Popular = client-only `tmdbOnlyRec` rows when the server did not return that pool (neighborCount is often 0 on server rows too).
  */
-function toYourPicksStripRows(recs, cfRecommendationIdSet) {
+function toYourPicksStripRows(recs, serverPickIdSet) {
   return recs.map((r) => {
     const id = mediaIdKey(r?.movie);
-    const inCfList = Boolean(id && cfRecommendationIdSet.has(id));
-    const collaborative = Number(r?.neighborCount ?? 0) >= 1;
-    const kind = inCfList || collaborative ? "pick" : "popular";
+    const kind = id && serverPickIdSet.has(id) ? "pick" : "popular";
     return { rec: r, kind };
   });
 }
@@ -2481,15 +2479,41 @@ export default function App() {
   }, [user, userRatings, catalogue]);
 
   async function invokeMatch(body) {
-    const { data: sessData } = await supabase.auth.getSession();
-    const accessToken = sessData?.session?.access_token;
-    if (!accessToken) {
+    async function callMatchWithAccessToken(token) {
+      const t = String(token ?? "").trim();
+      if (!t) return { data: null, error: { message: "No auth session token available" } };
+      return supabase.functions.invoke("match", {
+        headers: { Authorization: `Bearer ${t}` },
+        body,
+      });
+    }
+
+    let { data: sessWrap } = await supabase.auth.getSession();
+    let session = sessWrap?.session;
+    if (!session?.access_token) {
       return { data: null, error: { message: "No auth session token available" } };
     }
-    return supabase.functions.invoke("match", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body,
-    });
+
+    /** `getSession()` can return an expired JWT; gateway + Edge `getUser()` then respond 401 Invalid JWT. */
+    const expMs = session.expires_at ? session.expires_at * 1000 : 0;
+    if (!expMs || expMs < Date.now() + 120_000) {
+      const { data: ref, error: refErr } = await supabase.auth.refreshSession();
+      if (!refErr && ref?.session?.access_token) session = ref.session;
+    }
+
+    let result = await callMatchWithAccessToken(session.access_token);
+    const e = result.error;
+    const is401 =
+      e?.name === "FunctionsHttpError" &&
+      typeof e.context?.status === "number" &&
+      e.context.status === 401;
+    if (is401) {
+      const { data: ref2, error: refErr2 } = await supabase.auth.refreshSession();
+      if (!refErr2 && ref2?.session?.access_token) {
+        result = await callMatchWithAccessToken(ref2.session.access_token);
+      }
+    }
+    return result;
   }
 
   async function loadUserData() {
@@ -2949,6 +2973,25 @@ export default function App() {
 
   const worthALookRecs = matchData?.worthALookRecs ?? EMPTY_MATCH_RECS;
 
+  /** Union of media ids from Edge `match` payloads — used for Pick vs Popular (server rows vs client `tmdbOnlyRec`). */
+  const serverPickIdSet = useMemo(() => {
+    const s = new Set();
+    const add = (arr) => {
+      if (!Array.isArray(arr)) return;
+      for (const r of arr) {
+        const k = mediaIdKey(r?.movie);
+        if (k) s.add(k);
+      }
+    };
+    if (!matchData) return s;
+    add(matchData.recommendations);
+    add(matchData.worthALookRecs);
+    add(matchData.theaterRecs);
+    add(matchData.streamingMovieRecs);
+    add(matchData.streamingTvRecs);
+    return s;
+  }, [matchData]);
+
   /**
    * Unrated titles with Edge predictions when strict CF `recommendations` is empty (worth-a-look + home rows).
    * If results stay thin, prefer a larger client catalogue; optional last resort is raising neighbor/overlap caps in `match` (see comment there).
@@ -3011,9 +3054,6 @@ export default function App() {
     };
 
     const rebuildMoreTabStrips = async () => {
-      const cfRecommendationIdSet = new Set(
-        recommendations.map((r) => mediaIdKey(r?.movie)).filter(Boolean),
-      );
       const sorted = yourPicksStripSorted;
       if (sorted.length === 0) {
         if (!cancelled) {
@@ -3036,8 +3076,8 @@ export default function App() {
           .slice(0, MORE_TAB_OFF_SERVICE_MAX);
         strip2Recs = fillWorthLookStripFromPool(strip1Ids, strip2Recs, worthALookRecs);
         ;[strip1Recs, strip2Recs] = topUpYourPicksStrips(strip1Recs, strip2Recs, sorted);
-        const strip1Rows = toYourPicksStripRows(strip1Recs, cfRecommendationIdSet);
-        const strip2Rows = toYourPicksStripRows(strip2Recs, cfRecommendationIdSet);
+        const strip1Rows = toYourPicksStripRows(strip1Recs, serverPickIdSet);
+        const strip2Rows = toYourPicksStripRows(strip2Recs, serverPickIdSet);
         if (!cancelled) {
           setMoreStripsLoading(false);
           setMoreForYouStrip(strip1Rows);
@@ -3114,8 +3154,8 @@ export default function App() {
         }
 
         ;[strip1, strip2] = topUpYourPicksStrips(strip1, strip2, sorted);
-        const strip1Rows = toYourPicksStripRows(strip1, cfRecommendationIdSet);
-        const strip2Rows = toYourPicksStripRows(strip2, cfRecommendationIdSet);
+        const strip1Rows = toYourPicksStripRows(strip1, serverPickIdSet);
+        const strip2Rows = toYourPicksStripRows(strip2, serverPickIdSet);
 
         if (!cancelled) {
           setMoreForYouStrip(strip1Rows);
@@ -3133,7 +3173,7 @@ export default function App() {
     };
   }, [
     yourPicksStripSorted,
-    recommendations,
+    serverPickIdSet,
     selectedStreamingProviderIds,
     topPickOffset,
     theaterRecs,
