@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.1
+
+- **Title detail:** Opening a title **no longer waits** on the Edge **`predict`** call before navigation. The screen switches immediately; the **“Predicted rating for you”** block shows a **strip-style skeleton** (shimmer) until the prediction returns or fails, then shows the real score or **TBD**.
+
 ## 3.2.0
 
 - **Rate now (title detail):** Suggested titles come from **neighbor overlap** (`public.ratings`) even when those titles are **not** in the main CF catalogue. Candidates are ranked the same way as before (overlap count + neighbor avg score + same–media-type boost); **TMDB detail** hydrates metadata for ids missing locally. **Animation** is still excluded after hydrate. **Catalogue-only** popularity fallback unchanged when overlap yields no queue.

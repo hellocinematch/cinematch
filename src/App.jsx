@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.2.0: Rate now uses overlap+TMDB, not catalogue-only; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
+// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.2.1: detail predict skeleton + instant nav; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -1622,6 +1622,10 @@ const styles = `
   .d-genre-text { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666; }
   .d-title { font-family:'DM Serif Display',serif; font-size:32px; color:#f0ebe0; line-height:1.1; margin-top:6px; }
   .d-pred-box { background:#141414; border:1px solid #222; border-radius:12px; padding:16px 20px; margin:18px 0; display:flex; justify-content:space-between; align-items:center; }
+  /* v3.2.1: Same shimmer treatment as strip skeletons while match predict loads. */
+  .d-pred-box-skeleton { align-items:stretch; gap:16px; border-color:#2a2a2a; }
+  .d-pred-box-skeleton .d-pred-skel-right { display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:10px; flex-shrink:0; min-width:52px; }
+  .d-pred-box-skeleton .skel-line { margin-top:0; }
   /* v3.0.0: Detail community score — gold edge when source is Cinemastro aggregate. */
   .d-community-box--cinemastro { border-color:rgba(201,162,39,0.55); box-shadow:0 0 0 1px rgba(232,201,106,0.08); }
   .d-pred-box-low { border-style:dashed; border-color:#6c5a2c; }
@@ -3927,14 +3931,10 @@ export default function App() {
     advanceOb();
   }
 
-  async function openDetail(movie, prediction, opts = {}) {
-    let pred = prediction;
-    if (!pred && user && Object.keys(userRatings).length > 0) {
-      try {
-        const { data, error } = await invokeMatch({ action: "predict", userRatings, catalogue, movieId: movie.id });
-        if (!error && data?.prediction) pred = data.prediction;
-      } catch { /* optional prediction */ }
-    }
+  /** v3.2.1: Navigate immediately; fetch `predict` in background and show skeleton until settled. */
+  function openDetail(movie, prediction, opts = {}) {
+    const pred = prediction ?? null;
+    const needsPredict = Boolean(!pred && user && Object.keys(userRatings).length > 0);
     detailReturnScreenRef.current = screenRef.current;
     // Distinct URL per detail step so iOS edge-swipe / Mac trackpad back can popstate (v2.1.0). Community avg on detail from v3.0.0 RPC.
     if (opts.skipHistoryPush) {
@@ -3943,7 +3943,7 @@ export default function App() {
       history.pushState({ cinemastroDetail: true }, "", spaUrlForOverlay({ detail: movie.id }));
       detailHistoryPushedRef.current = true;
     }
-    setSelected({ movie, prediction: pred });
+    setSelected({ movie, prediction: pred, predictionLoading: needsPredict });
     void refreshCinemastroAvgForMediaId(movie.id);
     if (opts.startEditing && userRatings[movie.id] != null) {
       setDetailEditRating(true);
@@ -3955,6 +3955,24 @@ export default function App() {
       setDetailTouched(false);
     }
     setScreen("detail");
+    if (needsPredict) {
+      const movieId = movie.id;
+      void (async () => {
+        try {
+          const { data, error } = await invokeMatch({ action: "predict", userRatings, catalogue, movieId });
+          const nextPred = !error && data?.prediction ? data.prediction : null;
+          setSelected((prev) => {
+            if (!prev || prev.movie?.id !== movieId) return prev;
+            return { ...prev, prediction: nextPred, predictionLoading: false };
+          });
+        } catch {
+          setSelected((prev) => {
+            if (!prev || prev.movie?.id !== movieId) return prev;
+            return { ...prev, prediction: null, predictionLoading: false };
+          });
+        }
+      })();
+    }
   }
 
   function goBack() {
@@ -5538,7 +5556,8 @@ export default function App() {
 
       {/* DETAIL */}
       {screen === "detail" && selectedMovie && (() => {
-        const { movie, prediction } = selectedMovie;
+        const { movie, prediction, predictionLoading } = selectedMovie;
+        const showPredSkeleton = Boolean(predictionLoading);
         const myRating = userRatings[movie.id];
         const detailMediaKey = mediaIdKey(movie);
         const detailCinemastroEntry = detailMediaKey != null ? cinemastroAvgByKey[detailMediaKey] : undefined;
@@ -5588,7 +5607,23 @@ export default function App() {
                     </div>
                   </div>
                 )}
-                {hasPersonalPrediction(prediction) && (
+                {showPredSkeleton ? (
+                  <div
+                    className="d-pred-box d-pred-box-skeleton"
+                    aria-busy="true"
+                    aria-label="Loading predicted rating"
+                  >
+                    <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                      <div className="skel-line skel-line-title" style={{ width: "72%", maxWidth: 220 }} />
+                      <div className="skel-line skel-line-meta" style={{ width: "58%", maxWidth: 180, marginTop: 12 }} />
+                      <div className="skel-line skel-line-meta" style={{ width: "42%", maxWidth: 120, marginTop: 12 }} />
+                    </div>
+                    <div className="d-pred-skel-right">
+                      <div className="skel-line" style={{ width: 44, height: 30, borderRadius: 8 }} />
+                      <div className="skel-line skel-line-meta" style={{ width: 36, height: 10 }} />
+                    </div>
+                  </div>
+                ) : hasPersonalPrediction(prediction) ? (
                   <div className={`d-pred-box ${predBoxClass(prediction.confidence)}`}>
                     <div>
                       <div className="d-pred-label">Predicted rating for you</div>
@@ -5618,8 +5653,7 @@ export default function App() {
                       )}
                     </div>
                   </div>
-                )}
-                {!hasPersonalPrediction(prediction) && (
+                ) : (
                   <div className="d-pred-box">
                     <div>
                       <div className="d-pred-label">Predicted Rating for You</div>
