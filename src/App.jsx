@@ -2129,6 +2129,8 @@ export default function App() {
   const [siteStats, setSiteStats] = useState(null);
   /** v3.0.0: `movie-${tmdbId}` → avg score from `get_cinemastro_title_avgs` (badges prefer this over TMDB). */
   const [cinemastroAvgByKey, setCinemastroAvgByKey] = useState({});
+  /** Latest title keys for Cinemastro batch RPC (read when debounced fetch runs, not when effect first fires). */
+  const cinemastroFetchKeysRef = useRef([]);
 
   /** Browser Back should return to the in-app screen that opened detail, not leave the site (SPA history). */
   const detailReturnScreenRef = useRef(null);
@@ -3544,11 +3546,13 @@ export default function App() {
     watchlist,
   ]);
 
-  useEffect(() => {
-    const keys = cinemastroTitleKeysData.keys;
-    if (!keys.length) return undefined;
+  cinemastroFetchKeysRef.current = cinemastroTitleKeysData.keys;
 
-    let stale = false;
+  useEffect(() => {
+    const sig = cinemastroTitleKeysData.sig;
+    if (!sig) return undefined;
+
+    let cancelled = false;
     const chunk = (arr, n) => {
       const out = [];
       for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
@@ -3556,21 +3560,23 @@ export default function App() {
     };
 
     const run = async () => {
+      const keys = cinemastroFetchKeysRef.current;
+      if (!keys.length) return;
       for (const part of chunk(keys, 120)) {
-        if (stale) return;
+        if (cancelled) return;
         const payload = [];
         const seenSig = new Set();
         for (const key of part) {
           const p = parseMediaKey(key);
           if (!p) continue;
-          const sig = `${p.type}:${p.tmdbId}`;
-          if (seenSig.has(sig)) continue;
-          seenSig.add(sig);
+          const rowSig = `${p.type}:${p.tmdbId}`;
+          if (seenSig.has(rowSig)) continue;
+          seenSig.add(rowSig);
           payload.push({ tmdb_id: p.tmdbId, media_type: p.type });
         }
         if (!payload.length) continue;
         const { data, error } = await supabase.rpc("get_cinemastro_title_avgs", { p_titles: payload });
-        if (stale) return;
+        if (cancelled) return;
         if (error) {
           console.warn("get_cinemastro_title_avgs:", error.message);
           continue;
@@ -3584,15 +3590,22 @@ export default function App() {
           if (!Number.isFinite(sc)) continue;
           batchMerge[k] = sc;
         }
-        if (!stale && Object.keys(batchMerge).length) {
+        if (!cancelled && Object.keys(batchMerge).length) {
           setCinemastroAvgByKey((prev) => ({ ...prev, ...batchMerge }));
         }
       }
     };
 
-    void run();
+    /* Strips resolve in waves; sig flips often. Immediate fetch + stale=true aborts every run before
+       any chunk finishes. Debounce so one batch runs after keys settle (detail refresh still instant). */
+    const debounceMs = 520;
+    const t = window.setTimeout(() => {
+      void run();
+    }, debounceMs);
+
     return () => {
-      stale = true;
+      cancelled = true;
+      window.clearTimeout(t);
     };
   }, [cinemastroTitleKeysData.sig]);
 
