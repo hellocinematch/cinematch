@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.2
+
+- **Discover search:** **Clear** control (**×**) appears when the search field is not empty; one tap clears the query and results so you can start a new title without deleting character by character. Input is refocused after clear.
+
 ## 3.1.0
 
 - **Cinemastro vote weight (v3.1.0):** RPC **`get_cinemastro_title_avgs`** now returns **`rating_count`** per title alongside **`avg_score`**. Home strips, Discover, mood posters, and title detail show a **gold underline meter** (tiered fill: 0–49, 50–200, 200–500, 500–1500, 1500–3500, 3500–5000 ratings). **No line** when there is no community row; **outline-only / 0% fill** for the lowest tier. Apply **`20260418120000_get_cinemastro_title_avgs_rating_count.sql`** on Supabase (includes **`statement_timeout`** on the function for large `ratings` tables).

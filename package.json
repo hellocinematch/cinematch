@@ -1,7 +1,7 @@
 {
   "name": "cinematch",
   "private": true,
-  "version": "3.1.0",
+  "version": "3.1.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,8 @@
     "seed:external-users": "node scripts/seed-external-users-from-csv.mjs",
     "seed:external-ratings-transform": "node scripts/transform-external-ratings.mjs",
     "titles:enrich-export": "node scripts/enrich-ratings-export-with-tmdb-titles.mjs",
-    "titles:join-csv": "node scripts/join-csv-with-tmdb-titles.mjs"
+    "titles:join-csv": "node scripts/join-csv-with-tmdb-titles.mjs",
+    "titles:streaming-year": "node scripts/tmdb-streaming-releases-this-year.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",

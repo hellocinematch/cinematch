@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.0.0: community avg RPC + badges).
+// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.1.2: Discover search clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -1508,8 +1508,12 @@ const styles = `
   .search-submit-btn .search-icon { position:static; transform:none; font-size:16px; }
   /* Discover/Rated search keeps 16px + native reset to avoid iOS focus expansion. */
   .search-input { width:100%; min-width:0; background:#141414; border:1px solid #2a2a2a; border-radius:10px; padding:12px 16px 12px 42px; font-family:'DM Sans',sans-serif; font-size:16px; line-height:1.2; color:#f0ebe0; outline:none; transition:border-color 0.2s; -webkit-appearance:none; appearance:none; }
+  .search-input--with-clear { padding-right:42px; }
   .search-input::placeholder { color:#444; }
   .search-input:focus { border-color:#555; }
+  .search-clear-btn { position:absolute; right:6px; top:50%; transform:translateY(-50%); width:30px; height:30px; border:none; border-radius:8px; background:transparent; color:#888; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; font-size:20px; line-height:1; font-family:'DM Sans',sans-serif; }
+  .search-clear-btn:hover { color:#ccc; background:rgba(255,255,255,0.06); }
+  .search-clear-btn:active { opacity:0.85; }
   .search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:16px; pointer-events:none; }
   .filter-row { display:flex; gap:8px; padding:10px 24px 14px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; width:100%; max-width:100%; min-width:0; box-sizing:border-box; touch-action:pan-x; }
   .filter-row::-webkit-scrollbar { display:none; }
@@ -2150,6 +2154,7 @@ export default function App() {
   const [ratedSearchQuery, setRatedSearchQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
+  const discoverSearchInputRef = useRef(null);
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -3216,6 +3221,16 @@ export default function App() {
       }
     })();
   }, [appliedSearchQuery, activeFilter]);
+
+  /** v3.1.2: One-tap clear for Discover search (input + applied query + results). */
+  function clearDiscoverSearch() {
+    setSearchQuery("");
+    setAppliedSearchQuery("");
+    setSearchResults([]);
+    setSearchError("");
+    setSearching(false);
+    discoverSearchInputRef.current?.focus();
+  }
 
   const ONBOARDING_COUNT = 12;
   const obMovies = useMemo(() => {
@@ -5042,12 +5057,24 @@ export default function App() {
                 <span className="search-icon">🔍</span>
               </button>
               <input
-                className="search-input"
+                ref={discoverSearchInputRef}
+                className={`search-input${searchQuery.length > 0 ? " search-input--with-clear" : ""}`}
                 type="text"
                 placeholder="Search any movie or show…"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
+                autoComplete="off"
               />
+              {searchQuery.length > 0 ? (
+                <button
+                  type="button"
+                  className="search-clear-btn"
+                  aria-label="Clear search"
+                  onClick={() => clearDiscoverSearch()}
+                >
+                  ×
+                </button>
+              ) : null}
             </form>
           </div>
           <div className="filter-row">
