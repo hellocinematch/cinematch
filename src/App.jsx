@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.1.2: Discover search clear; v3.1.0: rating_count + meter).
+// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.2.0: Rate now uses overlap+TMDB, not catalogue-only; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -78,6 +78,11 @@ const DISCOVER_SEARCH_PAGES = 2;
 const DISCOVER_ALL_CAP_MOVIES = 40;
 const DISCOVER_ALL_CAP_TV = 40;
 const DISCOVER_SINGLE_TYPE_CAP = 40;
+
+/** v3.2.0: Rate now — max overlap candidates to rank before TMDB hydrate + genre filter (then slice to ONBOARDING_COUNT). */
+const RATE_NOW_OVERLAP_CANDIDATE_CAP = 48;
+/** v3.2.0: Parallel TMDB detail fetches per batch (avoid bursting read token). */
+const RATE_NOW_TMDB_FETCH_CONCURRENCY = 8;
 
 /**
  * More tab “Your picks”: strip 1 **For you**, strip 2 **Worth a Look**.
@@ -3756,6 +3761,10 @@ export default function App() {
     setScreen("rate-more");
   }
 
+  /**
+   * v3.2.0: Neighbor overlap from `ratings` only — do not require rows in `catalogueForRecs`.
+   * Rank by overlap + avg score (+ same-type boost); hydrate via catalogue or TMDB detail; drop animation.
+   */
   async function fetchNeighborOverlapTitlesFor(movie, limit = ONBOARDING_COUNT) {
     const tmdbId = Number(movie?.tmdbId);
     const mediaType = movie?.type === "tv" ? "tv" : "movie";
@@ -3785,17 +3794,17 @@ export default function App() {
       ...watchlist.map((m) => m.id),
       `${mediaType}-${tmdbId}`,
     ]);
-    const movieById = new Map(catalogueForRecs.map((m) => [m.id, m]));
     const agg = new Map();
 
     for (const row of overlapRatings || []) {
-      const rid = `${row.media_type}-${row.tmdb_id}`;
+      const mt = row.media_type === "tv" ? "tv" : "movie";
+      const tid = Number(row.tmdb_id);
+      if (!Number.isFinite(tid)) continue;
+      const rid = `${mt}-${tid}`;
       if (blockedIds.has(rid)) continue;
-      const m = movieById.get(rid);
-      if (!m || hasExcludedGenre(m)) continue;
       let rec = agg.get(rid);
       if (!rec) {
-        rec = { movie: m, userIds: new Set(), scoreSum: 0, scoreCount: 0 };
+        rec = { mediaType: mt, tmdbId: tid, userIds: new Set(), scoreSum: 0, scoreCount: 0 };
         agg.set(rid, rec);
       }
       rec.userIds.add(row.user_id);
@@ -3806,20 +3815,53 @@ export default function App() {
       }
     }
 
-    return [...agg.values()]
+    const ranked = [...agg.values()]
       .map((x) => {
-        const overlap = x.userIds.size;
-        const avgScore = x.scoreCount > 0 ? (x.scoreSum / x.scoreCount) : 0;
-        const sameTypeBoost = x.movie.type === mediaType ? 1.15 : 1;
-        const popularityBoost = Math.min(Number(x.movie.popularity) || 0, 100) * 0.015;
-        const rank = (overlap * 1.9 + avgScore * 0.65 + popularityBoost) * sameTypeBoost;
-        return { movie: x.movie, rank };
+        const overlapN = x.userIds.size;
+        const avgScore = x.scoreCount > 0 ? x.scoreSum / x.scoreCount : 0;
+        const sameTypeBoost = x.mediaType === mediaType ? 1.15 : 1;
+        const rank = (overlapN * 1.9 + avgScore * 0.65) * sameTypeBoost;
+        return { ...x, rank };
       })
-      .sort((a, b) => b.rank - a.rank)
-      .slice(0, limit)
-      .map((x) => x.movie);
+      .sort((a, b) => b.rank - a.rank);
+
+    const pool = ranked.slice(0, RATE_NOW_OVERLAP_CANDIDATE_CAP);
+    const catalogueById = new Map(catalogueForRecs.map((m) => [m.id, m]));
+    const needFetch = [];
+    for (const c of pool) {
+      const rid = `${c.mediaType}-${c.tmdbId}`;
+      if (!catalogueById.has(rid)) needFetch.push(c);
+    }
+
+    const tmdbByRid = new Map();
+    for (let i = 0; i < needFetch.length; i += RATE_NOW_TMDB_FETCH_CONCURRENCY) {
+      const chunk = needFetch.slice(i, i + RATE_NOW_TMDB_FETCH_CONCURRENCY);
+      const settled = await Promise.all(
+        chunk.map(async (c) => {
+          const rid = `${c.mediaType}-${c.tmdbId}`;
+          const raw = await fetchTMDB(`/${c.mediaType}/${c.tmdbId}?language=en-US`);
+          if (isTmdbApiErrorPayload(raw) || raw?.id == null) return null;
+          return [rid, normalizeTMDBItem(raw, c.mediaType)];
+        }),
+      );
+      for (const row of settled) {
+        if (row) tmdbByRid.set(row[0], row[1]);
+      }
+    }
+
+    const out = [];
+    for (const c of pool) {
+      if (out.length >= limit) break;
+      const rid = `${c.mediaType}-${c.tmdbId}`;
+      const m = catalogueById.get(rid) ?? tmdbByRid.get(rid);
+      if (!m) continue;
+      if (hasExcludedGenre(m)) continue;
+      out.push(m);
+    }
+    return out;
   }
 
+  /** v3.2.0: Queue from overlap+TMDB hydrate (`fetchNeighborOverlapTitlesFor`); fallback still catalogue popularity. */
   async function handleRateNowForPrediction(movie) {
     setRateSimilarLoading(true);
     setRateSimilarError("");
