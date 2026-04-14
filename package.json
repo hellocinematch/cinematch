@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "ml:transform-ratings": "node SeedData/ml-32m/transform_ratings.mjs",
     "ml:ingest-ratings": "node SeedData/ml-32m/ingest_ratings.mjs",
+    "seed:external-users": "node scripts/seed-external-users-from-csv.mjs",
+    "seed:external-ratings-transform": "node scripts/transform-external-ratings.mjs",
     "titles:enrich-export": "node scripts/enrich-ratings-export-with-tmdb-titles.mjs",
     "titles:join-csv": "node scripts/join-csv-with-tmdb-titles.mjs"
   },

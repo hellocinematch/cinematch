@@ -204,10 +204,14 @@ async function topUpYourPicksStripsRespectingStreaming(
 /** Stable id for catalogue rows (handles `id` vs type+tmdbId after JSON). */
 function mediaIdKey(movie) {
   if (!movie) return null;
-  if (movie.id != null && movie.id !== "") return String(movie.id);
+  if (movie.id != null && movie.id !== "") {
+    const p = parseMediaKey(movie.id);
+    if (p) return `${p.type}-${p.tmdbId}`;
+    return String(movie.id);
+  }
   const tid = movie.tmdbId;
   const ty = movie.type;
-  if (tid != null && ty) return `${ty}-${tid}`;
+  if (tid != null && ty) return `${String(ty).toLowerCase()}-${Number(tid)}`;
   return null;
 }
 
@@ -217,10 +221,27 @@ function parseMediaKey(id) {
   const s = String(id);
   const i = s.indexOf("-");
   if (i <= 0) return null;
-  const type = s.slice(0, i);
+  const type = s.slice(0, i).toLowerCase();
   const tmdbId = parseInt(s.slice(i + 1), 10);
   if (!Number.isFinite(tmdbId) || (type !== "movie" && type !== "tv")) return null;
   return { type, tmdbId };
+}
+
+/** Canonical key for `cinemastroAvgByKey` / RPC merge (must match `mediaIdKey` catalogue ids: `movie-123`). */
+function cinemastroAvgKeyFromRow(row) {
+  if (row?.tmdb_id == null || row?.media_type == null) return null;
+  const ty = String(row.media_type).trim().toLowerCase();
+  const tid = Number(row.tmdb_id);
+  if (!Number.isFinite(tid) || (ty !== "movie" && ty !== "tv")) return null;
+  return `${ty}-${tid}`;
+}
+
+/** PostgREST usually returns an array; normalize single-row or odd shapes so merges never silently drop. */
+function normalizeCinemastroRpcRows(data) {
+  if (data == null) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === "object" && ("tmdb_id" in data || "avg_score" in data)) return [data];
+  return [];
 }
 
 /** Cinemastro personal prediction exists only when neighbours rated this title (`predict` / strip Rec with real overlap). */
@@ -3483,7 +3504,7 @@ export default function App() {
     });
   }, [catalogue, appliedSearchQuery, searchResults, activeFilter]);
 
-  const titleKeysForCinemastroFetch = useMemo(() => {
+  const cinemastroTitleKeysData = useMemo(() => {
     const s = new Set();
     const addMovie = (m) => {
       const k = mediaIdKey(m);
@@ -3505,7 +3526,8 @@ export default function App() {
     for (const r of moodResults) addRec(r);
     if (selectedMovie?.movie) addMovie(selectedMovie.movie);
     for (const m of watchlist) addMovie(m);
-    return [...s];
+    const keys = [...s].sort();
+    return { keys, sig: keys.join("\x1e") };
   }, [
     catalogue,
     userRatings,
@@ -3523,10 +3545,10 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    let cancelled = false;
-    const keys = titleKeysForCinemastroFetch;
+    const keys = cinemastroTitleKeysData.keys;
     if (!keys.length) return undefined;
 
+    let stale = false;
     const chunk = (arr, n) => {
       const out = [];
       for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
@@ -3536,6 +3558,7 @@ export default function App() {
     const run = async () => {
       const merged = {};
       for (const part of chunk(keys, 120)) {
+        if (stale) return;
         const payload = [];
         const seenSig = new Set();
         for (const key of part) {
@@ -3548,29 +3571,33 @@ export default function App() {
         }
         if (!payload.length) continue;
         const { data, error } = await supabase.rpc("get_cinemastro_title_avgs", { p_titles: payload });
-        if (cancelled) return;
+        if (stale) return;
         if (error) {
           console.warn("get_cinemastro_title_avgs:", error.message);
           continue;
         }
-        const rows = Array.isArray(data) ? data : [];
+        const rows = normalizeCinemastroRpcRows(data);
         for (const row of rows) {
-          if (row?.tmdb_id == null || row?.media_type == null) continue;
-          const k = `${String(row.media_type)}-${String(row.tmdb_id)}`;
-          merged[k] = Number(row.avg_score);
+          const k = cinemastroAvgKeyFromRow(row);
+          if (!k) continue;
+          const sc = Number(row.avg_score);
+          if (!Number.isFinite(sc)) continue;
+          merged[k] = sc;
         }
       }
-      if (!cancelled && Object.keys(merged).length) {
+      if (!stale && Object.keys(merged).length) {
         setCinemastroAvgByKey((prev) => ({ ...prev, ...merged }));
       }
     };
 
-    const t = setTimeout(run, 320);
+    const t = setTimeout(() => {
+      void run();
+    }, 400);
     return () => {
-      cancelled = true;
+      stale = true;
       clearTimeout(t);
     };
-  }, [titleKeysForCinemastroFetch]);
+  }, [cinemastroTitleKeysData.sig]);
 
   async function refreshCinemastroAvgForMediaId(movieId) {
     const p = parseMediaKey(movieId);
@@ -3578,11 +3605,15 @@ export default function App() {
     const { data, error } = await supabase.rpc("get_cinemastro_title_avgs", {
       p_titles: [{ tmdb_id: p.tmdbId, media_type: p.type }],
     });
-    if (error || !data?.length) return;
-    const row = Array.isArray(data) ? data[0] : data;
-    if (row?.tmdb_id == null || row?.media_type == null) return;
-    const k = `${String(row.media_type)}-${String(row.tmdb_id)}`;
-    setCinemastroAvgByKey((prev) => ({ ...prev, [k]: Number(row.avg_score) }));
+    if (error) return;
+    const rows = normalizeCinemastroRpcRows(data);
+    const row = rows[0];
+    if (!row) return;
+    const k = cinemastroAvgKeyFromRow(row);
+    if (!k) return;
+    const sc = Number(row.avg_score);
+    if (!Number.isFinite(sc)) return;
+    setCinemastroAvgByKey((prev) => ({ ...prev, [k]: sc }));
   }
 
   function StripPosterBadge({ movie, predicted }) {
@@ -3767,6 +3798,7 @@ export default function App() {
       detailHistoryPushedRef.current = true;
     }
     setSelected({ movie, prediction: pred });
+    void refreshCinemastroAvgForMediaId(movie.id);
     if (opts.startEditing && userRatings[movie.id] != null) {
       setDetailEditRating(true);
       setDetailRating(userRatings[movie.id]);
