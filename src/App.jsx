@@ -3556,7 +3556,6 @@ export default function App() {
     };
 
     const run = async () => {
-      const merged = {};
       for (const part of chunk(keys, 120)) {
         if (stale) return;
         const payload = [];
@@ -3577,25 +3576,23 @@ export default function App() {
           continue;
         }
         const rows = normalizeCinemastroRpcRows(data);
+        const batchMerge = {};
         for (const row of rows) {
           const k = cinemastroAvgKeyFromRow(row);
           if (!k) continue;
           const sc = Number(row.avg_score);
           if (!Number.isFinite(sc)) continue;
-          merged[k] = sc;
+          batchMerge[k] = sc;
         }
-      }
-      if (!stale && Object.keys(merged).length) {
-        setCinemastroAvgByKey((prev) => ({ ...prev, ...merged }));
+        if (!stale && Object.keys(batchMerge).length) {
+          setCinemastroAvgByKey((prev) => ({ ...prev, ...batchMerge }));
+        }
       }
     };
 
-    const t = setTimeout(() => {
-      void run();
-    }, 400);
+    void run();
     return () => {
       stale = true;
-      clearTimeout(t);
     };
   }, [cinemastroTitleKeysData.sig]);
 
