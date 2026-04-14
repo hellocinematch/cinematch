@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.0
+
+- **Cinemastro vote weight (v3.1.0):** RPC **`get_cinemastro_title_avgs`** now returns **`rating_count`** per title alongside **`avg_score`**. Home strips, Discover, mood posters, and title detail show a **gold underline meter** (tiered fill: 0–49, 50–200, 200–500, 500–1500, 1500–3500, 3500–5000 ratings). **No line** when there is no community row; **outline-only / 0% fill** for the lowest tier. Apply **`20260418120000_get_cinemastro_title_avgs_rating_count.sql`** on Supabase (includes **`statement_timeout`** on the function for large `ratings` tables).
+- **Safari tab resume:** **`TOKEN_REFRESHED`** no longer calls **`setUser`**, avoiding unnecessary **match** refetch and “main refreshed” feel when switching back to the tab.
+
 ## 3.0.0
 
 - **Community score (Cinemastro vs TMDB):** Batch RPC **`get_cinemastro_title_avgs`** returns average **`public.ratings`** score per title (no count shown). **Home strips**, **Discover** cards, and **mood results** badges prefer **Cinemastro** when data exists; otherwise **TMDB**, then predicted. **Cinemastro** uses the same pill as TMDB with a **subtle gold border** (Option B). **Title detail** shows one community block (**Cinemastro** or **TMDB**, labeled); **predicted for you** unchanged. Apply the migration in Supabase before shipping the client.

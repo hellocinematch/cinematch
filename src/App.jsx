@@ -1429,6 +1429,10 @@ const styles = `
   .strip-badge { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.82); padding:4px 8px; border-radius:10px; font-size:12px; color:#e8c96a; font-family:'DM Serif Display',serif; z-index:2; }
   /* v3.0.0: Cinemastro community avg — Option B gold edge; TMDB uses base .strip-badge only. */
   .strip-badge.strip-badge--cinemastro { border:1px solid rgba(201,162,39,0.65); box-shadow:0 0 0 1px rgba(232,201,106,0.1); }
+  /* v3.1.0: Gold underline = community sample weight (tiered fill). */
+  .strip-badge.strip-badge--with-meter { display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 8px 5px; }
+  .cinemastro-vote-meter { width:100%; min-width:28px; max-width:72px; height:3px; border-radius:2px; border:1px solid rgba(201,162,39,0.55); background:rgba(0,0,0,0.35); box-sizing:border-box; overflow:hidden; }
+  .cinemastro-vote-meter-fill { height:100%; background:linear-gradient(90deg,#a67c1a,#e8c96a); border-radius:1px; min-width:0; transition:width 0.25s ease; }
   /* Your picks only: icon-only Pick ✨ vs Popular 📈; mirrors score badge contrast (lower-left vs lower-right). */
   .strip-kind-icon {
     position:absolute; bottom:6px; left:6px; z-index:2;
@@ -1523,7 +1527,10 @@ const styles = `
   .disc-type { position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.75); border:1px solid #333; padding:2px 7px; border-radius:8px; font-size:9px; letter-spacing:1px; text-transform:uppercase; color:#aaa; }
   .disc-rated-badge { color:#88cc88; }
   .disc-pred-badge { color:#e8c96a; }
+  .disc-pred-badge.disc-pred-badge--with-meter { display:inline-flex; flex-direction:column; align-items:center; gap:2px; padding:3px 6px 4px; }
   .disc-community-badge--cinemastro { border:1px solid rgba(201,162,39,0.55); border-radius:8px; padding:2px 6px; display:inline-block; }
+  .disc-community-badge--cinemastro.disc-pred-badge--with-meter { padding:3px 6px 4px; }
+  .cinemastro-vote-meter--disc { max-width:56px; }
   .disc-unseen-badge { color:#555; font-size:10px; font-family:'DM Sans',sans-serif; }
   .disc-title { font-size:13px; color:#ccc; margin-top:8px; line-height:1.3; font-weight:500; overflow-wrap:anywhere; word-break:break-word; }
   .disc-meta { font-size:11px; color:#555; margin-top:2px; overflow-wrap:anywhere; word-break:break-word; }
@@ -1561,7 +1568,9 @@ const styles = `
   .mood-result-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:64px; background:#1a1a1a; }
   .mood-result-overlay { position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 60%); }
   .mood-result-badge { position:absolute; top:12px; right:12px; background:rgba(0,0,0,0.75); border:1px solid #e8c96a; padding:5px 10px; border-radius:16px; font-family:'DM Serif Display',serif; font-size:16px; color:#e8c96a; }
+  .mood-result-badge.mood-result-badge--with-meter { display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 10px 6px; }
   .mood-result-badge.mood-result-badge--cinemastro { box-shadow:0 0 0 2px rgba(201,162,39,0.45); border-color:#c9a227; }
+  .cinemastro-vote-meter--mood { max-width:64px; }
   .mood-result-type { position:absolute; top:12px; left:12px; background:rgba(0,0,0,0.7); border:1px solid #333; padding:3px 8px; border-radius:8px; font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#aaa; }
   .mood-result-info { padding:14px 16px; }
   .mood-result-title { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; line-height:1.1; }
@@ -1612,6 +1621,8 @@ const styles = `
   .d-pred-label { font-size:12px; color:#666; }
   .d-pred-sub { font-size:11px; color:#444; margin-top:3px; }
   .d-pred-val { font-family:'DM Serif Display',serif; font-size:38px; color:#e8c96a; line-height:1; text-align:right; }
+  .d-pred-val-block { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .cinemastro-vote-meter--detail { width:min(120px, 100%); max-width:100%; }
   .d-pred-val-low { color:#b89f5a; }
   .d-pred-val-medium { color:#d8ba63; }
   .d-pred-val-high { color:#f1cf70; }
@@ -1929,9 +1940,53 @@ function formatScore(n) {
   return (Math.round(x * 10) / 10).toFixed(1);
 }
 
+/** v3.1.0: Map value is `{ avgScore, ratingCount }` (legacy session may still have a bare number for avg only). */
+function cinemastroEntryAvg(entry) {
+  if (entry == null) return undefined;
+  if (typeof entry === "number") return Number.isFinite(entry) ? entry : undefined;
+  const a = Number(entry.avgScore);
+  return Number.isFinite(a) ? a : undefined;
+}
+
+function cinemastroEntryCount(entry) {
+  if (entry == null || typeof entry === "number") return undefined;
+  const n = Number(entry.ratingCount);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Discrete fill % for gold underline meter (tiers by community sample size). */
+function cinemastroCommunityFillPercent(count) {
+  const n = Math.floor(Number(count));
+  if (!Number.isFinite(n) || n < 1) return null;
+  if (n <= 49) return 0;
+  if (n <= 200) return 20;
+  if (n <= 500) return 40;
+  if (n <= 1500) return 70;
+  if (n <= 3500) return 90;
+  return 100;
+}
+
+function CinemastroVoteMeter({ count, className = "" }) {
+  const n = Number(count);
+  if (!Number.isFinite(n) || n < 1) return null;
+  const pct = cinemastroCommunityFillPercent(n);
+  if (pct == null) return null;
+  const label = `${formatPublicStat(n)} Cinematch ratings`;
+  return (
+    <div
+      className={`cinemastro-vote-meter${className ? ` ${className}` : ""}`}
+      role="img"
+      aria-label={label}
+      title={label}
+    >
+      <div className="cinemastro-vote-meter-fill" style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
 /**
- * v3.0.0: Poster / Discover / mood badge — prefer Cinemastro avg (`cinemastroAvgByKey`), else TMDB, else predicted.
- * `pillClass` adds gold-edge treatment for Cinemastro (Option B); TMDB keeps the neutral dark pill.
+ * v3.1.0: Poster / Discover / mood badge — prefer Cinemastro (`cinemastroAvgByKey` avg + count), else TMDB, else predicted.
+ * `pillClass` adds gold-edge treatment for Cinemastro; TMDB keeps the neutral dark pill.
  */
 function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
   if (userRating != null && Number.isFinite(Number(userRating))) {
@@ -1940,16 +1995,23 @@ function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
       title: "Your rating",
       color: "#88cc88",
       pillClass: "",
+      cinemastroCount: null,
     };
   }
   const key = mediaIdKey(movie);
-  const c = key != null ? cinemastroAvgByKey[key] : undefined;
-  if (typeof c === "number" && Number.isFinite(c)) {
+  const entry = key != null ? cinemastroAvgByKey[key] : undefined;
+  const cAvg = cinemastroEntryAvg(entry);
+  const cCount = cinemastroEntryCount(entry);
+  if (typeof cAvg === "number" && Number.isFinite(cAvg)) {
     return {
-      text: formatScore(c),
-      title: "Cinemastro rating",
+      text: formatScore(cAvg),
+      title:
+        cCount != null && cCount > 0
+          ? `Cinemastro rating · ${formatPublicStat(cCount)} ratings`
+          : "Cinemastro rating",
       color: "#e8c96a",
       pillClass: "strip-badge--cinemastro",
+      cinemastroCount: cCount ?? null,
     };
   }
   const tmdb = movie?.tmdbRating;
@@ -1959,6 +2021,7 @@ function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
       title: "TMDB average",
       color: "#e8c96a",
       pillClass: "",
+      cinemastroCount: null,
     };
   }
   if (predicted != null && Number.isFinite(Number(predicted))) {
@@ -1967,9 +2030,10 @@ function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
       title: "Predicted for you",
       color: "#e8c96a",
       pillClass: "",
+      cinemastroCount: null,
     };
   }
-  return { text: "—", title: "", color: "#e8c96a", pillClass: "" };
+  return { text: "—", title: "", color: "#e8c96a", pillClass: "", cinemastroCount: null };
 }
 
 function formatMovieReleaseLine(movie) {
@@ -2127,7 +2191,7 @@ export default function App() {
   const [secondaryStripReady, setSecondaryStripReady] = useState(true);
   /** Public marketing counts (RPC). Undefined until first successful fetch. */
   const [siteStats, setSiteStats] = useState(null);
-  /** v3.0.0: `movie-${tmdbId}` → avg score from `get_cinemastro_title_avgs` (badges prefer this over TMDB). */
+  /** v3.1.0: `movie-${tmdbId}` → `{ avgScore, ratingCount }` from `get_cinemastro_title_avgs` (badges prefer over TMDB). */
   const [cinemastroAvgByKey, setCinemastroAvgByKey] = useState({});
   /** Latest title keys for Cinemastro batch RPC (read when debounced fetch runs, not when effect first fires). */
   const cinemastroFetchKeysRef = useRef([]);
@@ -2282,6 +2346,8 @@ export default function App() {
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      /* Safari tab resume: token refresh should not reset `user` or retrigger match/catalogue effects. */
+      if (event === "TOKEN_REFRESHED") return;
       if (event === "PASSWORD_RECOVERY") {
         routeRecovery();
         setUser(session?.user ?? null);
@@ -3588,7 +3654,11 @@ export default function App() {
           if (!k) continue;
           const sc = Number(row.avg_score);
           if (!Number.isFinite(sc)) continue;
-          batchMerge[k] = sc;
+          const rc = Number(row.rating_count);
+          batchMerge[k] = {
+            avgScore: sc,
+            ratingCount: Number.isFinite(rc) ? rc : 0,
+          };
         }
         if (!cancelled && Object.keys(batchMerge).length) {
           setCinemastroAvgByKey((prev) => ({ ...prev, ...batchMerge }));
@@ -3623,18 +3693,27 @@ export default function App() {
     if (!k) return;
     const sc = Number(row.avg_score);
     if (!Number.isFinite(sc)) return;
-    setCinemastroAvgByKey((prev) => ({ ...prev, [k]: sc }));
+    const rc = Number(row.rating_count);
+    setCinemastroAvgByKey((prev) => ({
+      ...prev,
+      [k]: { avgScore: sc, ratingCount: Number.isFinite(rc) ? rc : 0 },
+    }));
   }
 
   function StripPosterBadge({ movie, predicted }) {
     const bd = stripBadgeDisplay(movie, userRatings[movie.id], predicted, cinemastroAvgByKey);
+    const showMeter =
+      bd.pillClass === "strip-badge--cinemastro" &&
+      bd.cinemastroCount != null &&
+      bd.cinemastroCount >= 1;
     return (
       <div
-        className={`strip-badge${bd.pillClass ? ` ${bd.pillClass}` : ""}`}
+        className={`strip-badge${bd.pillClass ? ` ${bd.pillClass}` : ""}${showMeter ? " strip-badge--with-meter" : ""}`}
         style={{ color: bd.color }}
         title={bd.title || undefined}
       >
-        {bd.text}
+        <span className="strip-badge-score">{bd.text}</span>
+        {showMeter ? <CinemastroVoteMeter count={bd.cinemastroCount} /> : null}
       </div>
     );
   }
@@ -4996,6 +5075,10 @@ export default function App() {
                 const rec = recMap[m.id];
                 const myRating = userRatings[m.id];
                 const discBd = stripBadgeDisplay(m, myRating, rec?.predicted ?? null, cinemastroAvgByKey);
+                const discMeter =
+                  discBd.pillClass === "strip-badge--cinemastro" &&
+                  discBd.cinemastroCount != null &&
+                  discBd.cinemastroCount >= 1;
                 return (
                   <div className="disc-card" key={m.id} onClick={() => openDetail(m, rec)}>
                     <div className="disc-poster">
@@ -5007,10 +5090,13 @@ export default function App() {
                             ? <span className="disc-unseen-badge">Unrated</span>
                             : (
                               <span
-                                className={`disc-pred-badge${discBd.pillClass === "strip-badge--cinemastro" ? " disc-community-badge--cinemastro" : ""}`}
+                                className={`disc-pred-badge${discBd.pillClass === "strip-badge--cinemastro" ? " disc-community-badge--cinemastro" : ""}${discMeter ? " disc-pred-badge--with-meter" : ""}`}
                                 title={discBd.title || undefined}
                               >
-                                {discBd.text}
+                                <span className="disc-pred-badge-score">{discBd.text}</span>
+                                {discMeter ? (
+                                  <CinemastroVoteMeter count={discBd.cinemastroCount} className="cinemastro-vote-meter--disc" />
+                                ) : null}
                               </span>
                             )}
                       </div>
@@ -5105,12 +5191,19 @@ export default function App() {
                     <div className="mood-result-type">{rec.movie.type === "movie" ? "Movie" : "TV"}</div>
                     {(() => {
                       const mbd = stripBadgeDisplay(rec.movie, userRatings[rec.movie.id], rec.predicted, cinemastroAvgByKey);
+                      const moodMeter =
+                        mbd.pillClass === "strip-badge--cinemastro" &&
+                        mbd.cinemastroCount != null &&
+                        mbd.cinemastroCount >= 1;
                       return (
                         <div
-                          className={`mood-result-badge${mbd.pillClass === "strip-badge--cinemastro" ? " mood-result-badge--cinemastro" : ""}`}
+                          className={`mood-result-badge${mbd.pillClass === "strip-badge--cinemastro" ? " mood-result-badge--cinemastro" : ""}${moodMeter ? " mood-result-badge--with-meter" : ""}`}
                           title={mbd.title || undefined}
                         >
-                          {mbd.text}
+                          <span className="mood-result-badge-score">{mbd.text}</span>
+                          {moodMeter ? (
+                            <CinemastroVoteMeter count={mbd.cinemastroCount} className="cinemastro-vote-meter--mood" />
+                          ) : null}
                         </div>
                       );
                     })()}
@@ -5379,7 +5472,9 @@ export default function App() {
         const { movie, prediction } = selectedMovie;
         const myRating = userRatings[movie.id];
         const detailMediaKey = mediaIdKey(movie);
-        const detailCinemastroAvg = detailMediaKey != null ? cinemastroAvgByKey[detailMediaKey] : undefined;
+        const detailCinemastroEntry = detailMediaKey != null ? cinemastroAvgByKey[detailMediaKey] : undefined;
+        const detailCinemastroAvg = cinemastroEntryAvg(detailCinemastroEntry);
+        const detailCinemastroCount = cinemastroEntryCount(detailCinemastroEntry);
         const detailHasCinemastro = typeof detailCinemastroAvg === "number" && Number.isFinite(detailCinemastroAvg);
         const detailTmdbNum = movie.tmdbRating != null && Number.isFinite(Number(movie.tmdbRating)) ? Number(movie.tmdbRating) : null;
         const detailShowCommunity = detailHasCinemastro || detailTmdbNum != null;
@@ -5414,8 +5509,13 @@ export default function App() {
                         {detailHasCinemastro ? "From people on Cinemastro" : "From the broader community (TMDB)"}
                       </div>
                     </div>
-                    <div className="d-pred-val" style={{ fontSize: 32 }}>
-                      {detailHasCinemastro ? formatScore(detailCinemastroAvg) : formatScore(detailTmdbNum)}
+                    <div className="d-pred-val-block">
+                      <div className="d-pred-val" style={{ fontSize: 32 }}>
+                        {detailHasCinemastro ? formatScore(detailCinemastroAvg) : formatScore(detailTmdbNum)}
+                      </div>
+                      {detailHasCinemastro && detailCinemastroCount != null && detailCinemastroCount >= 1 ? (
+                        <CinemastroVoteMeter count={detailCinemastroCount} className="cinemastro-vote-meter--detail" />
+                      ) : null}
                     </div>
                   </div>
                 )}
