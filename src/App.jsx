@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
+// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.4.0: detail card copy/chips refresh; v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -1639,6 +1639,12 @@ const styles = `
   .detail-score-card-val--yours { color:#a8d4a8; }
   .detail-score-card-val--muted { color:#555; font-size:28px; }
   .detail-score-card-sub { font-size:11px; color:#555; line-height:1.35; }
+  .detail-score-chip-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:2px; }
+  .detail-score-chip { display:inline-flex; align-items:center; font-size:10px; line-height:1; border-radius:999px; padding:4px 8px; }
+  .detail-score-chip--range { color:#b7b7b7; background:#1f1f1f; border:1px solid #2a2a2a; }
+  .detail-score-chip--high { color:#6aaa6a; background:#1a2a1a; border:1px solid #274227; }
+  .detail-score-chip--medium { color:#d0be68; background:#2a230f; border:1px solid #5f4b22; }
+  .detail-score-chip--low { color:#ca7c7c; background:#2a1a1a; border:1px solid #5b2f2f; }
   .detail-score-card .d-rate-now-btn { margin-top:4px; align-self:flex-start; }
   .detail-score-card-skel .skel-line { margin-top:0; }
   .detail-score-card .cinemastro-vote-meter--detail { width:100%; max-width:100px; margin-top:2px; }
@@ -1741,10 +1747,6 @@ const styles = `
   .signout-btn { width:100%; background:#1a1a1a; color:#888; border:1px solid #2a2a2a; padding:14px; font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; border-radius:2px; transition:all 0.2s; }
   .signout-btn:hover { border-color:#555; color:#ccc; }
   .profile-section { padding:0 24px; margin-bottom:24px; }
-
-  .conf-high { background:#1a2a1a; color:#6aaa6a; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
-  .conf-medium { background:#2a2000; color:#aaaa50; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
-  .conf-low { background:#2a1a1a; color:#aa6a6a; display:inline-block; font-size:10px; padding:3px 8px; border-radius:10px; margin-top:6px; }
 
   @media (max-width: 899px) {
     /* Keep branded header fully within viewport on narrow screens. */
@@ -4451,17 +4453,10 @@ export default function App() {
   }
 
   const inWatchlist = (id) => watchlist.some(m => m.id === id);
-  const confClass = (c) => c === "high" ? "conf-high" : c === "medium" ? "conf-medium" : "conf-low";
-  const confLabel = (c) => c === "high" ? "✓✓ High confidence" : c === "medium" ? "✓ Medium confidence" : "~ Low confidence";
+  const confToneClass = (c) => c === "high" ? "detail-score-chip--high" : c === "medium" ? "detail-score-chip--medium" : "detail-score-chip--low";
+  const confToneLabel = (c) => c === "high" ? "High" : c === "medium" ? "Medium" : "Low";
   const predBoxClass = (c) => c === "high" ? "d-pred-box-high" : c === "medium" ? "d-pred-box-medium" : "d-pred-box-low";
   const predValClass = (c) => c === "high" ? "d-pred-val-high" : c === "medium" ? "d-pred-val-medium" : "d-pred-val-low";
-  const predRangeClass = (c) => c === "high" ? "d-pred-range-high" : c === "medium" ? "d-pred-range-medium" : "d-pred-range-low";
-  const shouldShowPredRange = (pred) => {
-    if (!pred) return false;
-    if (pred.confidence !== "high") return true;
-    const width = Math.abs(Number(pred.high) - Number(pred.low));
-    return Number.isFinite(width) && width > 0.4;
-  };
   const obMovie = obMovies[obStep];
   const userInitial = user?.user_metadata?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "?";
   const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "there";
@@ -5648,9 +5643,7 @@ export default function App() {
                           : " detail-score-card--you-gold"
                     }`}
                   >
-                    <div className="detail-score-card-lbl">
-                      {myRating != null && Number.isFinite(Number(myRating)) ? "Your rating" : "You"}
-                    </div>
+                    <div className="detail-score-card-lbl">For you</div>
                     {myRating != null && Number.isFinite(Number(myRating)) ? (
                       <>
                         <div className="detail-score-card-val detail-score-card-val--yours">{formatScore(Number(myRating))}</div>
@@ -5666,33 +5659,32 @@ export default function App() {
                         <div className={`detail-score-card-val ${predValClass(prediction.confidence)}`}>
                           {formatScore(prediction.predicted)}
                         </div>
-                        {shouldShowPredRange(prediction) ? (
-                          <div className={`detail-score-card-sub ${predRangeClass(prediction.confidence)}`}>
-                            {formatScore(prediction.low)}–{formatScore(prediction.high)} likely range
-                          </div>
-                        ) : null}
-                        <div className="detail-score-card-sub">
-                          <span className={confClass(prediction.confidence)}>{confLabel(prediction.confidence)}</span>
-                          {" · "}Based on your tastometer
+                        <div className="detail-score-chip-row">
+                          <span className="detail-score-chip detail-score-chip--range">
+                            {formatScore(prediction.low)}–{formatScore(prediction.high)}
+                          </span>
+                          <span className={`detail-score-chip ${confToneClass(prediction.confidence)}`}>
+                            {confToneLabel(prediction.confidence)}
+                          </span>
                         </div>
-                        {(prediction.confidence === "low" || prediction.confidence === "medium") && (
-                          <>
-                            <button
-                              type="button"
-                              className="d-rate-now-btn"
-                              disabled={rateSimilarLoading}
-                              onClick={() => { void handleRateNowForPrediction(movie); }}
-                            >
-                              {rateSimilarLoading ? "Loading..." : "Rate now"}
-                            </button>
-                            {rateSimilarError ? <div className="d-pred-improve-err">{rateSimilarError}</div> : null}
-                          </>
-                        )}
+                        <button
+                          type="button"
+                          className="d-rate-now-btn"
+                          disabled={rateSimilarLoading}
+                          onClick={() => { void handleRateNowForPrediction(movie); }}
+                        >
+                          {rateSimilarLoading
+                            ? "Loading..."
+                            : prediction.confidence === "high"
+                              ? "Rate more"
+                              : "Rate to refine"}
+                        </button>
+                        {rateSimilarError ? <div className="d-pred-improve-err">{rateSimilarError}</div> : null}
                       </>
                     ) : (
                       <>
                         <div className="detail-score-card-val detail-score-card-val--muted">TBD</div>
-                        <div className="detail-score-card-sub">Rate more titles to unlock a personal prediction</div>
+                        <div className="detail-score-card-sub">Rate more to predict.</div>
                       </>
                     )}
                   </div>
@@ -5701,11 +5693,11 @@ export default function App() {
                       detailHasCinemastro ? " detail-score-card--crowd-cine" : ""
                     }`}
                   >
-                    <div className="detail-score-card-lbl">Crowd</div>
+                    <div className="detail-score-card-lbl">{detailHasCinemastro ? "Cinemastro" : "TMDB Score"}</div>
                     {detailHasCinemastro ? (
                       <>
                         <div className="detail-score-card-val">{formatScore(detailCinemastroAvg)}</div>
-                        <div className="detail-score-card-sub">Cinemastro average</div>
+                        <div className="detail-score-card-sub">TMDB-based</div>
                         {detailCinemastroCount != null && detailCinemastroCount >= 1 ? (
                           <CinemastroVoteMeter count={detailCinemastroCount} className="cinemastro-vote-meter--detail" />
                         ) : null}
@@ -5713,12 +5705,11 @@ export default function App() {
                     ) : detailTmdbNum != null ? (
                       <>
                         <div className="detail-score-card-val">{formatScore(detailTmdbNum)}</div>
-                        <div className="detail-score-card-sub">TMDB average</div>
                       </>
                     ) : (
                       <>
                         <div className="detail-score-card-val detail-score-card-val--muted">—</div>
-                        <div className="detail-score-card-sub">No crowd score yet</div>
+                        <div className="detail-score-card-sub">No score yet</div>
                       </>
                     )}
                   </div>

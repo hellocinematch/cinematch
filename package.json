@@ -1,7 +1,7 @@
 {
   "name": "cinematch",
   "private": true,
-  "version": "3.3.0",
+  "version": "3.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,8 @@
     "ml:ingest-ratings": "node SeedData/ml-32m/ingest_ratings.mjs",
     "seed:external-users": "node scripts/seed-external-users-from-csv.mjs",
     "seed:external-ratings-transform": "node scripts/transform-external-ratings.mjs",
+    "seed:generate-ratings-from-titles": "node scripts/generate-seed-ratings-from-titles.mjs",
+    "seed:merge-weekly-into-prev": "node scripts/merge-weekly-ratings-into-prev-loaded.mjs",
     "titles:enrich-export": "node scripts/enrich-ratings-export-with-tmdb-titles.mjs",
     "titles:join-csv": "node scripts/join-csv-with-tmdb-titles.mjs",
     "titles:streaming-year": "node scripts/tmdb-streaming-releases-this-year.mjs"

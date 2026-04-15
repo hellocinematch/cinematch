@@ -3,7 +3,7 @@ import path from "node:path";
 import readline from "node:readline";
 
 /**
- * Join ratings CSVs (external_id, media_type, tmdb_id, score) with user_mapping.csv
+ * Join ratings CSVs or TSVs (external_id, media_type, tmdb_id, score) with user_mapping.csv
  * → ratings_for_ingest.csv (user_id, media_type, tmdb_id, score) for ml:ingest-ratings.
  *
  * Default inputs (when RATINGS_CSV / RATINGS_CSV_LIST unset): New_ratings.csv then
@@ -12,8 +12,8 @@ import readline from "node:readline";
  * media_type is normalized to lowercase (e.g. Movie → movie).
  *
  * Env:
- *   SEED_DATA_DIR — default: seed-data-final if those files exist, else SeedDataNew2023…
- *   RATINGS_CSV — single file (overrides default pair)
+ *   SEED_DATA_DIR — default: SeedDataWeeklyAdd if present, else seed-data-final, else SeedDataNew2023…
+ *   RATINGS_CSV — single file (overrides default pair). Tab- or comma-separated (auto from header row).
  *   RATINGS_CSV_LIST — comma-separated paths (overrides default pair)
  *   MAPPING_CSV — default $SEED_DATA_DIR/user_mapping.csv
  *   OUTPUT_CSV — default $SEED_DATA_DIR/ratings_for_ingest.csv
@@ -22,8 +22,14 @@ import readline from "node:readline";
 const ROOT = process.cwd();
 
 function resolveDefaultSeedDataDir() {
+  const weekly = path.join(ROOT, "SeedDataWeeklyAdd");
   const final = path.join(ROOT, "SeedData", "seed-data-final");
   const legacy = path.join(ROOT, "SeedDataNew2023andAbovewith5000newTempSeedUsers");
+  const weeklySignals =
+    fs.existsSync(path.join(weekly, "NewTitlesRatingsToAdd.csv")) ||
+    fs.existsSync(path.join(weekly, "ratings-prev-loaded.csv")) ||
+    fs.existsSync(path.join(weekly, "users.csv"));
+  if (weeklySignals) return weekly;
   const finalSignals =
     fs.existsSync(path.join(final, "New_ratings.csv")) ||
     fs.existsSync(path.join(final, "ratings-deduped.csv")) ||
@@ -35,10 +41,20 @@ function resolveDefaultSeedDataDir() {
 
 function pickFirstExisting(dir, basenames) {
   for (const b of basenames) {
+    if (!b) continue;
     const p = path.join(dir, b);
     if (fs.existsSync(p)) return p;
   }
   return null;
+}
+
+function pickLatestDatedNewRatings(dir) {
+  if (!fs.existsSync(dir)) return null;
+  const files = fs.readdirSync(dir)
+    .filter((f) => /^New_ratings_\d{8}\.csv$/i.test(f))
+    .sort();
+  if (files.length === 0) return null;
+  return path.join(dir, files[files.length - 1]);
 }
 
 function resolveRatingInputFiles(seedDataDir) {
@@ -59,7 +75,8 @@ function resolveRatingInputFiles(seedDataDir) {
     return out;
   }
 
-  const newRatings = pickFirstExisting(seedDataDir, [
+  const latestDated = pickLatestDatedNewRatings(seedDataDir);
+  const newRatings = latestDated || pickFirstExisting(seedDataDir, [
     "New_ratings.csv",
     "new_ratings.csv",
   ]);
@@ -127,6 +144,19 @@ function loadMapping() {
  * @param {import('node:fs').WriteStream} out
  * @param {{ written: number, skippedNoUser: number }} stats
  */
+function detectDelimiter(headerLine) {
+  const t = headerLine.includes("\t");
+  const c = headerLine.includes(",");
+  if (t && !c) return "\t";
+  if (c && !t) return ",";
+  if (t && c) {
+    const tabCols = headerLine.split("\t").length;
+    const commaCols = headerLine.split(",").length;
+    return tabCols >= commaCols ? "\t" : ",";
+  }
+  return ",";
+}
+
 async function streamRatingsFile(ratingsPath, idMap, out, stats) {
   const rl = readline.createInterface({
     input: fs.createReadStream(ratingsPath, { encoding: "utf8" }),
@@ -134,6 +164,7 @@ async function streamRatingsFile(ratingsPath, idMap, out, stats) {
   });
 
   let lineNo = 0;
+  let delim = ",";
   let extIdx = 0;
   let mediaIdx = 1;
   let tmdbIdx = 2;
@@ -142,7 +173,8 @@ async function streamRatingsFile(ratingsPath, idMap, out, stats) {
   for await (const line of rl) {
     lineNo += 1;
     if (lineNo === 1) {
-      const h = line.split(",").map((c) => c.trim());
+      delim = detectDelimiter(line);
+      const h = line.split(delim).map((c) => c.trim());
       extIdx = h.indexOf("external_id");
       mediaIdx = h.indexOf("media_type");
       tmdbIdx = h.indexOf("tmdb_id");
@@ -154,7 +186,7 @@ async function streamRatingsFile(ratingsPath, idMap, out, stats) {
       }
       continue;
     }
-    const cols = line.split(",");
+    const cols = line.split(delim);
     const externalId = (cols[extIdx] || "").trim();
     const mediaTypeRaw = (cols[mediaIdx] || "").trim();
     const mediaType = mediaTypeRaw.toLowerCase();

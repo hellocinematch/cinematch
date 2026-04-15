@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.4.0
+
+- **Title detail cards (copy + clarity):** Left card label is now **For you** in all states. In predicted state, the range and confidence move to compact chips (**`low–high`** + **High/Medium/Low**) and the long tastometer sentence is removed. **TBD** helper text is shortened to **“Rate more to predict.”**
+- **Prediction CTA wording:** Predicted-state action text is now confidence-aware — **High:** “Rate more”, **Medium/Low:** “Rate to refine”.
+- **Community card labels:** Removed the generic **Crowd** label. Right card now titles by source: **TMDB Score** (TMDB fallback) or **Cinemastro** (community score). Cinemastro subtext is **“TMDB-based”**; TMDB fallback no longer repeats a redundant sublabel.
+
 ## 3.3.0
 
 - **Title detail (layout):** **Backdrop hero** with **poster** overlapped on the **lower right**, aligned with the **title** row. **Year** + **type** chips and optional **tagline** (TMDB `tagline` via detail fetch). **No** runtime or certification yet.
