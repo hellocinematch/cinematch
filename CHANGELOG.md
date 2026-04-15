@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.3.0
+
+- **Title detail (layout):** **Backdrop hero** with **poster** overlapped on the **lower right**, aligned with the **title** row. **Year** + **type** chips and optional **tagline** (TMDB `tagline` via detail fetch). **No** runtime or certification yet.
+- **Title detail (scores):** **Two cards** — **You** (saved rating, or predicted + confidence / range, or **TBD** + rate-more cue) and **Crowd** (**Cinemastro** with meter when available, else **TMDB**). Previous stacked community + prediction blocks removed in favor of this row.
+
 ## 3.2.1
 
 - **Title detail:** Opening a title **no longer waits** on the Edge **`predict`** call before navigation. The screen switches immediately; the **“Predicted rating for you”** block shows a **strip-style skeleton** (shimmer) until the prediction returns or fails, then shows the real score or **TBD**.

@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.2.1: detail predict skeleton + instant nav; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
+// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -1608,15 +1608,42 @@ const styles = `
   .wtw-link:hover { text-decoration:underline; }
 
   .detail { height:100%; min-height:0; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; position:relative; width:100%; max-width:100%; }
-  /* Poster column (desktop): one Discover card width. Content column: wider; rate controls capped separately. */
-  .detail-poster-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
+  /* v3.3.0: Backdrop + overlapping poster (lower-right, aligned with title row). */
+  .detail-hero { position:relative; width:100%; max-width:100%; box-sizing:border-box; }
+  .detail-hero-backdrop { position:relative; height:min(42vw, 280px); min-height:200px; max-height:320px; overflow:hidden; background:#141414; }
+  .detail-hero-backdrop img { width:100%; height:100%; object-fit:cover; object-position:center top; }
+  .detail-hero-backdrop-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:clamp(48px, 15vw, 100px); background:#141414; }
+  .detail-hero-backdrop .d-overlay { position:absolute; inset:0; background:linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.5) 35%, transparent 72%); pointer-events:none; }
+  .detail-hero-band { position:relative; z-index:2; margin-top:-76px; padding:0 24px 4px; box-sizing:border-box; }
+  .detail-hero-band-inner { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; }
+  .detail-hero-copy { flex:1; min-width:0; padding-bottom:2px; }
+  .detail-hero-copy .d-type-genre { flex-wrap:wrap; }
+  .detail-hero-copy .d-title { margin-top:8px; text-shadow:0 2px 14px rgba(0,0,0,0.75); }
+  .d-tagline { font-size:14px; color:#9a9a90; font-style:italic; margin-top:10px; line-height:1.45; text-shadow:0 1px 10px rgba(0,0,0,0.65); }
+  .detail-hero-poster { flex-shrink:0; width:31%; max-width:136px; border-radius:10px; overflow:hidden; border:1px solid #2a2a2a; box-shadow:0 14px 36px rgba(0,0,0,0.5); background:#1a1a1a; }
+  .detail-hero-poster img { width:100%; display:block; aspect-ratio:2/3; object-fit:cover; }
   .detail-content-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
   .detail-rate-section { width:100%; }
-  .d-poster { height:320px; position:relative; overflow:hidden; }
-  .d-poster img { width:100%; height:100%; object-fit:cover; }
-  .d-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:100px; background:#141414; }
   .d-overlay { position:absolute; inset:0; background:linear-gradient(to top, #0a0a0a 0%, transparent 50%); }
-  .d-body { padding:20px 24px 24px; }
+  .d-body { padding:12px 24px 24px; }
+  .detail-score-row { display:flex; gap:12px; margin:6px 0 20px; }
+  .detail-score-card { flex:1; min-width:0; background:#141414; border:1px solid #252525; border-radius:12px; padding:14px 14px 16px; display:flex; flex-direction:column; align-items:stretch; gap:8px; }
+  .detail-score-card--you-gold { border-color:#5a4a24; }
+  .detail-score-card--you-rated { border-color:#2a4a2a; }
+  .detail-score-card--crowd-cine { border-color:rgba(201,162,39,0.5); box-shadow:0 0 0 1px rgba(232,201,106,0.06); }
+  .detail-score-card.d-pred-box-low { border-style:dashed; border-color:#6c5a2c; }
+  .detail-score-card.d-pred-box-medium { border-style:solid; border-color:#7e6931; }
+  .detail-score-card.d-pred-box-high { border-style:solid; border-color:#b18f36; }
+  .detail-score-card-lbl { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#666; }
+  .detail-score-card-val { font-family:'DM Serif Display',serif; font-size:clamp(26px, 7vw, 32px); line-height:1; color:#e8c96a; }
+  .detail-score-card-val--yours { color:#a8d4a8; }
+  .detail-score-card-val--muted { color:#555; font-size:28px; }
+  .detail-score-card-sub { font-size:11px; color:#555; line-height:1.35; }
+  .detail-score-card .d-rate-now-btn { margin-top:4px; align-self:flex-start; }
+  .detail-score-card-skel .skel-line { margin-top:0; }
+  .detail-score-card .cinemastro-vote-meter--detail { width:100%; max-width:100px; margin-top:2px; }
+  .rated-box--compact { padding:16px 18px; }
+  .rated-box--compact .rated-score { display:none; }
   .d-type-genre { display:flex; align-items:center; gap:8px; }
   .d-type-pill { background:#222; border:1px solid #333; padding:3px 8px; border-radius:8px; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#888; }
   .d-genre-text { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666; }
@@ -1770,15 +1797,9 @@ const styles = `
     .page-topbar .public-site-stats { display:none; }
     /* Title detail: same horizontal rhythm as home strips / section headers + safe-area (TMDB-like gutter). */
     .detail { padding-bottom:max(80px, calc(80px + env(safe-area-inset-bottom, 0px))); }
-    .detail-poster-wrap {
+    .detail-hero-band {
       padding-left:max(20px, env(safe-area-inset-left, 0px));
       padding-right:max(20px, env(safe-area-inset-right, 0px));
-      box-sizing:border-box;
-    }
-    .detail-poster-wrap .d-poster {
-      border-radius:12px;
-      border:1px solid #1e1e1e;
-      box-sizing:border-box;
     }
     .detail-content-wrap .d-body {
       padding-left:max(20px, env(safe-area-inset-left, 0px));
@@ -1822,17 +1843,9 @@ const styles = `
     .strip-genre { font-size:12px; }
     .filter-row { padding-left:32px; padding-right:32px; }
     .disc-grid { padding:0 32px; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
-    /* Match Discover: one card wide, two cards + gap for copy (readable line length). */
-    .detail-poster-wrap {
-      max-width:calc((min(100%, var(--shell)) - 64px - 48px) / 4);
-    }
-    .detail-poster-wrap .d-poster {
-      height:auto;
-      aspect-ratio:2/3;
-      border-radius:12px;
-      border:1px solid #1e1e1e;
-      box-sizing:border-box;
-    }
+    /* Detail: readable hero + content width (v3.3.0 hero spans shell). */
+    .detail-hero { max-width:min(100%, calc((min(100%, var(--shell)) - 64px - 48px) / 4 * 2 + 48px)); margin-left:auto; margin-right:auto; }
+    .detail-hero-band { padding-left:32px; padding-right:32px; }
     .detail-content-wrap {
       max-width:calc((min(100%, var(--shell)) - 112px) / 2 + 16px);
     }
@@ -1862,9 +1875,7 @@ const styles = `
     .strip-card { width:198px; }
     .strip-poster { width:198px; height:276px; }
     .disc-grid { grid-template-columns:repeat(5, minmax(0, 1fr)); gap:18px; }
-    .detail-poster-wrap {
-      max-width:calc((min(100%, var(--shell)) - 64px - 72px) / 5);
-    }
+    .detail-hero { max-width:min(100%, calc((min(100%, var(--shell)) - 64px - 72px) / 5 * 2 + 72px)); }
     .detail-content-wrap {
       max-width:calc(2 * (min(100%, var(--shell)) - 64px - 72px) / 5 + 18px);
     }
@@ -2226,6 +2237,30 @@ export default function App() {
   useEffect(() => {
     screenRef.current = screen;
   }, [screen]);
+
+  /** v3.3.0: TMDB detail `tagline` (movies); TV often empty — fetched when detail opens. */
+  const [detailTagline, setDetailTagline] = useState(null);
+  useEffect(() => {
+    if (screen !== "detail" || !selectedMovie?.movie) {
+      setDetailTagline(null);
+      return;
+    }
+    const m = selectedMovie.movie;
+    setDetailTagline(null);
+    let cancelled = false;
+    const type = m.type === "tv" ? "tv" : "movie";
+    void (async () => {
+      const raw = await fetchTMDB(`/${type}/${m.tmdbId}?language=en-US`);
+      if (cancelled) return;
+      if (isTmdbApiErrorPayload(raw)) return;
+      const tag = typeof raw?.tagline === "string" ? raw.tagline.trim() : "";
+      setDetailTagline(tag || null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when detail title id changes
+  }, [screen, selectedMovie?.movie?.id]);
 
   // iOS Safari can keep horizontal viewport drift even when overflow-x is hidden.
   // Guard in two layers:
@@ -5565,7 +5600,8 @@ export default function App() {
         const detailCinemastroCount = cinemastroEntryCount(detailCinemastroEntry);
         const detailHasCinemastro = typeof detailCinemastroAvg === "number" && Number.isFinite(detailCinemastroAvg);
         const detailTmdbNum = movie.tmdbRating != null && Number.isFinite(Number(movie.tmdbRating)) ? Number(movie.tmdbRating) : null;
-        const detailShowCommunity = detailHasCinemastro || detailTmdbNum != null;
+        const heroBackdropSrc = movie.backdrop || movie.poster || null;
+        const showFloatingPoster = Boolean(movie.poster && movie.backdrop);
         return (
           <div className="detail">
             <div className="page-topbar">
@@ -5573,101 +5609,125 @@ export default function App() {
               <div />
               <AccountAvatarMenu />
             </div>
-            <div className="detail-poster-wrap">
-              <div className="d-poster">
-                {movie.backdrop || movie.poster ? <img src={movie.backdrop || movie.poster} alt={movie.title} /> : <div className="d-poster-fallback">🎬</div>}
+            <div className="detail-hero">
+              <div className="detail-hero-backdrop">
+                {heroBackdropSrc ? (
+                  <img src={heroBackdropSrc} alt="" />
+                ) : (
+                  <div className="detail-hero-backdrop-fallback" aria-hidden>🎬</div>
+                )}
                 <div className="d-overlay" />
+              </div>
+              <div className="detail-hero-band">
+                <div className="detail-hero-band-inner">
+                  <div className="detail-hero-copy">
+                    <div className="d-type-genre">
+                      <span className="d-type-pill">{movie.type === "movie" ? "Movie" : "TV Show"}</span>
+                      {movie.year ? <span className="d-genre-text">{movie.year}</span> : null}
+                    </div>
+                    <div className="d-title">{movie.title}</div>
+                    {detailTagline ? <p className="d-tagline">{detailTagline}</p> : null}
+                  </div>
+                  {showFloatingPoster ? (
+                    <div className="detail-hero-poster">
+                      <img src={movie.poster} alt="" />
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
             <div className="detail-content-wrap">
               <div className="d-body">
-                <div className="d-type-genre">
-                  <span className="d-type-pill">{movie.type === "movie" ? "Movie" : "TV Show"}</span>
-                  {movie.year && <span className="d-genre-text">{movie.year}</span>}
-                </div>
-                <div className="d-title">{movie.title}</div>
-                {detailShowCommunity && (
+                <div className="detail-score-row">
                   <div
-                    className={`d-pred-box${detailHasCinemastro ? " d-community-box d-community-box--cinemastro" : ""}`}
-                    style={{ marginBottom: 10 }}
+                    className={`detail-score-card${
+                      myRating != null && Number.isFinite(Number(myRating))
+                        ? " detail-score-card--you-rated"
+                        : hasPersonalPrediction(prediction) && !showPredSkeleton
+                          ? ` ${predBoxClass(prediction.confidence)}`
+                          : " detail-score-card--you-gold"
+                    }`}
                   >
-                    <div>
-                      <div className="d-pred-label">{detailHasCinemastro ? "Cinemastro rating" : "TMDB average"}</div>
-                      <div className="d-pred-sub">
-                        {detailHasCinemastro ? "From people on Cinemastro" : "From the broader community (TMDB)"}
+                    <div className="detail-score-card-lbl">
+                      {myRating != null && Number.isFinite(Number(myRating)) ? "Your rating" : "You"}
+                    </div>
+                    {myRating != null && Number.isFinite(Number(myRating)) ? (
+                      <>
+                        <div className="detail-score-card-val detail-score-card-val--yours">{formatScore(Number(myRating))}</div>
+                        <div className="detail-score-card-sub">Saved on your profile</div>
+                      </>
+                    ) : showPredSkeleton ? (
+                      <div className="detail-score-card-skel" aria-busy="true" aria-label="Loading prediction">
+                        <div className="skel-line skel-line-title" style={{ width: "55%", marginTop: 4 }} />
+                        <div className="skel-line skel-line-meta" style={{ width: "40%", marginTop: 10 }} />
                       </div>
-                    </div>
-                    <div className="d-pred-val-block">
-                      <div className="d-pred-val" style={{ fontSize: 32 }}>
-                        {detailHasCinemastro ? formatScore(detailCinemastroAvg) : formatScore(detailTmdbNum)}
-                      </div>
-                      {detailHasCinemastro && detailCinemastroCount != null && detailCinemastroCount >= 1 ? (
-                        <CinemastroVoteMeter count={detailCinemastroCount} className="cinemastro-vote-meter--detail" />
-                      ) : null}
-                    </div>
-                  </div>
-                )}
-                {showPredSkeleton ? (
-                  <div
-                    className="d-pred-box d-pred-box-skeleton"
-                    aria-busy="true"
-                    aria-label="Loading predicted rating"
-                  >
-                    <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                      <div className="skel-line skel-line-title" style={{ width: "72%", maxWidth: 220 }} />
-                      <div className="skel-line skel-line-meta" style={{ width: "58%", maxWidth: 180, marginTop: 12 }} />
-                      <div className="skel-line skel-line-meta" style={{ width: "42%", maxWidth: 120, marginTop: 12 }} />
-                    </div>
-                    <div className="d-pred-skel-right">
-                      <div className="skel-line" style={{ width: 44, height: 30, borderRadius: 8 }} />
-                      <div className="skel-line skel-line-meta" style={{ width: 36, height: 10 }} />
-                    </div>
-                  </div>
-                ) : hasPersonalPrediction(prediction) ? (
-                  <div className={`d-pred-box ${predBoxClass(prediction.confidence)}`}>
-                    <div>
-                      <div className="d-pred-label">Predicted rating for you</div>
-                      <div className="d-pred-sub">Based on your tastometer</div>
-                      <span className={confClass(prediction.confidence)}>{confLabel(prediction.confidence)}</span>
-                      {(prediction.confidence === "low" || prediction.confidence === "medium") && (
-                        <>
-                          <div className="d-pred-improve">Rate more titles to improve</div>
-                          <button
-                            type="button"
-                            className="d-rate-now-btn"
-                            disabled={rateSimilarLoading}
-                            onClick={() => { void handleRateNowForPrediction(movie); }}
-                          >
-                            {rateSimilarLoading ? "Loading..." : "Rate now"}
-                          </button>
-                          {rateSimilarError && <div className="d-pred-improve-err">{rateSimilarError}</div>}
-                        </>
-                      )}
-                    </div>
-                    <div>
-                      <div className={`d-pred-val ${predValClass(prediction.confidence)}`}>{formatScore(prediction.predicted)}</div>
-                      {shouldShowPredRange(prediction) && (
-                        <div className={`d-pred-range ${predRangeClass(prediction.confidence)}`}>
-                          {formatScore(prediction.low)}–{formatScore(prediction.high)}
+                    ) : hasPersonalPrediction(prediction) ? (
+                      <>
+                        <div className={`detail-score-card-val ${predValClass(prediction.confidence)}`}>
+                          {formatScore(prediction.predicted)}
                         </div>
-                      )}
-                    </div>
+                        {shouldShowPredRange(prediction) ? (
+                          <div className={`detail-score-card-sub ${predRangeClass(prediction.confidence)}`}>
+                            {formatScore(prediction.low)}–{formatScore(prediction.high)} likely range
+                          </div>
+                        ) : null}
+                        <div className="detail-score-card-sub">
+                          <span className={confClass(prediction.confidence)}>{confLabel(prediction.confidence)}</span>
+                          {" · "}Based on your tastometer
+                        </div>
+                        {(prediction.confidence === "low" || prediction.confidence === "medium") && (
+                          <>
+                            <button
+                              type="button"
+                              className="d-rate-now-btn"
+                              disabled={rateSimilarLoading}
+                              onClick={() => { void handleRateNowForPrediction(movie); }}
+                            >
+                              {rateSimilarLoading ? "Loading..." : "Rate now"}
+                            </button>
+                            {rateSimilarError ? <div className="d-pred-improve-err">{rateSimilarError}</div> : null}
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="detail-score-card-val detail-score-card-val--muted">TBD</div>
+                        <div className="detail-score-card-sub">Rate more titles to unlock a personal prediction</div>
+                      </>
+                    )}
                   </div>
-                ) : (
-                  <div className="d-pred-box">
-                    <div>
-                      <div className="d-pred-label">Predicted Rating for You</div>
-                      <div className="d-pred-sub">Rate more titles to unlock</div>
-                    </div>
-                    <div className="d-pred-val" style={{ fontSize: 32, color: "#555" }}>TBD</div>
+                  <div
+                    className={`detail-score-card${
+                      detailHasCinemastro ? " detail-score-card--crowd-cine" : ""
+                    }`}
+                  >
+                    <div className="detail-score-card-lbl">Crowd</div>
+                    {detailHasCinemastro ? (
+                      <>
+                        <div className="detail-score-card-val">{formatScore(detailCinemastroAvg)}</div>
+                        <div className="detail-score-card-sub">Cinemastro average</div>
+                        {detailCinemastroCount != null && detailCinemastroCount >= 1 ? (
+                          <CinemastroVoteMeter count={detailCinemastroCount} className="cinemastro-vote-meter--detail" />
+                        ) : null}
+                      </>
+                    ) : detailTmdbNum != null ? (
+                      <>
+                        <div className="detail-score-card-val">{formatScore(detailTmdbNum)}</div>
+                        <div className="detail-score-card-sub">TMDB average</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="detail-score-card-val detail-score-card-val--muted">—</div>
+                        <div className="detail-score-card-sub">No crowd score yet</div>
+                      </>
+                    )}
                   </div>
-                )}
+                </div>
                 <div className="d-synopsis">{movie.synopsis}</div>
                 <WhereToWatch tmdbId={movie.tmdbId} type={movie.type} />
                 <div className="detail-rate-section">
                   {myRating && !detailEditRating ? (
-                    <div className="rated-box" style={{ marginTop: 20 }}>
-                      <div className="rated-score">{myRating}</div>
+                    <div className="rated-box rated-box--compact" style={{ marginTop: 20 }}>
                       <div className="rated-label">Your rating saved ✓</div>
                       {hasPersonalPrediction(prediction) && <div className="rated-pred">Predicted was {formatScore(prediction.predicted)} ({formatScore(prediction.low)}–{formatScore(prediction.high)})</div>}
                       <button type="button" className="btn-full btn-full-dark" style={{ marginTop: 16, width: "100%" }}
