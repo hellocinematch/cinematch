@@ -1627,25 +1627,27 @@ const styles = `
   .d-overlay { position:absolute; inset:0; background:linear-gradient(to top, #0a0a0a 0%, transparent 50%); }
   .d-body { padding:12px 24px 24px; }
   .detail-score-row { display:flex; gap:12px; margin:6px 0 20px; }
-  .detail-score-card { flex:1; min-width:0; background:#141414; border:1px solid #252525; border-radius:12px; padding:14px 14px 16px; display:flex; flex-direction:column; align-items:stretch; gap:8px; }
+  .detail-score-card { flex:1; min-width:0; background:#141414; border:1px solid #252525; border-radius:12px; padding:12px 12px 13px; display:flex; flex-direction:column; align-items:stretch; gap:6px; }
   .detail-score-card--you-gold { border-color:#5a4a24; }
   .detail-score-card--you-rated { border-color:#2a4a2a; }
   .detail-score-card--crowd-cine { border-color:rgba(201,162,39,0.5); box-shadow:0 0 0 1px rgba(232,201,106,0.06); }
   .detail-score-card.d-pred-box-low { border-style:dashed; border-color:#6c5a2c; }
   .detail-score-card.d-pred-box-medium { border-style:solid; border-color:#7e6931; }
   .detail-score-card.d-pred-box-high { border-style:solid; border-color:#b18f36; }
-  .detail-score-card-lbl { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#666; }
+  .detail-score-card-lbl { font-size:12px; letter-spacing:0.6px; text-transform:uppercase; color:#8f8f8f; }
   .detail-score-card-val { font-family:'DM Serif Display',serif; font-size:clamp(26px, 7vw, 32px); line-height:1; color:#e8c96a; }
   .detail-score-card-val--yours { color:#a8d4a8; }
   .detail-score-card-val--muted { color:#555; font-size:28px; }
   .detail-score-card-sub { font-size:11px; color:#555; line-height:1.35; }
-  .detail-score-chip-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:2px; }
-  .detail-score-chip { display:inline-flex; align-items:center; font-size:10px; line-height:1; border-radius:999px; padding:4px 8px; }
-  .detail-score-chip--range { color:#b7b7b7; background:#1f1f1f; border:1px solid #2a2a2a; }
-  .detail-score-chip--high { color:#6aaa6a; background:#1a2a1a; border:1px solid #274227; }
-  .detail-score-chip--medium { color:#d0be68; background:#2a230f; border:1px solid #5f4b22; }
-  .detail-score-chip--low { color:#ca7c7c; background:#2a1a1a; border:1px solid #5b2f2f; }
-  .detail-score-card .d-rate-now-btn { margin-top:4px; align-self:flex-start; }
+  .detail-score-pred-row { display:flex; align-items:flex-start; gap:10px; }
+  .detail-score-pred-row .detail-score-card-val { flex-shrink:0; }
+  .detail-score-meta-col { display:flex; flex-direction:column; gap:4px; margin-top:1px; min-width:0; }
+  .detail-score-meta-line { font-size:12px; line-height:1.2; white-space:nowrap; }
+  .detail-score-meta-line--range { color:#b7b7b7; }
+  .detail-score-meta-line--high { color:#6aaa6a; }
+  .detail-score-meta-line--medium { color:#d0be68; }
+  .detail-score-meta-line--low { color:#ca7c7c; }
+  .detail-score-card .d-rate-now-btn { margin-top:6px; align-self:flex-start; }
   .detail-score-card-skel .skel-line { margin-top:0; }
   .detail-score-card .cinemastro-vote-meter--detail { width:100%; max-width:100px; margin-top:2px; }
   .rated-box--compact { padding:16px 18px; }
@@ -4453,7 +4455,7 @@ export default function App() {
   }
 
   const inWatchlist = (id) => watchlist.some(m => m.id === id);
-  const confToneClass = (c) => c === "high" ? "detail-score-chip--high" : c === "medium" ? "detail-score-chip--medium" : "detail-score-chip--low";
+  const confToneClass = (c) => c === "high" ? "detail-score-meta-line--high" : c === "medium" ? "detail-score-meta-line--medium" : "detail-score-meta-line--low";
   const confToneLabel = (c) => c === "high" ? "High" : c === "medium" ? "Medium" : "Low";
   const predBoxClass = (c) => c === "high" ? "d-pred-box-high" : c === "medium" ? "d-pred-box-medium" : "d-pred-box-low";
   const predValClass = (c) => c === "high" ? "d-pred-val-high" : c === "medium" ? "d-pred-val-medium" : "d-pred-val-low";
@@ -5656,16 +5658,18 @@ export default function App() {
                       </div>
                     ) : hasPersonalPrediction(prediction) ? (
                       <>
-                        <div className={`detail-score-card-val ${predValClass(prediction.confidence)}`}>
-                          {formatScore(prediction.predicted)}
-                        </div>
-                        <div className="detail-score-chip-row">
-                          <span className="detail-score-chip detail-score-chip--range">
-                            {formatScore(prediction.low)}–{formatScore(prediction.high)}
-                          </span>
-                          <span className={`detail-score-chip ${confToneClass(prediction.confidence)}`}>
-                            {confToneLabel(prediction.confidence)}
-                          </span>
+                        <div className="detail-score-pred-row">
+                          <div className={`detail-score-card-val ${predValClass(prediction.confidence)}`}>
+                            {formatScore(prediction.predicted)}
+                          </div>
+                          <div className="detail-score-meta-col">
+                            <div className="detail-score-meta-line detail-score-meta-line--range">
+                              {formatScore(prediction.low)}–{formatScore(prediction.high)}
+                            </div>
+                            <div className={`detail-score-meta-line ${confToneClass(prediction.confidence)}`}>
+                              {confToneLabel(prediction.confidence)}
+                            </div>
+                          </div>
                         </div>
                         <button
                           type="button"
