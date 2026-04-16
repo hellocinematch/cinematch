@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.1
+
+- **Match auth hardening:** `invokeMatch` now validates that the session token looks like a Supabase access token before calling the `match` Edge Function. If a provider token shape is detected, it attempts a session refresh and fails fast with a clear client error instead of sending unsupported JWT algorithms to Edge.
+
 ## 3.4.0
 
 - **Title detail cards (copy + clarity):** Left card label is now **For you** in all states. In predicted state, the range and confidence move to compact chips (**`low–high`** + **High/Medium/Low**) and the long tastometer sentence is removed. **TBD** helper text is shortened to **“Rate more to predict.”**

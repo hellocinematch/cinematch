@@ -2837,6 +2837,32 @@ export default function App() {
   }, [user, userRatings, catalogue]);
 
   async function invokeMatch(body) {
+    function decodeJwtPayload(token) {
+      const parts = String(token ?? "").split(".");
+      if (parts.length !== 3) return null;
+      try {
+        const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+        return JSON.parse(atob(padded));
+      } catch {
+        return null;
+      }
+    }
+
+    function isSupabaseAccessToken(token) {
+      const payload = decodeJwtPayload(token);
+      if (!payload || typeof payload !== "object") return false;
+      const iss = String(payload.iss ?? "");
+      const aud = String(payload.aud ?? "");
+      const role = String(payload.role ?? "");
+      const sub = String(payload.sub ?? "");
+      const hasAuthShape =
+        (aud === "authenticated" || aud === "anon") &&
+        (role === "authenticated" || role === "anon") &&
+        sub.length > 0;
+      return hasAuthShape && iss.includes("/auth/v1");
+    }
+
     async function callMatchWithAccessToken(token) {
       const t = String(token ?? "").trim();
       if (!t) return { data: null, error: { message: "No auth session token available" } };
@@ -2850,6 +2876,19 @@ export default function App() {
     let session = sessWrap?.session;
     if (!session?.access_token) {
       return { data: null, error: { message: "No auth session token available" } };
+    }
+    if (!isSupabaseAccessToken(session.access_token)) {
+      const { data: ref, error: refErr } = await supabase.auth.refreshSession();
+      if (!refErr && ref?.session?.access_token) session = ref.session;
+    }
+    if (!session?.access_token || !isSupabaseAccessToken(session.access_token)) {
+      return {
+        data: null,
+        error: {
+          message:
+            "Auth session token is not a Supabase access token. Sign out/in and retry.",
+        },
+      };
     }
 
     /** `getSession()` can return an expired JWT; gateway + Edge `getUser()` then respond 401 Invalid JWT. */
