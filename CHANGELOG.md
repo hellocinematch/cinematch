@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.4
+
+- **Predict contributor retention (target merge):** For detail `predict` requests, `match` now explicitly fetches the requested title's ratings for selected top neighbors and merges them into neighbor maps before scoring. This avoids losing target-title contributors to full-map paging limits and improves real prediction hit rate for titles with known overlap.
+
 ## 3.4.3
 
 - **Predict candidate composition fix:** For detail `predict` requests, `match` now builds the overlap candidate pool by first including overlap users who already rated the requested target title, then filling the remaining slots with top overlap users. This prevents target-raters from being dropped before candidate slicing and improves real neighbor-backed prediction hit rate without changing TBD behavior when no contributors exist.

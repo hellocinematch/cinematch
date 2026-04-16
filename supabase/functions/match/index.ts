@@ -359,6 +359,24 @@ async function fetchFullMapsForUsers(
   return maps;
 }
 
+async function fetchSpecificTitleRatingsForUsers(
+  admin: SupabaseClient,
+  userIds: string[],
+  mediaType: "movie" | "tv",
+  tmdbId: number,
+): Promise<RatingRow[]> {
+  if (userIds.length === 0) return [];
+  const { data, error } = await admin
+    .from("ratings")
+    .select("user_id, media_type, tmdb_id, score")
+    .eq("media_type", mediaType)
+    .eq("tmdb_id", tmdbId)
+    .in("user_id", userIds)
+    .limit(Math.max(2000, userIds.length * 2));
+  if (error) throw error;
+  return (data ?? []) as RatingRow[];
+}
+
 async function loadNeighborRatingsFromDb(
   admin: SupabaseClient | null,
   currentUserId: string,
@@ -477,7 +495,24 @@ async function loadNeighborRatingsFromDb(
   const topIds = rankedBySim.slice(0, neighborsFullFetchLimit).map((x) => x.uid);
   if (topIds.length === 0) return {};
 
-  return await fetchFullMapsForUsers(admin, topIds);
+  const maps = await fetchFullMapsForUsers(admin, topIds);
+  if (parsedTarget) {
+    try {
+      const targetRows = await fetchSpecificTitleRatingsForUsers(
+        admin,
+        topIds,
+        parsedTarget.mediaType,
+        parsedTarget.tmdbId,
+      );
+      for (const r of targetRows) {
+        if (!maps[r.user_id]) maps[r.user_id] = {};
+        maps[r.user_id]![ratingRowKey(r.media_type, r.tmdb_id)] = r.score;
+      }
+    } catch (e) {
+      console.warn("match: explicit target-rating merge failed", (e as Error).message);
+    }
+  }
+  return maps;
 }
 
 type CachedPredictionRow = {
