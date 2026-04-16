@@ -4002,7 +4002,7 @@ export default function App() {
       const movieId = movie.id;
       void (async () => {
         try {
-          const { data, error } = await invokeMatch({ action: "predict", userRatings, catalogue, movieId });
+          const { data, error } = await invokeMatch({ action: "predict_cached", userRatings, movieId });
           const nextPred = !error && data?.prediction ? data.prediction : null;
           setSelected((prev) => {
             if (!prev || prev.movie?.id !== movieId) return prev;

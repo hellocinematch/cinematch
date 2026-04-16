@@ -27,6 +27,8 @@ const MAX_CANDIDATES_FROM_OVERLAP = 250;
 const MAX_NEIGHBORS_FULL_FETCH = 40;
 const MAX_ROWS_FULL_RATINGS = 15_000;
 const RATINGS_PAGE_SIZE = 1000;
+const PREDICTION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const PREDICTION_MODEL_VERSION = "cf-v2-seed-balanced-cache-v1";
 
 type Movie = Record<string, unknown> & {
   id: string;
@@ -37,9 +39,19 @@ type Movie = Record<string, unknown> & {
 
 type RatingsMap = Record<string, number>;
 type OtherRatings = Record<string, RatingsMap>;
+type ParsedMovieId = { mediaType: "movie" | "tv"; tmdbId: number };
 
 function ratingRowKey(mediaType: string, tmdbId: number): string {
   return `${mediaType}-${tmdbId}`;
+}
+
+function parseMovieId(movieId: string): ParsedMovieId | null {
+  const dash = movieId.indexOf("-");
+  if (dash <= 0) return null;
+  const mediaType = movieId.slice(0, dash);
+  const tmdbId = parseInt(movieId.slice(dash + 1), 10);
+  if ((mediaType !== "movie" && mediaType !== "tv") || Number.isNaN(tmdbId)) return null;
+  return { mediaType, tmdbId };
 }
 
 function cosineSimilarity(ratingsA: RatingsMap, ratingsB: RatingsMap): number {
@@ -351,7 +363,29 @@ async function loadNeighborRatingsFromDb(
 ): Promise<OtherRatings> {
   if (!admin || Object.keys(userRatings).length === 0) return {};
 
-  const titleKeys = Object.keys(userRatings).slice(0, MAX_SEED_TITLE_KEYS);
+  const scoreDelta = (score: number): number => Math.abs(score - 5.5);
+  const scoredKeys = Object.entries(userRatings)
+    .map(([key, score]) => ({ key, score: Number(score) }))
+    .filter((x) => Number.isFinite(x.score))
+    .sort((a, b) => {
+      const d = scoreDelta(b.score) - scoreDelta(a.score);
+      if (d !== 0) return d;
+      if (b.score !== a.score) return b.score - a.score;
+      return a.key.localeCompare(b.key);
+    });
+  const movieSeedKeys = scoredKeys
+    .map((x) => x.key)
+    .filter((key) => key.startsWith("movie-"));
+  const tvSeedKeys = scoredKeys
+    .map((x) => x.key)
+    .filter((key) => key.startsWith("tv-"));
+  const titleKeys: string[] = [];
+  while (titleKeys.length < MAX_SEED_TITLE_KEYS && (movieSeedKeys.length > 0 || tvSeedKeys.length > 0)) {
+    if (movieSeedKeys.length > 0) titleKeys.push(movieSeedKeys.shift()!);
+    if (titleKeys.length >= MAX_SEED_TITLE_KEYS) break;
+    if (tvSeedKeys.length > 0) titleKeys.push(tvSeedKeys.shift()!);
+  }
+
   const movieIds: number[] = [];
   const tvIds: number[] = [];
   for (const k of titleKeys) {
@@ -404,6 +438,83 @@ async function loadNeighborRatingsFromDb(
   return await fetchFullMapsForUsers(admin, topIds);
 }
 
+type CachedPredictionRow = {
+  user_id: string;
+  media_type: "movie" | "tv";
+  tmdb_id: number;
+  predicted: number;
+  low: number;
+  high: number;
+  confidence: string;
+  neighbor_count: number;
+  computed_at: string;
+  model_version: string;
+};
+
+function toPredFromCache(row: CachedPredictionRow): Pred {
+  return {
+    predicted: Number(row.predicted),
+    low: Number(row.low),
+    high: Number(row.high),
+    confidence: String(row.confidence),
+    neighborCount: Number(row.neighbor_count),
+  };
+}
+
+function isFreshCachedPrediction(row: CachedPredictionRow): boolean {
+  const computedAtMs = Date.parse(row.computed_at);
+  if (!Number.isFinite(computedAtMs)) return false;
+  return Date.now() - computedAtMs <= PREDICTION_CACHE_TTL_MS;
+}
+
+async function readCachedPrediction(
+  admin: SupabaseClient | null,
+  userId: string,
+  movieId: string,
+): Promise<CachedPredictionRow | null> {
+  if (!admin) return null;
+  const parsed = parseMovieId(movieId);
+  if (!parsed) return null;
+  const { data, error } = await admin
+    .from("user_title_predictions")
+    .select("user_id, media_type, tmdb_id, predicted, low, high, confidence, neighbor_count, computed_at, model_version")
+    .eq("user_id", userId)
+    .eq("media_type", parsed.mediaType)
+    .eq("tmdb_id", parsed.tmdbId)
+    .maybeSingle();
+  if (error) {
+    console.warn("match: cached prediction read failed", error.message);
+    return null;
+  }
+  return (data as CachedPredictionRow | null) ?? null;
+}
+
+async function writeCachedPrediction(
+  admin: SupabaseClient | null,
+  userId: string,
+  movieId: string,
+  prediction: Pred,
+): Promise<void> {
+  if (!admin) return;
+  const parsed = parseMovieId(movieId);
+  if (!parsed) return;
+  const { error } = await admin.from("user_title_predictions").upsert({
+    user_id: userId,
+    media_type: parsed.mediaType,
+    tmdb_id: parsed.tmdbId,
+    predicted: prediction.predicted,
+    low: prediction.low,
+    high: prediction.high,
+    confidence: prediction.confidence,
+    neighbor_count: prediction.neighborCount,
+    computed_at: new Date().toISOString(),
+    model_version: PREDICTION_MODEL_VERSION,
+  }, { onConflict: "user_id,media_type,tmdb_id" });
+  if (error) {
+    console.warn("match: cached prediction write failed", error.message);
+  }
+}
+
 // --- HTTP -------------------------------------------------------------------
 
 Deno.serve(async (req: Request) => {
@@ -453,7 +564,7 @@ Deno.serve(async (req: Request) => {
     const otherRatings = await loadNeighborRatingsFromDb(admin, user.id, userRatings);
     const neighbors = findNeighbors(userRatings, otherRatings);
 
-    if (action === "predict") {
+    if (action === "predict" || action === "predict_cached") {
       const movieId = body.movieId as string;
       if (!movieId) {
         return new Response(JSON.stringify({ error: "movieId required" }), {
@@ -461,7 +572,23 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const cached = await readCachedPrediction(admin, user.id, movieId);
+      const isSameModel = cached?.model_version === PREDICTION_MODEL_VERSION;
+      if (cached && isSameModel && isFreshCachedPrediction(cached)) {
+        return new Response(JSON.stringify({ prediction: toPredFromCache(cached), cached: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const prediction = predictRatingRange(movieId, neighbors);
+      if (prediction) {
+        await writeCachedPrediction(admin, user.id, movieId, prediction);
+      }
+      if (!prediction && cached && isSameModel) {
+        return new Response(JSON.stringify({ prediction: toPredFromCache(cached), cached: true, stale: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ prediction }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
