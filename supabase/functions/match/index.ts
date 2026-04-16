@@ -583,13 +583,17 @@ Deno.serve(async (req: Request) => {
       const prediction = predictRatingRange(movieId, neighbors);
       if (prediction) {
         await writeCachedPrediction(admin, user.id, movieId, prediction);
+        return new Response(JSON.stringify({ prediction }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      if (!prediction && cached && isSameModel) {
+
+      if (cached && isSameModel) {
         return new Response(JSON.stringify({ prediction: toPredFromCache(cached), cached: true, stale: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return new Response(JSON.stringify({ prediction }), {
+      return new Response(JSON.stringify({ prediction: null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
