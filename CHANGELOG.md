@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.2
+
+- **Predict reliability (target-aware neighbor selection):** `match` now uses larger, deterministic candidate windows for detail `predict` requests and prioritizes candidate users who already rated the requested title before final similarity ranking. This improves real neighbor-backed predictions for established users without fabricating a personal score when neighbor evidence is absent.
+
 ## 3.4.1
 
 - **Match auth hardening:** `invokeMatch` now validates that the session token looks like a Supabase access token before calling the `match` Edge Function. If a provider token shape is detected, it attempts a session refresh and fails fast with a clear client error instead of sending unsupported JWT algorithms to Edge.

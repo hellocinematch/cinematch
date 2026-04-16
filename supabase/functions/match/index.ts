@@ -27,6 +27,9 @@ const MAX_CANDIDATES_FROM_OVERLAP = 250;
 const MAX_NEIGHBORS_FULL_FETCH = 40;
 const MAX_ROWS_FULL_RATINGS = 15_000;
 const RATINGS_PAGE_SIZE = 1000;
+const MAX_SEED_TITLE_KEYS_PREDICT = 220;
+const MAX_CANDIDATES_FROM_OVERLAP_PREDICT = 700;
+const MAX_NEIGHBORS_FULL_FETCH_PREDICT = 140;
 const PREDICTION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const PREDICTION_MODEL_VERSION = "cf-v2-seed-balanced-cache-v1";
 
@@ -360,8 +363,18 @@ async function loadNeighborRatingsFromDb(
   admin: SupabaseClient | null,
   currentUserId: string,
   userRatings: RatingsMap,
+  opts?: { targetMovieId?: string },
 ): Promise<OtherRatings> {
   if (!admin || Object.keys(userRatings).length === 0) return {};
+  const targetMovieId = opts?.targetMovieId;
+  const isPredictTargeted = Boolean(targetMovieId);
+  const seedTitleLimit = isPredictTargeted ? MAX_SEED_TITLE_KEYS_PREDICT : MAX_SEED_TITLE_KEYS;
+  const overlapCandidateLimit = isPredictTargeted
+    ? MAX_CANDIDATES_FROM_OVERLAP_PREDICT
+    : MAX_CANDIDATES_FROM_OVERLAP;
+  const neighborsFullFetchLimit = isPredictTargeted
+    ? MAX_NEIGHBORS_FULL_FETCH_PREDICT
+    : MAX_NEIGHBORS_FULL_FETCH;
 
   const scoreDelta = (score: number): number => Math.abs(score - 5.5);
   const scoredKeys = Object.entries(userRatings)
@@ -380,9 +393,9 @@ async function loadNeighborRatingsFromDb(
     .map((x) => x.key)
     .filter((key) => key.startsWith("tv-"));
   const titleKeys: string[] = [];
-  while (titleKeys.length < MAX_SEED_TITLE_KEYS && (movieSeedKeys.length > 0 || tvSeedKeys.length > 0)) {
+  while (titleKeys.length < seedTitleLimit && (movieSeedKeys.length > 0 || tvSeedKeys.length > 0)) {
     if (movieSeedKeys.length > 0) titleKeys.push(movieSeedKeys.shift()!);
-    if (titleKeys.length >= MAX_SEED_TITLE_KEYS) break;
+    if (titleKeys.length >= seedTitleLimit) break;
     if (tvSeedKeys.length > 0) titleKeys.push(tvSeedKeys.shift()!);
   }
 
@@ -419,20 +432,38 @@ async function loadNeighborRatingsFromDb(
 
   const candidateIds = Object.entries(overlapCount)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, MAX_CANDIDATES_FROM_OVERLAP)
+    .slice(0, overlapCandidateLimit)
     .map(([uid]) => uid);
 
   if (candidateIds.length === 0) return {};
+
+  let targetRaterIds = new Set<string>();
+  const parsedTarget = targetMovieId ? parseMovieId(targetMovieId) : null;
+  if (parsedTarget && candidateIds.length > 0) {
+    const { data: targetRows, error: targetErr } = await admin
+      .from("ratings")
+      .select("user_id")
+      .eq("media_type", parsedTarget.mediaType)
+      .eq("tmdb_id", parsedTarget.tmdbId)
+      .in("user_id", candidateIds)
+      .limit(Math.max(2000, overlapCandidateLimit * 2));
+    if (targetErr) {
+      console.warn("match: target-raters fetch failed", targetErr.message);
+    } else {
+      targetRaterIds = new Set(((targetRows ?? []) as { user_id: string }[]).map((r) => r.user_id));
+    }
+  }
 
   const rankedBySim = candidateIds
     .map((uid) => ({
       uid,
       sim: cosineSimilarity(userRatings, partial[uid]!),
+      targetBoost: targetRaterIds.has(uid) ? 1 : 0,
     }))
     .filter((x) => x.sim > 0)
-    .sort((a, b) => b.sim - a.sim);
+    .sort((a, b) => b.targetBoost - a.targetBoost || b.sim - a.sim);
 
-  const topIds = rankedBySim.slice(0, MAX_NEIGHBORS_FULL_FETCH).map((x) => x.uid);
+  const topIds = rankedBySim.slice(0, neighborsFullFetchLimit).map((x) => x.uid);
   if (topIds.length === 0) return {};
 
   return await fetchFullMapsForUsers(admin, topIds);
@@ -561,9 +592,6 @@ Deno.serve(async (req: Request) => {
     const userRatings = (body.userRatings as RatingsMap) || {};
     const catalogue = (body.catalogue as Movie[]) || [];
 
-    const otherRatings = await loadNeighborRatingsFromDb(admin, user.id, userRatings);
-    const neighbors = findNeighbors(userRatings, otherRatings);
-
     if (action === "predict" || action === "predict_cached") {
       const movieId = body.movieId as string;
       if (!movieId) {
@@ -572,6 +600,10 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const otherRatings = await loadNeighborRatingsFromDb(admin, user.id, userRatings, {
+        targetMovieId: movieId,
+      });
+      const neighbors = findNeighbors(userRatings, otherRatings);
       const cached = await readCachedPrediction(admin, user.id, movieId);
       const isSameModel = cached?.model_version === PREDICTION_MODEL_VERSION;
       if (cached && isSameModel && isFreshCachedPrediction(cached)) {
@@ -599,6 +631,8 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "mood") {
+      const otherRatings = await loadNeighborRatingsFromDb(admin, user.id, userRatings);
+      const neighbors = findNeighbors(userRatings, otherRatings);
       const movies = (body.movies as Movie[]) || [];
       const vibe = Array.isArray(body.vibe)
         ? (body.vibe as unknown[]).filter((v): v is string => typeof v === "string")
@@ -637,6 +671,7 @@ Deno.serve(async (req: Request) => {
     const streamingMovies = (body.streamingMovies as Movie[]) || [];
     const streamingTV = (body.streamingTV as Movie[]) || [];
     const topPickOffset = typeof body.topPickOffset === "number" ? body.topPickOffset : 0;
+    const otherRatings = await loadNeighborRatingsFromDb(admin, user.id, userRatings);
 
     const result = runFullMatch(
       userRatings,
