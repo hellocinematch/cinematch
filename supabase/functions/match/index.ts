@@ -430,22 +430,20 @@ async function loadNeighborRatingsFromDb(
     overlapCount[r.user_id] = (overlapCount[r.user_id] || 0) + 1;
   }
 
-  const candidateIds = Object.entries(overlapCount)
+  const rankedOverlapIds = Object.entries(overlapCount)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, overlapCandidateLimit)
     .map(([uid]) => uid);
-
-  if (candidateIds.length === 0) return {};
+  if (rankedOverlapIds.length === 0) return {};
 
   let targetRaterIds = new Set<string>();
   const parsedTarget = targetMovieId ? parseMovieId(targetMovieId) : null;
-  if (parsedTarget && candidateIds.length > 0) {
+  if (parsedTarget && rankedOverlapIds.length > 0) {
     const { data: targetRows, error: targetErr } = await admin
       .from("ratings")
       .select("user_id")
       .eq("media_type", parsedTarget.mediaType)
       .eq("tmdb_id", parsedTarget.tmdbId)
-      .in("user_id", candidateIds)
+      .in("user_id", rankedOverlapIds)
       .limit(Math.max(2000, overlapCandidateLimit * 2));
     if (targetErr) {
       console.warn("match: target-raters fetch failed", targetErr.message);
@@ -453,6 +451,19 @@ async function loadNeighborRatingsFromDb(
       targetRaterIds = new Set(((targetRows ?? []) as { user_id: string }[]).map((r) => r.user_id));
     }
   }
+
+  const candidateSet = new Set<string>();
+  if (targetRaterIds.size > 0) {
+    for (const uid of rankedOverlapIds) {
+      if (targetRaterIds.has(uid)) candidateSet.add(uid);
+    }
+  }
+  for (const uid of rankedOverlapIds) {
+    if (candidateSet.size >= overlapCandidateLimit) break;
+    candidateSet.add(uid);
+  }
+  const candidateIds = [...candidateSet];
+  if (candidateIds.length === 0) return {};
 
   const rankedBySim = candidateIds
     .map((uid) => ({

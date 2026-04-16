@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.3
+
+- **Predict candidate composition fix:** For detail `predict` requests, `match` now builds the overlap candidate pool by first including overlap users who already rated the requested target title, then filling the remaining slots with top overlap users. This prevents target-raters from being dropped before candidate slicing and improves real neighbor-backed prediction hit rate without changing TBD behavior when no contributors exist.
+
 ## 3.4.2
 
 - **Predict reliability (target-aware neighbor selection):** `match` now uses larger, deterministic candidate windows for detail `predict` requests and prioritizes candidate users who already rated the requested title before final similarity ranking. This improves real neighbor-backed predictions for established users without fabricating a personal score when neighbor evidence is absent.
