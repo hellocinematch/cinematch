@@ -3973,7 +3973,11 @@ export default function App() {
   /** v3.2.1: Navigate immediately; fetch `predict` in background and show skeleton until settled. */
   function openDetail(movie, prediction, opts = {}) {
     const pred = prediction ?? null;
-    const needsPredict = Boolean(!pred && user && Object.keys(userRatings).length > 0);
+    const needsPredict = Boolean(
+      user &&
+      Object.keys(userRatings).length > 0 &&
+      (!pred || Number(pred.neighborCount ?? 0) === 0),
+    );
     detailReturnScreenRef.current = screenRef.current;
     // Distinct URL per detail step so iOS edge-swipe / Mac trackpad back can popstate (v2.1.0). Community avg on detail from v3.0.0 RPC.
     if (opts.skipHistoryPush) {
