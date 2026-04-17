@@ -1,5 +1,17 @@
 # Changelog
 
+## 4.0.6
+
+- **Your Picks is now page-local** — no more borrowing from In Theaters / Streaming / Pulse pools. The 🔥 For you + ✨ Worth a Look strips source exclusively from `recommendations_only` (`recommendations` + `worthALookRecs`) with a page-local `predict_cached` overlay applied on top, matching the pattern Pulse / In Theaters / Streaming already use. The overlay fills in `neighborCount` on rows where `match_recommendations_from_neighbors` returned a TMDB popularity fallback (thin `user_neighbors` / new account), so the blue predicted badge now renders on every row that has a cached per-title prediction.
+- **Per-page predict gating (perf).** Every `predict_cached` strip call is now scoped to the screen that actually renders it: `theaterRecs` / `inTheatersPagePopularRecs` → `/in-theaters`; `whatsHotRecs` / `secondaryRecs` → `/home`; `pulseTrendingRecs` / `pulsePopularRecs` → `/pulse`; `streamingMovieRecs` / `streamingTvRecs` → `/streaming-page`; `recommendations_only` + `yourPicksPredictions` → `/your-picks`. Eliminates ~5 unrelated sequential round-trips per route change (Your Picks landing used to wait on theaters + in-theaters popular + what's hot + pulse trending + pulse popular + secondary before firing its own predict). Non-active routes resolve from TMDB fallbacks exactly as before.
+- **Bounded Your Picks `predict_cached` set.** The `predict_cached` overlay now runs on just the IDs `recommendations_only` actually returned (~120–280 titles) instead of a speculative top-500 catalogue slice — cold-cache paths were pushing the Edge function into timeout territory on first load. The two Your Picks round-trips run sequentially (CF recs first, then the bounded predict_cached), which is both reliable and cheap.
+- **Predicted rows first in For you / Worth a Look.** 🔥 For you and ✨ Worth a Look now partition by prediction quality: **rows with `neighborCount ≥ 1` (blue pill) always render before TMDB-only fallback rows**, even when the fallback has a higher `predicted` score. Each partition is sorted by `predicted` desc. Strip rotation (`topPickOffset` / refresh) cycles within each partition independently so blue pills stay at the top across refreshes.
+
+## 4.0.5
+
+- **Your Picks page:** Primary nav opens a dedicated screen with **🔥 For you** (refreshable via the offset button) and **✨ Worth a Look**, using the same CF + worth-a-look + provider-aware strip builder the Home segment used. No new match / Edge changes—CF `recommendations` and `worthALookRecs` come from the existing `recommendations_only` path; streaming and theater rec pools already on `matchData` backfill as before.
+- **Home simplification:** Dropped the Home secondary nav (Now Playing / Your picks / Friends). Home now renders the Now Playing shelves only—Your Picks moved to its own page and Friends is deferred (Circles covers the social surface).
+
 ## 4.0.4
 
 - **Streaming page:** Primary nav opens a dedicated **Streaming** screen with two strips over the same US subscription-style pool—**Now Streaming** (newest release / air-date order) and **What’s popular in streaming** (TMDB popularity order)—gated by a Series/Movies toggle. `predict_cached` scores overlay both strips on this route only; fetch and strip predictions no longer run from Home. Home **Now Playing** keeps What’s hot (+ optional Region block); empty-state logic no longer depends on the removed streaming strip.

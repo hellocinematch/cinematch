@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import packageJson from "../package.json";
 import { AppFooter } from "./appFooter.jsx";
 import { supabase } from "./supabase";
@@ -295,11 +295,6 @@ function spaUrlWithoutOverlays() {
   u.searchParams.delete(SPA_QS_LEGAL);
   return `${u.pathname}${u.search}${u.hash}`;
 }
-
-/** Home secondary nav: internal ids align with tab labels (Now Playing / Your picks / Friends). */
-const HOME_SEGMENT_NOW_PLAYING = "nowPlaying";
-const HOME_SEGMENT_YOUR_PICKS = "yourPicks";
-const HOME_SEGMENT_FRIENDS = "friends";
 
 /** First TMDB catalogue fetch: post-login routing waits for this (or safety timeout), not for catalogue.length > 0. */
 const CATALOGUE_BOOTSTRAP_SAFETY_MS = 22_000;
@@ -1540,7 +1535,6 @@ const styles = `
 
   .home { flex:1 1 0; min-height:0; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
   .home-topbar { display:none; }
-  .home-desktop-nav-row { display:none; }
   /* Shared top chrome on Discover / Mood / Profile / Detail / Rated (not on Home — Home uses home-header + tagline). */
   .page-topbar {
     display:grid;
@@ -1643,22 +1637,11 @@ const styles = `
   .public-site-stats-row { display:flex; align-items:baseline; gap:5px; white-space:nowrap; }
   .public-site-stats-val { font-family:'DM Sans',sans-serif; font-size:11px; font-weight:600; color:#c4a85a; letter-spacing:0.02em; }
   .public-site-stats-lbl { font-family:'DM Sans',sans-serif; font-size:8px; font-weight:500; letter-spacing:0.55px; text-transform:uppercase; color:#555; }
-  .home-topnav { display:flex; gap:3px; padding:4px; background:#141414; border-radius:11px; border:1px solid #222; width:100%; max-width:620px; }
-  .home-topnav .home-segment { flex:1; }
   .home-header { padding:48px 24px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:12px; min-width:0; }
-  /* More / Friends: tighter mobile hero without tagline (wordmark + avatar only). */
-  .home-header--no-hero-tagline { padding-top:28px; padding-bottom:12px; }
   .home-hero { min-width:0; display:flex; flex-direction:column; gap:10px; align-items:flex-start; }
   .home-hero-copy { padding:0; display:block; max-width:100%; min-width:0; }
   .home-greeting { font-family:'DM Sans',sans-serif; font-size:52px; font-weight:600; color:#f0ebe0; margin-top:2px; line-height:1.02; letter-spacing:-0.6px; overflow-wrap:anywhere; }
   .home-subtitle { font-family:'DM Serif Display',serif; font-size:42px; font-weight:400; color:#cdcdc8; margin-top:8px; line-height:1.1; max-width:100%; letter-spacing:-0.2px; overflow-wrap:anywhere; }
-  .home-segments { display:flex; margin:0 24px 22px; padding:4px; background:#141414; border-radius:11px; border:1px solid #222; gap:3px; }
-  .home-segment { flex:1; text-align:center; padding:11px 6px; font-size:13px; font-family:'DM Sans',sans-serif; color:#888; cursor:pointer; border-radius:8px; border:none; background:transparent; transition:all 0.2s; }
-  .home-segment:hover { color:#bbb; }
-  .home-segment.active { background:#2a2610; color:#e8c96a; font-weight:500; }
-  .friends-placeholder { margin:24px; padding:32px 20px; border:1px dashed #2a2a2a; border-radius:12px; text-align:center; }
-  .friends-placeholder-title { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; margin-bottom:8px; }
-  .friends-placeholder-text { font-size:13px; color:#666; line-height:1.6; }
   .avatar { width:44px; height:44px; border-radius:50%; background:#e8c96a; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:600; color:#0a0a0a; cursor:pointer; font-family:'DM Sans',sans-serif; flex-shrink:0; }
   .avatar-wrap { position:relative; flex-shrink:0; }
   .avatar-menu { position:absolute; top:52px; right:0; min-width:150px; background:#141414; border:1px solid #2a2a2a; border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,0.45); padding:6px; z-index:120; }
@@ -2051,7 +2034,6 @@ const styles = `
       letter-spacing:0.5px;
       font-size:11px;
     }
-    .home-segments { margin-left:max(20px, env(safe-area-inset-left, 0px)); margin-right:max(20px, env(safe-area-inset-right, 0px)); }
     /* Home login path: logo+stats in hero can overflow on narrow Safari widths. Keep logo only on mobile. */
     .home-header .public-site-stats { display:none; }
     .discover-header { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); min-width:0; }
@@ -2099,12 +2081,8 @@ const styles = `
     .page-topbar { padding:14px 32px; padding-top:max(14px, env(safe-area-inset-top, 0px)); }
     .app-footer { padding-left:32px; padding-right:32px; }
     .legal-body { padding-left:32px; padding-right:32px; }
-    .home-desktop-nav-row { display:flex; justify-content:center; padding:8px 32px 8px; }
     .home .section-divider { margin:0 32px 10px !important; }
-    .home-desktop-nav-row .home-topnav { max-width:620px; }
     .home-header { padding:18px 32px 10px; display:block; }
-    /* Desktop: tagline-only strip hidden on More/Friends (logo + avatar stay in home-topbar). */
-    .home-header--no-hero-tagline { display:none; }
     /* Logo + community stats live in home-topbar; hide duplicate cluster here (stats are siblings of .app-brand). */
     .home-header .topbar-brand-cluster { display:none; }
     .home-header .app-brand,
@@ -2114,7 +2092,6 @@ const styles = `
     .discover-header,
     .mood-header { padding-left:32px; padding-right:32px; }
     .app-primary-nav__inner { padding-left:32px; padding-right:32px; }
-    .home-segments { display:none; }
     .section-header { padding:0 32px; }
     .strip { padding-left:32px; padding-right:32px; gap:18px; }
     .strip-card { width:184px; }
@@ -2151,7 +2128,6 @@ const styles = `
 
   @media (min-width: 1200px) {
     .app { --shell:1240px; }
-    .home-segments { max-width:680px; }
     .strip-card { width:198px; }
     .strip-poster { width:198px; height:276px; }
     .disc-grid { grid-template-columns:repeat(5, minmax(0, 1fr)); gap:18px; }
@@ -2478,7 +2454,6 @@ export default function App() {
   const [inTheatersPopularRanked, setInTheatersPopularRanked] = useState([]);
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
-  const [homeSegment, setHomeSegment] = useState(HOME_SEGMENT_NOW_PLAYING);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [profileSettingsError, setProfileSettingsError] = useState("");
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
@@ -2687,7 +2662,7 @@ export default function App() {
       window.removeEventListener("pageshow", onPageShow);
       if (clampRaf != null) cancelAnimationFrame(clampRaf);
     };
-  }, [screen, searching, appliedSearchQuery, homeSegment]);
+  }, [screen, searching, appliedSearchQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3151,18 +3126,26 @@ export default function App() {
       }
 
       try {
-        await predictStripThenMerge(inTheatersForRecs, "theaterRecs", true);
-        await predictStripThenMerge(inTheatersPagePopularForRecs, "inTheatersPagePopularRecs", true);
-        await predictStripThenMerge(whatsHotForRecs, "whatsHotRecs");
-        await predictStripThenMerge(pulseTrendingForRecs, "pulseTrendingRecs", true);
-        await predictStripThenMerge(pulsePopularForRecs, "pulsePopularRecs", true);
+        // Page-local predict: only run predict_cached for strips the current screen actually renders.
+        // Keeps routes independent and avoids ~1–2s of sequential round-trips on unrelated pages.
+        if (screen === "in-theaters") {
+          await predictStripThenMerge(inTheatersForRecs, "theaterRecs", true);
+          await predictStripThenMerge(inTheatersPagePopularForRecs, "inTheatersPagePopularRecs", true);
+        }
+        if (screen === "home") {
+          await predictStripThenMerge(whatsHotForRecs, "whatsHotRecs");
+          await predictStripThenMerge(secondaryStripCatalogRows, "secondaryRecs");
+        }
+        if (screen === "pulse") {
+          await predictStripThenMerge(pulseTrendingForRecs, "pulseTrendingRecs", true);
+          await predictStripThenMerge(pulsePopularForRecs, "pulsePopularRecs", true);
+        }
         if (screen === "streaming-page") {
           await predictStripThenMerge(streamingMoviesForRecs, "streamingMovieRecs");
           await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
         }
-        await predictStripThenMerge(secondaryStripCatalogRows, "secondaryRecs");
 
-        if (hasRatings && hasCatalogue) {
+        if (screen === "your-picks" && hasRatings && hasCatalogue) {
           let { data, error } = await invokeMatch({
             action: "recommendations_only",
             userRatings,
@@ -3220,6 +3203,28 @@ export default function App() {
               ...(nextRecs.length > 0 ? { recommendations: nextRecs } : {}),
               ...(nextWorth.length > 0 ? { worthALookRecs: nextWorth } : {}),
             }));
+          }
+
+          // Your Picks predict overlay — scoped to just the IDs `recommendations_only` returned so the
+          // server only has to read/compute a bounded set (~120–280) instead of a heuristic 500. Keeps
+          // cold-cache paths from timing out. Runs after the CF call to avoid duplicate work if the
+          // response is empty.
+          const yourPicksIds = new Set();
+          for (const r of nextRecs) if (r?.movie?.id) yourPicksIds.add(r.movie.id);
+          for (const r of nextWorth) if (r?.movie?.id) yourPicksIds.add(r.movie.id);
+          const idList = [...yourPicksIds];
+          if (idList.length > 0) {
+            const { data: predData, error: predErr } = await invokeMatch({
+              action: "predict_cached",
+              userRatings,
+              titles: idList,
+            });
+            if (!cancelled && !predErr && predData?.predictions) {
+              setMatchData((prev) => ({
+                ...(prev && typeof prev === "object" ? prev : {}),
+                yourPicksPredictions: predData.predictions,
+              }));
+            }
           }
         }
       } catch (e) {
@@ -3862,10 +3867,35 @@ export default function App() {
       stickyRecommendationsRef.current = rawRecommendations;
     }
   }, [user, rawRecommendations]);
-  const recommendations =
+  const baseRecommendations =
     Array.isArray(rawRecommendations) && rawRecommendations.length > 0
       ? rawRecommendations
       : stickyRecommendationsRef.current;
+
+  /**
+   * Overlay `matchData.yourPicksPredictions` (from Your Picks `predict_cached` pass) onto a rec list so each
+   * row gets `neighborCount` ≥ 1 when a neighbor-backed prediction exists — even if `recommendations_only`
+   * returned a TMDB fallback for that title. Rows already carrying ≥ 1 neighbors stay as-is.
+   */
+  const overlayYourPicksPredictions = useCallback(
+    (recs) => {
+      const predMap = matchData?.yourPicksPredictions;
+      if (!predMap || typeof predMap !== "object" || !recs?.length) return recs;
+      return recs.map((r) => {
+        if (!r?.movie?.id) return r;
+        if (Number(r.neighborCount ?? 0) >= 1) return r;
+        const pred = predMap[r.movie.id];
+        if (!pred || Number(pred.neighborCount ?? 0) < 1) return r;
+        return recFromMatchPrediction(r.movie, pred);
+      });
+    },
+    [matchData?.yourPicksPredictions],
+  );
+
+  const recommendations = useMemo(
+    () => overlayYourPicksPredictions(baseRecommendations),
+    [baseRecommendations, overlayYourPicksPredictions],
+  );
 
   const theaterRecs = useMemo(() => {
     const fromMatch = matchData?.theaterRecs;
@@ -3948,7 +3978,11 @@ export default function App() {
     secondaryStripCatalogRows.length,
   ]);
 
-  const worthALookRecs = matchData?.worthALookRecs ?? EMPTY_MATCH_RECS;
+  const rawWorthALookRecs = matchData?.worthALookRecs ?? EMPTY_MATCH_RECS;
+  const worthALookRecs = useMemo(
+    () => overlayYourPicksPredictions(rawWorthALookRecs),
+    [rawWorthALookRecs, overlayYourPicksPredictions],
+  );
 
   /** Strict CF neighbour picks only — not worth-a-look / theater / streaming pools (otherwise every strip row became Pick). */
   const cfRecommendationPickIdSet = useMemo(() => {
@@ -3961,45 +3995,51 @@ export default function App() {
   }, [recommendations]);
 
   /**
-   * Unrated titles with Edge predictions when strict CF `recommendations` is empty (worth-a-look + home rows).
-   * If results stay thin, prefer a larger client catalogue; optional last resort is raising neighbor/overlap caps in `match` (see comment there).
+   * Your Picks fallback pool: `worthALookRecs` only (from `recommendations_only`). Kept independent of
+   * In Theaters / Streaming / Pulse pools so route data stays page-local (see architecture brief).
    */
-  const mergedFallbackPool = useMemo(() => {
+  const yourPicksFallbackPool = useMemo(() => {
     const rated = new Set(Object.keys(userRatings));
     const byId = new Map();
-    const add = (arr) => {
-      for (const r of arr) {
-        if (!r?.movie?.id || rated.has(r.movie.id)) continue;
-        const prev = byId.get(r.movie.id);
-        if (!prev || r.predicted > prev.predicted) byId.set(r.movie.id, r);
-      }
-    };
-    add(worthALookRecs);
-    add(theaterRecs);
-    add(inTheatersPagePopularRecsResolved);
-    add(streamingMovieRecsResolved);
-    add(streamingTvRecsResolved);
+    for (const r of worthALookRecs) {
+      if (!r?.movie?.id || rated.has(r.movie.id)) continue;
+      const prev = byId.get(r.movie.id);
+      if (!prev || r.predicted > prev.predicted) byId.set(r.movie.id, r);
+    }
     return [...byId.values()].sort((a, b) => b.predicted - a.predicted);
-  }, [userRatings, worthALookRecs, theaterRecs, inTheatersPagePopularRecsResolved, streamingMovieRecsResolved, streamingTvRecsResolved]);
+  }, [userRatings, worthALookRecs]);
 
   /**
-   * Scored rows for Your picks strips: **CF recommendations first**, then worth-a-look / theater / streaming extras
-   * (deduped). Otherwise a short CF list replaces a fuller pre-match pool and strips **flash then shrink**.
+   * Scored rows for Your Picks strips. Partitions by prediction quality so **predicted rows
+   * (`neighborCount ≥ 1`) come first** — even if a TMDB-only fallback has a higher `predicted`
+   * score — then unpredicted rows fill the tail. Each partition is sorted by `predicted` desc;
+   * rotation in `rebuildMoreTabStrips` cycles within each partition independently to keep the
+   * blue pills at the top of the strip on refresh.
    */
   const yourPicksStripSorted = useMemo(() => {
-    const primary =
-      recommendations.length > 0
-        ? [...recommendations].sort((a, b) => b.predicted - a.predicted)
-        : [];
+    const primary = [...recommendations];
     const seen = new Set(primary.map((r) => r.movie.id));
-    const out = [...primary];
-    for (const r of mergedFallbackPool) {
+    const extras = [];
+    for (const r of yourPicksFallbackPool) {
       if (!r?.movie?.id || seen.has(r.movie.id)) continue;
       seen.add(r.movie.id);
-      out.push(r);
+      extras.push(r);
     }
-    return out;
-  }, [recommendations, mergedFallbackPool]);
+    const all = [...primary, ...extras];
+    const predicted = all
+      .filter((r) => Number(r?.neighborCount ?? 0) >= 1)
+      .sort((a, b) => b.predicted - a.predicted);
+    const unpredicted = all
+      .filter((r) => Number(r?.neighborCount ?? 0) < 1)
+      .sort((a, b) => b.predicted - a.predicted);
+    return [...predicted, ...unpredicted];
+  }, [recommendations, yourPicksFallbackPool]);
+
+  /** First index in `yourPicksStripSorted` without `neighborCount ≥ 1`. Used for partition-aware rotation. */
+  const yourPicksPredictedCount = useMemo(
+    () => yourPicksStripSorted.findIndex((r) => Number(r?.neighborCount ?? 0) < 1),
+    [yourPicksStripSorted],
+  );
 
   const hasYourPicksStripSource = yourPicksStripSorted.length > 0;
 
@@ -4033,9 +4073,18 @@ export default function App() {
         return;
       }
 
-      const n = sorted.length;
-      const start = topPickOffset % n;
-      const rotated = [...sorted.slice(start), ...sorted.slice(0, start)];
+      // Partition-preserving rotation: cycle predicted + unpredicted independently so blue-pill rows
+      // always stay ahead of TMDB-only rows on refresh (sorted is already [predicted…, unpredicted…]).
+      const predictedCount =
+        yourPicksPredictedCount === -1 ? sorted.length : yourPicksPredictedCount;
+      const pred = sorted.slice(0, predictedCount);
+      const unpred = sorted.slice(predictedCount);
+      const rotatePart = (arr) => {
+        if (arr.length === 0) return arr;
+        const s = topPickOffset % arr.length;
+        return [...arr.slice(s), ...arr.slice(0, s)];
+      };
+      const rotated = [...rotatePart(pred), ...rotatePart(unpred)];
 
       if (selectedStreamingProviderIds.length === 0) {
         let strip1Recs = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
@@ -4068,10 +4117,9 @@ export default function App() {
           strip1 = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
         } else if (strip1.length < MORE_TAB_ON_SERVICE_MAX && strip1.length > 0) {
           const inStrip1 = new Set(strip1.map((r) => r.movie.id));
-          const merged = [...theaterRecs, ...streamingMovieRecsResolved, ...streamingTvRecsResolved, ...worthALookRecs];
           const seen = new Set(inStrip1);
           const backfillPool = [];
-          for (const rec of merged) {
+          for (const rec of worthALookRecs) {
             if (!rec?.movie?.id || seen.has(rec.movie.id)) continue;
             seen.add(rec.movie.id);
             if (rec.predicted < MORE_TAB_OFF_SERVICE_PRED_MIN) continue;
@@ -4152,12 +4200,10 @@ export default function App() {
     };
   }, [
     yourPicksStripSorted,
+    yourPicksPredictedCount,
     cfRecommendationPickIdSet,
     selectedStreamingProviderIds,
     topPickOffset,
-    theaterRecs,
-    streamingMovieRecsResolved,
-    streamingTvRecsResolved,
     worthALookRecs,
   ]);
 
@@ -5672,10 +5718,114 @@ export default function App() {
       )}
 
       {screen === "your-picks" && (
-        <PageShell title="Your Picks" subtitle="Step 0 scaffold: dedicated page shell">
-          <div className="disc-empty"><div className="disc-empty-text">Your Picks page scaffold is ready. Personalized wiring is next.</div></div>
+        <div className="home">
+          <PageShell title="Your Picks" subtitle="Personalized picks from your ratings — on and off your streaming apps">
+            {/* Your picks strips: score badge bottom-right; ✨/📈 icon-only pill bottom-left; no range/confidence (detail only). */}
+            {(hasYourPicksStripSource || yourPicksLoading) && (
+              <div className="section" style={{ paddingTop: 0 }}>
+                <div className="section-header">
+                  <div className="section-title">🔥 For you</div>
+                  {hasYourPicksStripSource && (
+                    <div
+                      className="section-meta"
+                      style={{ cursor: "pointer" }}
+                      onClick={() => setTopPickOffset((p) => p + 3)}
+                    >
+                      {"↻ Refresh"}
+                    </div>
+                  )}
+                </div>
+                {moreForYouStrip.length > 0 ? (
+                  <div className="strip">
+                    {moreForYouStrip.map((row) => (
+                      <div
+                        className="strip-card"
+                        key={row.rec.movie.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
+                        onClick={() => openDetail(row.rec.movie, row.rec)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
+                      >
+                        <div className="strip-poster">
+                          {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
+                          <span
+                            className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
+                            aria-hidden
+                            title={row.kind === "pick" ? "Personal pick" : "Popular pool"}
+                          >
+                            {row.kind === "pick" ? "✨" : "📈"}
+                          </span>
+                          <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={row.rec.neighborCount} />
+                        </div>
+                        <div className="strip-title">{row.rec.movie.title}</div>
+                        <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <SkeletonStrip showKind />
+                )}
+              </div>
+            )}
+            {(hasYourPicksStripSource || yourPicksLoading) && (
+              <div className="section">
+                <div className="section-header">
+                  <div className="section-title">✨ Worth a Look</div>
+                  <div className="section-meta">
+                    {selectedStreamingProviderIds.length > 0
+                      ? "Strong predictions — not on your selected services"
+                      : "Strong predictions — beyond the first strip"}
+                  </div>
+                </div>
+                {worthLookStrip.length > 0 ? (
+                  <div className="strip">
+                    {worthLookStrip.map((row) => (
+                      <div
+                        className="strip-card"
+                        key={row.rec.movie.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
+                        onClick={() => openDetail(row.rec.movie, row.rec)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
+                      >
+                        <div className="strip-poster">
+                          {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
+                          <span
+                            className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
+                            aria-hidden
+                            title={row.kind === "pick" ? "Personal pick" : "Popular pool"}
+                          >
+                            {row.kind === "pick" ? "✨" : "📈"}
+                          </span>
+                          <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={row.rec.neighborCount} />
+                        </div>
+                        <div className="strip-title">{row.rec.movie.title}</div>
+                        <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <SkeletonStrip showKind />
+                )}
+              </div>
+            )}
+            {!hasYourPicksStripSource && !yourPicksLoading && (
+              <div className="section">
+                <div className="no-recs">
+                  <div className="no-recs-text">Predictions will show here after your first catalogue load and ratings.<br />Browse <strong>In Theaters</strong> or <strong>Streaming</strong> to get started.</div>
+                </div>
+              </div>
+            )}
+          </PageShell>
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
-        </PageShell>
+        </div>
       )}
 
       {screen === "secondary-region" && (
@@ -5693,59 +5843,18 @@ export default function App() {
             <div />
             <AccountAvatarMenu />
           </div>
-          <div className={`home-header ${homeSegment !== HOME_SEGMENT_NOW_PLAYING ? "home-header--no-hero-tagline" : ""}`}>
+          <div className="home-header">
             <div className="home-hero">
               <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-              {homeSegment === HOME_SEGMENT_NOW_PLAYING && (
-                <div className="home-hero-copy">
-                  <div className="home-subtitle">Movies and Shows - Picked for your TASTE!</div>
-                </div>
-              )}
+              <div className="home-hero-copy">
+                <div className="home-subtitle">Movies and Shows - Picked for your TASTE!</div>
+              </div>
             </div>
             <AccountAvatarMenu />
           </div>
           <div className="section-divider" style={{ margin: "0 24px 10px", borderTop: "1px solid #1a1a1a" }} />
-          <div className="home-desktop-nav-row">
-            <div className="home-topnav" role="tablist" aria-label="Now Playing, Your picks, Friends">
-              {[
-                [HOME_SEGMENT_NOW_PLAYING, "Now Playing"],
-                [HOME_SEGMENT_YOUR_PICKS, "Your picks"],
-                [HOME_SEGMENT_FRIENDS, "Friends"],
-              ].map(([id, label]) => (
-                <button
-                  key={`desktop-${id}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={homeSegment === id}
-                  className={`home-segment ${homeSegment === id ? "active" : ""}`}
-                  onClick={() => setHomeSegment(id)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="home-segments" role="tablist" aria-label="Now Playing, Your picks, Friends">
-            {[
-              [HOME_SEGMENT_NOW_PLAYING, "Now Playing"],
-              [HOME_SEGMENT_YOUR_PICKS, "Your picks"],
-              [HOME_SEGMENT_FRIENDS, "Friends"],
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={homeSegment === id}
-                className={`home-segment ${homeSegment === id ? "active" : ""}`}
-                onClick={() => setHomeSegment(id)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
 
-          {homeSegment === HOME_SEGMENT_NOW_PLAYING && (
-            <div className="section">
+          <div className="section">
               {homePicksLoadFailed ? (
                 <div className="no-recs">
                   <div className="no-recs-text">Couldn&apos;t load picks right now.<br />Check your connection and try again.</div>
@@ -5861,118 +5970,6 @@ export default function App() {
                 </div>
               )}
             </div>
-          )}
-
-          {homeSegment === HOME_SEGMENT_YOUR_PICKS && (
-            <>
-              {/* Your picks strips: score badge bottom-right; ✨/📈 icon-only pill bottom-left; no range/confidence (detail only). */}
-              {(hasYourPicksStripSource || yourPicksLoading) && (
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-title">🔥 For you</div>
-                    {hasYourPicksStripSource && (
-                      <div
-                        className="section-meta"
-                        style={{ cursor: "pointer" }}
-                        onClick={() => setTopPickOffset((p) => p + 3)}
-                      >
-                        {"↻ Refresh"}
-                      </div>
-                    )}
-                  </div>
-                  {moreForYouStrip.length > 0 ? (
-                    <div className="strip">
-                      {moreForYouStrip.map((row) => (
-                        <div
-                          className="strip-card"
-                          key={row.rec.movie.id}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
-                          onClick={() => openDetail(row.rec.movie, row.rec)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
-                        >
-                          <div className="strip-poster">
-                            {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
-                            <span
-                              className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
-                              aria-hidden
-                              title={row.kind === "pick" ? "Personal pick" : "Popular pool"}
-                            >
-                              {row.kind === "pick" ? "✨" : "📈"}
-                            </span>
-                            <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={row.rec.neighborCount} />
-                          </div>
-                          <div className="strip-title">{row.rec.movie.title}</div>
-                          <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <SkeletonStrip showKind />
-                  )}
-                </div>
-              )}
-              {(hasYourPicksStripSource || yourPicksLoading) && (
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-title">✨ Worth a Look</div>
-                    <div className="section-meta">
-                      {selectedStreamingProviderIds.length > 0
-                        ? "Strong predictions — not on your selected services"
-                        : "Strong predictions — beyond the first strip"}
-                    </div>
-                  </div>
-                  {worthLookStrip.length > 0 ? (
-                    <div className="strip">
-                      {worthLookStrip.map((row) => (
-                        <div
-                          className="strip-card"
-                          key={row.rec.movie.id}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
-                          onClick={() => openDetail(row.rec.movie, row.rec)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
-                        >
-                          <div className="strip-poster">
-                            {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
-                            <span
-                              className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
-                              aria-hidden
-                              title={row.kind === "pick" ? "Personal pick" : "Popular pool"}
-                            >
-                              {row.kind === "pick" ? "✨" : "📈"}
-                            </span>
-                            <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={row.rec.neighborCount} />
-                          </div>
-                          <div className="strip-title">{row.rec.movie.title}</div>
-                          <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <SkeletonStrip showKind />
-                  )}
-                </div>
-              )}
-              {!hasYourPicksStripSource && !yourPicksLoading && (
-                <div className="section">
-                  <div className="no-recs">
-                    <div className="no-recs-text">Predictions will show here after your first catalogue load and ratings.<br />Browse <strong>In Theaters</strong> or <strong>Now Playing</strong> to get started.</div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {homeSegment === HOME_SEGMENT_FRIENDS && (
-            <div className="friends-placeholder">
-              <div className="friends-placeholder-title">Friends</div>
-              <p className="friends-placeholder-text">Groups, shared lists, and watching with people you know will show up here.</p>
-              <p className="friends-placeholder-text" style={{ marginTop: 12, color: "#555" }}>Coming soon.</p>
-            </div>
-          )}
 
           <AppFooter
             onPrivacy={() => openLegalPage("privacy")}
