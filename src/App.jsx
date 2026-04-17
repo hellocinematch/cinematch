@@ -3146,28 +3146,50 @@ export default function App() {
         }
 
         if (screen === "your-picks" && hasRatings && hasCatalogue) {
+          // v4.0.7: One combined Edge round-trip (`your_picks_page`) replaces the prior two
+          // sequential calls (`recommendations_only` → `predict_cached` over rec IDs). The server
+          // parallelizes `runRecommendationsOnly` + a bulk cached-prediction read, so the overlay
+          // ships in the same response. Legacy fallbacks preserved in case the old Edge is still
+          // deployed when a new client hits it.
           let { data, error } = await invokeMatch({
-            action: "recommendations_only",
+            action: "your_picks_page",
             userRatings,
             catalogue: catalogueForRecs,
             topPickOffset,
           });
+          let usedLegacyPath = false;
           if (error) {
             const msg = String(error?.message ?? "");
-            const shouldUseLegacyFull =
-              /Unknown action|not found|404/i.test(msg);
-            console.warn("match recommendations_only:", msg);
-            if (shouldUseLegacyFull) {
+            const shouldFallBack = /Unknown action|not found|404/i.test(msg);
+            console.warn("match your_picks_page:", msg);
+            if (shouldFallBack) {
+              usedLegacyPath = true;
               ({ data, error } = await invokeMatch({
-                action: "full",
-                omitStripRecs: true,
+                action: "recommendations_only",
                 userRatings,
                 catalogue: catalogueForRecs,
-                inTheaters: inTheatersForRecs,
-                streamingMovies: streamingMoviesForRecs,
-                streamingTV: streamingTVForRecs,
                 topPickOffset,
               }));
+              if (error) {
+                const msg2 = String(error?.message ?? "");
+                const shouldUseLegacyFull = /Unknown action|not found|404/i.test(msg2);
+                console.warn("match recommendations_only:", msg2);
+                if (shouldUseLegacyFull) {
+                  ({ data, error } = await invokeMatch({
+                    action: "full",
+                    omitStripRecs: true,
+                    userRatings,
+                    catalogue: catalogueForRecs,
+                    inTheaters: inTheatersForRecs,
+                    streamingMovies: streamingMoviesForRecs,
+                    streamingTV: streamingTVForRecs,
+                    topPickOffset,
+                  }));
+                } else {
+                  error = null;
+                  data = { recommendations: [], worthALookRecs: [] };
+                }
+              }
             } else {
               error = null;
               data = { recommendations: [], worthALookRecs: [] };
@@ -3197,33 +3219,37 @@ export default function App() {
           }
           const nextRecs = Array.isArray(data?.recommendations) ? data.recommendations : [];
           const nextWorth = Array.isArray(data?.worthALookRecs) ? data.worthALookRecs : [];
-          if (nextRecs.length > 0 || nextWorth.length > 0) {
+          const nextPredictions =
+            data?.predictions && typeof data.predictions === "object" ? data.predictions : null;
+          if (nextRecs.length > 0 || nextWorth.length > 0 || nextPredictions) {
             setMatchData((prev) => ({
               ...(prev && typeof prev === "object" ? prev : {}),
               ...(nextRecs.length > 0 ? { recommendations: nextRecs } : {}),
               ...(nextWorth.length > 0 ? { worthALookRecs: nextWorth } : {}),
+              ...(nextPredictions ? { yourPicksPredictions: nextPredictions } : {}),
             }));
           }
 
-          // Your Picks predict overlay — scoped to just the IDs `recommendations_only` returned so the
-          // server only has to read/compute a bounded set (~120–280) instead of a heuristic 500. Keeps
-          // cold-cache paths from timing out. Runs after the CF call to avoid duplicate work if the
-          // response is empty.
-          const yourPicksIds = new Set();
-          for (const r of nextRecs) if (r?.movie?.id) yourPicksIds.add(r.movie.id);
-          for (const r of nextWorth) if (r?.movie?.id) yourPicksIds.add(r.movie.id);
-          const idList = [...yourPicksIds];
-          if (idList.length > 0) {
-            const { data: predData, error: predErr } = await invokeMatch({
-              action: "predict_cached",
-              userRatings,
-              titles: idList,
-            });
-            if (!cancelled && !predErr && predData?.predictions) {
-              setMatchData((prev) => ({
-                ...(prev && typeof prev === "object" ? prev : {}),
-                yourPicksPredictions: predData.predictions,
-              }));
+          // Legacy-fallback overlay path: old Edge (without `your_picks_page`) returns no
+          // `predictions`, so we re-issue the bounded `predict_cached` call like v4.0.6. Modern
+          // Edge already returns overlays inline above and skips this.
+          if (usedLegacyPath && !nextPredictions) {
+            const yourPicksIds = new Set();
+            for (const r of nextRecs) if (r?.movie?.id) yourPicksIds.add(r.movie.id);
+            for (const r of nextWorth) if (r?.movie?.id) yourPicksIds.add(r.movie.id);
+            const idList = [...yourPicksIds];
+            if (idList.length > 0) {
+              const { data: predData, error: predErr } = await invokeMatch({
+                action: "predict_cached",
+                userRatings,
+                titles: idList,
+              });
+              if (!cancelled && !predErr && predData?.predictions) {
+                setMatchData((prev) => ({
+                  ...(prev && typeof prev === "object" ? prev : {}),
+                  yourPicksPredictions: predData.predictions,
+                }));
+              }
             }
           }
         }

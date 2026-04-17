@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.7
+
+- **Your Picks hydration: one round-trip.** New Edge action `your_picks_page` combines the prior two sequential calls (`recommendations_only` → `predict_cached` over rec IDs) into a single response. Server-side runs `runRecommendationsOnly` (`match_recommendations_from_neighbors` RPC + worth-a-look pool) and a bulk indexed read from `user_title_predictions` concurrently via `Promise.all`, filters the cached predictions down to the rec IDs the client will render, and returns `{ recommendations, worthALookRecs, predictions }` in one payload. Fixes the ~15s first-load stall (and intermittent 3rd-try failures) caused by cold-cache compute across ~120–280 titles blowing past Edge timeouts — we now overlay strictly from cache, which warms over time from detail-page + other-strip `predict_cached` writes. Client keeps legacy fallbacks (`recommendations_only` + `predict_cached`, and `full` with `omitStripRecs`) so new clients hitting an older Edge continue to work.
+
 ## 4.0.6
 
 - **Your Picks is now page-local** — no more borrowing from In Theaters / Streaming / Pulse pools. The 🔥 For you + ✨ Worth a Look strips source exclusively from `recommendations_only` (`recommendations` + `worthALookRecs`) with a page-local `predict_cached` overlay applied on top, matching the pattern Pulse / In Theaters / Streaming already use. The overlay fills in `neighborCount` on rows where `match_recommendations_from_neighbors` returned a TMDB popularity fallback (thin `user_neighbors` / new account), so the blue predicted badge now renders on every row that has a cached per-title prediction.

@@ -867,6 +867,33 @@ async function readCachedPrediction(
   return (data as CachedPredictionRow | null) ?? null;
 }
 
+/**
+ * Bulk cache-read for `your_picks_page`. Reads every fresh, same-model prediction for this
+ * user in one indexed query (`user_title_predictions (user_id, media_type, tmdb_id)`), so the
+ * combined page call can overlay neighbor predictions without re-computing anything server
+ * side. Order by `computed_at` desc + a conservative row cap keeps the response bounded if a
+ * power user's cache has grown beyond the expected few-hundred rows.
+ */
+async function readCachedPredictionsForUser(
+  admin: SupabaseClient | null,
+  userId: string,
+  limit = 1500,
+): Promise<CachedPredictionRow[]> {
+  if (!admin) return [];
+  const { data, error } = await admin
+    .from("user_title_predictions")
+    .select("user_id, media_type, tmdb_id, predicted, low, high, confidence, neighbor_count, computed_at, model_version")
+    .eq("user_id", userId)
+    .eq("model_version", PREDICTION_MODEL_VERSION)
+    .order("computed_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.warn("match: bulk cached prediction read failed", error.message);
+    return [];
+  }
+  return (data ?? []) as CachedPredictionRow[];
+}
+
 async function writeCachedPrediction(
   admin: SupabaseClient | null,
   userId: string,
@@ -1054,6 +1081,64 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (action === "your_picks_page") {
+      /**
+       * Combined `/your-picks` hydration (v4.0.7).
+       *
+       * Replaces the two sequential client → Edge round-trips
+       *   1) `recommendations_only` (~300-800ms)  2) `predict_cached` over its rec IDs (~300-1500ms
+       *      cold cache — used to time out on first load).
+       *
+       * Server-side we now run those concurrently via `Promise.all`:
+       *   - `runRecommendationsOnly` (SQL RPC `match_recommendations_from_neighbors` + worth-a-look
+       *     fallback pool from the client catalogue).
+       *   - A single indexed bulk read from `user_title_predictions` for this user (fresh +
+       *     same-model only). After recs resolve we filter to the IDs the client will actually
+       *     render and return them as `predictions` for the client overlay.
+       *
+       * Important: this path intentionally does NOT compute missing predictions. Cold-cache
+       * compute over ~280 titles is exactly what pushed Edge timeouts previously. Overlays
+       * populate naturally as users browse detail pages / other strips.
+       */
+      const topPickOffset = typeof body.topPickOffset === "number" ? body.topPickOffset : 0;
+      const [recsResult, cachedRows] = await Promise.all([
+        runRecommendationsOnly(admin, user.id, userRatings, catalogue, topPickOffset).catch((err) => {
+          console.warn("match: your_picks_page recs degraded", (err as Error).message);
+          return { recommendations: [], worthALookRecs: [] } as {
+            recommendations: Rec[];
+            worthALookRecs: Rec[];
+          };
+        }),
+        readCachedPredictionsForUser(admin, user.id).catch((err) => {
+          console.warn("match: your_picks_page cached predictions degraded", (err as Error).message);
+          return [] as CachedPredictionRow[];
+        }),
+      ]);
+
+      const relevantIds = new Set<string>();
+      for (const r of recsResult.recommendations) relevantIds.add(String(r.movie.id));
+      for (const r of recsResult.worthALookRecs) relevantIds.add(String(r.movie.id));
+
+      const predictions: Record<string, Pred> = {};
+      for (const row of cachedRows) {
+        if (!isFreshCachedPrediction(row)) continue;
+        const mediaType = String(row.media_type);
+        if (mediaType !== "movie" && mediaType !== "tv") continue;
+        const key = ratingRowKey(mediaType, Number(row.tmdb_id));
+        if (!relevantIds.has(key)) continue;
+        predictions[key] = toPredFromCache(row);
+      }
+
+      return new Response(
+        JSON.stringify({
+          recommendations: recsResult.recommendations,
+          worthALookRecs: recsResult.worthALookRecs,
+          predictions,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     if (action !== "full") {
