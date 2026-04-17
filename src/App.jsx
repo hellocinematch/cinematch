@@ -3500,7 +3500,21 @@ export default function App() {
     return mixed.slice(0, ONBOARDING_COUNT);
   }, [obCatalogue, otherCinema]);
 
-  const recommendations = matchData?.recommendations ?? EMPTY_MATCH_RECS;
+  const rawRecommendations = matchData?.recommendations ?? EMPTY_MATCH_RECS;
+  const stickyRecommendationsRef = useRef([]);
+  useEffect(() => {
+    if (!user) {
+      stickyRecommendationsRef.current = [];
+      return;
+    }
+    if (Array.isArray(rawRecommendations) && rawRecommendations.length > 0) {
+      stickyRecommendationsRef.current = rawRecommendations;
+    }
+  }, [user, rawRecommendations]);
+  const recommendations =
+    Array.isArray(rawRecommendations) && rawRecommendations.length > 0
+      ? rawRecommendations
+      : stickyRecommendationsRef.current;
 
   const theaterRecs = useMemo(() => {
     const fromMatch = matchData?.theaterRecs;
