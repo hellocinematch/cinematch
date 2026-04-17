@@ -2823,19 +2823,28 @@ export default function App() {
         await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
         await predictStripThenMerge(secondaryStripCatalogRows, "secondaryRecs");
 
-        const { data, error } = await invokeMatch({
-          action: "full",
-          omitStripRecs: true,
+        let { data, error } = await invokeMatch({
+          action: "recommendations_only",
           userRatings,
           catalogue: catalogueForRecs,
-          inTheaters: inTheatersForRecs,
-          streamingMovies: streamingMoviesForRecs,
-          streamingTV: streamingTVForRecs,
           topPickOffset,
         });
+        if (error) {
+          console.warn("match recommendations_only:", error.message);
+          ({ data, error } = await invokeMatch({
+            action: "full",
+            omitStripRecs: true,
+            userRatings,
+            catalogue: catalogueForRecs,
+            inTheaters: inTheatersForRecs,
+            streamingMovies: streamingMoviesForRecs,
+            streamingTV: streamingTVForRecs,
+            topPickOffset,
+          }));
+        }
         if (cancelled) return;
         if (error) {
-          console.warn("match function:", error.message);
+          console.warn("match function fallback full:", error.message);
           setMatchData((prev) => {
             if (
               prev &&

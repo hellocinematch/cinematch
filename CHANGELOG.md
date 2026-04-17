@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.5.6
+
+- **For you / Worth a look reliability path:** Added `match` action `recommendations_only` backed by SQL RPC `match_recommendations_from_neighbors`, so home now fetches lightweight recommendation rows without loading full neighbor rating maps in Edge. Client keeps sequential `predict_cached` strip updates and falls back to legacy `full` (`omitStripRecs`) only if the lightweight action fails.
+
 ## 3.5.5
 
 - **Home Now Playing — all strips get predictions:** Sequential `predict_cached` runs **In Theaters → What’s hot → streaming movies → streaming TV → secondary region**, then `full` with `omitStripRecs` for **For you** / **Worth a look** + catalogue CF. `matchData` adds `whatsHotRecs` and `secondaryRecs` for strip parity with TMDB fallbacks until each batch returns.

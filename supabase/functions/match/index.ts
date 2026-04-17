@@ -723,6 +723,112 @@ type CachedPredictionRow = {
   model_version: string;
 };
 
+type NeighborRecommendationRow = {
+  media_type: "movie" | "tv";
+  tmdb_id: number;
+  weighted_score: number | string | null;
+  contributor_count: number | string | null;
+  total_weight: number | string | null;
+};
+
+function fallbackRecFromMovie(movie: Movie): Rec {
+  const t = Number(movie.tmdbRating ?? 7);
+  return {
+    movie,
+    predicted: t,
+    low: Math.max(1, Math.round((t - 1) * 10) / 10),
+    high: Math.min(10, Math.round((t + 1) * 10) / 10),
+    confidence: "low",
+    neighborCount: 0,
+  };
+}
+
+function confidenceFromTotalWeight(totalWeight: number): string {
+  if (totalWeight >= CONFIDENCE_HIGH_WEIGHT) return "high";
+  if (totalWeight >= CONFIDENCE_MEDIUM_WEIGHT) return "medium";
+  return "low";
+}
+
+async function fetchRecommendationsFromNeighborsRpc(
+  admin: SupabaseClient | null,
+  userId: string,
+  mediaType: "movie" | "tv" | null,
+  limit: number,
+): Promise<NeighborRecommendationRow[]> {
+  if (!admin) return [];
+  const { data, error } = await admin.rpc("match_recommendations_from_neighbors", {
+    p_user_id: userId,
+    p_media_type: mediaType,
+    p_limit: limit,
+    p_min_similarity: SIMILARITY_FLOOR_READ,
+    p_min_contributors: 2,
+  });
+  if (error) throw error;
+  return (data ?? []) as NeighborRecommendationRow[];
+}
+
+async function runRecommendationsOnly(
+  admin: SupabaseClient | null,
+  userId: string,
+  userRatings: RatingsMap,
+  catalogue: Movie[],
+  topPickOffset: number,
+): Promise<{ recommendations: Rec[]; worthALookRecs: Rec[] }> {
+  if (Object.keys(userRatings).length === 0 || catalogue.length === 0) {
+    return { recommendations: [], worthALookRecs: [] };
+  }
+
+  const byRowKey = new Map<string, Movie>();
+  for (const movie of catalogue) {
+    const parsed = parseMovieId(String(movie.id ?? ""));
+    if (!parsed) continue;
+    byRowKey.set(ratingRowKey(parsed.mediaType, parsed.tmdbId), movie);
+  }
+
+  const recRows = await fetchRecommendationsFromNeighborsRpc(admin, userId, null, 220);
+  const recommendations: Rec[] = [];
+  const recIdSet = new Set<string>();
+  for (const row of recRows) {
+    const mediaType = String(row.media_type);
+    if (mediaType !== "movie" && mediaType !== "tv") continue;
+    const tmdbId = Number(row.tmdb_id);
+    if (!Number.isFinite(tmdbId)) continue;
+    const movie = byRowKey.get(ratingRowKey(mediaType, tmdbId));
+    if (!movie) continue;
+    const predicted = Number(row.weighted_score);
+    if (!Number.isFinite(predicted)) continue;
+    const totalWeight = Number(row.total_weight);
+    const contributorCount = Number(row.contributor_count);
+    recommendations.push({
+      movie,
+      predicted: Math.round(predicted * 10) / 10,
+      low: Math.max(1, Math.round((predicted - 1) * 10) / 10),
+      high: Math.min(10, Math.round((predicted + 1) * 10) / 10),
+      confidence: confidenceFromTotalWeight(Number.isFinite(totalWeight) ? totalWeight : 0),
+      neighborCount: Number.isFinite(contributorCount) ? contributorCount : 0,
+    });
+    recIdSet.add(String(movie.id));
+  }
+
+  const fallbackCandidates = catalogue
+    .filter((m) => !recIdSet.has(String(m.id)))
+    .sort((a, b) => Number(b.popularity ?? 0) - Number(a.popularity ?? 0));
+  const start = recommendations.length > 0 ? topPickOffset % recommendations.length : 0;
+  const rotatedRecs = recommendations.length > 0
+    ? [...recommendations.slice(start), ...recommendations.slice(0, start)]
+    : [];
+  const worthALookRecs = [...rotatedRecs.slice(0, 60)];
+  const used = new Set(worthALookRecs.map((r) => String(r.movie.id)));
+  for (const movie of fallbackCandidates) {
+    if (worthALookRecs.length >= 60) break;
+    if (used.has(String(movie.id))) continue;
+    worthALookRecs.push(fallbackRecFromMovie(movie));
+    used.add(String(movie.id));
+  }
+
+  return { recommendations, worthALookRecs };
+}
+
 function toPredFromCache(row: CachedPredictionRow): Pred {
   return {
     predicted: Number(row.predicted),
@@ -932,6 +1038,14 @@ Deno.serve(async (req: Request) => {
       ;
       const scored = rankMoodByVibe(scoredPool, vibe).slice(0, 40);
       return new Response(JSON.stringify({ scored }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "recommendations_only") {
+      const topPickOffset = typeof body.topPickOffset === "number" ? body.topPickOffset : 0;
+      const result = await runRecommendationsOnly(admin, user.id, userRatings, catalogue, topPickOffset);
+      return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
