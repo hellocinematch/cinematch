@@ -2020,7 +2020,7 @@ function CinemastroVoteMeter({ count, className = "" }) {
  * v3.5.1: Poster / Discover / mood badge priority — user rating, then personal prediction, then community.
  * `pillClass` adds source-specific accents (Cinemastro gold, predicted blue).
  */
-function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
+function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey, predictedNeighborCount = 0) {
   if (userRating != null && Number.isFinite(Number(userRating))) {
     return {
       text: `★ ${formatScore(userRating)}`,
@@ -2030,7 +2030,7 @@ function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
       cinemastroCount: null,
     };
   }
-  if (predicted != null && Number.isFinite(Number(predicted))) {
+  if (predicted != null && Number.isFinite(Number(predicted)) && Number(predictedNeighborCount) >= 1) {
     return {
       text: formatScore(predicted),
       title: "Predicted for you",
@@ -3861,8 +3861,8 @@ export default function App() {
     }));
   }
 
-  function StripPosterBadge({ movie, predicted }) {
-    const bd = stripBadgeDisplay(movie, userRatings[movie.id], predicted, cinemastroAvgByKey);
+  function StripPosterBadge({ movie, predicted, predictedNeighborCount = 0 }) {
+    const bd = stripBadgeDisplay(movie, userRatings[movie.id], predicted, cinemastroAvgByKey, predictedNeighborCount);
     const showMeter =
       bd.pillClass === "strip-badge--cinemastro" &&
       bd.cinemastroCount != null &&
@@ -4921,7 +4921,7 @@ export default function App() {
                           <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                             <div className="strip-poster">
                               {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} />
+                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -4950,7 +4950,7 @@ export default function App() {
                               {inTheaterIdsForWhatsHotPill.has(rec.movie.id) && qualifiesForTheatricalPillMovie(rec.movie) && (
                                 <div className="strip-hot-theater-pill">In theaters</div>
                               )}
-                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} />
+                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -4984,7 +4984,7 @@ export default function App() {
                           <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                             <div className="strip-poster">
                               {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} />
+                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>
                             <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -5052,7 +5052,7 @@ export default function App() {
                               <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                                 <div className="strip-poster">
                                   {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                                  <StripPosterBadge movie={rec.movie} predicted={rec.predicted} />
+                                  <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
                                 </div>
                                 <div className="strip-title">{rec.movie.title}</div>
                                 <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -5112,7 +5112,7 @@ export default function App() {
                             >
                               {row.kind === "pick" ? "✨" : "📈"}
                             </span>
-                            <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} />
+                            <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={row.rec.neighborCount} />
                           </div>
                           <div className="strip-title">{row.rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
@@ -5155,7 +5155,7 @@ export default function App() {
                             >
                               {row.kind === "pick" ? "✨" : "📈"}
                             </span>
-                            <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} />
+                            <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={row.rec.neighborCount} />
                           </div>
                           <div className="strip-title">{row.rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
@@ -5298,7 +5298,7 @@ export default function App() {
               {discoverItems.map(m => {
                 const rec = recMap[m.id];
                 const myRating = userRatings[m.id];
-                const discBd = stripBadgeDisplay(m, myRating, rec?.predicted ?? null, cinemastroAvgByKey);
+                const discBd = stripBadgeDisplay(m, myRating, rec?.predicted ?? null, cinemastroAvgByKey, rec?.neighborCount ?? 0);
                 const discMeter =
                   discBd.pillClass === "strip-badge--cinemastro" &&
                   discBd.cinemastroCount != null &&
@@ -5414,7 +5414,7 @@ export default function App() {
                     <div className="mood-result-overlay" />
                     <div className="mood-result-type">{rec.movie.type === "movie" ? "Movie" : "TV"}</div>
                     {(() => {
-                      const mbd = stripBadgeDisplay(rec.movie, userRatings[rec.movie.id], rec.predicted, cinemastroAvgByKey);
+                      const mbd = stripBadgeDisplay(rec.movie, userRatings[rec.movie.id], rec.predicted, cinemastroAvgByKey, rec.neighborCount);
                       const moodMeter =
                         mbd.pillClass === "strip-badge--cinemastro" &&
                         mbd.cinemastroCount != null &&

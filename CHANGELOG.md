@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.5.2
+
+- **Predicted badge correctness:** Personal blue badges now require real neighbor evidence (`neighborCount >= 1`) on strip, Discover, and Mood cards. Titles falling back to TMDB/Cinemastro no longer appear as personal predictions, matching detail-screen behavior.
+
 ## 3.5.1
 
 - **Badge priority + color clarity:** Card badges now prioritize **your predicted score** (when present) over Cinemastro/TMDB crowd scores, while still keeping **your own rating** highest priority. Predicted badges use a distinct blue treatment across home strips, Discover, and Mood results; Cinemastro stays gold and rated stays green.
