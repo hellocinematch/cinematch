@@ -1269,9 +1269,46 @@ function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelection
 
 /** TMDB-style horizontal primary nav (desktop-first; links scroll on narrow widths). */
 function AppPrimaryNav({ menuItems, activeSectionId, onNavigateSection, onDiscover, onHome, discoverActive }) {
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") setMobileOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
+  // Close drawer if viewport widens past the mobile breakpoint (e.g. rotate, resize).
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mql = window.matchMedia("(min-width: 900px)");
+    const handle = (e) => { if (e.matches) setMobileOpen(false); };
+    if (mql.addEventListener) mql.addEventListener("change", handle);
+    else if (mql.addListener) mql.addListener(handle);
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener("change", handle);
+      else if (mql.removeListener) mql.removeListener(handle);
+    };
+  }, []);
+
+  function handleDrawerSelect(id) {
+    setMobileOpen(false);
+    onNavigateSection(id);
+  }
+
   return (
     <header className="app-primary-nav" role="navigation" aria-label="Primary">
       <div className="app-primary-nav__inner">
+        <button
+          type="button"
+          className={`app-primary-nav__hamburger ${mobileOpen ? "app-primary-nav__hamburger--open" : ""}`}
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
+          aria-controls="app-primary-nav-drawer"
+        >
+          <span aria-hidden="true">{mobileOpen ? "✕" : "☰"}</span>
+        </button>
         <div className="app-primary-nav__brand">
           <AppBrand onPress={onHome} />
         </div>
@@ -1298,6 +1335,32 @@ function AppPrimaryNav({ menuItems, activeSectionId, onNavigateSection, onDiscov
           </button>
         </div>
       </div>
+      {mobileOpen && (
+        <>
+          <button
+            type="button"
+            className="app-primary-nav__scrim"
+            aria-label="Close menu"
+            onClick={() => setMobileOpen(false)}
+          />
+          <nav
+            id="app-primary-nav-drawer"
+            className="app-primary-nav__drawer"
+            aria-label="Sections"
+          >
+            {menuItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`app-primary-nav__drawer-link ${activeSectionId === item.id ? "app-primary-nav__drawer-link--active" : ""}`}
+                onClick={() => handleDrawerSelect(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </>
+      )}
     </header>
   );
 }
@@ -1629,6 +1692,65 @@ const styles = `
   }
   .app-primary-nav__icon:hover { background:rgba(232, 201, 106, 0.12); }
   .app-primary-nav__icon--active { background:rgba(232, 201, 106, 0.16); }
+  .app-primary-nav__hamburger {
+    display:none;
+    flex-shrink:0;
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:22px;
+    padding:8px 10px;
+    line-height:1;
+    border-radius:8px;
+    color:#e8c96a;
+    min-width:40px;
+    align-items:center;
+    justify-content:center;
+  }
+  .app-primary-nav__hamburger:hover { background:rgba(232, 201, 106, 0.12); }
+  .app-primary-nav__hamburger--open { background:rgba(232, 201, 106, 0.16); }
+  .app-primary-nav__scrim {
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    top:calc(60px + env(safe-area-inset-top, 0px));
+    background:rgba(0,0,0,0.55);
+    border:none;
+    padding:0;
+    cursor:pointer;
+    z-index:2099;
+    display:none;
+  }
+  .app-primary-nav__drawer {
+    position:fixed;
+    top:calc(60px + env(safe-area-inset-top, 0px));
+    left:0;
+    right:0;
+    z-index:2101;
+    background:linear-gradient(180deg, #121212 0%, #0a0a0a 100%);
+    border-bottom:1px solid #222;
+    box-shadow:0 8px 20px rgba(0,0,0,0.5);
+    display:none;
+    flex-direction:column;
+    padding:6px 0 10px;
+    max-height:calc(100vh - 60px - env(safe-area-inset-top, 0px));
+    overflow-y:auto;
+  }
+  .app-primary-nav__drawer-link {
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-family:'DM Sans',sans-serif;
+    font-size:15px;
+    font-weight:600;
+    color:#c8c4bc;
+    padding:14px 24px;
+    text-align:left;
+    transition:color 0.15s, background 0.15s;
+  }
+  .app-primary-nav__drawer-link:hover { color:#e8c96a; background:rgba(232, 201, 106, 0.08); }
+  .app-primary-nav__drawer-link--active { color:#e8c96a; background:#2a2610; }
   .app--primary-nav { padding-top:calc(60px + env(safe-area-inset-top, 0px)); }
   .app--primary-nav .home-header { padding-top:20px; }
   .topbar-brand-cluster { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:nowrap; }
@@ -2038,9 +2160,13 @@ const styles = `
     .home-header .public-site-stats { display:none; }
     .discover-header { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); min-width:0; }
     .app-primary-nav__inner {
-      padding-left:max(20px, env(safe-area-inset-left, 0px));
+      padding-left:max(12px, env(safe-area-inset-left, 0px));
       padding-right:max(20px, env(safe-area-inset-right, 0px));
     }
+    .app-primary-nav__hamburger { display:inline-flex; }
+    .app-primary-nav__links { display:none; }
+    .app-primary-nav__scrim { display:block; }
+    .app-primary-nav__drawer { display:flex; }
     .filter-row { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .disc-grid { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .discover { width:100%; max-width:100%; }

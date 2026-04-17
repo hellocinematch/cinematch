@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.9
+
+- **Mobile hamburger menu for the primary nav.** On viewports below 900px the horizontal section links row is replaced by a ☰ button in the top-left; tapping it opens a slide-down drawer containing the same items (Circles / Pulse / In Theaters / Streaming / Your Picks, plus the regional label when a secondary region is set). The drawer dismisses on link tap, scrim tap, the ✕ close button, or Escape. Desktop (≥900px) is untouched — logo, inline section links, and the 🔍 Discover icon still render exactly as before. Also auto-closes if the viewport widens past the breakpoint mid-session (rotate / resize). Client-only; no Edge, no RPC, no prop plumbing changes.
+
 ## 4.0.8
 
 - **Home retired; Circles is the landing.** The `home` screen has been removed entirely. Post-login routing, the wordmark tap, back-from-legal, onboarding exit, and the mood back button all now land on `/circles`. The `navTab === "home"` value remains as the idle bottom-nav sentinel (meaning "neither Mood nor Profile is active"), which keeps the page-agnostic state model intact. `SPA_DEEPLINK_READY_SCREENS` now includes `circles`, `secondary-region`, and `your-picks`; `home` is out.
