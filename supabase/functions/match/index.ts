@@ -31,7 +31,20 @@ const MAX_SEED_TITLE_KEYS_PREDICT = 220;
 const MAX_CANDIDATES_FROM_OVERLAP_PREDICT = 700;
 const MAX_NEIGHBORS_FULL_FETCH_PREDICT = 140;
 const PREDICTION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const PREDICTION_MODEL_VERSION = "cf-v2-seed-balanced-cache-v1";
+/** Bumps cache when predict path changes. */
+const PREDICTION_MODEL_VERSION = "cf-v3-user-neighbors-v4";
+
+/**
+ * `user_neighbors` read filter. Must be <= compute-neighbors `NOISE_FLOOR` (0.10) or we drop stored
+ * edges and get false `prediction: null` when weaker-but-stored neighbors did rate the title.
+ * (Architecture §3h suggested 0.30 for extra pruning; that conflicts with 0.10 storage.)
+ */
+const SIMILARITY_FLOOR_READ = 0.10;
+/** `full` / `mood`: cap how many neighbors load full rating maps (CPU + `MAX_ROWS_FULL_RATINGS`). */
+const MAX_NEIGHBORS_FOR_FULL = 2000;
+/** Batch-predict confidence from Σ similarity of contributing neighbors (architecture §3h). */
+const CONFIDENCE_HIGH_WEIGHT = 3.0;
+const CONFIDENCE_MEDIUM_WEIGHT = 1.5;
 
 type Movie = Record<string, unknown> & {
   id: string;
@@ -287,6 +300,70 @@ function runFullMatch(
   };
 }
 
+function getRecommendationsFromNeighbors(
+  userRatings: RatingsMap,
+  neighbors: Neighbor[],
+  catalogue: Movie[],
+): Rec[] {
+  const seen = new Set(Object.keys(userRatings));
+  const movieMap = Object.fromEntries(catalogue.map((m) => [m.id, m]));
+  const ratingCounts: Record<string, number> = {};
+  for (const n of neighbors) {
+    for (const id of Object.keys(n.ratings)) {
+      ratingCounts[id] = (ratingCounts[id] || 0) + 1;
+    }
+  }
+  const candidates = new Set(
+    neighbors.flatMap((n) => Object.keys(n.ratings)).filter((id) => !seen.has(id)),
+  );
+  return [...candidates]
+    .filter((id) => (ratingCounts[id] || 0) >= MIN_MOVIE_RATINGS && movieMap[id])
+    .map((id) => {
+      const pr = predictRatingRange(id, neighbors);
+      return pr ? { movie: movieMap[id], ...pr } : null;
+    })
+    .filter((r): r is Rec => r !== null && r.predicted !== undefined)
+    .sort((a, b) => b.predicted - a.predicted);
+}
+
+function runFullMatchFromNeighbors(
+  neighbors: Neighbor[],
+  userRatings: RatingsMap,
+  catalogue: Movie[],
+  inTheaters: Movie[],
+  streamingMovies: Movie[],
+  streamingTV: Movie[],
+  topPickOffset: number,
+) {
+  const recommendations =
+    Object.keys(userRatings).length === 0 || catalogue.length === 0
+      ? []
+      : getRecommendationsFromNeighbors(userRatings, neighbors, catalogue);
+  const theaterRecs = [...inTheaters]
+    .map((m) => buildRecWithPrediction(m, neighbors))
+    .sort((a, b) => b.predicted - a.predicted);
+  const streamingMovieRecs = [...streamingMovies]
+    .map((m) => buildRecWithPrediction(m, neighbors))
+    .sort((a, b) => b.predicted - a.predicted);
+  const streamingTvRecs = [...streamingTV]
+    .map((m) => buildRecWithPrediction(m, neighbors))
+    .sort((a, b) => b.predicted - a.predicted);
+  const worthALookRecs = computeWorthALook(
+    catalogue,
+    recommendations,
+    topPickOffset,
+    userRatings,
+    neighbors,
+  );
+  return {
+    recommendations,
+    theaterRecs,
+    streamingMovieRecs,
+    streamingTvRecs,
+    worthALookRecs,
+  };
+}
+
 // --- Neighbour data (service role, Edge Function only) -----------------------
 //
 // Security:
@@ -375,6 +452,115 @@ async function fetchSpecificTitleRatingsForUsers(
     .limit(Math.max(2000, userIds.length * 2));
   if (error) throw error;
   return (data ?? []) as RatingRow[];
+}
+
+const SEED_PREFIX = "seed";
+
+async function isSeedSubject(admin: SupabaseClient | null, userId: string): Promise<boolean> {
+  if (!admin) return false;
+  const { data, error } = await admin.from("profiles").select("name").eq("id", userId).maybeSingle();
+  if (error) {
+    console.warn("match: profile read for seed guard failed", error.message);
+    return false;
+  }
+  const name = data?.name as string | null | undefined;
+  return Boolean(name?.toLowerCase().startsWith(SEED_PREFIX));
+}
+
+async function loadNeighborSimRowsLimited(
+  admin: SupabaseClient | null,
+  userId: string,
+  limit: number,
+): Promise<{ neighbor_id: string; similarity: number }[] | null> {
+  if (!admin) return null;
+  const { data, error } = await admin
+    .from("user_neighbors")
+    .select("neighbor_id, similarity")
+    .eq("user_id", userId)
+    .gte("similarity", SIMILARITY_FLOOR_READ)
+    .order("similarity", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.warn("match: user_neighbors read failed", error.message);
+    return null;
+  }
+  return (data ?? []) as { neighbor_id: string; similarity: number }[];
+}
+
+function predFromWeightedRaters(raters: { score: number; similarity: number }[]): Pred | null {
+  if (raters.length === 0) return null;
+  const weightedSum = raters.reduce((s, r) => s + r.score * r.similarity, 0);
+  const totalWeight = raters.reduce((s, r) => s + r.similarity, 0);
+  const predicted = Math.round((weightedSum / totalWeight) * 10) / 10;
+  const confidence = totalWeight >= CONFIDENCE_HIGH_WEIGHT
+    ? "high"
+    : totalWeight >= CONFIDENCE_MEDIUM_WEIGHT
+    ? "medium"
+    : "low";
+  const nRatings = raters.map((r) => r.score);
+  const mean = nRatings.reduce((a, b) => a + b, 0) / nRatings.length;
+  const stdDev = Math.sqrt(nRatings.reduce((s, r) => s + (r - mean) ** 2, 0) / nRatings.length);
+  const margin = stdDev * 0.8;
+  return {
+    predicted,
+    low: Math.max(1, Math.round((predicted - margin) * 10) / 10),
+    high: Math.min(10, Math.round((predicted + margin) * 10) / 10),
+    confidence,
+    neighborCount: raters.length,
+  };
+}
+
+async function predictBatchFromNeighborsTable(
+  admin: SupabaseClient | null,
+  userId: string,
+  titleIds: string[],
+): Promise<Record<string, Pred | null>> {
+  const out: Record<string, Pred | null> = {};
+  for (const t of titleIds) out[t] = null;
+  if (!admin || titleIds.length === 0) return out;
+
+  /** One indexed SQL join per title (`match_predict_neighbor_raters` migration). */
+  const tasks = titleIds.map(async (id) => {
+    const p = parseMovieId(id);
+    if (!p) return { id, raters: [] as { score: number; similarity: number }[] };
+    const { data, error } = await admin.rpc("match_predict_neighbor_raters", {
+      p_user_id: userId,
+      p_media_type: p.mediaType,
+      p_tmdb_id: p.tmdbId,
+      p_min_similarity: SIMILARITY_FLOOR_READ,
+    });
+    if (error) {
+      console.warn("match: match_predict_neighbor_raters rpc failed", id, error.message);
+      return { id, raters: [] as { score: number; similarity: number }[] };
+    }
+    const rows = (data ?? []) as { score: number | string; similarity: number | string }[];
+    const raters = rows.map((r) => ({
+      score: Number(r.score),
+      similarity: Number(r.similarity),
+    }));
+    return { id, raters };
+  });
+
+  const results = await Promise.all(tasks);
+  for (const { id, raters } of results) {
+    out[id] = predFromWeightedRaters(raters);
+  }
+  return out;
+}
+
+async function neighborsFromTable(
+  admin: SupabaseClient | null,
+  userId: string,
+): Promise<Neighbor[]> {
+  const rows = await loadNeighborSimRowsLimited(admin, userId, MAX_NEIGHBORS_FOR_FULL);
+  if (rows == null || rows.length === 0) return [];
+  const ids = rows.map((r) => r.neighbor_id);
+  const maps = await fetchFullMapsForUsers(admin, ids);
+  return rows.map((r) => ({
+    uid: r.neighbor_id,
+    sim: Number(r.similarity),
+    ratings: maps[r.neighbor_id] ?? {},
+  }));
 }
 
 async function loadNeighborRatingsFromDb(
@@ -638,47 +824,82 @@ Deno.serve(async (req: Request) => {
     const userRatings = (body.userRatings as RatingsMap) || {};
     const catalogue = (body.catalogue as Movie[]) || [];
 
-    if (action === "predict" || action === "predict_cached") {
-      const movieId = body.movieId as string;
-      if (!movieId) {
-        return new Response(JSON.stringify({ error: "movieId required" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const otherRatings = await loadNeighborRatingsFromDb(admin, user.id, userRatings, {
-        targetMovieId: movieId,
+    if (admin && (await isSeedSubject(admin, user.id))) {
+      return new Response(JSON.stringify({ error: "Not available for seed users" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-      const neighbors = findNeighbors(userRatings, otherRatings);
-      const cached = await readCachedPrediction(admin, user.id, movieId);
-      const isSameModel = cached?.model_version === PREDICTION_MODEL_VERSION;
-      if (cached && isSameModel && isFreshCachedPrediction(cached)) {
-        return new Response(JSON.stringify({ prediction: toPredFromCache(cached), cached: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    }
+
+    if (action === "predict" || action === "predict_cached") {
+      const fromTitles = Array.isArray(body.titles)
+        ? (body.titles as unknown[]).filter((t): t is string => typeof t === "string")
+        : [];
+      const movieIdRaw = typeof body.movieId === "string" ? body.movieId.trim() : "";
+      const titleIds = [...new Set([...fromTitles, ...(movieIdRaw ? [movieIdRaw] : [])])].filter(
+        (id) => parseMovieId(id) != null,
+      );
+      if (titleIds.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "movieId or non-empty titles[] required (movie-* / tv-* ids)" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const primaryId = movieIdRaw && parseMovieId(movieIdRaw) ? movieIdRaw : titleIds[0]!;
+
+      if (action === "predict_cached" && titleIds.length === 1) {
+        const only = titleIds[0]!;
+        const cached = await readCachedPrediction(admin, user.id, only);
+        const isSameModel = cached?.model_version === PREDICTION_MODEL_VERSION;
+        if (cached && isSameModel && isFreshCachedPrediction(cached)) {
+          return new Response(
+            JSON.stringify({ prediction: toPredFromCache(cached), predictions: { [only]: toPredFromCache(cached) }, cached: true }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
       }
 
-      const prediction = predictRatingRange(movieId, neighbors);
+      const predictions = await predictBatchFromNeighborsTable(admin, user.id, titleIds);
+      const prediction = predictions[primaryId] ?? null;
+
+      for (const id of titleIds) {
+        const p = predictions[id];
+        if (p) await writeCachedPrediction(admin, user.id, id, p);
+      }
+
       if (prediction) {
-        await writeCachedPrediction(admin, user.id, movieId, prediction);
-        return new Response(JSON.stringify({ prediction }), {
+        return new Response(JSON.stringify({ prediction, predictions }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      if (cached && isSameModel) {
-        return new Response(JSON.stringify({ prediction: toPredFromCache(cached), cached: true, stale: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      const cachedStale = await readCachedPrediction(admin, user.id, primaryId);
+      const isSameModelStale = cachedStale?.model_version === PREDICTION_MODEL_VERSION;
+      if (cachedStale && isSameModelStale) {
+        return new Response(
+          JSON.stringify({
+            prediction: toPredFromCache(cachedStale),
+            predictions: { [primaryId]: toPredFromCache(cachedStale) },
+            cached: true,
+            stale: true,
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
-      return new Response(JSON.stringify({ prediction: null }), {
+      return new Response(JSON.stringify({ prediction: null, predictions }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (action === "mood") {
-      const otherRatings = await loadNeighborRatingsFromDb(admin, user.id, userRatings);
-      const neighbors = findNeighbors(userRatings, otherRatings);
+      const neighbors = await neighborsFromTable(admin, user.id);
       const movies = (body.movies as Movie[]) || [];
       const vibe = Array.isArray(body.vibe)
         ? (body.vibe as unknown[]).filter((v): v is string => typeof v === "string")
@@ -717,11 +938,11 @@ Deno.serve(async (req: Request) => {
     const streamingMovies = (body.streamingMovies as Movie[]) || [];
     const streamingTV = (body.streamingTV as Movie[]) || [];
     const topPickOffset = typeof body.topPickOffset === "number" ? body.topPickOffset : 0;
-    const otherRatings = await loadNeighborRatingsFromDb(admin, user.id, userRatings);
+    const neighborsFull = await neighborsFromTable(admin, user.id);
 
-    const result = runFullMatch(
+    const result = runFullMatchFromNeighbors(
+      neighborsFull,
       userRatings,
-      otherRatings,
       catalogue,
       inTheaters,
       streamingMovies,
