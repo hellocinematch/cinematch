@@ -1440,29 +1440,41 @@ const styles = `
   }
   .page-topbar .app-brand { margin:0; }
   .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
+  /* Same centered column as .app / .bottom-nav so logo aligns with section titles + strip cards (TMDB-style). */
   .app-primary-nav {
     position:fixed;
     top:0;
     left:0;
     right:0;
+    margin-left:auto;
+    margin-right:auto;
+    width:100%;
+    max-width:var(--shell);
     z-index:2100;
-    background:linear-gradient(180deg, #032541 0%, #021a2e 100%);
-    border-bottom:1px solid rgba(1, 180, 228, 0.18);
+    background:linear-gradient(180deg, #121212 0%, #0a0a0a 100%);
+    border-bottom:1px solid #222;
+    box-shadow:0 1px 0 rgba(232, 201, 106, 0.08), 0 2px 12px rgba(0,0,0,0.35);
     padding-top:env(safe-area-inset-top, 0px);
-    box-shadow:0 2px 10px rgba(0,0,0,0.28);
+    box-sizing:border-box;
   }
   .app-primary-nav__inner {
     display:flex;
     align-items:center;
     gap:10px;
-    max-width:1400px;
-    margin:0 auto;
-    padding:10px 14px 10px;
-    min-height:48px;
+    width:100%;
+    margin:0;
+    padding:10px 24px 10px;
+    min-height:56px;
     box-sizing:border-box;
   }
   .app-primary-nav__brand { flex-shrink:0; }
-  .app-primary-nav__brand .brand-logo--header { height:26px; width:auto; display:block; }
+  .app-primary-nav__brand .brand-logo--header {
+    height:40px;
+    width:auto;
+    max-width:min(240px, 48vw);
+    display:block;
+    object-fit:contain;
+  }
   .app-primary-nav__links {
     display:flex;
     align-items:center;
@@ -1482,16 +1494,16 @@ const styles = `
     font-family:'DM Sans',sans-serif;
     font-size:13px;
     font-weight:600;
-    color:#fff;
+    color:#c8c4bc;
     padding:8px 10px;
     border-radius:6px;
     transition:color 0.15s, background 0.15s;
     white-space:nowrap;
   }
-  .app-primary-nav__link:hover { color:#01b4e4; }
+  .app-primary-nav__link:hover { color:#e8c96a; }
   .app-primary-nav__link--active {
-    color:#01b4e4;
-    background:rgba(1, 180, 228, 0.14);
+    color:#e8c96a;
+    background:#2a2610;
   }
   .app-primary-nav__right { flex-shrink:0; display:flex; align-items:center; gap:6px; }
   .app-primary-nav__icon {
@@ -1502,11 +1514,11 @@ const styles = `
     padding:8px;
     line-height:1;
     border-radius:8px;
-    color:#01b4e4;
+    color:#e8c96a;
   }
-  .app-primary-nav__icon:hover { background:rgba(1, 180, 228, 0.12); }
-  .app-primary-nav__icon--active { background:rgba(1, 180, 228, 0.14); }
-  .app--primary-nav { padding-top:calc(48px + env(safe-area-inset-top, 0px)); }
+  .app-primary-nav__icon:hover { background:rgba(232, 201, 106, 0.12); }
+  .app-primary-nav__icon--active { background:rgba(232, 201, 106, 0.16); }
+  .app--primary-nav { padding-top:calc(60px + env(safe-area-inset-top, 0px)); }
   .app--primary-nav .home-header { padding-top:20px; }
   .topbar-brand-cluster { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:nowrap; }
   .topbar-brand-cluster .app-brand-button { flex-shrink:1; }
@@ -1926,6 +1938,10 @@ const styles = `
     /* Home login path: logo+stats in hero can overflow on narrow Safari widths. Keep logo only on mobile. */
     .home-header .public-site-stats { display:none; }
     .discover-header { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); min-width:0; }
+    .app-primary-nav__inner {
+      padding-left:max(20px, env(safe-area-inset-left, 0px));
+      padding-right:max(20px, env(safe-area-inset-right, 0px));
+    }
     .filter-row { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .disc-grid { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .discover { width:100%; max-width:100%; }
@@ -1980,6 +1996,7 @@ const styles = `
     .home-subtitle { font-size:36px; max-width:none; white-space:nowrap; }
     .discover-header,
     .mood-header { padding-left:32px; padding-right:32px; }
+    .app-primary-nav__inner { padding-left:32px; padding-right:32px; }
     .home-segments { display:none; }
     .section-header { padding:0 32px; }
     .strip { padding-left:32px; padding-right:32px; gap:18px; }
