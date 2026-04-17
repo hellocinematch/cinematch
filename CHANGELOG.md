@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.3
+
+- **In Theaters page:** Primary nav opens a dedicated screen with **Now Playing** (newest US limited/theatrical releases first) and **Popular in theaters** (same gated pool, TMDB popularity order)—both strips use `movie/now_playing` + US release-type window + `predict_cached` (order preserved). The duplicate theatrical block is removed from Home **Now Playing**; What’s hot / Streaming / Region unchanged. `?detail=` deep links work from this screen.
+
 ## 4.0.2
 
 - **Pulse:** Dedicated Pulse screen with TMDB week **Trending** and **Popular** (movies + TV), `predict_cached` scores overlaid without reordering strips (TMDB order preserved). Pulse routes from primary nav; Home no longer masquerades as Pulse in the menu.

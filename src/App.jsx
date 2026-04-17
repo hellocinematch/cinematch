@@ -277,7 +277,7 @@ const SPA_QS_DETAIL = "detail";
 const SPA_QS_LEGAL = "legal";
 const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about"]);
 /** Only hydrate `?detail=` / `?legal=` after primary nav is up — avoids racing splash/auth/onboarding. */
-const SPA_DEEPLINK_READY_SCREENS = new Set(["home", "pulse", "discover", "profile", "rated", "mood-results"]);
+const SPA_DEEPLINK_READY_SCREENS = new Set(["home", "pulse", "in-theaters", "discover", "profile", "rated", "mood-results"]);
 
 /** One overlay at a time: title id (`movie-769`) or legal screen id (`privacy`). */
 function spaUrlForOverlay(overlay) {
@@ -501,6 +501,32 @@ function passesMoodRegionFilter(item, selectedRegions) {
   return languageMatch;
 }
 
+/** US theatrical pool: normalized movies, newest wide/limited release first (for Now Playing strip). */
+function sortTheatricalMoviesByReleaseDateDesc(items) {
+  return [...items].sort((a, b) => {
+    const da = Date.parse(a.releaseDate || `${a.year}-01-01`) || 0;
+    const db = Date.parse(b.releaseDate || `${b.year}-01-01`) || 0;
+    if (db !== da) return db - da;
+    return Number(b.popularity ?? 0) - Number(a.popularity ?? 0);
+  });
+}
+
+/** Same pool: TMDB popularity → vote average → release (for “popular in theaters” strip). */
+function sortTheatricalMoviesByPopularityDesc(items) {
+  return [...items].sort((a, b) => {
+    const popDiff = Number(b.popularity ?? 0) - Number(a.popularity ?? 0);
+    if (popDiff !== 0) return popDiff;
+    const ratingDiff = Number(b.tmdbRating ?? 0) - Number(a.tmdbRating ?? 0);
+    if (ratingDiff !== 0) return ratingDiff;
+    const da = Date.parse(a.releaseDate || `${a.year}-01-01`) || 0;
+    const db = Date.parse(b.releaseDate || `${b.year}-01-01`) || 0;
+    return db - da;
+  });
+}
+
+/**
+ * US now_playing (filtered). Returns two orderings over the same gated pool: release-date order and popularity order.
+ */
 async function fetchInTheaters(regionKeys = []) {
   try {
     const TARGET_COUNT = 15;
@@ -511,14 +537,6 @@ async function fetchInTheaters(regionKeys = []) {
       fetchTMDB("/movie/now_playing?language=en-US&region=US&page=1"),
       fetchTMDB("/movie/now_playing?language=en-US&region=US&page=2"),
     ]);
-
-    const sortByPopularityVotesDate = (items) => [...items].sort((a, b) => {
-      const popDiff = Number(b?.popularity ?? 0) - Number(a?.popularity ?? 0);
-      if (popDiff !== 0) return popDiff;
-      const votesDiff = Number(b?.vote_count ?? 0) - Number(a?.vote_count ?? 0);
-      if (votesDiff !== 0) return votesDiff;
-      return Date.parse(b?.release_date || "1970-01-01") - Date.parse(a?.release_date || "1970-01-01");
-    });
 
     const merged = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || [])])
       // Exclude soon-to-release titles that TMDB may include in now_playing payloads.
@@ -541,9 +559,12 @@ async function fetchInTheaters(regionKeys = []) {
       const newestLimited = limitedDates[limitedDates.length - 1];
       return withinPastDays(newestLimited, LIMITED_THEATRICAL_MAX_DAYS);
     });
-    return sortByPopularityVotesDate(withLimitedWindowGate).slice(0, TARGET_COUNT).map((m) => normalizeTMDBItem(m, "movie"));
+    const normalized = withLimitedWindowGate.map((item) => normalizeTMDBItem(item, "movie"));
+    const nowPlaying = sortTheatricalMoviesByReleaseDateDesc(normalized).slice(0, TARGET_COUNT);
+    const popularInTheaters = sortTheatricalMoviesByPopularityDesc(normalized).slice(0, TARGET_COUNT);
+    return { nowPlaying, popularInTheaters };
   } catch {
-    return [];
+    return { nowPlaying: [], popularInTheaters: [] };
   }
 }
 
@@ -2430,6 +2451,8 @@ export default function App() {
   const [pulseTrending, setPulseTrending] = useState([]);
   const [pulsePopular, setPulsePopular] = useState([]);
   const [pulseCatalogReady, setPulseCatalogReady] = useState(false);
+  /** Same US theatrical pool as {@link inTheaters}, sorted by TMDB popularity (In Theaters page second strip). */
+  const [inTheatersPopularRanked, setInTheatersPopularRanked] = useState([]);
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [homeSegment, setHomeSegment] = useState(HOME_SEGMENT_NOW_PLAYING);
@@ -2718,14 +2741,16 @@ export default function App() {
     }, CATALOGUE_BOOTSTRAP_SAFETY_MS);
     (async () => {
       try {
-        const [data, theaters] = await Promise.all([fetchCataloguePhasePopular(), fetchInTheaters([])]);
+        const [data, th] = await Promise.all([fetchCataloguePhasePopular(), fetchInTheaters([])]);
         if (cancelled) return;
         const seen = new Set(data.map(m => m.id));
-        const addedTheaters = theaters.filter(m => !seen.has(m.id));
+        const pool = [...th.nowPlaying, ...th.popularInTheaters];
+        const addedTheaters = pool.filter((m) => !seen.has(m.id));
         const merged = [...data, ...addedTheaters];
         setCatalogue(merged);
         setObCatalogue(data);
-        setInTheaters(theaters);
+        setInTheaters(th.nowPlaying);
+        setInTheatersPopularRanked(th.popularInTheaters);
         void (async () => {
           try {
             const enrich = await fetchCataloguePhaseTopRated();
@@ -2758,12 +2783,14 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const theaters = await fetchInTheaters(showRegionKeys);
+        const th = await fetchInTheaters(showRegionKeys);
         if (cancelled) return;
-        setInTheaters(theaters);
-        setCatalogue(prev => {
-          const seen = new Set(prev.map(m => m.id));
-          const added = theaters.filter(m => !seen.has(m.id));
+        setInTheaters(th.nowPlaying);
+        setInTheatersPopularRanked(th.popularInTheaters);
+        setCatalogue((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const pool = [...th.nowPlaying, ...th.popularInTheaters];
+          const added = pool.filter((m) => !seen.has(m.id));
           if (added.length === 0) return prev;
           return [...prev, ...added];
         });
@@ -2969,10 +2996,28 @@ export default function App() {
     return pulsePopularForRecs.map((m) => tmdbOnlyRec(m));
   }, [matchData?.pulsePopularRecs, pulsePopularForRecs]);
 
-  /** Movie ids also on the In Theaters row — small pill on What's hot cards only (no cross-strip dedupe). */
+  const inTheatersPagePopularForRecs = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return inTheatersPopularRanked;
+    return inTheatersPopularRanked.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [inTheatersPopularRanked, user, showGenreIds, showRegionKeys]);
+
+  const inTheatersPagePopularRecsResolved = useMemo(() => {
+    const fromMatch = matchData?.inTheatersPagePopularRecs;
+    if (fromMatch?.length) return fromMatch;
+    return inTheatersPagePopularForRecs.map((m) => tmdbOnlyRec(m));
+  }, [matchData?.inTheatersPagePopularRecs, inTheatersPagePopularForRecs]);
+
+  /** Theatrical titles (now playing ∪ popularity row after profile filter) — “In theaters” pill on What’s hot. */
+  const inTheaterPoolForRecs = useMemo(() => {
+    const byId = new Map();
+    for (const m of inTheatersForRecs) byId.set(m.id, m);
+    for (const m of inTheatersPagePopularForRecs) byId.set(m.id, m);
+    return [...byId.values()];
+  }, [inTheatersForRecs, inTheatersPagePopularForRecs]);
+
   const inTheaterIdsForWhatsHotPill = useMemo(
-    () => new Set(inTheatersForRecs.map(m => m.id)),
-    [inTheatersForRecs],
+    () => new Set(inTheaterPoolForRecs.map((m) => m.id)),
+    [inTheaterPoolForRecs],
   );
 
   /** V1.3.2: All secondary-market titles (for recMap, TV meta, cold-start CTA). */
@@ -3025,8 +3070,9 @@ export default function App() {
     add(whatsHotForRecs);
     add(pulseTrendingForRecs);
     add(pulsePopularForRecs);
+    add(inTheatersPagePopularForRecs);
     return map;
-  }, [catalogue, watchlist, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, secondaryStripCatalogRows, whatsHotForRecs, pulseTrendingForRecs, pulsePopularForRecs]);
+  }, [catalogue, watchlist, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, secondaryStripCatalogRows, whatsHotForRecs, pulseTrendingForRecs, pulsePopularForRecs, inTheatersPagePopularForRecs]);
 
   /** Secondary region strip: TMDB fallback until `matchData.secondaryRecs` fills from `predict_cached`. */
   const secondaryStripRecsResolved = useMemo(() => {
@@ -3082,7 +3128,8 @@ export default function App() {
       }
 
       try {
-        await predictStripThenMerge(inTheatersForRecs, "theaterRecs");
+        await predictStripThenMerge(inTheatersForRecs, "theaterRecs", true);
+        await predictStripThenMerge(inTheatersPagePopularForRecs, "inTheatersPagePopularRecs", true);
         await predictStripThenMerge(whatsHotForRecs, "whatsHotRecs");
         await predictStripThenMerge(pulseTrendingForRecs, "pulseTrendingRecs", true);
         await predictStripThenMerge(pulsePopularForRecs, "pulsePopularRecs", true);
@@ -3129,6 +3176,7 @@ export default function App() {
                   prev.whatsHotRecs?.length ||
                   prev.pulseTrendingRecs?.length ||
                   prev.pulsePopularRecs?.length ||
+                  prev.inTheatersPagePopularRecs?.length ||
                   prev.streamingMovieRecs?.length ||
                   prev.streamingTvRecs?.length ||
                   prev.secondaryRecs?.length)
@@ -3165,6 +3213,7 @@ export default function App() {
     userRatings,
     catalogueForRecs,
     inTheatersForRecs,
+    inTheatersPagePopularForRecs,
     whatsHotForRecs,
     pulseTrendingForRecs,
     pulsePopularForRecs,
@@ -3606,6 +3655,7 @@ export default function App() {
     setPulseTrending([]);
     setPulsePopular([]);
     setPulseCatalogReady(false);
+    setInTheatersPopularRanked([]);
     setStreamingMoviesReady(true);
     setStreamingTvReady(true);
     setCinemaPreference(null); setOtherCinema(null);
@@ -3615,13 +3665,15 @@ export default function App() {
   async function retryInitialCatalogueFetch() {
     setCatalogueRetryBusy(true);
     try {
-      const [data, theaters] = await Promise.all([fetchCatalogue(), fetchInTheaters([])]);
-      const seen = new Set(data.map(m => m.id));
-      const addedTheaters = theaters.filter(m => !seen.has(m.id));
+      const [data, th] = await Promise.all([fetchCatalogue(), fetchInTheaters([])]);
+      const seen = new Set(data.map((m) => m.id));
+      const pool = [...th.nowPlaying, ...th.popularInTheaters];
+      const addedTheaters = pool.filter((m) => !seen.has(m.id));
       const merged = [...data, ...addedTheaters];
       setCatalogue(merged);
       setObCatalogue(data);
-      setInTheaters(theaters);
+      setInTheaters(th.nowPlaying);
+      setInTheatersPopularRanked(th.popularInTheaters);
     } catch (e) {
       console.error(e);
     } finally {
@@ -3792,7 +3844,7 @@ export default function App() {
   const theaterRecs = useMemo(() => {
     const fromMatch = matchData?.theaterRecs;
     if (fromMatch?.length) return fromMatch;
-    return inTheatersForRecs.map(m => tmdbOnlyRec(m)).sort((a, b) => b.predicted - a.predicted);
+    return inTheatersForRecs.map((m) => tmdbOnlyRec(m));
   }, [matchData?.theaterRecs, inTheatersForRecs]);
 
   const streamingMovieRecsResolved = useMemo(() => {
@@ -3819,16 +3871,33 @@ export default function App() {
     (!streamingMoviesReady ||
       (matchLoading && streamingMovieRecsResolved.length === 0));
 
-  /** All streaming phases finished and TMDB returned nothing (avoid “couldn’t load” while movies or TV still fetching). */
-  const homePicksLoadFailed = useMemo(
-    () =>
-      theaterRecs.length === 0 &&
+  /**
+   * Now Playing tab has no dedicated In Theaters strip (see In Theaters page). Fail only when the remaining
+   * shelves are empty after their fetches — unless a secondary Region block can still show titles.
+   */
+  const homePicksLoadFailed = useMemo(() => {
+    const noWhatsHot = whatsHotReady && whatsHotForRecs.length === 0;
+    const noStreaming =
       streamingMoviesReady &&
       streamingTvReady &&
       streamingMovies.length === 0 &&
-      streamingTV.length === 0,
-    [theaterRecs.length, streamingMovies, streamingTV, streamingMoviesReady, streamingTvReady],
-  );
+      streamingTV.length === 0;
+    if (!noWhatsHot || !noStreaming) return false;
+    if (secondaryRegionKey && V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
+      return secondaryStripReady && secondaryStripCatalogRows.length === 0;
+    }
+    return true;
+  }, [
+    whatsHotReady,
+    whatsHotForRecs.length,
+    streamingMoviesReady,
+    streamingTvReady,
+    streamingMovies.length,
+    streamingTV.length,
+    secondaryRegionKey,
+    secondaryStripReady,
+    secondaryStripCatalogRows.length,
+  ]);
 
   const worthALookRecs = matchData?.worthALookRecs ?? EMPTY_MATCH_RECS;
 
@@ -3858,10 +3927,11 @@ export default function App() {
     };
     add(worthALookRecs);
     add(theaterRecs);
+    add(inTheatersPagePopularRecsResolved);
     add(streamingMovieRecsResolved);
     add(streamingTvRecsResolved);
     return [...byId.values()].sort((a, b) => b.predicted - a.predicted);
-  }, [userRatings, worthALookRecs, theaterRecs, streamingMovieRecsResolved, streamingTvRecsResolved]);
+  }, [userRatings, worthALookRecs, theaterRecs, inTheatersPagePopularRecsResolved, streamingMovieRecsResolved, streamingTvRecsResolved]);
 
   /**
    * Scored rows for Your picks strips: **CF recommendations first**, then worth-a-look / theater / streaming extras
@@ -4050,6 +4120,7 @@ export default function App() {
       ...whatsHotRecsResolved.map((r) => r.movie),
       ...pulseTrendingRecsResolved.map((r) => r.movie),
       ...pulsePopularRecsResolved.map((r) => r.movie),
+      ...inTheatersPagePopularRecsResolved.map((r) => r.movie),
       ...secondaryStripRecsResolved.map((r) => r.movie),
       ...moreForYouStrip.map((row) => row.rec.movie),
       ...worthLookStrip.map((row) => row.rec.movie),
@@ -4076,7 +4147,7 @@ export default function App() {
     };
     void hydrateTvStripMeta();
     return () => { cancelled = true; };
-  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, secondaryStripRecsResolved, moreForYouStrip, worthLookStrip]);
+  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, moreForYouStrip, worthLookStrip]);
 
   const recMap = useMemo(() => ({
     ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),
@@ -4085,12 +4156,13 @@ export default function App() {
     ...Object.fromEntries(whatsHotRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(pulseTrendingRecsResolved.map((r) => [r.movie.id, r])),
     ...Object.fromEntries(pulsePopularRecsResolved.map((r) => [r.movie.id, r])),
+    ...Object.fromEntries(inTheatersPagePopularRecsResolved.map((r) => [r.movie.id, r])),
     ...Object.fromEntries(secondaryStripRecsResolved.map((r) => [r.movie.id, r])),
     ...Object.fromEntries(theaterRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(moreForYouStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(worthLookStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
-  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
+  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
   const FILTERS = ["All", "Movies", "TV Shows"];
   const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
@@ -4142,6 +4214,7 @@ export default function App() {
     for (const m of catalogue) addMovie(m);
     for (const id of Object.keys(userRatings)) s.add(id);
     for (const r of theaterRecs) addRec(r);
+    for (const r of inTheatersPagePopularRecsResolved) addRec(r);
     for (const r of whatsHotRecsResolved) addRec(r);
     for (const r of streamingMovieRecsResolved) addRec(r);
     for (const r of streamingTvRecsResolved) addRec(r);
@@ -4158,6 +4231,7 @@ export default function App() {
     catalogue,
     userRatings,
     theaterRecs,
+    inTheatersPagePopularRecsResolved,
     whatsHotRecsResolved,
     streamingMovieRecsResolved,
     streamingTvRecsResolved,
@@ -5381,10 +5455,83 @@ export default function App() {
       )}
 
       {screen === "in-theaters" && (
-        <PageShell title="In Theaters" subtitle="Step 0 scaffold: dedicated page shell">
-          <div className="disc-empty"><div className="disc-empty-text">In Theaters page scaffold is ready. Section migration is next.</div></div>
+        <div className="home">
+          <PageShell title="In Theaters" subtitle={"Now playing and what's buzzing in US theaters — scored for your taste"}>
+            <div className="section" style={{ paddingTop: 0 }}>
+              <div className="section-header">
+                <div className="section-title">Now Playing</div>
+                <div className="section-meta">In theaters</div>
+              </div>
+              {theaterRecs.length === 0 ? (
+                <div className="empty-box">
+                  <div className="empty-text">
+                    {showRegionKeys.length > 0
+                      ? "Limited titles for this region in US theaters right now"
+                      : "No theatrical releases"}
+                  </div>
+                </div>
+              ) : (
+                <div className="strip">
+                  {theaterRecs.map((rec) => (
+                    <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                      <div className="strip-poster">
+                        {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
+                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                      </div>
+                      <div className="strip-title">{rec.movie.title}</div>
+                      <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="section">
+              <div className="section-header">
+                <div className="section-title">Popular in theaters</div>
+                <div className="section-meta">Same US releases, TMDB popularity order</div>
+              </div>
+              {inTheatersPagePopularRecsResolved.length === 0 ? (
+                <div className="empty-box">
+                  <div className="empty-text">
+                    {showRegionKeys.length > 0
+                      ? "Limited titles for this region in US theaters right now"
+                      : "No theatrical releases"}
+                  </div>
+                </div>
+              ) : (
+                <div className="strip">
+                  {inTheatersPagePopularRecsResolved.map((rec) => (
+                    <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                      <div className="strip-poster">
+                        {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
+                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                      </div>
+                      <div className="strip-title">{rec.movie.title}</div>
+                      <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {Object.keys(userRatings).length === 0 &&
+              theaterRecs.length + inTheatersPagePopularRecsResolved.length > 0 && (
+                <div className="section">
+                  <div className="no-recs" style={{ marginTop: 0, border: "none", padding: "0 0 8px" }}>
+                    <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
+                    <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={startDefaultRateMore}>
+                      Rate More Titles
+                    </button>
+                  </div>
+                </div>
+              )}
+          </PageShell>
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
-        </PageShell>
+        </div>
       )}
 
       {screen === "streaming-page" && (
@@ -5475,35 +5622,7 @@ export default function App() {
                 </div>
               ) : (
                 <>
-                  {/* Horizontal strips: show predicted score on the poster badge only; range + confidence live on title detail. */}
-                  <div className="top-picks-block">
-                    <div className="section-header">
-                      <div className="section-title">In Theaters</div>
-                      <div className="section-meta">Now playing</div>
-                    </div>
-                    {theaterRecs.length === 0 ? (
-                      <div className="empty-box">
-                        <div className="empty-text">
-                          {showRegionKeys.length > 0
-                            ? "Limited titles for this region in US theaters right now"
-                            : "No theatrical releases"}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="strip">
-                        {theaterRecs.map(rec => (
-                          <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
-                            <div className="strip-poster">
-                              {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
-                            </div>
-                            <div className="strip-title">{rec.movie.title}</div>
-                            <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {/* In Theaters lives on the dedicated page (primary nav). */}
                   <div className="top-picks-block">
                     <div className="section-header">
                       <div className="section-title">What&apos;s hot</div>
@@ -5744,7 +5863,7 @@ export default function App() {
               {!hasYourPicksStripSource && !yourPicksLoading && (
                 <div className="section">
                   <div className="no-recs">
-                    <div className="no-recs-text">Predictions will show here after your first catalogue load and ratings.<br />Browse <strong>Now Playing</strong> to get started.</div>
+                    <div className="no-recs-text">Predictions will show here after your first catalogue load and ratings.<br />Browse <strong>In Theaters</strong> or <strong>Now Playing</strong> to get started.</div>
                   </div>
                 </div>
               )}
