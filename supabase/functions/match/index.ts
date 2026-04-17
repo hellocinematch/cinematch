@@ -1044,7 +1044,13 @@ Deno.serve(async (req: Request) => {
 
     if (action === "recommendations_only") {
       const topPickOffset = typeof body.topPickOffset === "number" ? body.topPickOffset : 0;
-      const result = await runRecommendationsOnly(admin, user.id, userRatings, catalogue, topPickOffset);
+      let result: { recommendations: Rec[]; worthALookRecs: Rec[] };
+      try {
+        result = await runRecommendationsOnly(admin, user.id, userRatings, catalogue, topPickOffset);
+      } catch (err) {
+        console.warn("match: recommendations_only degraded", (err as Error).message);
+        result = { recommendations: [], worthALookRecs: [] };
+      }
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

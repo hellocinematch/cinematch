@@ -2800,6 +2800,7 @@ export default function App() {
     setMatchLoading(true);
     const t = setTimeout(async () => {
       const hasRatings = Object.keys(userRatings).length > 0;
+      const hasCatalogue = Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0;
 
       async function predictStripThenMerge(movieRows, matchKey) {
         const ids = movieRows.map((m) => m.id).filter(Boolean);
@@ -2823,48 +2824,63 @@ export default function App() {
         await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
         await predictStripThenMerge(secondaryStripCatalogRows, "secondaryRecs");
 
-        let { data, error } = await invokeMatch({
-          action: "recommendations_only",
-          userRatings,
-          catalogue: catalogueForRecs,
-          topPickOffset,
-        });
-        if (error) {
-          console.warn("match recommendations_only:", error.message);
-          ({ data, error } = await invokeMatch({
-            action: "full",
-            omitStripRecs: true,
+        if (hasRatings && hasCatalogue) {
+          let { data, error } = await invokeMatch({
+            action: "recommendations_only",
             userRatings,
             catalogue: catalogueForRecs,
-            inTheaters: inTheatersForRecs,
-            streamingMovies: streamingMoviesForRecs,
-            streamingTV: streamingTVForRecs,
             topPickOffset,
-          }));
-        }
-        if (cancelled) return;
-        if (error) {
-          console.warn("match function fallback full:", error.message);
-          setMatchData((prev) => {
-            if (
-              prev &&
-              typeof prev === "object" &&
-              (prev.theaterRecs?.length ||
-                prev.whatsHotRecs?.length ||
-                prev.streamingMovieRecs?.length ||
-                prev.streamingTvRecs?.length ||
-                prev.secondaryRecs?.length)
-            ) {
-              return prev;
-            }
-            return null;
           });
-          return;
+          if (error) {
+            const msg = String(error?.message ?? "");
+            const shouldUseLegacyFull =
+              /Unknown action|not found|404/i.test(msg);
+            console.warn("match recommendations_only:", msg);
+            if (shouldUseLegacyFull) {
+              ({ data, error } = await invokeMatch({
+                action: "full",
+                omitStripRecs: true,
+                userRatings,
+                catalogue: catalogueForRecs,
+                inTheaters: inTheatersForRecs,
+                streamingMovies: streamingMoviesForRecs,
+                streamingTV: streamingTVForRecs,
+                topPickOffset,
+              }));
+            } else {
+              error = null;
+              data = { recommendations: [], worthALookRecs: [] };
+            }
+          }
+          if (cancelled) return;
+          if (error) {
+            console.warn("match function fallback full:", error.message);
+            setMatchData((prev) => {
+              if (
+                prev &&
+                typeof prev === "object" &&
+                (prev.theaterRecs?.length ||
+                  prev.whatsHotRecs?.length ||
+                  prev.streamingMovieRecs?.length ||
+                  prev.streamingTvRecs?.length ||
+                  prev.secondaryRecs?.length)
+              ) {
+                return prev;
+              }
+              return null;
+            });
+            return;
+          }
+          const nextRecs = Array.isArray(data?.recommendations) ? data.recommendations : [];
+          const nextWorth = Array.isArray(data?.worthALookRecs) ? data.worthALookRecs : [];
+          if (nextRecs.length > 0 || nextWorth.length > 0) {
+            setMatchData((prev) => ({
+              ...(prev && typeof prev === "object" ? prev : {}),
+              ...(nextRecs.length > 0 ? { recommendations: nextRecs } : {}),
+              ...(nextWorth.length > 0 ? { worthALookRecs: nextWorth } : {}),
+            }));
+          }
         }
-        setMatchData((prev) => ({
-          ...(prev && typeof prev === "object" ? prev : {}),
-          ...(data && typeof data === "object" ? data : {}),
-        }));
       } catch (e) {
         if (!cancelled) console.error(e);
       } finally {
