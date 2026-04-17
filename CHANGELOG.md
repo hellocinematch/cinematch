@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.10
+
+- **Hotfix v4.0.9.** The mobile hamburger commit referenced `React.useState` / `React.useEffect` in `AppPrimaryNav`, but `src/App.jsx` only imports the hooks as named exports (no `React` namespace). That threw `React is not defined` at render time and broke the entire app shell. Switched both calls to the named `useState` / `useEffect` imports. No behavior change beyond "the page now loads again".
+
 ## 4.0.9
 
 - **Mobile hamburger menu for the primary nav.** On viewports below 900px the horizontal section links row is replaced by a ☰ button in the top-left; tapping it opens a slide-down drawer containing the same items (Circles / Pulse / In Theaters / Streaming / Your Picks, plus the regional label when a secondary region is set). The drawer dismisses on link tap, scrim tap, the ✕ close button, or Escape. Desktop (≥900px) is untouched — logo, inline section links, and the 🔍 Discover icon still render exactly as before. Also auto-closes if the viewport widens past the breakpoint mid-session (rotate / resize). Client-only; no Edge, no RPC, no prop plumbing changes.

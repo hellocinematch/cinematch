@@ -1269,9 +1269,9 @@ function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelection
 
 /** TMDB-style horizontal primary nav (desktop-first; links scroll on narrow widths). */
 function AppPrimaryNav({ menuItems, activeSectionId, onNavigateSection, onDiscover, onHome, discoverActive }) {
-  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!mobileOpen) return;
     const onKey = (e) => { if (e.key === "Escape") setMobileOpen(false); };
     window.addEventListener("keydown", onKey);
@@ -1279,7 +1279,7 @@ function AppPrimaryNav({ menuItems, activeSectionId, onNavigateSection, onDiscov
   }, [mobileOpen]);
 
   // Close drawer if viewport widens past the mobile breakpoint (e.g. rotate, resize).
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const mql = window.matchMedia("(min-width: 900px)");
     const handle = (e) => { if (e.matches) setMobileOpen(false); };
