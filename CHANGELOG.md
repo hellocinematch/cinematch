@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.5.4
+
+- **`match` `full` + home:** Optional body flag `omitStripRecs: true` skips recomputing In Theaters / streaming strip scores (client already has them from `predict_cached`). Response carries `recommendations` and `worthALookRecs` only; the app merges into existing `matchData`.
+
+## 3.5.3
+
+- **Home: strip-by-strip predictions before full:** The app runs batch `predict_cached` **in order** — In Theaters → streaming movies → streaming TV — merging each strip as its response returns, then calls `match` `full` for recommendations, worth-a-look, and a consistent full payload. If `full` fails, previously merged strip scores are kept when present.
+
 ## 3.5.2
 
 - **Predicted badge correctness:** Personal blue badges now require real neighbor evidence (`neighborCount >= 1`) on strip, Discover, and Mood cards. Titles falling back to TMDB/Cinemastro no longer appear as personal predictions, matching detail-screen behavior.

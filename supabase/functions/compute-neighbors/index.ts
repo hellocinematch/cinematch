@@ -317,12 +317,22 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({})) as {
       mode?: string;
       userId?: string;
+      /** Only for mode "all" (trusted): 0-based index into sorted eligible user ids. */
+      offset?: number;
+      /**
+       * Only for mode "all" (trusted): max users to process this invocation.
+       * Omit for full list (may exceed Edge ~150s idle timeout on large graphs — use chunks).
+       */
+      limit?: number;
     };
 
     const mode = body.mode;
     const userId = typeof body.userId === "string" ? body.userId.trim() : "";
 
     let targetIds: string[] = [];
+    let chunkMeta:
+      | { offset: number; limit: number | null; totalEligible: number }
+      | undefined;
 
     if (mode === "all") {
       if (!trustedJob) {
@@ -331,7 +341,28 @@ Deno.serve(async (req: Request) => {
           hint: "Use service role Bearer, or set COMPUTE_NEIGHBORS_CRON_SECRET and pass it via Authorization Bearer or x-compute-neighbors-secret.",
         }, 403);
       }
-      targetIds = await fetchAllRealUserIds(admin);
+      const allIds = (await fetchAllRealUserIds(admin)).sort();
+      const rawOff = body.offset;
+      const rawLim = body.limit;
+      const chunkOffset =
+        typeof rawOff === "number" && Number.isFinite(rawOff) && rawOff >= 0
+          ? Math.floor(rawOff)
+          : 0;
+      const chunkLimit =
+        typeof rawLim === "number" && Number.isFinite(rawLim) && rawLim > 0
+          ? Math.floor(rawLim)
+          : null;
+
+      chunkMeta = {
+        offset: chunkOffset,
+        limit: chunkLimit,
+        totalEligible: allIds.length,
+      };
+
+      targetIds =
+        chunkLimit === null
+          ? allIds
+          : allIds.slice(chunkOffset, chunkOffset + chunkLimit);
     } else if (userId) {
       if (trustedJob) {
         if (await isSeedSubject(admin, userId)) {
@@ -354,7 +385,8 @@ Deno.serve(async (req: Request) => {
     } else {
       return jsonResponse({
         error: "Invalid body",
-        hint: "Send { \"mode\": \"all\" } (trusted caller) or { \"userId\": \"<uuid>\" }.",
+        hint:
+          "Send { \"mode\": \"all\" } (trusted caller), optional { \"offset\": 0, \"limit\": 3 } to avoid Edge timeouts, or { \"userId\": \"<uuid>\" }.",
       }, 400);
     }
 
@@ -380,6 +412,20 @@ Deno.serve(async (req: Request) => {
       processedUsers: results.length,
       failedUsers: failed,
     };
+
+    if (mode === "all" && chunkMeta) {
+      payload.chunk = {
+        ...chunkMeta,
+        nextOffset:
+          chunkMeta.limit === null
+            ? null
+            : chunkMeta.offset + results.length,
+        hasMore:
+          chunkMeta.limit === null
+            ? false
+            : chunkMeta.offset + results.length < chunkMeta.totalEligible,
+      };
+    }
 
     if (mode === "all" && results.length > 100) {
       payload.summaryOnly = true;

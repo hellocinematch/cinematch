@@ -334,11 +334,27 @@ function runFullMatchFromNeighbors(
   streamingMovies: Movie[],
   streamingTV: Movie[],
   topPickOffset: number,
+  opts?: { omitStripRecs?: boolean },
 ) {
   const recommendations =
     Object.keys(userRatings).length === 0 || catalogue.length === 0
       ? []
       : getRecommendationsFromNeighbors(userRatings, neighbors, catalogue);
+  const worthALookRecs = computeWorthALook(
+    catalogue,
+    recommendations,
+    topPickOffset,
+    userRatings,
+    neighbors,
+  );
+
+  if (opts?.omitStripRecs) {
+    return {
+      recommendations,
+      worthALookRecs,
+    };
+  }
+
   const theaterRecs = [...inTheaters]
     .map((m) => buildRecWithPrediction(m, neighbors))
     .sort((a, b) => b.predicted - a.predicted);
@@ -348,13 +364,6 @@ function runFullMatchFromNeighbors(
   const streamingTvRecs = [...streamingTV]
     .map((m) => buildRecWithPrediction(m, neighbors))
     .sort((a, b) => b.predicted - a.predicted);
-  const worthALookRecs = computeWorthALook(
-    catalogue,
-    recommendations,
-    topPickOffset,
-    userRatings,
-    neighbors,
-  );
   return {
     recommendations,
     theaterRecs,
@@ -938,6 +947,7 @@ Deno.serve(async (req: Request) => {
     const streamingMovies = (body.streamingMovies as Movie[]) || [];
     const streamingTV = (body.streamingTV as Movie[]) || [];
     const topPickOffset = typeof body.topPickOffset === "number" ? body.topPickOffset : 0;
+    const omitStripRecs = body.omitStripRecs === true;
     const neighborsFull = await neighborsFromTable(admin, user.id);
 
     const result = runFullMatchFromNeighbors(
@@ -948,6 +958,7 @@ Deno.serve(async (req: Request) => {
       streamingMovies,
       streamingTV,
       topPickOffset,
+      omitStripRecs ? { omitStripRecs: true } : undefined,
     );
 
     return new Response(JSON.stringify(result), {

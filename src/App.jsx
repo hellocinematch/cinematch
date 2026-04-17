@@ -1177,6 +1177,30 @@ function tmdbOnlyRec(movie) {
   };
 }
 
+/** One strip row from `match` `predict_cached` / `predict` `predictions` map (aligns with personal-score product rule). */
+function recFromMatchPrediction(movie, pred) {
+  const n = pred?.neighborCount ?? 0;
+  if (pred && typeof pred.predicted === "number" && n >= 1) {
+    return {
+      movie,
+      predicted: pred.predicted,
+      low: typeof pred.low === "number" ? pred.low : Math.max(1, Math.round((pred.predicted - 1) * 10) / 10),
+      high: typeof pred.high === "number" ? pred.high : Math.min(10, Math.round((pred.predicted + 1) * 10) / 10),
+      confidence: pred.confidence ?? "low",
+      neighborCount: n,
+    };
+  }
+  return tmdbOnlyRec(movie);
+}
+
+function recsFromPredictionMap(movies, predictions) {
+  if (!movies?.length) return [];
+  const predMap = predictions && typeof predictions === "object" ? predictions : {};
+  return movies
+    .map((m) => recFromMatchPrediction(m, predMap[m.id] ?? null))
+    .sort((a, b) => b.predicted - a.predicted);
+}
+
 /** Supabase recovery sessions: JWT `amr` includes recovery (string or { method }) until `updateUser({ password })` runs. */
 function isPasswordRecoverySession(session) {
   if (!session?.access_token) return false;
@@ -2768,9 +2792,31 @@ export default function App() {
     let cancelled = false;
     setMatchLoading(true);
     const t = setTimeout(async () => {
+      const hasRatings = Object.keys(userRatings).length > 0;
+
+      async function predictStripThenMerge(movieRows, matchKey) {
+        const ids = movieRows.map((m) => m.id).filter(Boolean);
+        if (ids.length === 0 || !hasRatings) return;
+        const { data: predData, error: predErr } = await invokeMatch({
+          action: "predict_cached",
+          userRatings,
+          titles: ids,
+        });
+        if (cancelled || predErr || !predData?.predictions) return;
+        setMatchData((prev) => ({
+          ...(prev && typeof prev === "object" ? prev : {}),
+          [matchKey]: recsFromPredictionMap(movieRows, predData.predictions),
+        }));
+      }
+
       try {
+        await predictStripThenMerge(inTheatersForRecs, "theaterRecs");
+        await predictStripThenMerge(streamingMoviesForRecs, "streamingMovieRecs");
+        await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
+
         const { data, error } = await invokeMatch({
           action: "full",
+          omitStripRecs: true,
           userRatings,
           catalogue: catalogueForRecs,
           inTheaters: inTheatersForRecs,
@@ -2781,10 +2827,24 @@ export default function App() {
         if (cancelled) return;
         if (error) {
           console.warn("match function:", error.message);
-          setMatchData(null);
+          setMatchData((prev) => {
+            if (
+              prev &&
+              typeof prev === "object" &&
+              (prev.theaterRecs?.length ||
+                prev.streamingMovieRecs?.length ||
+                prev.streamingTvRecs?.length)
+            ) {
+              return prev;
+            }
+            return null;
+          });
           return;
         }
-        setMatchData(data);
+        setMatchData((prev) => ({
+          ...(prev && typeof prev === "object" ? prev : {}),
+          ...(data && typeof data === "object" ? data : {}),
+        }));
       } catch (e) {
         if (!cancelled) console.error(e);
       } finally {
