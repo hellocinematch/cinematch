@@ -277,7 +277,7 @@ const SPA_QS_DETAIL = "detail";
 const SPA_QS_LEGAL = "legal";
 const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about"]);
 /** Only hydrate `?detail=` / `?legal=` after primary nav is up — avoids racing splash/auth/onboarding. */
-const SPA_DEEPLINK_READY_SCREENS = new Set(["home", "pulse", "in-theaters", "discover", "profile", "rated", "mood-results"]);
+const SPA_DEEPLINK_READY_SCREENS = new Set(["home", "pulse", "in-theaters", "streaming-page", "discover", "profile", "rated", "mood-results"]);
 
 /** One overlay at a time: title id (`movie-769`) or legal screen id (`privacy`). */
 function spaUrlForOverlay(overlay) {
@@ -306,8 +306,8 @@ const CATALOGUE_BOOTSTRAP_SAFETY_MS = 22_000;
 /** Defer non-critical home fetches so first paint / post-login routing wins on slow mobile networks. */
 const WHATS_HOT_FETCH_DEFER_MS = 450;
 const SECONDARY_STRIP_FETCH_DEFER_MS = 550;
-/** Primary home streaming strip: defer so TMDB catalogue + theaters win the first bytes on cellular. */
-const STREAMING_HOME_FETCH_DEFER_MS = 200;
+/** Streaming page TMDB fetch: short defer after route paint. */
+const STREAMING_PAGE_FETCH_DEFER_MS = 200;
 
 function getRegionLanguageCodes(regionKeys) {
   if (!Array.isArray(regionKeys) || regionKeys.length === 0) return [];
@@ -513,6 +513,29 @@ function sortTheatricalMoviesByReleaseDateDesc(items) {
 
 /** Same pool: TMDB popularity → vote average → release (for “popular in theaters” strip). */
 function sortTheatricalMoviesByPopularityDesc(items) {
+  return [...items].sort((a, b) => {
+    const popDiff = Number(b.popularity ?? 0) - Number(a.popularity ?? 0);
+    if (popDiff !== 0) return popDiff;
+    const ratingDiff = Number(b.tmdbRating ?? 0) - Number(a.tmdbRating ?? 0);
+    if (ratingDiff !== 0) return ratingDiff;
+    const da = Date.parse(a.releaseDate || `${a.year}-01-01`) || 0;
+    const db = Date.parse(b.releaseDate || `${b.year}-01-01`) || 0;
+    return db - da;
+  });
+}
+
+/** Streaming page “Now” order: newest release/air date first, popularity tiebreak. */
+function sortStreamingByReleaseDateDesc(items) {
+  return [...items].sort((a, b) => {
+    const da = Date.parse(a.releaseDate || `${a.year}-01-01`) || 0;
+    const db = Date.parse(b.releaseDate || `${b.year}-01-01`) || 0;
+    if (db !== da) return db - da;
+    return Number(b.popularity ?? 0) - Number(a.popularity ?? 0);
+  });
+}
+
+/** Streaming page “Popular” order: TMDB popularity → vote avg → release (mirrors theaters). */
+function sortStreamingByPopularityDesc(items) {
   return [...items].sort((a, b) => {
     const popDiff = Number(b.popularity ?? 0) - Number(a.popularity ?? 0);
     if (popDiff !== 0) return popDiff;
@@ -2123,7 +2146,7 @@ const styles = `
     .mood-result-actions { margin-top:auto; padding-top:10px; }
     .empty-box,
     .no-recs { margin-left:32px; margin-right:32px; }
-    /* Keep Home picks stacked (In Theaters then Streaming) to preserve original flow. */
+    /* Home Now Playing: What’s hot + optional Region block. */
   }
 
   @media (min-width: 1200px) {
@@ -2801,9 +2824,9 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user, showRegionKeys]);
 
-  /** Home streaming strip: phase 1 = movies (fast), phase 2 = TV + detail calls (slower). Ignores profile streaming provider selection (see More tab). */
+  /** Streaming page: US subscription-style pools (phase 1 = movies, phase 2 = TV + details). Not tied to profile provider picks (see More). */
   useEffect(() => {
-    if (!user) return;
+    if (!user || screen !== "streaming-page") return;
     let cancelled = false;
     setStreamingMoviesReady(false);
     setStreamingTvReady(false);
@@ -2841,12 +2864,12 @@ export default function App() {
           return [...prev, ...added];
         });
       })();
-    }, STREAMING_HOME_FETCH_DEFER_MS);
+    }, STREAMING_PAGE_FETCH_DEFER_MS);
     return () => {
       cancelled = true;
       clearTimeout(defer);
     };
-  }, [user, showRegionKeys]);
+  }, [user, showRegionKeys, screen]);
 
   useEffect(() => {
     if (!user) {
@@ -3133,8 +3156,10 @@ export default function App() {
         await predictStripThenMerge(whatsHotForRecs, "whatsHotRecs");
         await predictStripThenMerge(pulseTrendingForRecs, "pulseTrendingRecs", true);
         await predictStripThenMerge(pulsePopularForRecs, "pulsePopularRecs", true);
-        await predictStripThenMerge(streamingMoviesForRecs, "streamingMovieRecs");
-        await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
+        if (screen === "streaming-page") {
+          await predictStripThenMerge(streamingMoviesForRecs, "streamingMovieRecs");
+          await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
+        }
         await predictStripThenMerge(secondaryStripCatalogRows, "secondaryRecs");
 
         if (hasRatings && hasCatalogue) {
@@ -3221,6 +3246,7 @@ export default function App() {
     streamingTVForRecs,
     secondaryStripCatalogRows,
     topPickOffset,
+    screen,
   ]);
 
   useEffect(() => {
@@ -3862,6 +3888,38 @@ export default function App() {
   const streamingRecs = streamingTab === "movie" ? streamingMovieRecsResolved : streamingTvRecsResolved;
 
   /**
+   * Streaming page derives two strips over the same pool: **Now Streaming** (release / air-date desc)
+   * and **What’s popular in streaming** (TMDB popularity desc). `predict_cached` scores overlay via id map
+   * when `matchData.streamingMovieRecs` / `streamingTvRecs` are present; TMDB fallback otherwise.
+   */
+  const streamingMoviesNowResolved = useMemo(() => {
+    const fromMatch = matchData?.streamingMovieRecs;
+    const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
+    return sortStreamingByReleaseDateDesc(streamingMoviesForRecs).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
+  }, [matchData?.streamingMovieRecs, streamingMoviesForRecs]);
+
+  const streamingMoviesPopularResolved = useMemo(() => {
+    const fromMatch = matchData?.streamingMovieRecs;
+    const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
+    return sortStreamingByPopularityDesc(streamingMoviesForRecs).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
+  }, [matchData?.streamingMovieRecs, streamingMoviesForRecs]);
+
+  const streamingTvNowResolved = useMemo(() => {
+    const fromMatch = matchData?.streamingTvRecs;
+    const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
+    return sortStreamingByReleaseDateDesc(streamingTVForRecs).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
+  }, [matchData?.streamingTvRecs, streamingTVForRecs]);
+
+  const streamingTvPopularResolved = useMemo(() => {
+    const fromMatch = matchData?.streamingTvRecs;
+    const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
+    return sortStreamingByPopularityDesc(streamingTVForRecs).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
+  }, [matchData?.streamingTvRecs, streamingTVForRecs]);
+
+  const streamingNowRecs = streamingTab === "movie" ? streamingMoviesNowResolved : streamingTvNowResolved;
+  const streamingPopularRecs = streamingTab === "movie" ? streamingMoviesPopularResolved : streamingTvPopularResolved;
+
+  /**
    * Movies fetch completes before TV; default streaming tab is Series. Users who switch to Movies often
    * already have streamingMoviesReady=true, so the old !streamingMoviesReady skeleton never ran — empty strip.
    * Also show skeleton while match is in flight and there are no movie rows yet (TMDB pool empty until match fills).
@@ -3877,12 +3935,7 @@ export default function App() {
    */
   const homePicksLoadFailed = useMemo(() => {
     const noWhatsHot = whatsHotReady && whatsHotForRecs.length === 0;
-    const noStreaming =
-      streamingMoviesReady &&
-      streamingTvReady &&
-      streamingMovies.length === 0 &&
-      streamingTV.length === 0;
-    if (!noWhatsHot || !noStreaming) return false;
+    if (!noWhatsHot) return false;
     if (secondaryRegionKey && V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
       return secondaryStripReady && secondaryStripCatalogRows.length === 0;
     }
@@ -3890,10 +3943,6 @@ export default function App() {
   }, [
     whatsHotReady,
     whatsHotForRecs.length,
-    streamingMoviesReady,
-    streamingTvReady,
-    streamingMovies.length,
-    streamingTV.length,
     secondaryRegionKey,
     secondaryStripReady,
     secondaryStripCatalogRows.length,
@@ -5535,10 +5584,91 @@ export default function App() {
       )}
 
       {screen === "streaming-page" && (
-        <PageShell title="Streaming" subtitle="Step 0 scaffold: dedicated page shell">
-          <div className="disc-empty"><div className="disc-empty-text">Streaming page scaffold is ready. Section migration is next.</div></div>
+        <div className="home">
+          <PageShell title="Streaming" subtitle="New & popular on major services — scored for your taste (not filtered by your app list)">
+            <div className="section" style={{ paddingTop: 0 }}>
+              <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
+                <button type="button" className={`filter-pill ${streamingTab === "tv" ? "active" : ""}`} onClick={() => setStreamingTab("tv")}>
+                  Series
+                </button>
+                <button type="button" className={`filter-pill ${streamingTab === "movie" ? "active" : ""}`} onClick={() => setStreamingTab("movie")}>
+                  Movies
+                </button>
+              </div>
+              <div className="section-header">
+                <div className="section-title">Now Streaming</div>
+                <div className="section-meta">Newest {streamingTab === "movie" ? "releases" : "series & seasons"}</div>
+              </div>
+              {showStreamingMovieSkeleton ? (
+                <SkeletonStrip />
+              ) : streamingTab === "tv" && !streamingTvReady ? (
+                <SkeletonStrip />
+              ) : streamingNowRecs.length === 0 ? (
+                <div className="empty-box">
+                  <div className="empty-text">No streaming {streamingTab === "movie" ? "movies" : "series"} right now</div>
+                </div>
+              ) : (
+                <div className="strip">
+                  {streamingNowRecs.map((rec) => (
+                    <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                      <div className="strip-poster">
+                        {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
+                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                      </div>
+                      <div className="strip-title">{rec.movie.title}</div>
+                      <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="section">
+              <div className="section-header">
+                <div className="section-title">What&apos;s popular in streaming</div>
+                <div className="section-meta">Same pool, TMDB popularity order</div>
+              </div>
+              {showStreamingMovieSkeleton ? (
+                <SkeletonStrip />
+              ) : streamingTab === "tv" && !streamingTvReady ? (
+                <SkeletonStrip />
+              ) : streamingPopularRecs.length === 0 ? (
+                <div className="empty-box">
+                  <div className="empty-text">No streaming {streamingTab === "movie" ? "movies" : "series"} right now</div>
+                </div>
+              ) : (
+                <div className="strip">
+                  {streamingPopularRecs.map((rec) => (
+                    <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                      <div className="strip-poster">
+                        {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
+                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                      </div>
+                      <div className="strip-title">{rec.movie.title}</div>
+                      <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {Object.keys(userRatings).length === 0 &&
+              streamingNowRecs.length + streamingPopularRecs.length > 0 && (
+                <div className="section">
+                  <div className="no-recs" style={{ marginTop: 0, border: "none", padding: "0 0 8px" }}>
+                    <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
+                    <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={startDefaultRateMore}>
+                      Rate More Titles
+                    </button>
+                  </div>
+                </div>
+              )}
+          </PageShell>
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
-        </PageShell>
+        </div>
       )}
 
       {screen === "your-picks" && (
@@ -5643,40 +5773,6 @@ export default function App() {
                               {inTheaterIdsForWhatsHotPill.has(rec.movie.id) && qualifiesForTheatricalPillMovie(rec.movie) && (
                                 <div className="strip-hot-theater-pill">In theaters</div>
                               )}
-                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
-                            </div>
-                            <div className="strip-title">{rec.movie.title}</div>
-                            <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="top-picks-block">
-                    <div className="section-header">
-                      <div className="section-title">Streaming</div>
-                      <div className="section-meta">Broad picks (not your app list)</div>
-                    </div>
-                    <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
-                      <button type="button" className={`filter-pill ${streamingTab === "tv" ? "active" : ""}`} onClick={() => setStreamingTab("tv")}>
-                        Series
-                      </button>
-                      <button type="button" className={`filter-pill ${streamingTab === "movie" ? "active" : ""}`} onClick={() => setStreamingTab("movie")}>
-                        Movies
-                      </button>
-                    </div>
-                    {showStreamingMovieSkeleton ? (
-                      <SkeletonStrip />
-                    ) : streamingTab === "tv" && !streamingTvReady ? (
-                      <SkeletonStrip />
-                    ) : streamingRecs.length === 0 ? (
-                      <div className="empty-box"><div className="empty-text">No streaming {streamingTab === "movie" ? "movies" : "series"} right now</div></div>
-                    ) : (
-                      <div className="strip">
-                        {streamingRecs.map(rec => (
-                          <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
-                            <div className="strip-poster">
-                              {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
                               <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
                             </div>
                             <div className="strip-title">{rec.movie.title}</div>

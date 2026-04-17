@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.4
+
+- **Streaming page:** Primary nav opens a dedicated **Streaming** screen with two strips over the same US subscription-style pool—**Now Streaming** (newest release / air-date order) and **What’s popular in streaming** (TMDB popularity order)—gated by a Series/Movies toggle. `predict_cached` scores overlay both strips on this route only; fetch and strip predictions no longer run from Home. Home **Now Playing** keeps What’s hot (+ optional Region block); empty-state logic no longer depends on the removed streaming strip.
+
 ## 4.0.3
 
 - **In Theaters page:** Primary nav opens a dedicated screen with **Now Playing** (newest US limited/theatrical releases first) and **Popular in theaters** (same gated pool, TMDB popularity order)—both strips use `movie/now_playing` + US release-type window + `predict_cached` (order preserved). The duplicate theatrical block is removed from Home **Now Playing**; What’s hot / Streaming / Region unchanged. `?detail=` deep links work from this screen.
