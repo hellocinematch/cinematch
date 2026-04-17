@@ -1657,14 +1657,13 @@ const styles = `
   .detail-score-row { display:flex; gap:12px; margin:6px 0 20px; }
   .detail-score-card { flex:1; min-width:0; background:#141414; border:1px solid #252525; border-radius:12px; padding:12px 12px 13px; display:flex; flex-direction:column; align-items:stretch; gap:6px; }
   .detail-score-card--you-gold { border-color:#5a4a24; }
+  .detail-score-card--you-pred { border-color:rgba(59,130,246,0.75); box-shadow:0 0 0 1px rgba(59,130,246,0.18); }
   .detail-score-card--you-rated { border-color:#2a4a2a; }
   .detail-score-card--crowd-cine { border-color:rgba(201,162,39,0.5); box-shadow:0 0 0 1px rgba(232,201,106,0.06); }
-  .detail-score-card.d-pred-box-low { border-style:dashed; border-color:#6c5a2c; }
-  .detail-score-card.d-pred-box-medium { border-style:solid; border-color:#7e6931; }
-  .detail-score-card.d-pred-box-high { border-style:solid; border-color:#b18f36; }
   .detail-score-card-lbl { font-size:12px; letter-spacing:0.6px; text-transform:uppercase; color:#8f8f8f; }
   .detail-score-card-val { font-family:'DM Serif Display',serif; font-size:clamp(26px, 7vw, 32px); line-height:1; color:#e8c96a; }
   .detail-score-card-val--yours { color:#a8d4a8; }
+  .detail-score-card-val--predicted { color:#6ca8ff; }
   .detail-score-card-val--muted { color:#555; font-size:28px; }
   .detail-score-card-sub { font-size:11px; color:#555; line-height:1.35; }
   .detail-score-pred-row { display:flex; align-items:flex-start; gap:10px; }
@@ -4644,8 +4643,10 @@ export default function App() {
   const inWatchlist = (id) => watchlist.some(m => m.id === id);
   const confToneClass = (c) => c === "high" ? "detail-score-meta-line--high" : c === "medium" ? "detail-score-meta-line--medium" : "detail-score-meta-line--low";
   const confToneLabel = (c) => c === "high" ? "High" : c === "medium" ? "Medium" : "Low";
-  const predBoxClass = (c) => c === "high" ? "d-pred-box-high" : c === "medium" ? "d-pred-box-medium" : "d-pred-box-low";
-  const predValClass = (c) => c === "high" ? "d-pred-val-high" : c === "medium" ? "d-pred-val-medium" : "d-pred-val-low";
+  const shouldShowPredictionRange = (pred) => {
+    if (!pred) return false;
+    return formatScore(pred.low) !== formatScore(pred.high);
+  };
   const obMovie = obMovies[obStep];
   const userInitial = user?.user_metadata?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "?";
   const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "there";
@@ -5828,7 +5829,7 @@ export default function App() {
                       myRating != null && Number.isFinite(Number(myRating))
                         ? " detail-score-card--you-rated"
                         : hasPersonalPrediction(prediction) && !showPredSkeleton
-                          ? ` ${predBoxClass(prediction.confidence)}`
+                          ? " detail-score-card--you-pred"
                           : " detail-score-card--you-gold"
                     }`}
                   >
@@ -5846,13 +5847,15 @@ export default function App() {
                     ) : hasPersonalPrediction(prediction) ? (
                       <>
                         <div className="detail-score-pred-row">
-                          <div className={`detail-score-card-val ${predValClass(prediction.confidence)}`}>
+                          <div className="detail-score-card-val detail-score-card-val--predicted">
                             {formatScore(prediction.predicted)}
                           </div>
                           <div className="detail-score-meta-col">
-                            <div className="detail-score-meta-line detail-score-meta-line--range">
-                              {formatScore(prediction.low)}–{formatScore(prediction.high)}
-                            </div>
+                            {shouldShowPredictionRange(prediction) ? (
+                              <div className="detail-score-meta-line detail-score-meta-line--range">
+                                {formatScore(prediction.low)}–{formatScore(prediction.high)}
+                              </div>
+                            ) : null}
                             <div className={`detail-score-meta-line ${confToneClass(prediction.confidence)}`}>
                               {confToneLabel(prediction.confidence)}
                             </div>
