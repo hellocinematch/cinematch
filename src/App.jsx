@@ -1162,6 +1162,41 @@ function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelection
   );
 }
 
+/** TMDB-style horizontal primary nav (desktop-first; links scroll on narrow widths). */
+function AppPrimaryNav({ menuItems, activeSectionId, onNavigateSection, onDiscover, onHome, discoverActive }) {
+  return (
+    <header className="app-primary-nav" role="navigation" aria-label="Primary">
+      <div className="app-primary-nav__inner">
+        <div className="app-primary-nav__brand">
+          <AppBrand onPress={onHome} />
+        </div>
+        <nav className="app-primary-nav__links" aria-label="Sections">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`app-primary-nav__link ${activeSectionId === item.id ? "app-primary-nav__link--active" : ""}`}
+              onClick={() => onNavigateSection(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="app-primary-nav__right">
+          <button
+            type="button"
+            className={`app-primary-nav__icon ${discoverActive ? "app-primary-nav__icon--active" : ""}`}
+            onClick={onDiscover}
+            aria-label="Discover"
+          >
+            🔍
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 function PageShell({ title, subtitle, children }) {
   return (
     <div className="discover">
@@ -1405,6 +1440,74 @@ const styles = `
   }
   .page-topbar .app-brand { margin:0; }
   .page-topbar .avatar-wrap { justify-self:end; align-self:center; }
+  .app-primary-nav {
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    z-index:2100;
+    background:linear-gradient(180deg, #032541 0%, #021a2e 100%);
+    border-bottom:1px solid rgba(1, 180, 228, 0.18);
+    padding-top:env(safe-area-inset-top, 0px);
+    box-shadow:0 2px 10px rgba(0,0,0,0.28);
+  }
+  .app-primary-nav__inner {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    max-width:1400px;
+    margin:0 auto;
+    padding:10px 14px 10px;
+    min-height:48px;
+    box-sizing:border-box;
+  }
+  .app-primary-nav__brand { flex-shrink:0; }
+  .app-primary-nav__brand .brand-logo--header { height:26px; width:auto; display:block; }
+  .app-primary-nav__links {
+    display:flex;
+    align-items:center;
+    gap:2px;
+    flex:1;
+    min-width:0;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .app-primary-nav__links::-webkit-scrollbar { display:none; }
+  .app-primary-nav__link {
+    flex-shrink:0;
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-family:'DM Sans',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    color:#fff;
+    padding:8px 10px;
+    border-radius:6px;
+    transition:color 0.15s, background 0.15s;
+    white-space:nowrap;
+  }
+  .app-primary-nav__link:hover { color:#01b4e4; }
+  .app-primary-nav__link--active {
+    color:#01b4e4;
+    background:rgba(1, 180, 228, 0.14);
+  }
+  .app-primary-nav__right { flex-shrink:0; display:flex; align-items:center; gap:6px; }
+  .app-primary-nav__icon {
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:20px;
+    padding:8px;
+    line-height:1;
+    border-radius:8px;
+    color:#01b4e4;
+  }
+  .app-primary-nav__icon:hover { background:rgba(1, 180, 228, 0.12); }
+  .app-primary-nav__icon--active { background:rgba(1, 180, 228, 0.14); }
+  .app--primary-nav { padding-top:calc(48px + env(safe-area-inset-top, 0px)); }
+  .app--primary-nav .home-header { padding-top:20px; }
   .topbar-brand-cluster { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:nowrap; }
   .topbar-brand-cluster .app-brand-button { flex-shrink:1; }
   .public-site-stats { display:flex; flex-direction:column; gap:1px; justify-content:center; flex-shrink:0; line-height:1.12; padding:2px 0; }
@@ -2184,7 +2287,6 @@ function LegalLazyFallback() {
 export default function App() {
   const [screen, setScreen] = useState("splash");
   const [navTab, setNavTab] = useState("home");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("signup");
   const [authEmail, setAuthEmail] = useState("");
@@ -4296,7 +4398,7 @@ export default function App() {
   }
 
   const shouldShowSecondaryRegionPage = Boolean(secondaryRegionKey);
-  const hamburgerVisibleScreens = new Set([
+  const primaryNavScreens = new Set([
     "home",
     "circles",
     "pulse",
@@ -4318,10 +4420,10 @@ export default function App() {
     { id: "your-picks", label: "Your Picks" },
     ...(shouldShowSecondaryRegionPage ? [{ id: "secondary-region", label: "Secondary Region" }] : []),
   ];
-  const activeMenuId = screen === "home" ? "pulse" : screen;
+  const activeSectionId =
+    screen === "home" ? "pulse" : screen === "discover" ? null : screen;
 
-  function openMenuScreen(nextScreen) {
-    setMenuOpen(false);
+  function navigatePrimarySection(nextScreen) {
     if (nextScreen === "pulse") {
       setNavTab("home");
       setScreen("home");
@@ -4330,16 +4432,14 @@ export default function App() {
     setScreen(nextScreen);
   }
 
+  const showPrimaryNav = Boolean(user && primaryNavScreens.has(screen));
+
   useEffect(() => {
     if (!showAvatarMenu) return;
     const close = () => setShowAvatarMenu(false);
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [showAvatarMenu]);
-
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [screen]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -4796,74 +4896,20 @@ export default function App() {
 
   return (
     <div className="viewport-shell">
-      <div className="app">
+      <div className={`app${showPrimaryNav ? " app--primary-nav" : ""}`}>
         <style>{styles}</style>
-        {user && hamburgerVisibleScreens.has(screen) && (
-          <>
-            <button
-              type="button"
-              aria-label="Open navigation menu"
-              onClick={() => setMenuOpen((v) => !v)}
-              style={{
-                position: "fixed",
-                top: 14,
-                left: 14,
-                zIndex: 2200,
-                background: "#141414",
-                color: "#f0ebe0",
-                border: "1px solid #2a2a2a",
-                borderRadius: 10,
-                width: 38,
-                height: 38,
-                fontSize: 18,
-                cursor: "pointer",
-              }}
-            >
-              ☰
-            </button>
-            {menuOpen && (
-              <>
-                <div
-                  onClick={() => setMenuOpen(false)}
-                  style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2190 }}
-                />
-                <div
-                  style={{
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    bottom: 0,
-                    width: 270,
-                    background: "#0f0f0f",
-                    borderRight: "1px solid #262626",
-                    zIndex: 2195,
-                    padding: "66px 14px 16px",
-                  }}
-                >
-                  {menuItems.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => openMenuScreen(item.id)}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        marginBottom: 8,
-                        padding: "11px 12px",
-                        borderRadius: 10,
-                        border: activeMenuId === item.id ? "1px solid #3f3720" : "1px solid #252525",
-                        background: activeMenuId === item.id ? "#2a2610" : "#141414",
-                        color: activeMenuId === item.id ? "#e8c96a" : "#d7d7d7",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
+        {showPrimaryNav && (
+          <AppPrimaryNav
+            menuItems={menuItems}
+            activeSectionId={activeSectionId}
+            onNavigateSection={navigatePrimarySection}
+            onDiscover={() => {
+              setNavTab("discover");
+              setScreen("discover");
+            }}
+            onHome={goHome}
+            discoverActive={screen === "discover"}
+          />
         )}
 
       {/* SPLASH */}
@@ -5076,8 +5122,8 @@ export default function App() {
       )}
 
       {screen === "circles" && (
-        <PageShell title="Circles" subtitle="Step 0 scaffold: circles page shell">
-          <div className="disc-empty"><div className="disc-empty-text">Circles page scaffold is ready. Data wiring comes next.</div></div>
+        <PageShell title="Circles" subtitle="Coming soon">
+          <div className="disc-empty"><div className="disc-empty-text">Something exciting is happening here — keep checking.</div></div>
           <BottomNav {...navProps} />
         </PageShell>
       )}

@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.1
+
+- **Primary navigation:** Replaced the hamburger drawer with a TMDB-style fixed top bar (wordmark, horizontal section links, Discover shortcut). Narrow viewports scroll links horizontally. Circles placeholder copy updated to a “something exciting…” teaser.
+
 ## 4.0.0
 
 - **Page architecture scaffold (Step 0):** Added top-left hamburger navigation and shifted bottom fixed bar to Mood/Profile quick access. Introduced shell screens for Circles, In Theaters, Streaming, Your Picks, and conditional Secondary Region, while keeping the existing Home implementation intact as the Pulse baseline during migration.
