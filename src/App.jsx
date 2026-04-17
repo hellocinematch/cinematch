@@ -277,7 +277,7 @@ const SPA_QS_DETAIL = "detail";
 const SPA_QS_LEGAL = "legal";
 const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about"]);
 /** Only hydrate `?detail=` / `?legal=` after primary nav is up — avoids racing splash/auth/onboarding. */
-const SPA_DEEPLINK_READY_SCREENS = new Set(["home", "discover", "profile", "rated", "mood-results"]);
+const SPA_DEEPLINK_READY_SCREENS = new Set(["home", "pulse", "discover", "profile", "rated", "mood-results"]);
 
 /** One overlay at a time: title id (`movie-769`) or legal screen id (`privacy`). */
 function spaUrlForOverlay(overlay) {
@@ -556,6 +556,72 @@ async function fetchWhatsHotCatalog() {
       fetchTMDB("/trending/movie/day?language=en-US&page=2"),
       fetchTMDB("/trending/tv/day?language=en-US"),
       fetchTMDB("/trending/tv/day?language=en-US&page=2"),
+    ]);
+    if ([m1, m2, t1, t2].some(isTmdbApiErrorPayload)) return [];
+    const movieRaw = filterDefaultExcludedGenres([...(m1.results || []), ...(m2.results || [])]);
+    const tvRaw = filterDefaultExcludedGenres([...(t1.results || []), ...(t2.results || [])]).filter((item) => {
+      const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
+      return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
+    });
+    const dedupeNorm = (normList) => [...new Map(normList.map((m) => [m.id, m])).values()];
+    const movies = dedupeNorm(movieRaw.map((item) => normalizeTMDBItem(item, "movie")));
+    const shows = dedupeNorm(tvRaw.map((item) => normalizeTMDBItem(item, "tv")));
+    const mixed = [];
+    const max = Math.max(movies.length, shows.length);
+    const cap = 18;
+    for (let i = 0; i < max && mixed.length < cap; i++) {
+      if (movies[i]) mixed.push(movies[i]);
+      if (mixed.length >= cap) break;
+      if (shows[i]) mixed.push(shows[i]);
+    }
+    return mixed;
+  } catch {
+    return [];
+  }
+}
+
+/** Pulse — trending movies + TV (week), interleaved; global discovery (not Home “today” strip). */
+async function fetchPulseTrendingCatalog() {
+  try {
+    const excludedTrendingGenres = new Set([10767, 10763]); // Talk + News
+    const [m1, m2, t1, t2] = await Promise.all([
+      fetchTMDB("/trending/movie/week?language=en-US"),
+      fetchTMDB("/trending/movie/week?language=en-US&page=2"),
+      fetchTMDB("/trending/tv/week?language=en-US"),
+      fetchTMDB("/trending/tv/week?language=en-US&page=2"),
+    ]);
+    if ([m1, m2, t1, t2].some(isTmdbApiErrorPayload)) return [];
+    const movieRaw = filterDefaultExcludedGenres([...(m1.results || []), ...(m2.results || [])]);
+    const tvRaw = filterDefaultExcludedGenres([...(t1.results || []), ...(t2.results || [])]).filter((item) => {
+      const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
+      return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
+    });
+    const dedupeNorm = (normList) => [...new Map(normList.map((m) => [m.id, m])).values()];
+    const movies = dedupeNorm(movieRaw.map((item) => normalizeTMDBItem(item, "movie")));
+    const shows = dedupeNorm(tvRaw.map((item) => normalizeTMDBItem(item, "tv")));
+    const mixed = [];
+    const max = Math.max(movies.length, shows.length);
+    const cap = 18;
+    for (let i = 0; i < max && mixed.length < cap; i++) {
+      if (movies[i]) mixed.push(movies[i]);
+      if (mixed.length >= cap) break;
+      if (shows[i]) mixed.push(shows[i]);
+    }
+    return mixed;
+  } catch {
+    return [];
+  }
+}
+
+/** Pulse — popular movies + TV, interleaved. */
+async function fetchPulsePopularCatalog() {
+  try {
+    const excludedTrendingGenres = new Set([10767, 10763]);
+    const [m1, m2, t1, t2] = await Promise.all([
+      fetchTMDB("/movie/popular?language=en-US&page=1"),
+      fetchTMDB("/movie/popular?language=en-US&page=2"),
+      fetchTMDB("/tv/popular?language=en-US&page=1"),
+      fetchTMDB("/tv/popular?language=en-US&page=2"),
     ]);
     if ([m1, m2, t1, t2].some(isTmdbApiErrorPayload)) return [];
     const movieRaw = filterDefaultExcludedGenres([...(m1.results || []), ...(m2.results || [])]);
@@ -1246,6 +1312,13 @@ function recsFromPredictionMap(movies, predictions) {
   return movies
     .map((m) => recFromMatchPrediction(m, predMap[m.id] ?? null))
     .sort((a, b) => b.predicted - a.predicted);
+}
+
+/** Same as {@link recsFromPredictionMap} but keeps `movies` order (e.g. Pulse trending / popular). */
+function recsFromPredictionMapInOrder(movies, predictions) {
+  if (!movies?.length) return [];
+  const predMap = predictions && typeof predictions === "object" ? predictions : {};
+  return movies.map((m) => recFromMatchPrediction(m, predMap[m.id] ?? null));
 }
 
 /** Supabase recovery sessions: JWT `amr` includes recovery (string or { method }) until `updateUser({ password })` runs. */
@@ -2354,6 +2427,9 @@ export default function App() {
   const [streamingTvReady, setStreamingTvReady] = useState(false);
   const [whatsHot, setWhatsHot] = useState([]);
   const [whatsHotReady, setWhatsHotReady] = useState(false);
+  const [pulseTrending, setPulseTrending] = useState([]);
+  const [pulsePopular, setPulsePopular] = useState([]);
+  const [pulseCatalogReady, setPulseCatalogReady] = useState(false);
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [homeSegment, setHomeSegment] = useState(HOME_SEGMENT_NOW_PLAYING);
@@ -2773,6 +2849,35 @@ export default function App() {
     };
   }, [user]);
 
+  /** Pulse page: week trending + global popular (TMDB only on wire; match scores via predict_cached). */
+  useEffect(() => {
+    if (!user || screen !== "pulse") return;
+    let cancelled = false;
+    setPulseCatalogReady(false);
+    const defer = setTimeout(() => {
+      (async () => {
+        const [trendingRows, popularRows] = await Promise.all([
+          fetchPulseTrendingCatalog(),
+          fetchPulsePopularCatalog(),
+        ]);
+        if (cancelled) return;
+        setPulseTrending(trendingRows);
+        setPulsePopular(popularRows);
+        setCatalogue((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const added = [...trendingRows, ...popularRows].filter((m) => !seen.has(m.id));
+          if (added.length === 0) return prev;
+          return [...prev, ...added];
+        });
+        setPulseCatalogReady(true);
+      })();
+    }, WHATS_HOT_FETCH_DEFER_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(defer);
+    };
+  }, [user, screen]);
+
   /** V1.3.0: Fetch secondary-market theaters + streaming (parallel); V1.3.2: keep pools separate for tabs. */
   useEffect(() => {
     if (!user || !secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
@@ -2842,6 +2947,28 @@ export default function App() {
     return whatsHotForRecs.map((m) => tmdbOnlyRec(m));
   }, [matchData?.whatsHotRecs, whatsHotForRecs]);
 
+  const pulseTrendingForRecs = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return pulseTrending;
+    return pulseTrending.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [pulseTrending, user, showGenreIds, showRegionKeys]);
+
+  const pulsePopularForRecs = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return pulsePopular;
+    return pulsePopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [pulsePopular, user, showGenreIds, showRegionKeys]);
+
+  const pulseTrendingRecsResolved = useMemo(() => {
+    const fromMatch = matchData?.pulseTrendingRecs;
+    if (fromMatch?.length) return fromMatch;
+    return pulseTrendingForRecs.map((m) => tmdbOnlyRec(m));
+  }, [matchData?.pulseTrendingRecs, pulseTrendingForRecs]);
+
+  const pulsePopularRecsResolved = useMemo(() => {
+    const fromMatch = matchData?.pulsePopularRecs;
+    if (fromMatch?.length) return fromMatch;
+    return pulsePopularForRecs.map((m) => tmdbOnlyRec(m));
+  }, [matchData?.pulsePopularRecs, pulsePopularForRecs]);
+
   /** Movie ids also on the In Theaters row — small pill on What's hot cards only (no cross-strip dedupe). */
   const inTheaterIdsForWhatsHotPill = useMemo(
     () => new Set(inTheatersForRecs.map(m => m.id)),
@@ -2896,8 +3023,10 @@ export default function App() {
     add(streamingTVForRecs);
     add(secondaryStripCatalogRows);
     add(whatsHotForRecs);
+    add(pulseTrendingForRecs);
+    add(pulsePopularForRecs);
     return map;
-  }, [catalogue, watchlist, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, secondaryStripCatalogRows, whatsHotForRecs]);
+  }, [catalogue, watchlist, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, secondaryStripCatalogRows, whatsHotForRecs, pulseTrendingForRecs, pulsePopularForRecs]);
 
   /** Secondary region strip: TMDB fallback until `matchData.secondaryRecs` fills from `predict_cached`. */
   const secondaryStripRecsResolved = useMemo(() => {
@@ -2934,7 +3063,7 @@ export default function App() {
       const hasRatings = Object.keys(userRatings).length > 0;
       const hasCatalogue = Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0;
 
-      async function predictStripThenMerge(movieRows, matchKey) {
+      async function predictStripThenMerge(movieRows, matchKey, preserveTmdbOrder = false) {
         const ids = movieRows.map((m) => m.id).filter(Boolean);
         if (ids.length === 0 || !hasRatings) return;
         const { data: predData, error: predErr } = await invokeMatch({
@@ -2943,15 +3072,20 @@ export default function App() {
           titles: ids,
         });
         if (cancelled || predErr || !predData?.predictions) return;
+        const recs = preserveTmdbOrder
+          ? recsFromPredictionMapInOrder(movieRows, predData.predictions)
+          : recsFromPredictionMap(movieRows, predData.predictions);
         setMatchData((prev) => ({
           ...(prev && typeof prev === "object" ? prev : {}),
-          [matchKey]: recsFromPredictionMap(movieRows, predData.predictions),
+          [matchKey]: recs,
         }));
       }
 
       try {
         await predictStripThenMerge(inTheatersForRecs, "theaterRecs");
         await predictStripThenMerge(whatsHotForRecs, "whatsHotRecs");
+        await predictStripThenMerge(pulseTrendingForRecs, "pulseTrendingRecs", true);
+        await predictStripThenMerge(pulsePopularForRecs, "pulsePopularRecs", true);
         await predictStripThenMerge(streamingMoviesForRecs, "streamingMovieRecs");
         await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
         await predictStripThenMerge(secondaryStripCatalogRows, "secondaryRecs");
@@ -2993,6 +3127,8 @@ export default function App() {
                 typeof prev === "object" &&
                 (prev.theaterRecs?.length ||
                   prev.whatsHotRecs?.length ||
+                  prev.pulseTrendingRecs?.length ||
+                  prev.pulsePopularRecs?.length ||
                   prev.streamingMovieRecs?.length ||
                   prev.streamingTvRecs?.length ||
                   prev.secondaryRecs?.length)
@@ -3030,6 +3166,8 @@ export default function App() {
     catalogueForRecs,
     inTheatersForRecs,
     whatsHotForRecs,
+    pulseTrendingForRecs,
+    pulsePopularForRecs,
     streamingMoviesForRecs,
     streamingTVForRecs,
     secondaryStripCatalogRows,
@@ -3465,6 +3603,9 @@ export default function App() {
     setStreamingTV([]);
     setWhatsHot([]);
     setWhatsHotReady(false);
+    setPulseTrending([]);
+    setPulsePopular([]);
+    setPulseCatalogReady(false);
     setStreamingMoviesReady(true);
     setStreamingTvReady(true);
     setCinemaPreference(null); setOtherCinema(null);
@@ -3907,6 +4048,8 @@ export default function App() {
       ...theaterRecs.map((r) => r.movie),
       ...streamingRecs.map((r) => r.movie),
       ...whatsHotRecsResolved.map((r) => r.movie),
+      ...pulseTrendingRecsResolved.map((r) => r.movie),
+      ...pulsePopularRecsResolved.map((r) => r.movie),
       ...secondaryStripRecsResolved.map((r) => r.movie),
       ...moreForYouStrip.map((row) => row.rec.movie),
       ...worthLookStrip.map((row) => row.rec.movie),
@@ -3933,19 +4076,21 @@ export default function App() {
     };
     void hydrateTvStripMeta();
     return () => { cancelled = true; };
-  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, secondaryStripRecsResolved, moreForYouStrip, worthLookStrip]);
+  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, secondaryStripRecsResolved, moreForYouStrip, worthLookStrip]);
 
   const recMap = useMemo(() => ({
     ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingMovieRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingTvRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(whatsHotRecsResolved.map(r => [r.movie.id, r])),
+    ...Object.fromEntries(pulseTrendingRecsResolved.map((r) => [r.movie.id, r])),
+    ...Object.fromEntries(pulsePopularRecsResolved.map((r) => [r.movie.id, r])),
     ...Object.fromEntries(secondaryStripRecsResolved.map((r) => [r.movie.id, r])),
     ...Object.fromEntries(theaterRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(moreForYouStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(worthLookStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
-  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
+  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
   const FILTERS = ["All", "Movies", "TV Shows"];
   const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
@@ -4437,13 +4582,12 @@ export default function App() {
     { id: "your-picks", label: "Your Picks" },
     ...(shouldShowSecondaryRegionPage ? [{ id: "secondary-region", label: "Secondary Region" }] : []),
   ];
-  const activeSectionId =
-    screen === "home" ? "pulse" : screen === "discover" ? null : screen;
+  const activeSectionId = screen === "discover" || screen === "home" ? null : screen;
 
   function navigatePrimarySection(nextScreen) {
     if (nextScreen === "pulse") {
       setNavTab("home");
-      setScreen("home");
+      setScreen("pulse");
       return;
     }
     setScreen(nextScreen);
@@ -5146,10 +5290,94 @@ export default function App() {
       )}
 
       {screen === "pulse" && (
-        <PageShell title="Pulse" subtitle="Use menu → Pulse to open current Home implementation">
-          <div className="disc-empty"><div className="disc-empty-text">Pulse routes to the existing Home flow in this scaffold pass.</div></div>
+        <div className="home">
+          <PageShell title="Pulse" subtitle="Trending & popular worldwide — scored for your taste">
+            {!pulseCatalogReady ? (
+              <>
+                <div className="section">
+                  <div className="section-header">
+                    <div className="section-title">Trending</div>
+                    <div className="section-meta">This week</div>
+                  </div>
+                  <SkeletonStrip />
+                </div>
+                <div className="section">
+                  <div className="section-header">
+                    <div className="section-title">Popular</div>
+                    <div className="section-meta">Movies &amp; TV</div>
+                  </div>
+                  <SkeletonStrip />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="section">
+                  <div className="section-header">
+                    <div className="section-title">Trending</div>
+                    <div className="section-meta">This week</div>
+                  </div>
+                  {pulseTrendingRecsResolved.length === 0 ? (
+                    <div className="empty-box">
+                      <div className="empty-text">No trending titles right now</div>
+                    </div>
+                  ) : (
+                    <div className="strip">
+                      {pulseTrendingRecsResolved.map((rec) => (
+                        <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                          <div className="strip-poster">
+                            {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
+                            <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                          </div>
+                          <div className="strip-title">{rec.movie.title}</div>
+                          <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="section">
+                  <div className="section-header">
+                    <div className="section-title">Popular</div>
+                    <div className="section-meta">Movies &amp; TV</div>
+                  </div>
+                  {pulsePopularRecsResolved.length === 0 ? (
+                    <div className="empty-box">
+                      <div className="empty-text">No popular titles right now</div>
+                    </div>
+                  ) : (
+                    <div className="strip">
+                      {pulsePopularRecsResolved.map((rec) => (
+                        <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                          <div className="strip-poster">
+                            {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
+                            <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                          </div>
+                          <div className="strip-title">{rec.movie.title}</div>
+                          <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {Object.keys(userRatings).length === 0 &&
+                  pulseTrendingRecsResolved.length + pulsePopularRecsResolved.length > 0 && (
+                    <div className="no-recs" style={{ marginTop: 16, border: "none", padding: "12px 0 0" }}>
+                      <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
+                      <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={startDefaultRateMore}>
+                        Rate More Titles
+                      </button>
+                    </div>
+                  )}
+              </>
+            )}
+          </PageShell>
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
-        </PageShell>
+        </div>
       )}
 
       {screen === "in-theaters" && (

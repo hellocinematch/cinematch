@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.2
+
+- **Pulse:** Dedicated Pulse screen with TMDB week **Trending** and **Popular** (movies + TV), `predict_cached` scores overlaid without reordering strips (TMDB order preserved). Pulse routes from primary nav; Home no longer masquerades as Pulse in the menu.
+
 ## 4.0.1
 
 - **Primary navigation:** Replaced the hamburger drawer with a TMDB-style fixed top bar (wordmark, horizontal section links, Discover shortcut). Narrow viewports scroll links horizontally. Circles placeholder copy updated to a “something exciting…” teaser.
