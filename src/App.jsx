@@ -277,7 +277,7 @@ const SPA_QS_DETAIL = "detail";
 const SPA_QS_LEGAL = "legal";
 const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about"]);
 /** Only hydrate `?detail=` / `?legal=` after primary nav is up — avoids racing splash/auth/onboarding. */
-const SPA_DEEPLINK_READY_SCREENS = new Set(["home", "pulse", "in-theaters", "streaming-page", "discover", "profile", "rated", "mood-results"]);
+const SPA_DEEPLINK_READY_SCREENS = new Set(["circles", "pulse", "in-theaters", "streaming-page", "secondary-region", "your-picks", "discover", "profile", "rated", "mood-results"]);
 
 /** One overlay at a time: title id (`movie-769`) or legal screen id (`privacy`). */
 function spaUrlForOverlay(overlay) {
@@ -3132,8 +3132,7 @@ export default function App() {
           await predictStripThenMerge(inTheatersForRecs, "theaterRecs", true);
           await predictStripThenMerge(inTheatersPagePopularForRecs, "inTheatersPagePopularRecs", true);
         }
-        if (screen === "home") {
-          await predictStripThenMerge(whatsHotForRecs, "whatsHotRecs");
+        if (screen === "secondary-region") {
           await predictStripThenMerge(secondaryStripCatalogRows, "secondaryRecs");
         }
         if (screen === "pulse") {
@@ -3270,7 +3269,6 @@ export default function App() {
     catalogueForRecs,
     inTheatersForRecs,
     inTheatersPagePopularForRecs,
-    whatsHotForRecs,
     pulseTrendingForRecs,
     pulsePopularForRecs,
     streamingMoviesForRecs,
@@ -3301,7 +3299,7 @@ export default function App() {
           setScreen("pref-primary");
           return;
         }
-        setScreen("home");
+        setScreen("circles");
         setNavTab("home");
       } catch (e) {
         console.warn("Post-login routing failed:", e);
@@ -3985,24 +3983,8 @@ export default function App() {
     (!streamingMoviesReady ||
       (matchLoading && streamingMovieRecsResolved.length === 0));
 
-  /**
-   * Now Playing tab has no dedicated In Theaters strip (see In Theaters page). Fail only when the remaining
-   * shelves are empty after their fetches — unless a secondary Region block can still show titles.
-   */
-  const homePicksLoadFailed = useMemo(() => {
-    const noWhatsHot = whatsHotReady && whatsHotForRecs.length === 0;
-    if (!noWhatsHot) return false;
-    if (secondaryRegionKey && V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
-      return secondaryStripReady && secondaryStripCatalogRows.length === 0;
-    }
-    return true;
-  }, [
-    whatsHotReady,
-    whatsHotForRecs.length,
-    secondaryRegionKey,
-    secondaryStripReady,
-    secondaryStripCatalogRows.length,
-  ]);
+  /** `homePicksLoadFailed` removed in v4.0.8 — the Home screen retired and every remaining primary
+   *  page owns its own empty/error state. */
 
   const rawWorthALookRecs = matchData?.worthALookRecs ?? EMPTY_MATCH_RECS;
   const worthALookRecs = useMemo(
@@ -4642,7 +4624,7 @@ export default function App() {
       }
     }
     setNavTab("home");
-    setScreen("home");
+    setScreen("circles");
   }
 
   function advanceOb() {
@@ -4654,7 +4636,7 @@ export default function App() {
       if (screen === "rate-more") {
         exitRateMoreFlow();
       }
-      else { setScreen("loading-recs"); setTimeout(() => { setNavTab("home"); setScreen("home"); }, 2200); }
+      else { setScreen("loading-recs"); setTimeout(() => { setNavTab("home"); setScreen("circles"); }, 2200); }
     }
   }
 
@@ -4719,7 +4701,8 @@ export default function App() {
     history.replaceState(null, "", spaUrlWithoutOverlays());
     setDetailEditRating(false);
     setSelected(null);
-    setScreen(navTab === "mood" ? "mood-results" : navTab);
+    // navTab === "home" is the idle bottom-nav sentinel; the landing screen is now "circles".
+    setScreen(navTab === "mood" ? "mood-results" : navTab === "home" ? "circles" : navTab);
   }
 
   function openLegalPage(target) {
@@ -4738,9 +4721,11 @@ export default function App() {
     history.replaceState(null, "", spaUrlWithoutOverlays());
     const ret = legalReturnScreenRef.current;
     legalReturnScreenRef.current = null;
-    setScreen(ret ?? "home");
+    setScreen(ret ?? "circles");
   }
 
+  /** v4.0.8: Landing surface is now Circles; "home" as a screen has been retired. `navTab === "home"`
+   *  stays as the idle bottom-nav sentinel (i.e. neither Mood nor Profile is active). */
   function goHome() {
     const s = screenRef.current;
     if (s === "onboarding" || s === "rate-more") void markOnboardingComplete();
@@ -4748,15 +4733,17 @@ export default function App() {
     detailHistoryPushedRef.current = false;
     legalHistoryPushedRef.current = false;
     setNavTab("home");
-    setScreen("home");
+    setScreen("circles");
     setSelected(null);
     setDetailEditRating(false);
     setShowAvatarMenu(false);
   }
 
   const shouldShowSecondaryRegionPage = Boolean(secondaryRegionKey);
+  /** v4.0.8: `home` retired as a screen; `circles` is the landing. Kept `home` out of the set so
+   *  lingering `setScreen("home")` (any we missed) would visibly fail instead of silently rendering
+   *  nothing. */
   const primaryNavScreens = new Set([
-    "home",
     "circles",
     "pulse",
     "in-theaters",
@@ -4775,9 +4762,11 @@ export default function App() {
     { id: "in-theaters", label: "In Theaters" },
     { id: "streaming-page", label: "Streaming" },
     { id: "your-picks", label: "Your Picks" },
-    ...(shouldShowSecondaryRegionPage ? [{ id: "secondary-region", label: "Secondary Region" }] : []),
+    ...(shouldShowSecondaryRegionPage
+      ? [{ id: "secondary-region", label: V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region" }]
+      : []),
   ];
-  const activeSectionId = screen === "discover" || screen === "home" ? null : screen;
+  const activeSectionId = screen === "discover" ? null : screen;
 
   function navigatePrimarySection(nextScreen) {
     if (nextScreen === "pulse") {
@@ -5855,148 +5844,108 @@ export default function App() {
       )}
 
       {screen === "secondary-region" && (
-        <PageShell title="Secondary Region" subtitle="Step 0 scaffold: conditional page shell">
-          <div className="disc-empty"><div className="disc-empty-text">Secondary Region page scaffold is ready. Regional migration is next.</div></div>
-          <BottomNav {...navProps} />
-        </PageShell>
-      )}
-
-      {/* HOME */}
-      {screen === "home" && (
         <div className="home">
-          <div className="home-topbar">
-            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-            <div />
-            <AccountAvatarMenu />
-          </div>
-          <div className="home-header">
-            <div className="home-hero">
-              <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-              <div className="home-hero-copy">
-                <div className="home-subtitle">Movies and Shows - Picked for your TASTE!</div>
-              </div>
-            </div>
-            <AccountAvatarMenu />
-          </div>
-          <div className="section-divider" style={{ margin: "0 24px 10px", borderTop: "1px solid #1a1a1a" }} />
-
-          <div className="section">
-              {homePicksLoadFailed ? (
-                <div className="no-recs">
-                  <div className="no-recs-text">Couldn&apos;t load picks right now.<br />Check your connection and try again.</div>
+          <PageShell
+            title={V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region"}
+            subtitle="Theaters & streaming — scored for your taste"
+          >
+            {!secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey) ? (
+              <div className="disc-empty">
+                <div className="disc-empty-text">
+                  Pick a secondary region in your profile to see regional theaters &amp; streaming here.
                 </div>
-              ) : (
-                <>
-                  {/* In Theaters lives on the dedicated page (primary nav). */}
-                  <div className="top-picks-block">
-                    <div className="section-header">
-                      <div className="section-title">What&apos;s hot</div>
-                      <div className="section-meta">Trending today</div>
-                    </div>
-                    {!whatsHotReady ? (
-                      <SkeletonStrip />
-                    ) : whatsHotRecsResolved.length === 0 ? (
-                      <div className="empty-box">
-                        <div className="empty-text">No trending titles right now</div>
-                      </div>
-                    ) : (
-                      <div className="strip">
-                        {whatsHotRecsResolved.map((rec) => (
-                          <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
-                            <div className="strip-poster">
-                              {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                              {inTheaterIdsForWhatsHotPill.has(rec.movie.id) && qualifiesForTheatricalPillMovie(rec.movie) && (
-                                <div className="strip-hot-theater-pill">In theaters</div>
-                              )}
-                              <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
-                            </div>
-                            <div className="strip-title">{rec.movie.title}</div>
-                            <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+              </div>
+            ) : (
+              <>
+                <div className="section" style={{ paddingTop: 0 }}>
+                  <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
+                    <button
+                      type="button"
+                      className={`filter-pill ${secondaryBlockSegment === SECONDARY_BLOCK_THEATERS ? "active" : ""}`}
+                      onClick={() => setSecondaryBlockSegment(SECONDARY_BLOCK_THEATERS)}
+                    >
+                      In Theaters
+                    </button>
+                    <button
+                      type="button"
+                      className={`filter-pill ${secondaryBlockSegment === SECONDARY_BLOCK_STREAMING ? "active" : ""}`}
+                      onClick={() => setSecondaryBlockSegment(SECONDARY_BLOCK_STREAMING)}
+                    >
+                      Streaming
+                    </button>
                   </div>
-                  {secondaryRegionKey && (
-                    <div className="top-picks-block">
-                      <div className="section-header">
-                        <div className="section-title">{V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region"}</div>
-                        <div className="section-meta">Theaters &amp; streaming</div>
-                      </div>
-                      <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
-                        <button
-                          type="button"
-                          className={`filter-pill ${secondaryBlockSegment === SECONDARY_BLOCK_THEATERS ? "active" : ""}`}
-                          onClick={() => setSecondaryBlockSegment(SECONDARY_BLOCK_THEATERS)}
-                        >
-                          In Theaters
-                        </button>
-                        <button
-                          type="button"
-                          className={`filter-pill ${secondaryBlockSegment === SECONDARY_BLOCK_STREAMING ? "active" : ""}`}
-                          onClick={() => setSecondaryBlockSegment(SECONDARY_BLOCK_STREAMING)}
-                        >
-                          Streaming
-                        </button>
-                      </div>
-                      {secondaryBlockSegment === SECONDARY_BLOCK_STREAMING && (
-                        <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
-                          <button
-                            type="button"
-                            className={`filter-pill ${secondaryBlockStreamingTab === "tv" ? "active" : ""}`}
-                            onClick={() => setSecondaryBlockStreamingTab("tv")}
-                          >
-                            Series
-                          </button>
-                          <button
-                            type="button"
-                            className={`filter-pill ${secondaryBlockStreamingTab === "movie" ? "active" : ""}`}
-                            onClick={() => setSecondaryBlockStreamingTab("movie")}
-                          >
-                            Movies
-                          </button>
-                        </div>
-                      )}
-                      {!secondaryStripReady ? (
-                        <SkeletonStrip />
-                      ) : secondaryActiveRawRows.length === 0 ? (
-                        <div className="empty-box">
-                          <div className="empty-text">
-                            {secondaryBlockSegment === SECONDARY_BLOCK_THEATERS
-                              ? "No theatrical releases in this market right now"
-                              : secondaryBlockStreamingTab === "movie"
-                                ? "No streaming movies in this market right now"
-                                : "No streaming series in this market right now"}
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="strip">
-                            {secondaryStripRecsVisible.map((rec) => (
-                              <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
-                                <div className="strip-poster">
-                                  {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                                  <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
-                                </div>
-                                <div className="strip-title">{rec.movie.title}</div>
-                                <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
+                  {secondaryBlockSegment === SECONDARY_BLOCK_STREAMING && (
+                    <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
+                      <button
+                        type="button"
+                        className={`filter-pill ${secondaryBlockStreamingTab === "tv" ? "active" : ""}`}
+                        onClick={() => setSecondaryBlockStreamingTab("tv")}
+                      >
+                        Series
+                      </button>
+                      <button
+                        type="button"
+                        className={`filter-pill ${secondaryBlockStreamingTab === "movie" ? "active" : ""}`}
+                        onClick={() => setSecondaryBlockStreamingTab("movie")}
+                      >
+                        Movies
+                      </button>
                     </div>
                   )}
-                </>
-              )}
-              {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingMovieRecsResolved.length + streamingTvRecsResolved.length + whatsHotRecsResolved.length + secondaryStripRecsResolved.length > 0 && (
-                <div className="no-recs" style={{ marginTop: 16, border: "none", padding: "12px 0 0" }}>
-                  <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
-                  <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={startDefaultRateMore}>Rate More Titles</button>
+                  <div className="section-header">
+                    <div className="section-title">
+                      {secondaryBlockSegment === SECONDARY_BLOCK_THEATERS
+                        ? "In Theaters"
+                        : secondaryBlockStreamingTab === "movie"
+                          ? "Streaming Movies"
+                          : "Streaming Series"}
+                    </div>
+                    <div className="section-meta">
+                      {secondaryBlockSegment === SECONDARY_BLOCK_THEATERS
+                        ? "Newest regional releases"
+                        : "New & popular on major services"}
+                    </div>
+                  </div>
+                  {!secondaryStripReady ? (
+                    <SkeletonStrip />
+                  ) : secondaryActiveRawRows.length === 0 ? (
+                    <div className="empty-box">
+                      <div className="empty-text">
+                        {secondaryBlockSegment === SECONDARY_BLOCK_THEATERS
+                          ? "No theatrical releases in this market right now"
+                          : secondaryBlockStreamingTab === "movie"
+                            ? "No streaming movies in this market right now"
+                            : "No streaming series in this market right now"}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="strip">
+                      {secondaryStripRecsVisible.map((rec) => (
+                        <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+                          <div className="strip-poster">
+                            {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
+                            <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                          </div>
+                          <div className="strip-title">{rec.movie.title}</div>
+                          <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-
+                {Object.keys(userRatings).length === 0 && secondaryStripRecsVisible.length > 0 && (
+                  <div className="section">
+                    <div className="no-recs" style={{ marginTop: 0, border: "none", padding: "0 0 8px" }}>
+                      <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
+                      <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={startDefaultRateMore}>
+                        Rate More Titles
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </PageShell>
           <AppFooter
             onPrivacy={() => openLegalPage("privacy")}
             onTerms={() => openLegalPage("terms")}
@@ -6005,6 +5954,10 @@ export default function App() {
           <BottomNav {...navProps} />
         </div>
       )}
+
+      {/* HOME screen retired in v4.0.8 — primary landing is now Circles. What's hot + Secondary Region
+          have migrated off Home: What's hot removed entirely (Pulse / In Theaters already cover
+          trending / theatrical), Secondary Region lives on its own page above. */}
 
       {/* RATE MORE */}
       {screen === "rate-more" && rateMoreMovie && (
@@ -6164,7 +6117,7 @@ export default function App() {
             <AccountAvatarMenu />
           </div>
           <div className="mood-header">
-            <button className="mood-back" onClick={() => { setNavTab("home"); setScreen("home"); }}>← Back</button>
+            <button className="mood-back" onClick={() => { setNavTab("home"); setScreen("circles"); }}>← Back</button>
             <div className="mood-step">Card {moodStep + 1} of {totalCards}</div>
             <div className="mood-title">{currentMoodCard.title}</div>
             <div className="mood-subtitle">{currentMoodCard.subtitle}</div>
