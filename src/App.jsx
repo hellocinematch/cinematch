@@ -7,7 +7,7 @@ const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
 const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
 
-// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.4.0: detail card copy/chips refresh; v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
+// Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.5.0: precomputed neighbors + faster match predict; v3.4.0: detail card copy/chips refresh; v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
@@ -2234,6 +2234,10 @@ export default function App() {
   const deepLinkDetailAppliedRef = useRef(false);
   const deepLinkLegalAppliedRef = useRef(false);
   const screenRef = useRef(screen);
+  /** Deferred single-user neighbor recompute after rating writes. */
+  const computeNeighborsTimerRef = useRef(null);
+  const computeNeighborsPendingRef = useRef(false);
+  const computeNeighborsInFlightRef = useRef(false);
   const attemptedRatedHydrationRef = useRef(new Set());
   const worthProviderCacheRef = useRef(new Map());
   const tvStripMetaCacheRef = useRef(new Map());
@@ -2241,6 +2245,57 @@ export default function App() {
   useEffect(() => {
     screenRef.current = screen;
   }, [screen]);
+
+  function shouldDeferComputeNeighbors() {
+    const s = screenRef.current;
+    return s === "onboarding" || s === "rate-more" || s === "loading-recs";
+  }
+
+  async function runComputeNeighborsNow() {
+    if (!user || computeNeighborsInFlightRef.current) return;
+    computeNeighborsPendingRef.current = false;
+    computeNeighborsInFlightRef.current = true;
+    try {
+      const { error } = await supabase.functions.invoke("compute-neighbors", {
+        body: { userId: user.id },
+      });
+      if (error) console.warn("compute-neighbors invoke failed:", error.message);
+    } catch (e) {
+      console.warn("compute-neighbors invoke failed:", e);
+    } finally {
+      computeNeighborsInFlightRef.current = false;
+      if (computeNeighborsPendingRef.current && !shouldDeferComputeNeighbors()) {
+        void runComputeNeighborsNow();
+      }
+    }
+  }
+
+  /** Debounce ratings outside onboarding; defer entirely while onboarding/rate-more is active. */
+  function scheduleComputeNeighborsRebuild() {
+    if (!user) return;
+    computeNeighborsPendingRef.current = true;
+    if (shouldDeferComputeNeighbors()) return;
+    if (computeNeighborsTimerRef.current) clearTimeout(computeNeighborsTimerRef.current);
+    computeNeighborsTimerRef.current = setTimeout(() => {
+      computeNeighborsTimerRef.current = null;
+      if (computeNeighborsPendingRef.current) void runComputeNeighborsNow();
+    }, 8000);
+  }
+
+  /** Flush deferred recompute once onboarding/rate-more/loading exits. */
+  useEffect(() => {
+    if (!user) return;
+    if (!computeNeighborsPendingRef.current || shouldDeferComputeNeighbors()) return;
+    if (computeNeighborsTimerRef.current) clearTimeout(computeNeighborsTimerRef.current);
+    computeNeighborsTimerRef.current = setTimeout(() => {
+      computeNeighborsTimerRef.current = null;
+      if (computeNeighborsPendingRef.current) void runComputeNeighborsNow();
+    }, 1000);
+  }, [screen, user]);
+
+  useEffect(() => () => {
+    if (computeNeighborsTimerRef.current) clearTimeout(computeNeighborsTimerRef.current);
+  }, []);
 
   /** v3.3.0: TMDB detail `tagline` (movies); TV often empty — fetched when detail opens. */
   const [detailTagline, setDetailTagline] = useState(null);
@@ -3828,7 +3883,10 @@ export default function App() {
       const [type, tmdbId] = movieId.split("-");
       const { error: ratingErr } = await supabase.from("ratings").upsert({ user_id: user.id, tmdb_id: parseInt(tmdbId), media_type: type, score }, { onConflict: "user_id,tmdb_id,media_type" });
       if (ratingErr) console.warn("Could not save rating:", ratingErr.message);
-      else void refreshCinemastroAvgForMediaId(movieId);
+      else {
+        void refreshCinemastroAvgForMediaId(movieId);
+        scheduleComputeNeighborsRebuild();
+      }
       await supabase.from("watchlist").delete().eq("user_id", user.id).eq("tmdb_id", parseInt(tmdbId)).eq("media_type", type);
     }
   }

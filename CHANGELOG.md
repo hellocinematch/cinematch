@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.5.0
+
+- **Two-function neighbor architecture:** Added `public.user_neighbors` storage + new `compute-neighbors` Edge Function to precompute cosine neighbors offline. Seed subjects are excluded using `profiles.name` (`seed%`), while seed accounts may still appear as neighbors.
+- **Faster detail predict:** `match` now reads precomputed neighbors, and detail predict uses SQL RPC `match_predict_neighbor_raters` (neighbors ∩ title raters) instead of heavy runtime neighbor scans. Added optional `ratings (media_type, tmdb_id, user_id)` index migration for large-title performance.
+- **Safer prediction behavior:** `match` keeps the no-fabrication rule (`prediction: null` when no real neighbor raters). Read floor aligns with stored neighbors (`0.10`), and prediction cache model version bumps to avoid stale null carryover.
+- **On-rating neighbor refresh (deferred):** App now schedules `compute-neighbors` after successful rating writes, but defers execution while onboarding/rate-more/loading flows are active so a batch of onboarding ratings triggers one recompute at the end.
+
 ## 3.4.4
 
 - **Predict contributor retention (target merge):** For detail `predict` requests, `match` now explicitly fetches the requested title's ratings for selected top neighbors and merges them into neighbor maps before scoring. This avoids losing target-title contributors to full-map paging limits and improves real prediction hit rate for titles with known overlap.
