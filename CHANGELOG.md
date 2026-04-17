@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.5.5
+
+- **Home Now Playing — all strips get predictions:** Sequential `predict_cached` runs **In Theaters → What’s hot → streaming movies → streaming TV → secondary region**, then `full` with `omitStripRecs` for **For you** / **Worth a look** + catalogue CF. `matchData` adds `whatsHotRecs` and `secondaryRecs` for strip parity with TMDB fallbacks until each batch returns.
+
 ## 3.5.4
 
 - **`match` `full` + home:** Optional body flag `omitStripRecs: true` skips recomputing In Theaters / streaming strip scores (client already has them from `predict_cached`). Response carries `recommendations` and `worthALookRecs` only; the app merges into existing `matchData`.

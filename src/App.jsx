@@ -2705,10 +2705,11 @@ export default function App() {
     return whatsHot.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
   }, [whatsHot, user, showGenreIds, showRegionKeys]);
 
-  const whatsHotRecsResolved = useMemo(
-    () => whatsHotForRecs.map(m => tmdbOnlyRec(m)),
-    [whatsHotForRecs],
-  );
+  const whatsHotRecsResolved = useMemo(() => {
+    const fromMatch = matchData?.whatsHotRecs;
+    if (fromMatch?.length) return fromMatch;
+    return whatsHotForRecs.map((m) => tmdbOnlyRec(m));
+  }, [matchData?.whatsHotRecs, whatsHotForRecs]);
 
   /** Movie ids also on the In Theaters row — small pill on What's hot cards only (no cross-strip dedupe). */
   const inTheaterIdsForWhatsHotPill = useMemo(
@@ -2767,20 +2768,27 @@ export default function App() {
     return map;
   }, [catalogue, watchlist, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, secondaryStripCatalogRows, whatsHotForRecs]);
 
-  const secondaryStripRecsAll = useMemo(
-    () => secondaryStripCatalogRows.map((m) => tmdbOnlyRec(m)),
-    [secondaryStripCatalogRows],
-  );
+  /** Secondary region strip: TMDB fallback until `matchData.secondaryRecs` fills from `predict_cached`. */
+  const secondaryStripRecsResolved = useMemo(() => {
+    const fromMatch = matchData?.secondaryRecs;
+    if (fromMatch?.length) {
+      const byId = Object.fromEntries(fromMatch.map((r) => [r.movie.id, r]));
+      return secondaryStripCatalogRows.map((m) => byId[m.id] ?? tmdbOnlyRec(m));
+    }
+    return secondaryStripCatalogRows.map((m) => tmdbOnlyRec(m));
+  }, [matchData?.secondaryRecs, secondaryStripCatalogRows]);
   /** V1.3.2: Raw rows for the active In theaters / Streaming → Movies|Series tab. */
   const secondaryActiveRawRows = useMemo(() => {
     if (secondaryBlockSegment === SECONDARY_BLOCK_THEATERS) return secondaryTheaterRows;
     return secondaryBlockStreamingTab === "movie" ? secondaryStreamingMovieRows : secondaryStreamingTvRows;
   }, [secondaryBlockSegment, secondaryBlockStreamingTab, secondaryTheaterRows, secondaryStreamingMovieRows, secondaryStreamingTvRows]);
   /** V1.3.3: Fixed cap per tab — no Load more (tabs replace pagination). */
-  const secondaryStripRecsVisible = useMemo(
-    () => secondaryActiveRawRows.slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => tmdbOnlyRec(m)),
-    [secondaryActiveRawRows],
-  );
+  const secondaryStripRecsVisible = useMemo(() => {
+    const byId = Object.fromEntries(secondaryStripRecsResolved.map((r) => [r.movie.id, r]));
+    return secondaryActiveRawRows
+      .slice(0, SECONDARY_STRIP_TAB_CAP)
+      .map((m) => byId[m.id] ?? tmdbOnlyRec(m));
+  }, [secondaryActiveRawRows, secondaryStripRecsResolved]);
 
   /** Collaborative filtering runs in Edge Function `match` (neighbour ratings loaded server-side; not in the client bundle). */
   useEffect(() => {
@@ -2811,8 +2819,10 @@ export default function App() {
 
       try {
         await predictStripThenMerge(inTheatersForRecs, "theaterRecs");
+        await predictStripThenMerge(whatsHotForRecs, "whatsHotRecs");
         await predictStripThenMerge(streamingMoviesForRecs, "streamingMovieRecs");
         await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
+        await predictStripThenMerge(secondaryStripCatalogRows, "secondaryRecs");
 
         const { data, error } = await invokeMatch({
           action: "full",
@@ -2832,8 +2842,10 @@ export default function App() {
               prev &&
               typeof prev === "object" &&
               (prev.theaterRecs?.length ||
+                prev.whatsHotRecs?.length ||
                 prev.streamingMovieRecs?.length ||
-                prev.streamingTvRecs?.length)
+                prev.streamingTvRecs?.length ||
+                prev.secondaryRecs?.length)
             ) {
               return prev;
             }
@@ -2856,7 +2868,17 @@ export default function App() {
       clearTimeout(t);
       setMatchLoading(false);
     };
-  }, [user, userRatings, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, topPickOffset]);
+  }, [
+    user,
+    userRatings,
+    catalogueForRecs,
+    inTheatersForRecs,
+    whatsHotForRecs,
+    streamingMoviesForRecs,
+    streamingTVForRecs,
+    secondaryStripCatalogRows,
+    topPickOffset,
+  ]);
 
   useEffect(() => {
     if (screen !== "loading-catalogue" || !user || !catalogueBootstrapDone) return;
@@ -3715,7 +3737,7 @@ export default function App() {
       ...theaterRecs.map((r) => r.movie),
       ...streamingRecs.map((r) => r.movie),
       ...whatsHotRecsResolved.map((r) => r.movie),
-      ...secondaryStripRecsAll.map((r) => r.movie),
+      ...secondaryStripRecsResolved.map((r) => r.movie),
       ...moreForYouStrip.map((row) => row.rec.movie),
       ...worthLookStrip.map((row) => row.rec.movie),
     ]
@@ -3741,19 +3763,19 @@ export default function App() {
     };
     void hydrateTvStripMeta();
     return () => { cancelled = true; };
-  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, secondaryStripRecsAll, moreForYouStrip, worthLookStrip]);
+  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, secondaryStripRecsResolved, moreForYouStrip, worthLookStrip]);
 
   const recMap = useMemo(() => ({
     ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingMovieRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingTvRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(whatsHotRecsResolved.map(r => [r.movie.id, r])),
-    ...Object.fromEntries(secondaryStripRecsAll.map((r) => [r.movie.id, r])),
+    ...Object.fromEntries(secondaryStripRecsResolved.map((r) => [r.movie.id, r])),
     ...Object.fromEntries(theaterRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(moreForYouStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(worthLookStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
-  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, secondaryStripRecsAll, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
+  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
   const FILTERS = ["All", "Movies", "TV Shows"];
   const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
@@ -3808,7 +3830,7 @@ export default function App() {
     for (const r of whatsHotRecsResolved) addRec(r);
     for (const r of streamingMovieRecsResolved) addRec(r);
     for (const r of streamingTvRecsResolved) addRec(r);
-    for (const r of secondaryStripRecsAll) addRec(r);
+    for (const r of secondaryStripRecsResolved) addRec(r);
     for (const row of moreForYouStrip) addRec(row.rec);
     for (const row of worthLookStrip) addRec(row.rec);
     for (const m of discoverItems) addMovie(m);
@@ -3824,7 +3846,7 @@ export default function App() {
     whatsHotRecsResolved,
     streamingMovieRecsResolved,
     streamingTvRecsResolved,
-    secondaryStripRecsAll,
+    secondaryStripRecsResolved,
     moreForYouStrip,
     worthLookStrip,
     discoverItems,
@@ -5125,7 +5147,7 @@ export default function App() {
                   )}
                 </>
               )}
-              {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingMovieRecsResolved.length + streamingTvRecsResolved.length + whatsHotRecsResolved.length + secondaryStripRecsAll.length > 0 && (
+              {Object.keys(userRatings).length === 0 && theaterRecs.length + streamingMovieRecsResolved.length + streamingTvRecsResolved.length + whatsHotRecsResolved.length + secondaryStripRecsResolved.length > 0 && (
                 <div className="no-recs" style={{ marginTop: 16, border: "none", padding: "12px 0 0" }}>
                   <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
                   <button className="btn-confirm" style={{ marginTop: 12, width: "100%" }} onClick={startDefaultRateMore}>Rate More Titles</button>
