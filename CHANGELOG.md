@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.0
+
+- **Page architecture scaffold (Step 0):** Added top-left hamburger navigation and shifted bottom fixed bar to Mood/Profile quick access. Introduced shell screens for Circles, In Theaters, Streaming, Your Picks, and conditional Secondary Region, while keeping the existing Home implementation intact as the Pulse baseline during migration.
+
 ## 3.5.6
 
 - **For you / Worth a look reliability path:** Added `match` action `recommendations_only` backed by SQL RPC `match_recommendations_from_neighbors`, so home now fetches lightweight recommendation rows without loading full neighbor rating maps in Edge. Client keeps sequential `predict_cached` strip updates and falls back to legacy `full` (`omitStripRecs`) only if the lightweight action fails.

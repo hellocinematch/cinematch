@@ -1137,7 +1137,7 @@ const MOOD_CARDS = [
 ];
 
 function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults }) {
-  const tabs = [["🏠", "Home", "home"], ["🔍", "Discover", "discover"], ["🎭", "Mood", "mood"], ["👤", "Profile", "profile"]];
+  const tabs = [["🎭", "Mood", "mood"], ["👤", "Profile", "profile"]];
   return (
     <div className="bottom-nav">
       {tabs.map(([icon, label, tab]) => (
@@ -1158,6 +1158,18 @@ function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelection
           {navTab === tab && <div className="nav-label">{label}</div>}
         </div>
       ))}
+    </div>
+  );
+}
+
+function PageShell({ title, subtitle, children }) {
+  return (
+    <div className="discover">
+      <div className="discover-header">
+        <div className="discover-title">{title}</div>
+        {subtitle ? <div className="search-status" style={{ paddingLeft: 0 }}>{subtitle}</div> : null}
+      </div>
+      {children}
     </div>
   );
 }
@@ -2172,6 +2184,7 @@ function LegalLazyFallback() {
 export default function App() {
   const [screen, setScreen] = useState("splash");
   const [navTab, setNavTab] = useState("home");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("signup");
   const [authEmail, setAuthEmail] = useState("");
@@ -4282,12 +4295,51 @@ export default function App() {
     setShowAvatarMenu(false);
   }
 
+  const shouldShowSecondaryRegionPage = Boolean(secondaryRegionKey);
+  const hamburgerVisibleScreens = new Set([
+    "home",
+    "circles",
+    "pulse",
+    "in-theaters",
+    "streaming-page",
+    "your-picks",
+    "secondary-region",
+    "discover",
+    "profile",
+    "rated",
+    "mood-picker",
+    "mood-results",
+  ]);
+  const menuItems = [
+    { id: "circles", label: "Circles" },
+    { id: "pulse", label: "Pulse" },
+    { id: "in-theaters", label: "In Theaters" },
+    { id: "streaming-page", label: "Streaming" },
+    { id: "your-picks", label: "Your Picks" },
+    ...(shouldShowSecondaryRegionPage ? [{ id: "secondary-region", label: "Secondary Region" }] : []),
+  ];
+  const activeMenuId = screen === "home" ? "pulse" : screen;
+
+  function openMenuScreen(nextScreen) {
+    setMenuOpen(false);
+    if (nextScreen === "pulse") {
+      setNavTab("home");
+      setScreen("home");
+      return;
+    }
+    setScreen(nextScreen);
+  }
+
   useEffect(() => {
     if (!showAvatarMenu) return;
     const close = () => setShowAvatarMenu(false);
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [showAvatarMenu]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [screen]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -4746,6 +4798,73 @@ export default function App() {
     <div className="viewport-shell">
       <div className="app">
         <style>{styles}</style>
+        {user && hamburgerVisibleScreens.has(screen) && (
+          <>
+            <button
+              type="button"
+              aria-label="Open navigation menu"
+              onClick={() => setMenuOpen((v) => !v)}
+              style={{
+                position: "fixed",
+                top: 14,
+                left: 14,
+                zIndex: 2200,
+                background: "#141414",
+                color: "#f0ebe0",
+                border: "1px solid #2a2a2a",
+                borderRadius: 10,
+                width: 38,
+                height: 38,
+                fontSize: 18,
+                cursor: "pointer",
+              }}
+            >
+              ☰
+            </button>
+            {menuOpen && (
+              <>
+                <div
+                  onClick={() => setMenuOpen(false)}
+                  style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2190 }}
+                />
+                <div
+                  style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    width: 270,
+                    background: "#0f0f0f",
+                    borderRight: "1px solid #262626",
+                    zIndex: 2195,
+                    padding: "66px 14px 16px",
+                  }}
+                >
+                  {menuItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => openMenuScreen(item.id)}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        marginBottom: 8,
+                        padding: "11px 12px",
+                        borderRadius: 10,
+                        border: activeMenuId === item.id ? "1px solid #3f3720" : "1px solid #252525",
+                        background: activeMenuId === item.id ? "#2a2610" : "#141414",
+                        color: activeMenuId === item.id ? "#e8c96a" : "#d7d7d7",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
 
       {/* SPLASH */}
       {screen === "splash" && (
@@ -4954,6 +5073,48 @@ export default function App() {
           <div className="loading-title">Using your tastometer to predict</div>
           <div className="loading-sub">Scoring titles for you</div>
         </div>
+      )}
+
+      {screen === "circles" && (
+        <PageShell title="Circles" subtitle="Step 0 scaffold: circles page shell">
+          <div className="disc-empty"><div className="disc-empty-text">Circles page scaffold is ready. Data wiring comes next.</div></div>
+          <BottomNav {...navProps} />
+        </PageShell>
+      )}
+
+      {screen === "pulse" && (
+        <PageShell title="Pulse" subtitle="Use menu → Pulse to open current Home implementation">
+          <div className="disc-empty"><div className="disc-empty-text">Pulse routes to the existing Home flow in this scaffold pass.</div></div>
+          <BottomNav {...navProps} />
+        </PageShell>
+      )}
+
+      {screen === "in-theaters" && (
+        <PageShell title="In Theaters" subtitle="Step 0 scaffold: dedicated page shell">
+          <div className="disc-empty"><div className="disc-empty-text">In Theaters page scaffold is ready. Section migration is next.</div></div>
+          <BottomNav {...navProps} />
+        </PageShell>
+      )}
+
+      {screen === "streaming-page" && (
+        <PageShell title="Streaming" subtitle="Step 0 scaffold: dedicated page shell">
+          <div className="disc-empty"><div className="disc-empty-text">Streaming page scaffold is ready. Section migration is next.</div></div>
+          <BottomNav {...navProps} />
+        </PageShell>
+      )}
+
+      {screen === "your-picks" && (
+        <PageShell title="Your Picks" subtitle="Step 0 scaffold: dedicated page shell">
+          <div className="disc-empty"><div className="disc-empty-text">Your Picks page scaffold is ready. Personalized wiring is next.</div></div>
+          <BottomNav {...navProps} />
+        </PageShell>
+      )}
+
+      {screen === "secondary-region" && (
+        <PageShell title="Secondary Region" subtitle="Step 0 scaffold: conditional page shell">
+          <div className="disc-empty"><div className="disc-empty-text">Secondary Region page scaffold is ready. Regional migration is next.</div></div>
+          <BottomNav {...navProps} />
+        </PageShell>
       )}
 
       {/* HOME */}
