@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.5.1
+
+- **Badge priority + color clarity:** Card badges now prioritize **your predicted score** (when present) over Cinemastro/TMDB crowd scores, while still keeping **your own rating** highest priority. Predicted badges use a distinct blue treatment across home strips, Discover, and Mood results; Cinemastro stays gold and rated stays green.
+
 ## 3.5.0
 
 - **Two-function neighbor architecture:** Added `public.user_neighbors` storage + new `compute-neighbors` Edge Function to precompute cosine neighbors offline. Seed subjects are excluded using `profiles.name` (`seed%`), while seed accounts may still appear as neighbors.

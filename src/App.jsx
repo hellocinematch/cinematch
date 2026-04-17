@@ -1434,6 +1434,7 @@ const styles = `
   .strip-badge { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.82); padding:4px 8px; border-radius:10px; font-size:12px; color:#e8c96a; font-family:'DM Serif Display',serif; z-index:2; }
   /* v3.0.0: Cinemastro community avg — Option B gold edge; TMDB uses base .strip-badge only. */
   .strip-badge.strip-badge--cinemastro { border:1px solid rgba(201,162,39,0.65); box-shadow:0 0 0 1px rgba(232,201,106,0.1); }
+  .strip-badge.strip-badge--predicted { border:1px solid rgba(59,130,246,0.7); box-shadow:0 0 0 1px rgba(59,130,246,0.2); }
   /* v3.1.0: Gold underline = community sample weight (tiered fill). */
   .strip-badge.strip-badge--with-meter { display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 8px 5px; }
   .cinemastro-vote-meter { width:100%; min-width:28px; max-width:72px; height:3px; border-radius:2px; border:1px solid rgba(201,162,39,0.55); background:rgba(0,0,0,0.35); box-sizing:border-box; overflow:hidden; }
@@ -1536,6 +1537,8 @@ const styles = `
   .disc-type { position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.75); border:1px solid #333; padding:2px 7px; border-radius:8px; font-size:9px; letter-spacing:1px; text-transform:uppercase; color:#aaa; }
   .disc-rated-badge { color:#88cc88; }
   .disc-pred-badge { color:#e8c96a; }
+  .disc-pred-badge--predicted { color:#3b82f6; border:1px solid rgba(59,130,246,0.65); border-radius:8px; padding:2px 6px; display:inline-block; box-shadow:0 0 0 1px rgba(59,130,246,0.14); }
+  .disc-pred-badge--predicted.disc-pred-badge--with-meter { padding:3px 6px 4px; }
   .disc-pred-badge.disc-pred-badge--with-meter { display:inline-flex; flex-direction:column; align-items:center; gap:2px; padding:3px 6px 4px; }
   .disc-community-badge--cinemastro { border:1px solid rgba(201,162,39,0.55); border-radius:8px; padding:2px 6px; display:inline-block; }
   .disc-community-badge--cinemastro.disc-pred-badge--with-meter { padding:3px 6px 4px; }
@@ -1579,6 +1582,7 @@ const styles = `
   .mood-result-badge { position:absolute; top:12px; right:12px; background:rgba(0,0,0,0.75); border:1px solid #e8c96a; padding:5px 10px; border-radius:16px; font-family:'DM Serif Display',serif; font-size:16px; color:#e8c96a; }
   .mood-result-badge.mood-result-badge--with-meter { display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 10px 6px; }
   .mood-result-badge.mood-result-badge--cinemastro { box-shadow:0 0 0 2px rgba(201,162,39,0.45); border-color:#c9a227; }
+  .mood-result-badge.mood-result-badge--predicted { box-shadow:0 0 0 2px rgba(59,130,246,0.38); border-color:#3b82f6; color:#3b82f6; }
   .cinemastro-vote-meter--mood { max-width:64px; }
   .mood-result-type { position:absolute; top:12px; left:12px; background:rgba(0,0,0,0.7); border:1px solid #333; padding:3px 8px; border-radius:8px; font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#aaa; }
   .mood-result-info { padding:14px 16px; }
@@ -2013,8 +2017,8 @@ function CinemastroVoteMeter({ count, className = "" }) {
 }
 
 /**
- * v3.1.0: Poster / Discover / mood badge — prefer Cinemastro (`cinemastroAvgByKey` avg + count), else TMDB, else predicted.
- * `pillClass` adds gold-edge treatment for Cinemastro; TMDB keeps the neutral dark pill.
+ * v3.5.1: Poster / Discover / mood badge priority — user rating, then personal prediction, then community.
+ * `pillClass` adds source-specific accents (Cinemastro gold, predicted blue).
  */
 function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
   if (userRating != null && Number.isFinite(Number(userRating))) {
@@ -2023,6 +2027,15 @@ function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
       title: "Your rating",
       color: "#88cc88",
       pillClass: "",
+      cinemastroCount: null,
+    };
+  }
+  if (predicted != null && Number.isFinite(Number(predicted))) {
+    return {
+      text: formatScore(predicted),
+      title: "Predicted for you",
+      color: "#3b82f6",
+      pillClass: "strip-badge--predicted",
       cinemastroCount: null,
     };
   }
@@ -2047,15 +2060,6 @@ function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey) {
     return {
       text: formatScore(Number(tmdb)),
       title: "TMDB average",
-      color: "#e8c96a",
-      pillClass: "",
-      cinemastroCount: null,
-    };
-  }
-  if (predicted != null && Number.isFinite(Number(predicted))) {
-    return {
-      text: formatScore(predicted),
-      title: "Predicted for you",
       color: "#e8c96a",
       pillClass: "",
       cinemastroCount: null,
@@ -5310,7 +5314,7 @@ export default function App() {
                             ? <span className="disc-unseen-badge">Unrated</span>
                             : (
                               <span
-                                className={`disc-pred-badge${discBd.pillClass === "strip-badge--cinemastro" ? " disc-community-badge--cinemastro" : ""}${discMeter ? " disc-pred-badge--with-meter" : ""}`}
+                                className={`disc-pred-badge${discBd.pillClass === "strip-badge--cinemastro" ? " disc-community-badge--cinemastro" : ""}${discBd.pillClass === "strip-badge--predicted" ? " disc-pred-badge--predicted" : ""}${discMeter ? " disc-pred-badge--with-meter" : ""}`}
                                 title={discBd.title || undefined}
                               >
                                 <span className="disc-pred-badge-score">{discBd.text}</span>
@@ -5417,7 +5421,7 @@ export default function App() {
                         mbd.cinemastroCount >= 1;
                       return (
                         <div
-                          className={`mood-result-badge${mbd.pillClass === "strip-badge--cinemastro" ? " mood-result-badge--cinemastro" : ""}${moodMeter ? " mood-result-badge--with-meter" : ""}`}
+                          className={`mood-result-badge${mbd.pillClass === "strip-badge--cinemastro" ? " mood-result-badge--cinemastro" : ""}${mbd.pillClass === "strip-badge--predicted" ? " mood-result-badge--predicted" : ""}${moodMeter ? " mood-result-badge--with-meter" : ""}`}
                           title={mbd.title || undefined}
                         >
                           <span className="mood-result-badge-score">{mbd.text}</span>
