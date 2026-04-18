@@ -2,6 +2,18 @@ import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } fro
 import packageJson from "../package.json";
 import { AppFooter } from "./appFooter.jsx";
 import { supabase } from "./supabase";
+import {
+  CIRCLE_CAP,
+  CIRCLE_NAME_MAX,
+  CIRCLE_DESCRIPTION_MAX,
+  VIBES,
+  vibeMeta,
+  fetchMyCircles,
+  fetchCircleDetail,
+  createCircle,
+  leaveCircle,
+  currentUserRole,
+} from "./circles";
 
 const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
@@ -2267,6 +2279,104 @@ const styles = `
   @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
   @keyframes spin { to{transform:rotate(360deg)} }
   @keyframes shimmer { 100% { transform:translateX(100%); } }
+  @keyframes sheetUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+
+  /* =============================================================================================
+     Circles (v5.0.0 Phase A)
+     ============================================================================================= */
+  .circles-header { padding:16px 24px 4px; }
+  .circles-header-row { display:flex; align-items:flex-start; gap:12px; justify-content:space-between; }
+  .circles-header-copy { min-width:0; flex:1 1 auto; }
+  .circles-count-sub { font-family:'DM Sans',sans-serif; font-size:13px; color:#888; margin-top:4px; }
+  .circles-header-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .circles-bell { position:relative; background:#141414; border:1px solid #2a2a2a; color:#e8c96a; padding:8px 10px; border-radius:999px; cursor:pointer; font-size:14px; line-height:1; display:flex; align-items:center; gap:4px; }
+  .circles-bell[disabled] { opacity:0.55; cursor:default; }
+  .circles-bell-count { font-family:'DM Sans',sans-serif; font-size:11px; color:#888; font-weight:600; }
+  .circles-new-btn { background:#e8c96a; color:#0a0a0a; border:none; padding:10px 16px; border-radius:999px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; letter-spacing:0.3px; cursor:pointer; transition:background 0.15s, transform 0.15s; white-space:nowrap; }
+  .circles-new-btn:hover:not(:disabled) { background:#f0d880; }
+  .circles-new-btn:disabled { opacity:0.4; cursor:default; background:#2a2610; color:#e8c96a; }
+  .circles-new-btn--lg { padding:14px 28px; font-size:14px; margin-top:20px; }
+  .circles-cap-banner { margin-top:12px; padding:10px 14px; background:#2a1a0a; border:1px solid #4a2e12; color:#e8c96a; border-radius:10px; font-size:13px; }
+  .circles-error-banner { margin-top:12px; padding:10px 14px; background:#1a0808; border:1px solid #441111; color:#f09a9a; border-radius:10px; font-size:13px; overflow-wrap:anywhere; }
+
+  .circles-skeleton { padding:20px 24px; display:flex; flex-direction:column; gap:12px; }
+  .circles-skeleton-card { height:96px; border-radius:14px; background:linear-gradient(90deg,#121212 0%,#1a1a1a 50%,#121212 100%); background-size:200% 100%; animation:shimmer 1.4s linear infinite; }
+
+  .circles-empty { padding:32px 24px 24px; text-align:center; display:flex; flex-direction:column; align-items:center; animation:fadeIn 0.4s ease; }
+  .circles-empty-title { font-family:'DM Serif Display',serif; font-size:26px; color:#f0ebe0; }
+  .circles-empty-sub { margin-top:6px; font-size:13px; color:#888; max-width:320px; line-height:1.5; }
+  .circles-empty-slots { margin-top:24px; display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; width:100%; max-width:280px; }
+  .circles-empty-slot { aspect-ratio:1; border-radius:10px; border:1px dashed #222; background:#111; }
+
+  .circles-list { padding:16px 24px 24px; display:flex; flex-direction:column; gap:12px; animation:fadeIn 0.3s ease; }
+  .circle-card { position:relative; display:block; width:100%; text-align:left; background:#111; border:1px solid #1e1e1e; border-radius:14px; padding:16px 18px; cursor:pointer; overflow:hidden; transition:transform 0.15s, border-color 0.15s; animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1); --vibe-accent:#e8c96a; --vibe-tint:#3a2a0a; font-family:'DM Sans',sans-serif; color:inherit; }
+  .circle-card:hover { transform:translateY(-2px); border-color:var(--vibe-accent); }
+  .circle-card:focus-visible { outline:2px solid var(--vibe-accent); outline-offset:2px; }
+  .circle-card__tint { position:absolute; inset:0; background:radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--vibe-tint) 75%, transparent) 0%, transparent 65%); pointer-events:none; opacity:0.85; }
+  .circle-card__body { position:relative; z-index:1; display:flex; flex-direction:column; gap:6px; }
+  .circle-card__top { display:flex; align-items:center; gap:8px; }
+  .circle-card__name { font-family:'DM Serif Display',serif; font-size:22px; color:#f0ebe0; line-height:1.1; flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+  .circle-card__crown { font-size:16px; flex-shrink:0; }
+  .circle-card__desc { font-size:13px; color:#aaa; line-height:1.4; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .circle-card__meta-row { display:flex; align-items:center; gap:10px; margin-top:4px; flex-wrap:wrap; }
+  .circle-card__vibe-badge { display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; border:1px solid var(--vibe-accent); color:var(--vibe-accent); background:color-mix(in srgb, var(--vibe-accent) 12%, transparent); font-size:11px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; }
+  .circle-card__members { font-size:12px; color:#888; letter-spacing:0.3px; }
+
+  .circles-detail-header { padding:12px 24px 0; }
+  .circles-detail-back { background:none; border:none; color:#888; font-family:'DM Sans',sans-serif; font-size:13px; padding:6px 0; margin-bottom:4px; cursor:pointer; }
+  .circles-detail-back:hover { color:#e8c96a; }
+  .circles-detail-loading { padding:40px 0; color:#666; font-size:13px; text-align:center; }
+  .circle-hero { position:relative; background:#111; border:1px solid #1e1e1e; border-radius:16px; overflow:hidden; --vibe-accent:#e8c96a; --vibe-tint:#3a2a0a; animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1); }
+  .circle-hero__tint { position:absolute; inset:0; background:linear-gradient(135deg, color-mix(in srgb, var(--vibe-tint) 90%, transparent) 0%, transparent 70%); pointer-events:none; }
+  .circle-hero__body { position:relative; z-index:1; padding:24px 20px; display:flex; flex-direction:column; gap:8px; }
+  .circle-hero__name-row { display:flex; align-items:center; gap:10px; }
+  .circle-hero__name { font-family:'DM Serif Display',serif; font-size:32px; color:#f0ebe0; line-height:1.1; flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+  .circle-hero__crown { font-size:22px; flex-shrink:0; }
+  .circle-hero__desc { font-size:14px; color:#c8c4bc; line-height:1.5; overflow-wrap:anywhere; }
+  .circle-hero__meta-row { display:flex; align-items:center; gap:10px; margin-top:4px; flex-wrap:wrap; }
+
+  .circle-detail-body { padding:20px 24px 40px; display:flex; flex-direction:column; gap:20px; }
+  .circle-detail-placeholder { background:#111; border:1px dashed #222; border-radius:14px; padding:20px; }
+  .circle-detail-placeholder__title { font-family:'DM Serif Display',serif; font-size:18px; color:#f0ebe0; margin-bottom:6px; }
+  .circle-detail-placeholder__text { font-size:13px; color:#888; line-height:1.5; }
+  .circle-leave-btn { background:transparent; color:#e05a5a; border:1px solid #4a1818; padding:12px 20px; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; transition:background 0.15s, border-color 0.15s; align-self:flex-start; }
+  .circle-leave-btn:hover:not(:disabled) { background:#1a0808; border-color:#e05a5a; }
+  .circle-leave-btn:disabled { opacity:0.5; cursor:default; }
+
+  /* Bottom sheet / confirm shared shell */
+  .circles-sheet-root { position:fixed; inset:0; z-index:2200; display:flex; flex-direction:column; justify-content:flex-end; animation:fadeIn 0.2s ease; }
+  .circles-sheet-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.6); border:none; padding:0; cursor:pointer; }
+  .circles-sheet, .circles-confirm { position:relative; background:#141414; border-top:1px solid #2a2a2a; border-radius:20px 20px 0 0; padding:12px 20px max(24px, env(safe-area-inset-bottom, 0px)); width:100%; max-width:min(100%, 480px); margin:0 auto; animation:sheetUp 0.35s cubic-bezier(0.16,1,0.3,1); display:flex; flex-direction:column; gap:12px; box-sizing:border-box; box-shadow:0 -12px 32px rgba(0,0,0,0.5); }
+  .circles-sheet-handle { width:40px; height:4px; border-radius:2px; background:#333; align-self:center; margin-bottom:4px; }
+  .circles-sheet-title { font-family:'DM Serif Display',serif; font-size:24px; color:#f0ebe0; }
+  .circles-sheet-sub { font-size:13px; color:#888; margin-top:-6px; }
+  .circles-field { display:flex; flex-direction:column; gap:6px; position:relative; }
+  .circles-field-label { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#888; font-weight:600; }
+  .circles-field-required { color:#e8c96a; }
+  .circles-input { background:#0f0f0f; border:1px solid #2a2a2a; border-radius:10px; padding:13px 14px; font-family:'DM Sans',sans-serif; font-size:16px; color:#f0ebe0; outline:none; transition:border-color 0.15s; }
+  .circles-input:focus { border-color:#e8c96a; }
+  .circles-input:disabled { opacity:0.6; }
+  .circles-textarea { background:#0f0f0f; border:1px solid #2a2a2a; border-radius:10px; padding:12px 14px; font-family:'DM Sans',sans-serif; font-size:15px; color:#f0ebe0; outline:none; transition:border-color 0.15s; resize:vertical; min-height:60px; }
+  .circles-textarea:focus { border-color:#e8c96a; }
+  .circles-textarea:disabled { opacity:0.6; }
+  .circles-field-count { position:absolute; top:0; right:0; font-size:11px; color:#555; font-family:'DM Sans',sans-serif; }
+  .circles-sheet-actions { display:flex; gap:10px; margin-top:8px; }
+  .circles-btn-primary { flex:2; background:#e8c96a; color:#0a0a0a; border:none; padding:14px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; border-radius:10px; cursor:pointer; transition:background 0.15s; }
+  .circles-btn-primary:hover:not(:disabled) { background:#f0d880; }
+  .circles-btn-primary:disabled { opacity:0.4; cursor:default; }
+  .circles-btn-ghost { flex:1; background:#1a1a1a; color:#c8c4bc; border:1px solid #2a2a2a; padding:14px; font-family:'DM Sans',sans-serif; font-size:14px; border-radius:10px; cursor:pointer; transition:border-color 0.15s, color 0.15s; }
+  .circles-btn-ghost:hover:not(:disabled) { border-color:#444; color:#f0ebe0; }
+  .circles-btn-ghost:disabled { opacity:0.5; cursor:default; }
+  .circles-btn-danger { flex:2; background:#e05a5a; color:#0a0a0a; border:none; padding:14px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; border-radius:10px; cursor:pointer; transition:background 0.15s; }
+  .circles-btn-danger:hover:not(:disabled) { background:#ee7a7a; }
+  .circles-btn-danger:disabled { opacity:0.5; cursor:default; }
+  .circles-confirm-title { font-family:'DM Serif Display',serif; font-size:22px; color:#f0ebe0; }
+  .circles-confirm-text { font-size:14px; color:#c8c4bc; line-height:1.5; }
+
+  @media (max-width: 420px) {
+    .circle-card__name { font-size:20px; }
+    .circle-hero__name { font-size:26px; }
+  }
 `;
 
 // ---------------------------------------------------------------------------
@@ -2581,6 +2691,24 @@ export default function App() {
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
+  // v5.0.0: Circles page state (Phase A — no Edge functions, direct supabase client calls).
+  const [circlesList, setCirclesList] = useState([]);
+  const [circlesLoading, setCirclesLoading] = useState(false);
+  const [circlesError, setCirclesError] = useState("");
+  const [circlesLoaded, setCirclesLoaded] = useState(false);
+  const [showCreateCircleSheet, setShowCreateCircleSheet] = useState(false);
+  const [createCircleName, setCreateCircleName] = useState("");
+  const [createCircleDescription, setCreateCircleDescription] = useState("");
+  const [createCircleVibe, setCreateCircleVibe] = useState("Mixed Bag");
+  const [createCircleSubmitting, setCreateCircleSubmitting] = useState(false);
+  const [createCircleError, setCreateCircleError] = useState("");
+  const [selectedCircleId, setSelectedCircleId] = useState(null);
+  const [circleDetailData, setCircleDetailData] = useState(null);
+  const [circleDetailLoading, setCircleDetailLoading] = useState(false);
+  const [circleDetailError, setCircleDetailError] = useState("");
+  const [leaveCircleBusy, setLeaveCircleBusy] = useState(false);
+  const [leaveCircleError, setLeaveCircleError] = useState("");
+  const [leaveConfirmCircle, setLeaveConfirmCircle] = useState(null);
   const [profileSettingsError, setProfileSettingsError] = useState("");
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
   const [showGenreIds, setShowGenreIds] = useState([]);
@@ -4865,12 +4993,194 @@ export default function App() {
     setShowAvatarMenu(false);
   }
 
+  // ============================================================================================
+  // Circles (Phase A) — data loaders + actions. Uses the supabase client directly (no Edge yet).
+  // ============================================================================================
+
+  const reloadMyCircles = useCallback(async () => {
+    if (!user) return;
+    setCirclesLoading(true);
+    setCirclesError("");
+    try {
+      const rows = await fetchMyCircles();
+      setCirclesList(rows);
+      setCirclesLoaded(true);
+    } catch (e) {
+      console.error("Circles: fetchMyCircles failed", e);
+      setCirclesError(e?.message || "Could not load your circles.");
+    } finally {
+      setCirclesLoading(false);
+    }
+  }, [user]);
+
+  // Initial load once the user is signed in and the circles page is reachable.
+  useEffect(() => {
+    if (!user) {
+      setCirclesList([]);
+      setCirclesLoaded(false);
+      return;
+    }
+    if (circlesLoaded) return;
+    void reloadMyCircles();
+  }, [user, circlesLoaded, reloadMyCircles]);
+
+  // Also refresh whenever the user navigates to the Circles list (cheap; small response).
+  useEffect(() => {
+    if (!user) return;
+    if (screen !== "circles") return;
+    if (!circlesLoaded) return;
+    void reloadMyCircles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
+
+  const activeCirclesCount = circlesList.length;
+  const atCircleCap = activeCirclesCount >= CIRCLE_CAP;
+
+  function openCreateCircleSheet() {
+    if (atCircleCap) return;
+    setCreateCircleName("");
+    setCreateCircleDescription("");
+    setCreateCircleVibe("Mixed Bag");
+    setCreateCircleError("");
+    setShowCreateCircleSheet(true);
+  }
+
+  function closeCreateCircleSheet() {
+    if (createCircleSubmitting) return;
+    setShowCreateCircleSheet(false);
+    setCreateCircleError("");
+  }
+
+  async function submitCreateCircle() {
+    if (!user || createCircleSubmitting) return;
+    const trimmed = createCircleName.trim();
+    if (!trimmed) {
+      setCreateCircleError("Give your circle a name.");
+      return;
+    }
+    if (trimmed.length > CIRCLE_NAME_MAX) {
+      setCreateCircleError(`Name must be ${CIRCLE_NAME_MAX} characters or fewer.`);
+      return;
+    }
+    if (createCircleDescription.length > CIRCLE_DESCRIPTION_MAX) {
+      setCreateCircleError(`Description must be ${CIRCLE_DESCRIPTION_MAX} characters or fewer.`);
+      return;
+    }
+    if (atCircleCap) {
+      setCreateCircleError("You're at the 10-circle limit. Leave one to create another.");
+      return;
+    }
+    setCreateCircleSubmitting(true);
+    setCreateCircleError("");
+    try {
+      const fresh = await createCircle({
+        name: trimmed,
+        description: createCircleDescription,
+        vibe: createCircleVibe,
+        creatorId: user.id,
+      });
+      setCirclesList((prev) => [fresh, ...prev]);
+      setShowCreateCircleSheet(false);
+      setCreateCircleName("");
+      setCreateCircleDescription("");
+      setCreateCircleVibe("Mixed Bag");
+    } catch (e) {
+      console.error("Circles: createCircle failed", e);
+      setCreateCircleError(e?.message || "Could not create circle. Please try again.");
+    } finally {
+      setCreateCircleSubmitting(false);
+    }
+  }
+
+  function openCircleDetail(circleId) {
+    if (!circleId) return;
+    setSelectedCircleId(circleId);
+    setCircleDetailData(null);
+    setCircleDetailError("");
+    setLeaveCircleError("");
+    setScreen("circle-detail");
+  }
+
+  function backFromCircleDetail() {
+    setSelectedCircleId(null);
+    setCircleDetailData(null);
+    setCircleDetailError("");
+    setLeaveCircleError("");
+    setLeaveConfirmCircle(null);
+    setScreen("circles");
+  }
+
+  // Load circle detail when entering the detail screen.
+  useEffect(() => {
+    if (screen !== "circle-detail") return;
+    if (!selectedCircleId) return;
+    let cancelled = false;
+    setCircleDetailLoading(true);
+    setCircleDetailError("");
+    (async () => {
+      try {
+        const detail = await fetchCircleDetail(selectedCircleId);
+        if (cancelled) return;
+        if (!detail) {
+          setCircleDetailError("This circle is no longer available.");
+          setCircleDetailData(null);
+        } else {
+          setCircleDetailData(detail);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        console.error("Circles: fetchCircleDetail failed", e);
+        setCircleDetailError(e?.message || "Could not load circle.");
+      } finally {
+        if (!cancelled) setCircleDetailLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, selectedCircleId]);
+
+  function requestLeaveCircle(circle) {
+    if (!circle) return;
+    setLeaveCircleError("");
+    setLeaveConfirmCircle(circle);
+  }
+
+  function cancelLeaveCircle() {
+    if (leaveCircleBusy) return;
+    setLeaveConfirmCircle(null);
+  }
+
+  async function confirmLeaveCircle() {
+    if (!user || !leaveConfirmCircle || leaveCircleBusy) return;
+    const target = leaveConfirmCircle;
+    const role = currentUserRole(target, user.id);
+    setLeaveCircleBusy(true);
+    setLeaveCircleError("");
+    try {
+      await leaveCircle({
+        circleId: target.id,
+        userId: user.id,
+        isCreator: role === "creator",
+      });
+      setCirclesList((prev) => prev.filter((c) => c.id !== target.id));
+      setLeaveConfirmCircle(null);
+      backFromCircleDetail();
+    } catch (e) {
+      console.error("Circles: leaveCircle failed", e);
+      setLeaveCircleError(e?.message || "Could not leave the circle. Please try again.");
+    } finally {
+      setLeaveCircleBusy(false);
+    }
+  }
+
   const shouldShowSecondaryRegionPage = Boolean(secondaryRegionKey);
   /** v4.0.8: `home` retired as a screen; `circles` is the landing. Kept `home` out of the set so
    *  lingering `setScreen("home")` (any we missed) would visibly fail instead of silently rendering
    *  nothing. */
   const primaryNavScreens = new Set([
     "circles",
+    "circle-detail",
     "pulse",
     "in-theaters",
     "streaming-page",
@@ -4892,7 +5202,8 @@ export default function App() {
       ? [{ id: "secondary-region", label: V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region" }]
       : []),
   ];
-  const activeSectionId = screen === "discover" ? null : screen;
+  // v5.0.0: keep the "Circles" section link highlighted while the user is drilled into a circle.
+  const activeSectionId = screen === "discover" ? null : screen === "circle-detail" ? "circles" : screen;
 
   function navigatePrimarySection(nextScreen) {
     if (nextScreen === "pulse") {
@@ -5593,10 +5904,324 @@ export default function App() {
       )}
 
       {screen === "circles" && (
-        <PageShell title="Circles" subtitle="Coming soon">
-          <div className="disc-empty"><div className="disc-empty-text">Something exciting is happening here — keep checking.</div></div>
+        <div className="home">
+          <div className="discover">
+            <div className="discover-header circles-header">
+              <div className="circles-header-row">
+                <div className="circles-header-copy">
+                  <div className="discover-title">Circles</div>
+                  <div className="circles-count-sub">
+                    {activeCirclesCount} of {CIRCLE_CAP} circles
+                  </div>
+                </div>
+                <div className="circles-header-actions">
+                  <button
+                    type="button"
+                    className="circles-bell"
+                    aria-label="Pending invites"
+                    title="Pending invites (coming in Phase B)"
+                    disabled
+                  >
+                    <span aria-hidden="true">🔔</span>
+                    <span className="circles-bell-count">0</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="circles-new-btn"
+                    onClick={openCreateCircleSheet}
+                    disabled={atCircleCap || circlesLoading || !user}
+                  >
+                    + New Circle
+                  </button>
+                </div>
+              </div>
+              {atCircleCap && (
+                <div className="circles-cap-banner">
+                  You're at the {CIRCLE_CAP}-circle limit. Leave one to create or join another.
+                </div>
+              )}
+              {circlesError && (
+                <div className="circles-error-banner">{circlesError}</div>
+              )}
+            </div>
+
+            {circlesLoading && !circlesLoaded ? (
+              <div className="circles-skeleton">
+                <div className="circles-skeleton-card" />
+                <div className="circles-skeleton-card" />
+                <div className="circles-skeleton-card" />
+              </div>
+            ) : activeCirclesCount === 0 ? (
+              <div className="circles-empty">
+                <div className="circles-empty-title">Create your first circle</div>
+                <div className="circles-empty-sub">
+                  Circles are private groups where your taste, ratings, and picks flow together.
+                </div>
+                <div className="circles-empty-slots" aria-hidden="true">
+                  {Array.from({ length: CIRCLE_CAP }).map((_, i) => (
+                    <div className="circles-empty-slot" key={i} />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="circles-new-btn circles-new-btn--lg"
+                  onClick={openCreateCircleSheet}
+                  disabled={!user}
+                >
+                  + Create a circle
+                </button>
+              </div>
+            ) : (
+              <div className="circles-list">
+                {circlesList.map((circle) => {
+                  const meta = vibeMeta(circle.vibe);
+                  const isCreator = currentUserRole(circle, user?.id) === "creator";
+                  return (
+                    <button
+                      type="button"
+                      key={circle.id}
+                      className="circle-card"
+                      onClick={() => openCircleDetail(circle.id)}
+                      style={{
+                        "--vibe-accent": meta.accent,
+                        "--vibe-tint": meta.tint,
+                      }}
+                    >
+                      <div className="circle-card__tint" aria-hidden="true" />
+                      <div className="circle-card__body">
+                        <div className="circle-card__top">
+                          <div className="circle-card__name">{circle.name}</div>
+                          {isCreator && (
+                            <div className="circle-card__crown" title="You're the creator">👑</div>
+                          )}
+                        </div>
+                        {circle.description && (
+                          <div className="circle-card__desc">{circle.description}</div>
+                        )}
+                        <div className="circle-card__meta-row">
+                          <span className="circle-card__vibe-badge">{meta.id}</span>
+                          <span className="circle-card__members">
+                            {circle.memberCount} {circle.memberCount === 1 ? "member" : "members"}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
           <BottomNav {...navProps} />
-        </PageShell>
+        </div>
+      )}
+
+      {/* Circles — stub dashboard (Phase A). Phase C replaces this with the full hero + rated strip. */}
+      {screen === "circle-detail" && (
+        <div className="home">
+          <div className="discover">
+            <div className="discover-header circles-detail-header">
+              <button
+                type="button"
+                className="circles-detail-back"
+                onClick={backFromCircleDetail}
+              >
+                ← Back
+              </button>
+              {circleDetailLoading && !circleDetailData ? (
+                <div className="circles-detail-loading">Loading…</div>
+              ) : circleDetailError ? (
+                <div className="circles-error-banner">{circleDetailError}</div>
+              ) : circleDetailData ? (
+                (() => {
+                  const meta = vibeMeta(circleDetailData.vibe);
+                  const isCreator = currentUserRole(circleDetailData, user?.id) === "creator";
+                  return (
+                    <div
+                      className="circle-hero"
+                      style={{
+                        "--vibe-accent": meta.accent,
+                        "--vibe-tint": meta.tint,
+                      }}
+                    >
+                      <div className="circle-hero__tint" aria-hidden="true" />
+                      <div className="circle-hero__body">
+                        <div className="circle-hero__name-row">
+                          <div className="circle-hero__name">{circleDetailData.name}</div>
+                          {isCreator && <div className="circle-hero__crown" title="You're the creator">👑</div>}
+                        </div>
+                        {circleDetailData.description && (
+                          <div className="circle-hero__desc">{circleDetailData.description}</div>
+                        )}
+                        <div className="circle-hero__meta-row">
+                          <span className="circle-card__vibe-badge">{meta.id}</span>
+                          <span className="circle-card__members">
+                            {circleDetailData.memberCount}{" "}
+                            {circleDetailData.memberCount === 1 ? "member" : "members"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : null}
+            </div>
+
+            {circleDetailData && (
+              <div className="circle-detail-body">
+                <div className="circle-detail-placeholder">
+                  <div className="circle-detail-placeholder__title">Rated in this circle</div>
+                  <div className="circle-detail-placeholder__text">
+                    Once your circle has at least two members, the titles you've all rated will
+                    show up here with a group score and your personal prediction.
+                  </div>
+                </div>
+                {leaveCircleError && (
+                  <div className="circles-error-banner">{leaveCircleError}</div>
+                )}
+                <button
+                  type="button"
+                  className="circle-leave-btn"
+                  onClick={() => requestLeaveCircle(circleDetailData)}
+                  disabled={leaveCircleBusy}
+                >
+                  Leave circle
+                </button>
+              </div>
+            )}
+          </div>
+          <BottomNav {...navProps} />
+        </div>
+      )}
+
+      {/* Create Circle bottom sheet */}
+      {showCreateCircleSheet && (
+        <div className="circles-sheet-root" role="dialog" aria-modal="true" aria-label="Create a circle">
+          <button
+            type="button"
+            className="circles-sheet-backdrop"
+            aria-label="Close"
+            onClick={closeCreateCircleSheet}
+          />
+          <div className="circles-sheet">
+            <div className="circles-sheet-handle" aria-hidden="true" />
+            <div className="circles-sheet-title">New circle</div>
+            <div className="circles-sheet-sub">Private by default. You can invite up to 25 members.</div>
+
+            <div className="circles-field">
+              <label className="circles-field-label">
+                Name <span className="circles-field-required">*</span>
+              </label>
+              <input
+                className="circles-input"
+                type="text"
+                maxLength={CIRCLE_NAME_MAX}
+                placeholder="e.g. Friday movie night"
+                value={createCircleName}
+                onChange={(e) => setCreateCircleName(e.target.value)}
+                disabled={createCircleSubmitting}
+                autoFocus
+              />
+              <div className="circles-field-count">
+                {createCircleName.length}/{CIRCLE_NAME_MAX}
+              </div>
+            </div>
+
+            <div className="circles-field">
+              <label className="circles-field-label">Description</label>
+              <textarea
+                className="circles-textarea"
+                maxLength={CIRCLE_DESCRIPTION_MAX}
+                placeholder="What's this circle about? (optional)"
+                value={createCircleDescription}
+                onChange={(e) => setCreateCircleDescription(e.target.value)}
+                disabled={createCircleSubmitting}
+                rows={2}
+              />
+              <div className="circles-field-count">
+                {createCircleDescription.length}/{CIRCLE_DESCRIPTION_MAX}
+              </div>
+            </div>
+
+            <div className="circles-field">
+              <label className="circles-field-label">Vibe</label>
+              <select
+                className="circles-input"
+                value={createCircleVibe}
+                onChange={(e) => setCreateCircleVibe(e.target.value)}
+                disabled={createCircleSubmitting}
+              >
+                {VIBES.map((v) => (
+                  <option key={v.id} value={v.id}>{v.id}</option>
+                ))}
+              </select>
+            </div>
+
+            {createCircleError && <div className="circles-error-banner">{createCircleError}</div>}
+
+            <div className="circles-sheet-actions">
+              <button
+                type="button"
+                className="circles-btn-ghost"
+                onClick={closeCreateCircleSheet}
+                disabled={createCircleSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="circles-btn-primary"
+                onClick={submitCreateCircle}
+                disabled={createCircleSubmitting || !createCircleName.trim()}
+              >
+                {createCircleSubmitting ? "Creating…" : "Create circle"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave circle confirmation */}
+      {leaveConfirmCircle && (
+        <div className="circles-sheet-root" role="dialog" aria-modal="true" aria-label="Leave circle">
+          <button
+            type="button"
+            className="circles-sheet-backdrop"
+            aria-label="Cancel"
+            onClick={cancelLeaveCircle}
+          />
+          <div className="circles-confirm">
+            <div className="circles-confirm-title">Leave this circle?</div>
+            <div className="circles-confirm-text">
+              {currentUserRole(leaveConfirmCircle, user?.id) === "creator"
+                ? "You're the creator. Leaving will archive the circle — members can still view it, but no new invites or ratings will flow through."
+                : "Your past ratings stay visible in the circle, but you'll lose access to future activity."}
+            </div>
+            {leaveCircleError && <div className="circles-error-banner">{leaveCircleError}</div>}
+            <div className="circles-sheet-actions">
+              <button
+                type="button"
+                className="circles-btn-ghost"
+                onClick={cancelLeaveCircle}
+                disabled={leaveCircleBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="circles-btn-danger"
+                onClick={confirmLeaveCircle}
+                disabled={leaveCircleBusy}
+              >
+                {leaveCircleBusy ? "Leaving…" : "Leave circle"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {screen === "pulse" && (
