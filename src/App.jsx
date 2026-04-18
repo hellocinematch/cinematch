@@ -115,6 +115,10 @@ const MORE_TAB_ON_SERVICE_MAX = 15;
 const MORE_TAB_OFF_SERVICE_MAX = 20;
 /** Strip 2 floor; also used to backfill strip 1 from scored theater / streaming / worth-a-look rows. */
 const MORE_TAB_OFF_SERVICE_PRED_MIN = 6.5;
+/** Max titles per Discover `predict_cached` batch (Edge + DB bound). */
+const DISCOVER_PREDICT_CACHED_CAP = 120;
+/** After `your_picks_page`, compute CF overlays for this many rec ids (cold cache — Edge only reads DB in `your_picks_page`). */
+const YOUR_PICKS_PREDICT_CACHED_CAP = 80;
 
 /**
  * When CF `recommendations` is short, strip 2 would be empty after taking strip 1. The Edge function
@@ -272,7 +276,13 @@ function normalizeCinemastroRpcRows(data) {
 /** Cinemastro personal prediction exists only when neighbours rated this title (`predict` / strip Rec with real overlap). */
 function hasPersonalPrediction(pred) {
   if (!pred) return false;
-  return Number(pred.neighborCount ?? 0) >= 1;
+  return Number(pred.neighborCount ?? pred.neighbor_count ?? 0) >= 1;
+}
+
+/** Edge `Rec` rows may use `neighbor_count` (snake_case) in JSON — strips + Your Picks sort must match. */
+function recNeighborCount(rec) {
+  if (!rec || typeof rec !== "object") return 0;
+  return Number(rec.neighborCount ?? rec.neighbor_count ?? 0);
 }
 
 /**
@@ -365,7 +375,8 @@ function buildWatchlistFromRows(watchlistData, catalogue) {
     const id = `${w.media_type}-${w.tmdb_id}`;
     const base = movieMap[id] || { id, tmdbId: w.tmdb_id, type: w.media_type, title: w.title, poster: w.poster };
     const poster = normalizeWatchlistPosterUrl(base.poster);
-    return { ...base, poster: poster ?? base.poster };
+    const fromGroup = w.source_circle_id != null;
+    return { ...base, poster: poster ?? base.poster, fromGroup };
   }).filter(Boolean);
 }
 
@@ -428,26 +439,6 @@ function withinPastDays(dateString, days) {
   if (!Number.isFinite(thenMs)) return false;
   const ageMs = Date.now() - thenMs;
   return ageMs >= 0 && ageMs <= days * 24 * 60 * 60 * 1000;
-}
-
-/**
- * V1.3.1: “In theaters” pill guard — TMDB `now_playing` can include legacy titles (re-runs, data quirks)
- * while `movie.year` / `releaseDate` stay the original theatrical date. Hide the pill when that metadata
- * is clearly not a current run.
- */
-function qualifiesForTheatricalPillMovie(movie) {
-  const cy = new Date().getFullYear();
-  const y = Number.parseInt(String(movie?.year ?? ""), 10);
-  if (Number.isFinite(y) && y < cy - 2) return false;
-  const rd = movie?.releaseDate;
-  if (typeof rd === "string" && rd.length >= 10) {
-    const t = Date.parse(rd.slice(0, 10));
-    if (Number.isFinite(t)) {
-      const twoYearsMs = 730 * 24 * 60 * 60 * 1000;
-      if (Date.now() - t > twoYearsMs) return false;
-    }
-  }
-  return true;
 }
 
 async function fetchTvDetailsById(ids = []) {
@@ -1414,13 +1405,16 @@ function tmdbOnlyRec(movie) {
 
 /** One strip row from `match` `predict_cached` / `predict` `predictions` map (aligns with personal-score product rule). */
 function recFromMatchPrediction(movie, pred) {
-  const n = pred?.neighborCount ?? 0;
-  if (pred && typeof pred.predicted === "number" && n >= 1) {
+  const n = Number(pred?.neighborCount ?? pred?.neighbor_count ?? 0);
+  const predN = Number(pred?.predicted);
+  if (pred && typeof pred === "object" && Number.isFinite(predN) && n >= 1) {
+    const lowRaw = Number(pred.low);
+    const highRaw = Number(pred.high);
     return {
       movie,
-      predicted: pred.predicted,
-      low: typeof pred.low === "number" ? pred.low : Math.max(1, Math.round((pred.predicted - 1) * 10) / 10),
-      high: typeof pred.high === "number" ? pred.high : Math.min(10, Math.round((pred.predicted + 1) * 10) / 10),
+      predicted: predN,
+      low: Number.isFinite(lowRaw) ? lowRaw : Math.max(1, Math.round((predN - 1) * 10) / 10),
+      high: Number.isFinite(highRaw) ? highRaw : Math.min(10, Math.round((predN + 1) * 10) / 10),
       confidence: pred.confidence ?? "low",
       neighborCount: n,
     };
@@ -1432,7 +1426,7 @@ function recsFromPredictionMap(movies, predictions) {
   if (!movies?.length) return [];
   const predMap = predictions && typeof predictions === "object" ? predictions : {};
   return movies
-    .map((m) => recFromMatchPrediction(m, predMap[m.id] ?? null))
+    .map((m) => recFromMatchPrediction(m, predictionMapLookup(predMap, m.id) ?? null))
     .sort((a, b) => b.predicted - a.predicted);
 }
 
@@ -1440,7 +1434,106 @@ function recsFromPredictionMap(movies, predictions) {
 function recsFromPredictionMapInOrder(movies, predictions) {
   if (!movies?.length) return [];
   const predMap = predictions && typeof predictions === "object" ? predictions : {};
-  return movies.map((m) => recFromMatchPrediction(m, predMap[m.id] ?? null));
+  return movies.map((m) => recFromMatchPrediction(m, predictionMapLookup(predMap, m.id) ?? null));
+}
+
+/**
+ * Edge `predict_cached` returns a `predictions` map that includes **null** entries for titles with
+ * no neighbor raters. Spreading that map over cache would wipe good rows — merge only real preds.
+ */
+function mergeNonNullPredictions(base, fromEdge) {
+  const out = { ...base };
+  if (!fromEdge || typeof fromEdge !== "object") return out;
+  for (const [k, v] of Object.entries(fromEdge)) {
+    if (v == null || typeof v !== "object") continue;
+    const predicted = Number(v.predicted);
+    if (!Number.isFinite(predicted)) continue;
+    const neighborCount = Number(v.neighborCount ?? v.neighbor_count ?? 0);
+    out[k] = {
+      ...v,
+      predicted,
+      neighborCount: Number.isFinite(neighborCount) ? neighborCount : 0,
+    };
+  }
+  return out;
+}
+
+/** `predictions` maps use catalogue ids (`movie-123`); avoid missed lookups from type coercion. */
+function predictionMapLookup(map, movieId) {
+  if (map == null || movieId == null || typeof map !== "object") return undefined;
+  const hit = map[movieId];
+  if (hit != null) return hit;
+  return map[String(movieId)];
+}
+
+/**
+ * `supabase.functions.invoke` usually returns parsed JSON; occasionally `data` is a string or wrapped.
+ * Without this, `data?.recommendations` stays empty even when the Edge body is valid.
+ */
+function unwrapMatchFunctionData(raw) {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    try {
+      return unwrapMatchFunctionData(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw !== "object") return null;
+  if (
+    "recommendations" in raw ||
+    "worthALookRecs" in raw ||
+    "predictions" in raw ||
+    "prediction" in raw ||
+    "scored" in raw
+  ) {
+    return raw;
+  }
+  if (raw.data != null && typeof raw.data === "object") {
+    return unwrapMatchFunctionData(raw.data);
+  }
+  return raw;
+}
+
+function logMatchInvokeFailure(label, result) {
+  const err = result?.error;
+  if (!err) return;
+  const msg = err.message ?? String(err);
+  const body = result?.data;
+  const extra =
+    body && typeof body === "object" && body !== null && "error" in body ? body.error : "";
+  console.warn(`[match invoke] ${label}:`, msg, extra !== "" ? extra : "");
+}
+
+/** Single-title `predict_cached` may return `prediction: null` while `predictions[id]` is set (Edge batch shape). */
+function predictionFromMatchPredictCachedData(data, movieId) {
+  if (!data || typeof data !== "object") return null;
+  const top = data.prediction;
+  if (top != null && typeof top === "object") return top;
+  const map = data.predictions;
+  if (map && typeof map === "object" && movieId != null) {
+    let v = map[movieId];
+    if (v == null) v = map[String(movieId)];
+    if (v != null && typeof v === "object") return v;
+  }
+  return null;
+}
+
+/** Normalize Edge / cache payload so `hasPersonalPrediction` and detail UI see `neighborCount`. */
+function normalizeDetailPredictionPayload(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const predicted = Number(raw.predicted);
+  if (!Number.isFinite(predicted)) return null;
+  const nc = Number(raw.neighborCount ?? raw.neighbor_count ?? 0);
+  const lowRaw = Number(raw.low);
+  const highRaw = Number(raw.high);
+  return {
+    predicted,
+    low: Number.isFinite(lowRaw) ? lowRaw : Math.max(1, Math.round((predicted - 1) * 10) / 10),
+    high: Number.isFinite(highRaw) ? highRaw : Math.min(10, Math.round((predicted + 1) * 10) / 10),
+    confidence: raw.confidence ?? "low",
+    neighborCount: nc,
+  };
 }
 
 /** Supabase recovery sessions: JWT `amr` includes recovery (string or { method }) until `updateUser({ password })` runs. */
@@ -2125,6 +2218,7 @@ const styles = `
   .settings-genre-action-btn { background:#1a1a1a; color:#888; border:1px solid #2a2a2a; padding:8px 14px; font-size:12px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.2s; }
   .settings-genre-action-btn:hover { border-color:#555; color:#ccc; }
   .profile-watchlist-section { padding:0 0 8px; }
+  .wl-from-group { font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#6a6a6a; margin-top:4px; font-weight:600; }
   .stat-box { background:#141414; border:1px solid #1e1e1e; border-radius:12px; padding:16px; text-align:center; }
   .stat-box-clickable { cursor:pointer; transition:border-color 0.2s, background 0.2s; }
   .stat-box-clickable:hover { border-color:#333; background:#181818; }
@@ -2790,7 +2884,7 @@ export default function App() {
   const [streamingMoviesReady, setStreamingMoviesReady] = useState(false);
   const [streamingTvReady, setStreamingTvReady] = useState(false);
   const [whatsHot, setWhatsHot] = useState([]);
-  const [whatsHotReady, setWhatsHotReady] = useState(false);
+  const [_whatsHotReady, setWhatsHotReady] = useState(false);
   const [pulseTrending, setPulseTrending] = useState([]);
   const [pulsePopular, setPulsePopular] = useState([]);
   const [pulseCatalogReady, setPulseCatalogReady] = useState(false);
@@ -3390,19 +3484,6 @@ export default function App() {
     return inTheatersPagePopularForRecs.map((m) => tmdbOnlyRec(m));
   }, [matchData?.inTheatersPagePopularRecs, inTheatersPagePopularForRecs]);
 
-  /** Theatrical titles (now playing ∪ popularity row after profile filter) — “In theaters” pill on What’s hot. */
-  const inTheaterPoolForRecs = useMemo(() => {
-    const byId = new Map();
-    for (const m of inTheatersForRecs) byId.set(m.id, m);
-    for (const m of inTheatersPagePopularForRecs) byId.set(m.id, m);
-    return [...byId.values()];
-  }, [inTheatersForRecs, inTheatersPagePopularForRecs]);
-
-  const inTheaterIdsForWhatsHotPill = useMemo(
-    () => new Set(inTheaterPoolForRecs.map((m) => m.id)),
-    [inTheaterPoolForRecs],
-  );
-
   /** V1.3.2: All secondary-market titles (for recMap, TV meta, cold-start CTA). */
   const secondaryStripCatalogRows = useMemo(
     () => dedupeMediaRowsById([...secondaryTheaterRows, ...secondaryStreamingMovieRows, ...secondaryStreamingTvRows]),
@@ -3515,31 +3596,191 @@ export default function App() {
       .map((m) => byId[m.id] ?? tmdbOnlyRec(m));
   }, [secondaryActiveRawRows, secondaryStripRecsResolved]);
 
-  /** Collaborative filtering runs in Edge Function `match` (neighbour ratings loaded server-side; not in the client bundle). */
+  /**
+   * Global CF hydration: `your_picks_page` + optional `predict_cached` overlay for rec ids.
+   * **Not** gated on `screen` — Discover / In Theaters / etc. used to skip this entirely, so the
+   * Network tab showed only `predict_cached` (strips + detail) and `recommendations` / overlays never filled.
+   *
+   * **Catalogue:** prefer `catalogueForRecs` (profile + secondary merge, v5.3.0). If filters make it
+   * empty while bootstrap `catalogue` still has titles, fall back — otherwise the effect never runs.
+   */
   useEffect(() => {
     if (!user) {
       setMatchData(null);
       setMatchLoading(false);
       return;
     }
+    const hasRatings = Object.keys(userRatings).length > 0;
+    const catalogueForMatch =
+      Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0
+        ? catalogueForRecs
+        : Array.isArray(catalogue) && catalogue.length > 0
+          ? catalogue
+          : [];
+    const hasCatalogue = catalogueForMatch.length > 0;
+    if (!hasRatings || !hasCatalogue) {
+      setMatchLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setMatchLoading(true);
     const t = setTimeout(async () => {
+      try {
+        const yourPicksResult = await invokeMatch({
+          action: "your_picks_page",
+          userRatings,
+          catalogue: catalogueForMatch,
+          topPickOffset,
+        });
+        let data = unwrapMatchFunctionData(yourPicksResult.data);
+        let { error } = yourPicksResult;
+        if (error) {
+          logMatchInvokeFailure("your_picks_page", yourPicksResult);
+          const msg = String(error?.message ?? "");
+          const shouldFallBack = /Unknown action|not found|404/i.test(msg);
+          console.warn("match your_picks_page:", msg);
+          if (shouldFallBack) {
+            const ro = await invokeMatch({
+              action: "recommendations_only",
+              userRatings,
+              catalogue: catalogueForMatch,
+              topPickOffset,
+            });
+            data = unwrapMatchFunctionData(ro.data);
+            error = ro.error;
+            if (error) {
+              const msg2 = String(error?.message ?? "");
+              const shouldUseLegacyFull = /Unknown action|not found|404/i.test(msg2);
+              console.warn("match recommendations_only:", msg2);
+              if (shouldUseLegacyFull) {
+                const full = await invokeMatch({
+                  action: "full",
+                  omitStripRecs: true,
+                  userRatings,
+                  catalogue: catalogueForMatch,
+                  inTheaters: inTheatersForRecs,
+                  streamingMovies: streamingMoviesForRecs,
+                  streamingTV: streamingTVForRecs,
+                  topPickOffset,
+                });
+                data = unwrapMatchFunctionData(full.data);
+                error = full.error;
+              } else {
+                error = null;
+                data = { recommendations: [], worthALookRecs: [] };
+              }
+            }
+          }
+        }
+        if (cancelled) return;
+        if (error) {
+          console.warn("match function fallback full:", error.message);
+          setMatchData((prev) => {
+            if (
+              prev &&
+              typeof prev === "object" &&
+              (prev.theaterRecs?.length ||
+                prev.whatsHotRecs?.length ||
+                prev.pulseTrendingRecs?.length ||
+                prev.pulsePopularRecs?.length ||
+                prev.inTheatersPagePopularRecs?.length ||
+                prev.streamingMovieRecs?.length ||
+                prev.streamingTvRecs?.length ||
+                prev.secondaryRecs?.length)
+            ) {
+              return prev;
+            }
+            return null;
+          });
+          return;
+        }
+        const nextRecs = Array.isArray(data?.recommendations) ? data.recommendations : [];
+        const nextWorth = Array.isArray(data?.worthALookRecs) ? data.worthALookRecs : [];
+        const nextPredictions =
+          data?.predictions && typeof data.predictions === "object" ? data.predictions : null;
+        let mergedYourPicksPredictions =
+          nextPredictions && typeof nextPredictions === "object" ? { ...nextPredictions } : {};
+
+        if (cancelled) return;
+        const overlayIds = new Set();
+        for (const r of nextRecs) if (r?.movie?.id) overlayIds.add(r.movie.id);
+        for (const r of nextWorth) if (r?.movie?.id) overlayIds.add(r.movie.id);
+        const idList = [...overlayIds].slice(0, YOUR_PICKS_PREDICT_CACHED_CAP);
+        if (idList.length > 0) {
+          const predResult = await invokeMatch({
+            action: "predict_cached",
+            userRatings,
+            titles: idList,
+          });
+          const predPayload = unwrapMatchFunctionData(predResult.data);
+          const predErr = predResult.error;
+          if (predErr) logMatchInvokeFailure("predict_cached (your picks overlay)", predResult);
+          if (
+            !cancelled &&
+            !predErr &&
+            predPayload?.predictions &&
+            typeof predPayload.predictions === "object"
+          ) {
+            mergedYourPicksPredictions = mergeNonNullPredictions(
+              mergedYourPicksPredictions,
+              predPayload.predictions,
+            );
+          }
+        }
+
+        if (cancelled) return;
+        setMatchData((prev) => ({
+          ...(prev && typeof prev === "object" ? prev : {}),
+          recommendations: nextRecs,
+          worthALookRecs: nextWorth,
+          /** Always set (even `{}`) so stale id→pred entries cannot overlay the wrong strip after a refresh. */
+          yourPicksPredictions: mergedYourPicksPredictions,
+        }));
+      } catch (e) {
+        if (!cancelled) console.error(e);
+      } finally {
+        if (!cancelled) setMatchLoading(false);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+      setMatchLoading(false);
+    };
+  }, [
+    user,
+    userRatings,
+    catalogue,
+    catalogueForRecs,
+    topPickOffset,
+    inTheatersForRecs,
+    streamingMoviesForRecs,
+    streamingTVForRecs,
+  ]);
+
+  /** Page-local `predict_cached` for strips on the active screen only (no `your_picks_page` here). */
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
       const hasRatings = Object.keys(userRatings).length > 0;
-      const hasCatalogue = Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0;
 
       async function predictStripThenMerge(movieRows, matchKey, preserveTmdbOrder = false) {
         const ids = movieRows.map((m) => m.id).filter(Boolean);
         if (ids.length === 0 || !hasRatings) return;
-        const { data: predData, error: predErr } = await invokeMatch({
+        const predResult = await invokeMatch({
           action: "predict_cached",
           userRatings,
           titles: ids,
         });
-        if (cancelled || predErr || !predData?.predictions) return;
+        const predPayload = unwrapMatchFunctionData(predResult.data);
+        const predErr = predResult.error;
+        if (predErr) logMatchInvokeFailure(`predict_cached (${matchKey})`, predResult);
+        if (cancelled || predErr || !predPayload?.predictions) return;
         const recs = preserveTmdbOrder
-          ? recsFromPredictionMapInOrder(movieRows, predData.predictions)
-          : recsFromPredictionMap(movieRows, predData.predictions);
+          ? recsFromPredictionMapInOrder(movieRows, predPayload.predictions)
+          : recsFromPredictionMap(movieRows, predPayload.predictions);
         setMatchData((prev) => ({
           ...(prev && typeof prev === "object" ? prev : {}),
           [matchKey]: recs,
@@ -3547,8 +3788,6 @@ export default function App() {
       }
 
       try {
-        // Page-local predict: only run predict_cached for strips the current screen actually renders.
-        // Keeps routes independent and avoids ~1–2s of sequential round-trips on unrelated pages.
         if (screen === "in-theaters") {
           await predictStripThenMerge(inTheatersForRecs, "theaterRecs", true);
           await predictStripThenMerge(inTheatersPagePopularForRecs, "inTheatersPagePopularRecs", true);
@@ -3564,130 +3803,17 @@ export default function App() {
           await predictStripThenMerge(streamingMoviesForRecs, "streamingMovieRecs");
           await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
         }
-
-        if (screen === "your-picks" && hasRatings && hasCatalogue) {
-          // v4.0.7: One combined Edge round-trip (`your_picks_page`) replaces the prior two
-          // sequential calls (`recommendations_only` → `predict_cached` over rec IDs). The server
-          // parallelizes `runRecommendationsOnly` + a bulk cached-prediction read, so the overlay
-          // ships in the same response. Legacy fallbacks preserved in case the old Edge is still
-          // deployed when a new client hits it.
-          let { data, error } = await invokeMatch({
-            action: "your_picks_page",
-            userRatings,
-            catalogue: catalogueForRecs,
-            topPickOffset,
-          });
-          let usedLegacyPath = false;
-          if (error) {
-            const msg = String(error?.message ?? "");
-            const shouldFallBack = /Unknown action|not found|404/i.test(msg);
-            console.warn("match your_picks_page:", msg);
-            if (shouldFallBack) {
-              usedLegacyPath = true;
-              ({ data, error } = await invokeMatch({
-                action: "recommendations_only",
-                userRatings,
-                catalogue: catalogueForRecs,
-                topPickOffset,
-              }));
-              if (error) {
-                const msg2 = String(error?.message ?? "");
-                const shouldUseLegacyFull = /Unknown action|not found|404/i.test(msg2);
-                console.warn("match recommendations_only:", msg2);
-                if (shouldUseLegacyFull) {
-                  ({ data, error } = await invokeMatch({
-                    action: "full",
-                    omitStripRecs: true,
-                    userRatings,
-                    catalogue: catalogueForRecs,
-                    inTheaters: inTheatersForRecs,
-                    streamingMovies: streamingMoviesForRecs,
-                    streamingTV: streamingTVForRecs,
-                    topPickOffset,
-                  }));
-                } else {
-                  error = null;
-                  data = { recommendations: [], worthALookRecs: [] };
-                }
-              }
-            } else {
-              error = null;
-              data = { recommendations: [], worthALookRecs: [] };
-            }
-          }
-          if (cancelled) return;
-          if (error) {
-            console.warn("match function fallback full:", error.message);
-            setMatchData((prev) => {
-              if (
-                prev &&
-                typeof prev === "object" &&
-                (prev.theaterRecs?.length ||
-                  prev.whatsHotRecs?.length ||
-                  prev.pulseTrendingRecs?.length ||
-                  prev.pulsePopularRecs?.length ||
-                  prev.inTheatersPagePopularRecs?.length ||
-                  prev.streamingMovieRecs?.length ||
-                  prev.streamingTvRecs?.length ||
-                  prev.secondaryRecs?.length)
-              ) {
-                return prev;
-              }
-              return null;
-            });
-            return;
-          }
-          const nextRecs = Array.isArray(data?.recommendations) ? data.recommendations : [];
-          const nextWorth = Array.isArray(data?.worthALookRecs) ? data.worthALookRecs : [];
-          const nextPredictions =
-            data?.predictions && typeof data.predictions === "object" ? data.predictions : null;
-          if (nextRecs.length > 0 || nextWorth.length > 0 || nextPredictions) {
-            setMatchData((prev) => ({
-              ...(prev && typeof prev === "object" ? prev : {}),
-              ...(nextRecs.length > 0 ? { recommendations: nextRecs } : {}),
-              ...(nextWorth.length > 0 ? { worthALookRecs: nextWorth } : {}),
-              ...(nextPredictions ? { yourPicksPredictions: nextPredictions } : {}),
-            }));
-          }
-
-          // Legacy-fallback overlay path: old Edge (without `your_picks_page`) returns no
-          // `predictions`, so we re-issue the bounded `predict_cached` call like v4.0.6. Modern
-          // Edge already returns overlays inline above and skips this.
-          if (usedLegacyPath && !nextPredictions) {
-            const yourPicksIds = new Set();
-            for (const r of nextRecs) if (r?.movie?.id) yourPicksIds.add(r.movie.id);
-            for (const r of nextWorth) if (r?.movie?.id) yourPicksIds.add(r.movie.id);
-            const idList = [...yourPicksIds];
-            if (idList.length > 0) {
-              const { data: predData, error: predErr } = await invokeMatch({
-                action: "predict_cached",
-                userRatings,
-                titles: idList,
-              });
-              if (!cancelled && !predErr && predData?.predictions) {
-                setMatchData((prev) => ({
-                  ...(prev && typeof prev === "object" ? prev : {}),
-                  yourPicksPredictions: predData.predictions,
-                }));
-              }
-            }
-          }
-        }
       } catch (e) {
         if (!cancelled) console.error(e);
-      } finally {
-        if (!cancelled) setMatchLoading(false);
       }
     }, 350);
     return () => {
       cancelled = true;
       clearTimeout(t);
-      setMatchLoading(false);
     };
   }, [
     user,
     userRatings,
-    catalogueForRecs,
     inTheatersForRecs,
     inTheatersPagePopularForRecs,
     pulseTrendingForRecs,
@@ -3695,7 +3821,6 @@ export default function App() {
     streamingMoviesForRecs,
     streamingTVForRecs,
     secondaryStripCatalogRows,
-    topPickOffset,
     screen,
   ]);
 
@@ -4301,21 +4426,26 @@ export default function App() {
     return mixed.slice(0, ONBOARDING_COUNT);
   }, [obCatalogue, otherCinema]);
 
-  const rawRecommendations = matchData?.recommendations ?? EMPTY_MATCH_RECS;
+  /** When `matchData.recommendations` is `[]`, we must use it — not fall back to sticky (that hid empty CF and broke “predicted first” sort). */
+  const rawRecommendations = matchData?.recommendations;
   const stickyRecommendationsRef = useRef([]);
   useEffect(() => {
     if (!user) {
       stickyRecommendationsRef.current = [];
       return;
     }
-    if (Array.isArray(rawRecommendations) && rawRecommendations.length > 0) {
-      stickyRecommendationsRef.current = rawRecommendations;
+    const r = matchData?.recommendations;
+    if (Array.isArray(r) && r.length > 0) {
+      stickyRecommendationsRef.current = r;
+    } else if (Array.isArray(r) && r.length === 0) {
+      stickyRecommendationsRef.current = [];
     }
-  }, [user, rawRecommendations]);
-  const baseRecommendations =
-    Array.isArray(rawRecommendations) && rawRecommendations.length > 0
-      ? rawRecommendations
-      : stickyRecommendationsRef.current;
+  }, [user, matchData?.recommendations]);
+  const baseRecommendations = Array.isArray(rawRecommendations)
+    ? rawRecommendations
+    : stickyRecommendationsRef.current.length > 0
+      ? stickyRecommendationsRef.current
+      : EMPTY_MATCH_RECS;
 
   /**
    * Overlay `matchData.yourPicksPredictions` (from Your Picks `predict_cached` pass) onto a rec list so each
@@ -4328,9 +4458,9 @@ export default function App() {
       if (!predMap || typeof predMap !== "object" || !recs?.length) return recs;
       return recs.map((r) => {
         if (!r?.movie?.id) return r;
-        if (Number(r.neighborCount ?? 0) >= 1) return r;
-        const pred = predMap[r.movie.id];
-        if (!pred || Number(pred.neighborCount ?? 0) < 1) return r;
+        if (recNeighborCount(r) >= 1) return r;
+        const pred = predictionMapLookup(predMap, r.movie.id);
+        if (!pred || Number(pred.neighborCount ?? pred.neighbor_count ?? 0) < 1) return r;
         return recFromMatchPrediction(r.movie, pred);
       });
     },
@@ -4456,17 +4586,17 @@ export default function App() {
     }
     const all = [...primary, ...extras];
     const predicted = all
-      .filter((r) => Number(r?.neighborCount ?? 0) >= 1)
+      .filter((r) => recNeighborCount(r) >= 1)
       .sort((a, b) => b.predicted - a.predicted);
     const unpredicted = all
-      .filter((r) => Number(r?.neighborCount ?? 0) < 1)
+      .filter((r) => recNeighborCount(r) < 1)
       .sort((a, b) => b.predicted - a.predicted);
     return [...predicted, ...unpredicted];
   }, [recommendations, yourPicksFallbackPool]);
 
   /** First index in `yourPicksStripSorted` without `neighborCount ≥ 1`. Used for partition-aware rotation. */
   const yourPicksPredictedCount = useMemo(
-    () => yourPicksStripSorted.findIndex((r) => Number(r?.neighborCount ?? 0) < 1),
+    () => yourPicksStripSorted.findIndex((r) => recNeighborCount(r) < 1),
     [yourPicksStripSorted],
   );
 
@@ -4673,6 +4803,66 @@ export default function App() {
     return () => { cancelled = true; };
   }, [theaterRecs, streamingRecs, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, moreForYouStrip, worthLookStrip]);
 
+  const discoverItems = useMemo(() => {
+    let base;
+    if (appliedSearchQuery.length >= 2) base = searchResults;
+    else base = catalogue.filter(m => activeFilter === "All" ? true : activeFilter === "Movies" ? m.type === "movie" : m.type === "tv");
+    // Discover should surface fresher releases first; undated rows stay at the tail.
+    return [...base].sort((a, b) => {
+      const ay = Number.parseInt(a?.year || "", 10);
+      const by = Number.parseInt(b?.year || "", 10);
+      const aValid = Number.isFinite(ay);
+      const bValid = Number.isFinite(by);
+      if (aValid && bValid) return by - ay; // latest first
+      if (aValid) return -1;
+      if (bValid) return 1;
+      return 0;
+    });
+  }, [catalogue, appliedSearchQuery, searchResults, activeFilter]);
+
+  /** `predict_cached` overlay for Discover grid (cap keeps Edge bounded); merged into `recMap` below. */
+  const discoverRecsResolved = useMemo(() => {
+    const fromMatch = matchData?.discoverRecs;
+    if (fromMatch?.length) {
+      const byId = Object.fromEntries(fromMatch.map((r) => [r.movie.id, r]));
+      return discoverItems.map((m) => byId[m.id] ?? tmdbOnlyRec(m));
+    }
+    return discoverItems.map((m) => tmdbOnlyRec(m));
+  }, [matchData?.discoverRecs, discoverItems]);
+
+  useEffect(() => {
+    if (!user || screen !== "discover") return;
+    const hasRatings = Object.keys(userRatings).length > 0;
+    if (!hasRatings) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const rows = discoverItems.slice(0, DISCOVER_PREDICT_CACHED_CAP);
+      if (rows.length === 0) return;
+      try {
+        const predResult = await invokeMatch({
+          action: "predict_cached",
+          userRatings,
+          titles: rows.map((m) => m.id).filter(Boolean),
+        });
+        const predPayload = unwrapMatchFunctionData(predResult.data);
+        const predErr = predResult.error;
+        if (predErr) logMatchInvokeFailure("predict_cached (discover)", predResult);
+        if (cancelled || predErr || !predPayload?.predictions) return;
+        const recs = recsFromPredictionMapInOrder(rows, predPayload.predictions);
+        setMatchData((prev) => ({
+          ...(prev && typeof prev === "object" ? prev : {}),
+          discoverRecs: recs,
+        }));
+      } catch (e) {
+        if (!cancelled) console.error(e);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [user, userRatings, screen, discoverItems]);
+
   const recMap = useMemo(() => ({
     ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingMovieRecsResolved.map(r => [r.movie.id, r])),
@@ -4686,7 +4876,8 @@ export default function App() {
     ...Object.fromEntries(moreForYouStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(worthLookStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
-  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations]);
+    ...Object.fromEntries(discoverRecsResolved.map((r) => [r.movie.id, r])),
+  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations, discoverRecsResolved]);
   const FILTERS = ["All", "Movies", "TV Shows"];
   const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
@@ -4708,23 +4899,6 @@ export default function App() {
       </div>
     );
   }
-
-  const discoverItems = useMemo(() => {
-    let base;
-    if (appliedSearchQuery.length >= 2) base = searchResults;
-    else base = catalogue.filter(m => activeFilter === "All" ? true : activeFilter === "Movies" ? m.type === "movie" : m.type === "tv");
-    // Discover should surface fresher releases first; undated rows stay at the tail.
-    return [...base].sort((a, b) => {
-      const ay = Number.parseInt(a?.year || "", 10);
-      const by = Number.parseInt(b?.year || "", 10);
-      const aValid = Number.isFinite(ay);
-      const bValid = Number.isFinite(by);
-      if (aValid && bValid) return by - ay; // latest first
-      if (aValid) return -1;
-      if (bValid) return 1;
-      return 0;
-    });
-  }, [catalogue, appliedSearchQuery, searchResults, activeFilter]);
 
   const cinemastroTitleKeysData = useMemo(() => {
     const s = new Set();
@@ -5069,11 +5243,6 @@ export default function App() {
   /** v3.2.1: Navigate immediately; fetch `predict` in background and show skeleton until settled. */
   function openDetail(movie, prediction, opts = {}) {
     const pred = prediction ?? null;
-    const needsPredict = Boolean(
-      user &&
-      Object.keys(userRatings).length > 0 &&
-      (!pred || Number(pred.neighborCount ?? 0) === 0),
-    );
     detailReturnScreenRef.current = screenRef.current;
     // Distinct URL per detail step so iOS edge-swipe / Mac trackpad back can popstate (v2.1.0). Community avg on detail from v3.0.0 RPC.
     if (opts.skipHistoryPush) {
@@ -5082,7 +5251,8 @@ export default function App() {
       history.pushState({ cinemastroDetail: true }, "", spaUrlForOverlay({ detail: movie.id }));
       detailHistoryPushedRef.current = true;
     }
-    setSelected({ movie, prediction: pred, predictionLoading: needsPredict });
+    // Show skeleton until we know session + whether to call Edge — `user` from React can lag `getSession()` after refresh.
+    setSelected({ movie, prediction: pred, predictionLoading: true });
     void refreshCinemastroAvgForMediaId(movie.id);
     if (opts.startEditing && userRatings[movie.id] != null) {
       setDetailEditRating(true);
@@ -5094,24 +5264,46 @@ export default function App() {
       setDetailTouched(false);
     }
     setScreen("detail");
-    if (needsPredict) {
-      const movieId = movie.id;
-      void (async () => {
-        try {
-          const { data, error } = await invokeMatch({ action: "predict_cached", userRatings, movieId });
-          const nextPred = !error && data?.prediction ? data.prediction : null;
+    const movieId = movie.id;
+    void (async () => {
+      try {
+        const { data: sessWrap } = await supabase.auth.getSession();
+        const sessionUser = sessWrap?.session?.user ?? null;
+        const hasRatings = Object.keys(userRatings).length > 0;
+        const neighborN = Number(pred?.neighborCount ?? pred?.neighbor_count ?? 0);
+        const alreadyHaveCf =
+          pred != null &&
+          neighborN >= 1 &&
+          normalizeDetailPredictionPayload(pred) != null;
+        const needsPredict = Boolean(sessionUser) && hasRatings && !alreadyHaveCf;
+
+        if (!needsPredict) {
           setSelected((prev) => {
             if (!prev || prev.movie?.id !== movieId) return prev;
+            const nextPred =
+              pred != null ? (normalizeDetailPredictionPayload(pred) ?? pred) : null;
             return { ...prev, prediction: nextPred, predictionLoading: false };
           });
-        } catch {
-          setSelected((prev) => {
-            if (!prev || prev.movie?.id !== movieId) return prev;
-            return { ...prev, prediction: null, predictionLoading: false };
-          });
+          return;
         }
-      })();
-    }
+
+        const result = await invokeMatch({ action: "predict_cached", userRatings, movieId });
+        const { data, error } = result;
+        if (error) logMatchInvokeFailure("predict_cached (detail)", result);
+        const raw = !error ? predictionFromMatchPredictCachedData(data, movieId) : null;
+        const nextPred = normalizeDetailPredictionPayload(raw);
+        setSelected((prev) => {
+          if (!prev || prev.movie?.id !== movieId) return prev;
+          return { ...prev, prediction: nextPred, predictionLoading: false };
+        });
+      } catch (e) {
+        console.warn("[match invoke] predict_cached (detail) threw:", e);
+        setSelected((prev) => {
+          if (!prev || prev.movie?.id !== movieId) return prev;
+          return { ...prev, prediction: null, predictionLoading: false };
+        });
+      }
+    })();
   }
 
   function goBack() {
@@ -5738,16 +5930,33 @@ export default function App() {
 
   async function toggleWatchlist(movie) {
     const alreadySaved = watchlist.find(m => m.id === movie.id);
-    setWatchlist(w => alreadySaved ? w.filter(m => m.id !== movie.id) : [...w, movie]);
+    const fromCircleContext =
+      detailReturnScreenRef.current === "circle-detail" && selectedCircleId;
+    const sourceCircleId = fromCircleContext ? selectedCircleId : null;
+    setWatchlist((w) =>
+      alreadySaved
+        ? w.filter((m) => m.id !== movie.id)
+        : [...w, { ...movie, fromGroup: Boolean(sourceCircleId) }],
+    );
     if (user) {
       const [type, tmdbId] = movie.id.split("-");
       if (alreadySaved) {
         await supabase.from("watchlist").delete().eq("user_id", user.id).eq("tmdb_id", parseInt(tmdbId)).eq("media_type", type);
       } else {
-        await supabase.from("watchlist").insert({ user_id: user.id, tmdb_id: parseInt(tmdbId), media_type: type, title: movie.title, poster: movie.poster });
+        const row = {
+          user_id: user.id,
+          tmdb_id: parseInt(tmdbId),
+          media_type: type,
+          title: movie.title,
+          poster: movie.poster,
+        };
+        if (sourceCircleId) row.source_circle_id = sourceCircleId;
+        await supabase.from("watchlist").insert(row);
         setTimeout(() => goBack(), 1000);
       }
-    } else if (!alreadySaved) { setTimeout(() => goBack(), 1000); }
+    } else if (!alreadySaved) {
+      setTimeout(() => goBack(), 1000);
+    }
   }
 
   function toggleMoodOption(cardId, optionId) {
@@ -7120,7 +7329,7 @@ export default function App() {
                         <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                           <div className="strip-poster">
                             {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                            <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                            <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                           </div>
                           <div className="strip-title">{rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7144,7 +7353,7 @@ export default function App() {
                         <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                           <div className="strip-poster">
                             {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                            <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                            <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                           </div>
                           <div className="strip-title">{rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7196,7 +7405,7 @@ export default function App() {
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
                         {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
                       <div className="strip-title">{rec.movie.title}</div>
                       <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7224,7 +7433,7 @@ export default function App() {
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
                         {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
                       <div className="strip-title">{rec.movie.title}</div>
                       <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7284,7 +7493,7 @@ export default function App() {
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
                         {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
                       <div className="strip-title">{rec.movie.title}</div>
                       <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7312,7 +7521,7 @@ export default function App() {
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
                         {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                        <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
                       <div className="strip-title">{rec.movie.title}</div>
                       <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7381,7 +7590,7 @@ export default function App() {
                           >
                             {row.kind === "pick" ? "✨" : "📈"}
                           </span>
-                          <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={row.rec.neighborCount} />
+                          <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={recNeighborCount(row.rec)} />
                         </div>
                         <div className="strip-title">{row.rec.movie.title}</div>
                         <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7424,7 +7633,7 @@ export default function App() {
                           >
                             {row.kind === "pick" ? "✨" : "📈"}
                           </span>
-                          <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={row.rec.neighborCount} />
+                          <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={recNeighborCount(row.rec)} />
                         </div>
                         <div className="strip-title">{row.rec.movie.title}</div>
                         <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7534,7 +7743,7 @@ export default function App() {
                         <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                           <div className="strip-poster">
                             {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} /> : <div className="strip-poster-fallback">🎬</div>}
-                            <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={rec.neighborCount} />
+                            <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                           </div>
                           <div className="strip-title">{rec.movie.title}</div>
                           <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7673,7 +7882,7 @@ export default function App() {
               {discoverItems.map(m => {
                 const rec = recMap[m.id];
                 const myRating = userRatings[m.id];
-                const discBd = stripBadgeDisplay(m, myRating, rec?.predicted ?? null, cinemastroAvgByKey, rec?.neighborCount ?? 0);
+                const discBd = stripBadgeDisplay(m, myRating, rec?.predicted ?? null, cinemastroAvgByKey, recNeighborCount(rec));
                 const discMeter =
                   discBd.pillClass === "strip-badge--cinemastro" &&
                   discBd.cinemastroCount != null &&
@@ -7789,7 +7998,7 @@ export default function App() {
                     <div className="mood-result-overlay" />
                     <div className="mood-result-type">{rec.movie.type === "movie" ? "Movie" : "TV"}</div>
                     {(() => {
-                      const mbd = stripBadgeDisplay(rec.movie, userRatings[rec.movie.id], rec.predicted, cinemastroAvgByKey, rec.neighborCount);
+                      const mbd = stripBadgeDisplay(rec.movie, userRatings[rec.movie.id], rec.predicted, cinemastroAvgByKey, recNeighborCount(rec));
                       const moodMeter =
                         mbd.pillClass === "strip-badge--cinemastro" &&
                         mbd.cinemastroCount != null &&
@@ -7953,6 +8162,7 @@ export default function App() {
                       {m.poster ? <img src={m.poster} alt={m.title} /> : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 36 }}>🎬</div>}
                     </div>
                     <div className="strip-title">{m.title}</div>
+                    {m.fromGroup ? <div className="wl-from-group">Group</div> : null}
                   </div>
                 ))}
               </div>

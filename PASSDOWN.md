@@ -1,47 +1,52 @@
-# Passdown — Circles Phase C & follow-ups (for next chat)
+# Passdown — next chat (Cinematch Circles + watchlist)
 
-Attach this file in the next Cursor chat (`@PASSDOWN.md`) **or** use `@HANDOFF.md` for ongoing project rules. This doc captures **this thread’s** context; `HANDOFF.md` remains the long-lived checklist.
+Attach **`@PASSDOWN.md`** for **this doc** (thread context + what shipped recently). Use **`@HANDOFF.md`** for standing rules, version bumps, architecture, and the global “what’s next” list.
 
 ---
 
 ## Repo version
 
-- **`package.json`:** **5.4.4** — **Circle info** = centered **modal** over circle view; hero = one line: vibe + members | Circle info.
-- Next version bump (**5.5.0**) when shipping the next vertical slice (e.g. `watchlist.source_circle_id`, Phase D, etc.) — include **`CHANGELOG.md`** in that release commit, not in docs-only commits.
+- **`package.json`:** **5.5.0** — `watchlist.source_circle_id` + Profile watchlist **Group** label; Circles strip + Circle info (see below).
+- **Next bump:** **5.6.0** when Phase D, Phase E, or the next **feature** ships — include **`CHANGELOG.md`** in that release commit (not docs-only commits).
 
 ---
 
-## What shipped (Circles Phase C)
+## What shipped (recent vertical slices)
 
-### Backend (v5.2.0 area; may be same release train as UI)
+### Circle strip (Phase C, evolved)
 
-- **`get_circle_rated_strip(p_circle_id uuid)`** — `SECURITY DEFINER`, `auth.uid()` membership check; returns JSON: `member_count`, `gated`, `titles[]` (together | solo, group/site scores, `viewer_score`).
-- **`get-circle-rated-titles`** Edge — JWT → RPC → batched **`user_title_predictions`** reads only (no per-title `match_predict`; cold cache → null).
-- **`fetchCircleRatedTitles`** in `src/circles.js` — invokes Edge; on Edge failure (except not-member / Unauthorized) **falls back** to direct `supabase.rpc('get_circle_rated_strip')` with **`prediction: null`** (strip still renders; badges fall back to Cinemastro/TMDB).
+- **RPC** `get_circle_rated_strip(uuid, int, int)` — `p_limit` / `p_offset`, max **20** titles returned; **`total_eligible`**, **`has_more`**; site averages via `get_cinemastro_title_avgs` **only for the current page** (perf migration `20260430120000`).
+- **Edge** `get-circle-rated-titles` — JWT → RPC → **batched** `user_title_predictions` only (no per-title `match_predict`; cold cache → `prediction: null`). Client falls back to RPC-only on Edge failure (`src/circles.js` `fetchCircleRatedTitles`).
+- **UI** — Single horizontal **Rated in this circle** row (API order: together then solo); **→** tile at end loads **+5** (first page **10**); cap **20**; Discover hint when more titles exist beyond cap.
+- **Circle info** — **Centered modal** (`circles-modal-root`, `z-index: 2300`), not a bottom sheet. Hero: **one line** — vibe + member count **left**, **Circle info** **right**; members list + **Leave circle** (main detail body no longer has Leave).
+- **Constants** — `CIRCLE_STRIP_INITIAL`, `CIRCLE_STRIP_PAGE`, `CIRCLE_STRIP_MAX` in `src/circles.js`.
 
-### UI (v5.3.0)
+### Watchlist — group hint (v5.5.0)
 
-- **`src/App.jsx`** — `circle-detail` loads strip when `member_count >= 2`; one horizontal **Rated in this circle** row; end **→** tile loads more (max 20); hero meta **B** + **Circle info** sheet (members, leave); TMDB hydrate via `circleStripExtraMovies`; `openDetail` on card tap.
+- **Column** `watchlist.source_circle_id` → `circles(id)` `ON DELETE SET NULL` — migration **`20260501120000_watchlist_source_circle_id.sql`**.
+- **When it’s set:** user taps **+ Watchlist** on title **detail** opened **from the circle strip** (`openDetail` stores return screen in `detailReturnScreenRef`; when it’s **`circle-detail`** and **`selectedCircleId`** is set, insert includes `source_circle_id`).
+- **Profile → Watchlist:** small uppercase **Group** label under the title (`.wl-from-group`) — **no circle name** in UI for now.
 
 ---
 
-## SQL migrations (apply order in Supabase SQL editor if not already)
+## SQL migrations (apply in order if prod is behind)
 
 | File | Purpose |
 |------|---------|
-| `20260426120000_circles_phase_c_get_circle_rated_strip.sql` | `rated_at` column if missing; initial `get_circle_rated_strip` |
-| `20260427120000_circles_get_circle_rated_strip_fix.sql` | Archive filter fix; `jsonb_agg` via ordered subquery |
-| `20260428120000_circles_strip_timeout_and_index.sql` | **`ratings(user_id)`** index; **`statement_timeout = 120s`** on RPC (one-arg `get_circle_rated_strip`; superseded by 291’s signature) |
-| `20260429120000_circles_strip_pagination.sql` | **`get_circle_rated_strip(uuid, int, int)`** — `p_limit` / `p_offset`, max **20** rows, **`total_eligible`** + **`has_more`** |
-| `20260430120000_circles_strip_site_avgs_page_only.sql` | **Perf:** `get_cinemastro_title_avgs` only for **current page** solo rows (not whole circle) |
+| `20260426120000_circles_phase_c_get_circle_rated_strip.sql` | `rated_at` if missing; initial strip RPC |
+| `20260427120000_circles_get_circle_rated_strip_fix.sql` | Archive filter + ordered `jsonb_agg` |
+| `20260428120000_circles_strip_timeout_and_index.sql` | `ratings(user_id)` index; 120s timeout on RPC (signature later superseded) |
+| `20260429120000_circles_strip_pagination.sql` | `get_circle_rated_strip(uuid, int, int)` |
+| `20260430120000_circles_strip_site_avgs_page_only.sql` | Page-only site avgs (perf) |
+| `20260501120000_watchlist_source_circle_id.sql` | **`watchlist.source_circle_id`** |
 
-**Prod:** User applies these manually (common house rule). Keep repo = source of truth.
+**Prod:** Often applied via SQL editor; keep repo = source of truth.
 
 ---
 
 ## Edge deploy (manual)
 
-Git push does **not** deploy functions. After changing Edge code:
+Git push does **not** deploy Edge functions.
 
 ```bash
 npx supabase@latest functions deploy get-circle-rated-titles --project-ref lovpktgeutujljltlhdl
@@ -51,11 +56,11 @@ npx supabase@latest functions deploy get-circle-rated-titles --project-ref lovpk
 
 ---
 
-## Debugging notes (from this thread)
+## Debugging notes
 
-1. **`P0001: not authenticated`** when running `SELECT get_circle_rated_strip(...)` in the **SQL editor** is **expected** — `auth.uid()` is null there. Test with the **logged-in app** or Edge with user JWT.
-2. **`statement timeout`** — large `public.ratings`; mitigated by **`ratings_user_id`** index + **120s** function timeout (migration `20260428120000_...`). If still slow, check Supabase DB/pooler statement limits.
-3. **Generic “Could not load circle titles”** — Edge hides RPC errors unless updated; Edge was improved to return **Postgres/PostgREST `message` / `details` / `hint`** in the JSON `error` field (redeploy Edge to pick up).
+1. **`P0001: not authenticated`** on `get_circle_rated_strip` in the **SQL editor** — expected (`auth.uid()` null). Test in app or Edge with JWT.
+2. **Strip timeouts** — index + 120s RPC timeout; if still slow, check pooler limits.
+3. **Watchlist insert** fails after client deploy but **before** migration — add **`source_circle_id`** column in Supabase (run `20260501120000`).
 
 ---
 
@@ -63,39 +68,38 @@ npx supabase@latest functions deploy get-circle-rated-titles --project-ref lovpk
 
 | Area | Path |
 |------|------|
-| Strip UI + fetch effects | `src/App.jsx` — search `circleStrip`, `fetchCircleRatedTitles`, `circle-detail` |
-| Client invoke + RPC fallback | `src/circles.js` — `fetchCircleRatedTitles`, `invokeCirclesEdge` |
-| Edge strip + predictions | `supabase/functions/get-circle-rated-titles/index.ts` |
-| RPC definitions | `supabase/migrations/20260426120000_*.sql`, `20260427120000_*.sql`, `20260428120000_*.sql` |
-| Product + display contract | `supabase/migrations/20260422120000_circles_schema.sql` (header comments) |
-| Ongoing project handoff | **`HANDOFF.md`** |
+| Circles + strip + circle info + watchlist UI | `src/App.jsx` — `circle-detail`, `circleStrip`, `showCircleInfoSheet`, `toggleWatchlist`, `buildWatchlistFromRows`, `detailReturnScreenRef` |
+| Strip client + RPC fallback | `src/circles.js` — `fetchCircleRatedTitles`, `CIRCLE_STRIP_*` |
+| Edge strip | `supabase/functions/get-circle-rated-titles/index.ts` |
+| Watchlist column | `supabase/migrations/20260501120000_watchlist_source_circle_id.sql` |
+| Circles product / deferred items (historical) | `supabase/migrations/20260422120000_circles_schema.sql` (header) |
+| Ongoing checklist | **`HANDOFF.md`** |
 
 ---
 
-## Suggested next priorities (from `HANDOFF.md`)
+## Suggested next priorities
 
-1. **`watchlist.source_circle_id`** + UI when adding titles with circle attribution (schema comment).
-2. **Phase D** — invite by handle (needs `public.profiles.handle`).
-3. **Phase E** — polish (covers, `icon_emoji`, archived section, etc.).
-4. **Backlog** — split `App.jsx` into `pages/*`.
+1. **Phase D** — search / invite by **`public.profiles.handle`** (column + RLS + UI).
+2. **Phase E** — polish (covers, `icon_emoji`, per-circle color, archived section).
+3. **Backlog** — split `App.jsx` into `pages/*`.
 
 ---
 
 ## Git / ops
 
 - Do **not** `git push` or deploy unless the user asks (house rule).
-- Client-only deploy → Vercel auto-builds on push.
+- Client-only push → Vercel auto-builds.
 
 ---
 
 ## Quick verify
 
 ```bash
-cd "/path/to/Cinematch"
+cd "/Users/tlmahesh/Library/Mobile Documents/com~apple~CloudDocs/Cinematch"
 grep '"version"' package.json
 git status && git log -3 --oneline
 ```
 
-Expected: **`"version": "5.4.4"`**.
+Expected: **`"version": "5.5.0"`**.
 
-If this file replaced older notes, recover with: `git show HEAD~1:PASSDOWN.md` (adjust `HEAD~n` as needed).
+If this file overwrote older notes: `git show HEAD~1:PASSDOWN.md` (adjust `HEAD~n` as needed).

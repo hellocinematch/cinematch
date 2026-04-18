@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.5.0
+
+- **Watchlist — group hint.** `watchlist.source_circle_id` (optional FK to `circles`). When you save from title detail opened **from a circle** (`circle-detail` → strip card), the row stores the circle id; **Profile → Watchlist** shows a small **Group** label (no circle name). Migration: `supabase/migrations/20260501120000_watchlist_source_circle_id.sql`.
+- **Match / Your Picks.** `your_picks_page` hydrates whenever you have ratings and a non-empty catalogue (not only certain tabs). Edge payload prefers `catalogueForRecs`, with **fallback to full `catalogue`** when filters leave the filtered list empty. Responses from `supabase.functions.invoke` are normalized via `unwrapMatchFunctionData`. Prediction overlays merge string/number scores and `neighbor_count` / `neighborCount`; `yourPicksPredictions` is always replaced (including `{}`) to avoid stale maps.
+
 ## 5.4.4
 
 - **Circles — Circle info UX.** Hero: **vibe**, **member count**, and **Circle info** on **one row** (left cluster + link right). Circle info opens as a **centered modal** over the circle view (`z-index: 2300`), not a bottom sheet. Circle name in the hero uses a **2-line clamp** so long titles don’t dominate the card.
