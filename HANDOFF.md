@@ -9,16 +9,16 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 1. **Read this file first** — `HANDOFF.md` at the repository root:  
    `/Users/tlmahesh/Library/Mobile Documents/com~apple~CloudDocs/Cinematch/HANDOFF.md`
 2. In Cursor chat, attach it: type **`@HANDOFF.md`** and select the file, or paste: *“Follow `HANDOFF.md`.”*
-3. **Version bump rule for the next vertical slice:** current release is **5.1.0**. When the **next** feature ships (Phase C circle dashboard + rated strip, or any coordinated client + server change), bump to **`5.2.0`** and add a matching **`CHANGELOG.md`** section in the **same release commit** as the first shipping change. Do **not** bump version in a handoff-only commit—only when real code ships.
+3. **Version bump rule for the next vertical slice:** current release in repo is **5.2.0** (unchanged for docs-only or handoff-only commits). When **Phase C UI** (circle strip wired on `circle-detail`) or the **next real feature** ships, bump to **`5.3.0`** and add a matching **`CHANGELOG.md`** section in the **same release commit** as the first shipping change—not in a handoff-only or docs-only commit.
 
 ---
 
 ## Current state (as of last update)
 
-- **`main` is pushed** to `origin` (includes Circles Phase A + RLS hotfix + Phase B).
-- **`package.json` version:** `5.1.0` — **Circles Phase B (invite by email)** is released.
-- **Prod DB:** Phase A circles schema + RLS recursion hotfix + Phase B SQL helpers should already be applied in Supabase SQL editor (user confirmed invites work).
-- **Edge functions:** `send-circle-invite` and `accept-circle-invite` must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`).
+- **`main` is pushed** to `origin` (includes Circles Phase A + RLS hotfix + Phase B + Phase C strip backend).
+- **`package.json` version:** `5.2.0` — **Circles Phase C backend** (RPC + `get-circle-rated-titles` Edge + `fetchCircleRatedTitles`); **strip UI** on `circle-detail` still pending.
+- **Prod DB:** Phase A circles schema + RLS recursion hotfix + Phase B SQL helpers + Phase C `get_circle_rated_strip` / `ratings.rated_at` migration (apply `20260426120000_circles_phase_c_get_circle_rated_strip.sql` if not already).
+- **Edge functions:** `send-circle-invite`, `accept-circle-invite`, and **`get-circle-rated-titles`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`).
 
 ---
 
@@ -42,7 +42,7 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 | Circles schema + display contract | `supabase/migrations/20260422120000_circles_schema.sql` (read top comment block before Phase C) |
 | RLS hotfix (helpers) | `supabase/migrations/20260423120000_circles_rls_recursion_fix.sql` |
 | Phase B RPCs | `supabase/migrations/20260424120000_circles_phase_b_helpers.sql`. Optional: `20260425120000_circles_resolve_email_grant_service_role.sql` (grant-only if DB predates grant line) |
-| Edge: invite send/accept | `supabase/functions/send-circle-invite/index.ts`, `supabase/functions/accept-circle-invite/index.ts` |
+| Edge: invite send/accept / strip | `supabase/functions/send-circle-invite/index.ts`, `supabase/functions/accept-circle-invite/index.ts`, `supabase/functions/get-circle-rated-titles/index.ts` |
 | Product spec | `Architechture/cinemastro-circles-requirements.md` (path spelling as in repo) |
 
 **Supabase project ref:** `lovpktgeutujljltlhdl`
@@ -51,8 +51,9 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 
 ## What’s next (priority)
 
-1. **Phase C — Circle dashboard + “Rated in this circle” strip**  
-   - `get-circle-rated-titles` Edge function (or equivalent) + real circle-detail UI per display contract in `20260422120000_circles_schema.sql`.  
+1. **Phase C — Circle dashboard + “Rated in this circle” strip (UI remaining)**  
+   - **Backend shipped in v5.2.0:** `get_circle_rated_strip` RPC, `get-circle-rated-titles` Edge, `fetchCircleRatedTitles` in `src/circles.js`.  
+   - **Still to do:** Wire `circle-detail` to `fetchCircleRatedTitles` and render posters + two sections per display contract in `20260422120000_circles_schema.sql`.  
    - Gate: **`member_count >= 2`** for the strip; two sections; no individual scores / rated-count UI per spec.  
    - **`watchlist.source_circle_id`** when dashboard adds attribution (deferred in schema comment until Phase C).
 
@@ -81,4 +82,6 @@ git status && git log -5 --oneline
 grep '"version"' package.json
 ```
 
-Expected version line: **`"version": "5.1.0"`** until the next release bump (next chat → **`5.2.0`** when Phase C or the next feature ships).
+Expected version line: **`"version": "5.2.0"`** until the next release bump (→ **`5.3.0`** when Phase C strip UI or the next feature ships).
+
+If this file overwrote older notes, recover the previous text with: `git show HEAD~1:HANDOFF.md` (adjust `HEAD~1` if needed).

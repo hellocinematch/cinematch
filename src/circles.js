@@ -241,6 +241,13 @@ export async function acceptCircleInvite({ inviteId }) {
   return invokeCirclesEdge("accept-circle-invite", { invite_id: inviteId });
 }
 
+/** Phase C: circle strip (`get-circle-rated-titles` Edge + `get_circle_rated_strip` RPC). */
+export async function fetchCircleRatedTitles({ circleId }) {
+  const id = (circleId || "").trim();
+  if (!id) throw new Error("Missing circle.");
+  return invokeCirclesEdge("get-circle-rated-titles", { circle_id: id });
+}
+
 /** Decline runs directly under the "recipient can respond to invite" UPDATE policy. No Edge. */
 export async function declineCircleInvite({ inviteId }) {
   if (!inviteId) throw new Error("Missing invite.");
