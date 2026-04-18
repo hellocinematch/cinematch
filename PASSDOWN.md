@@ -6,7 +6,7 @@ Attach this file in the next Cursor chat (`@PASSDOWN.md`) **or** use `@HANDOFF.m
 
 ## Repo version
 
-- **`package.json`:** **5.4.1** — Strip **perf**: SQL page-only site avgs; Edge batched prediction **cache** only (no per-title `match_predict`).
+- **`package.json`:** **5.4.2** — Single-strip circle row + end **→** tile for load more (max 20); v5.4.1 perf (SQL + Edge cache) unchanged server-side.
 - Next version bump (**5.5.0**) when shipping the next vertical slice (e.g. `watchlist.source_circle_id`, Phase D, etc.) — include **`CHANGELOG.md`** in that release commit, not in docs-only commits.
 
 ---
@@ -21,7 +21,7 @@ Attach this file in the next Cursor chat (`@PASSDOWN.md`) **or** use `@HANDOFF.m
 
 ### UI (v5.3.0)
 
-- **`src/App.jsx`** — `circle-detail` loads strip when `member_count >= 2`; two horizontal sections (**Rated in this circle** / **Also watched here**); TMDB hydrate via `circleStripExtraMovies`; `openDetail` on card tap.
+- **`src/App.jsx`** — `circle-detail` loads strip when `member_count >= 2`; one horizontal **Rated in this circle** row (together then solo, API order); end **→** tile loads more (max 20); TMDB hydrate via `circleStripExtraMovies`; `openDetail` on card tap.
 
 ---
 
@@ -96,6 +96,6 @@ grep '"version"' package.json
 git status && git log -3 --oneline
 ```
 
-Expected: **`"version": "5.4.1"`**.
+Expected: **`"version": "5.4.2"`**.
 
 If this file replaced older notes, recover with: `git show HEAD~1:PASSDOWN.md` (adjust `HEAD~n` as needed).

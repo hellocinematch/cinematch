@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.4.2
+
+- **Circles strip UI.** Single horizontal row for **Rated in this circle** (together + solo in server order). **Load more** is a trailing **›** tile at the end of the strip (no separate second section; cap 20 unchanged).
+
 ## 5.4.1
 
 - **Circles strip performance.** `get_circle_rated_strip` now calls `get_cinemastro_title_avgs` only for titles on the **current page** (not every solo title in the circle). Edge `get-circle-rated-titles` uses **two batched reads** from `user_title_predictions` (movie + tv) and **no longer** invokes `match_predict_neighbor_raters` per title (cold cache → `prediction: null`, same as other strips). Migration: `supabase/migrations/20260430120000_circles_strip_site_avgs_page_only.sql`. Redeploy Edge after pull.

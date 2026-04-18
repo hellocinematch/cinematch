@@ -2352,12 +2352,15 @@ const styles = `
   .circle-strip-comm-line--muted { color:#555; }
   .circle-detail-strip-empty { margin:0 !important; }
   .circle-detail-strip-empty .empty-sub { margin-top:8px; font-size:12px; color:#777; line-height:1.45; }
-  .circle-strip-pager { display:flex; justify-content:center; margin-top:4px; }
-  .circle-strip-load-more { background:#1a1a1a; color:#e8c96a; border:1px solid #3a3a3a; padding:10px 20px; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; transition:background 0.15s, border-color 0.15s; }
-  .circle-strip-load-more:hover:not(:disabled) { background:#222; border-color:#555; }
-  .circle-strip-load-more:disabled { opacity:0.55; cursor:default; }
   .circle-strip-cap-hint { font-size:12px; color:#777; line-height:1.5; margin-top:8px; text-align:center; max-width:36em; margin-left:auto; margin-right:auto; }
   .circle-strip-cap-hint button { margin-top:8px; background:transparent; border:none; color:#e8c96a; text-decoration:underline; cursor:pointer; font-size:inherit; padding:0; font-family:inherit; }
+  .strip-card--circle-more { border:none; background:transparent; padding:0; font:inherit; text-align:left; align-self:flex-start; }
+  .strip-card--circle-more:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:12px; }
+  .strip-card--circle-more:disabled { opacity:0.55; cursor:default; }
+  .strip-card--circle-more:not(:disabled):hover .circle-strip-more-poster { border-color:#555; background:#1e1e1e; }
+  .circle-strip-more-poster { display:flex; align-items:center; justify-content:center; border-style:dashed; }
+  .circle-strip-more-arrow { font-size:42px; font-weight:300; color:#e8c96a; line-height:1; user-select:none; }
+  .circle-strip-more-spinner { font-size:13px; color:#888; }
   .strip-card--circle-pending { opacity:0.8; pointer-events:none; }
   .circle-detail-placeholder { background:#111; border:1px dashed #222; border-radius:14px; padding:20px; }
   .circle-detail-placeholder__title { font-family:'DM Serif Display',serif; font-size:18px; color:#f0ebe0; margin-bottom:6px; }
@@ -6535,8 +6538,6 @@ export default function App() {
                     );
                   }
                   const titles = Array.isArray(circleStripPayload?.titles) ? circleStripPayload.titles : [];
-                  const together = titles.filter((t) => t.section === "together");
-                  const solo = titles.filter((t) => t.section === "solo");
                   const renderStripRow = (row) => {
                     const movie = circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies);
                     const rowKey = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
@@ -6618,44 +6619,41 @@ export default function App() {
                   return (
                     <>
                       <div className="circle-detail-strip-wrap">
-                        {together.length === 0 && solo.length === 0 ? (
+                        {titles.length === 0 ? (
                           <div className="empty-box circle-detail-strip-empty">
                             <div className="empty-text">No shared ratings in this circle yet.</div>
                             <div className="empty-sub">Rate titles on your shelf — they&apos;ll show here when circle members have rated too.</div>
                           </div>
                         ) : (
-                          <>
-                            {together.length > 0 && (
-                              <div className="section circle-detail-strip-section">
-                                <div className="section-header circle-detail-strip-header">
-                                  <div className="section-title">Rated in this circle</div>
-                                </div>
-                                <div className="strip">{together.map(renderStripRow)}</div>
-                              </div>
-                            )}
-                            {solo.length > 0 && (
-                              <div className="section circle-detail-strip-section">
-                                <div className="section-header circle-detail-strip-header">
-                                  <div className="section-title">Also watched here</div>
-                                </div>
-                                <div className="strip">{solo.map(renderStripRow)}</div>
-                              </div>
-                            )}
-                          </>
+                          <div className="section circle-detail-strip-section">
+                            <div className="section-header circle-detail-strip-header">
+                              <div className="section-title">Rated in this circle</div>
+                            </div>
+                            <div className="strip">
+                              {titles.map(renderStripRow)}
+                              {showLoadMore && (
+                                <button
+                                  type="button"
+                                  className="strip-card strip-card--circle-more"
+                                  onClick={() => void loadCircleStripMore()}
+                                  disabled={circleStripLoadingMore}
+                                  aria-label={circleStripLoadingMore ? "Loading more titles" : "Load more titles"}
+                                >
+                                  <div className="strip-poster circle-strip-more-poster">
+                                    {circleStripLoadingMore ? (
+                                      <span className="circle-strip-more-spinner">Loading…</span>
+                                    ) : (
+                                      <span className="circle-strip-more-arrow" aria-hidden>→</span>
+                                    )}
+                                  </div>
+                                  <div className="strip-title">More</div>
+                                  <div className="strip-genre">&nbsp;</div>
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         )}
                       </div>
-                      {showLoadMore && (
-                        <div className="circle-strip-pager">
-                          <button
-                            type="button"
-                            className="circle-strip-load-more"
-                            onClick={() => void loadCircleStripMore()}
-                            disabled={circleStripLoadingMore}
-                          >
-                            {circleStripLoadingMore ? "Loading…" : "Load more"}
-                          </button>
-                        </div>
-                      )}
                       {showSearchHint && (
                         <div className="circle-strip-cap-hint">
                           Showing {CIRCLE_STRIP_MAX} recent titles in this circle. For anything else, search by title in Discover.
