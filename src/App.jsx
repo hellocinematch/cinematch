@@ -2338,10 +2338,20 @@ const styles = `
   .circle-hero__tint { position:absolute; inset:0; background:linear-gradient(135deg, color-mix(in srgb, var(--vibe-tint) 90%, transparent) 0%, transparent 70%); pointer-events:none; }
   .circle-hero__body { position:relative; z-index:1; padding:24px 20px; display:flex; flex-direction:column; gap:8px; }
   .circle-hero__name-row { display:flex; align-items:center; gap:10px; }
-  .circle-hero__name { font-family:'DM Serif Display',serif; font-size:32px; color:#f0ebe0; line-height:1.1; flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+  .circle-hero__name { font-family:'DM Serif Display',serif; font-size:32px; color:#f0ebe0; line-height:1.15; flex:1 1 auto; min-width:0; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .circle-hero__crown { font-size:22px; flex-shrink:0; }
   .circle-hero__desc { font-size:14px; color:#c8c4bc; line-height:1.5; overflow-wrap:anywhere; }
   .circle-hero__meta-row { display:flex; align-items:center; gap:10px; margin-top:4px; flex-wrap:wrap; }
+  .circle-hero__meta-row--one-line { justify-content:space-between; gap:12px; align-items:center; }
+  .circle-hero__meta-left { display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0; flex:1 1 auto; }
+  .circle-hero__info-btn { flex-shrink:0; background:transparent; border:none; color:#e8c96a; font-size:13px; font-family:'DM Sans',sans-serif; font-weight:600; letter-spacing:0.02em; cursor:pointer; padding:4px 2px; text-decoration:underline; text-underline-offset:3px; align-self:center; }
+  .circle-hero__info-btn:hover { color:#f0dc9a; }
+  .circle-info-member-list { display:flex; flex-direction:column; gap:12px; margin:8px 0 16px; max-height:min(50vh, 320px); overflow-y:auto; }
+  .circle-info-member-row { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; color:#e0dcd4; }
+  .circle-info-member-name { min-width:0; overflow-wrap:anywhere; }
+  .circle-info-member-badge { flex-shrink:0; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#888; }
+  .circle-info-member-badge--creator { color:#e8c96a; }
+  .circle-info-modal-leave { align-self:stretch; margin-top:4px; }
 
   .circle-detail-body { padding:20px 24px 40px; display:flex; flex-direction:column; gap:20px; }
   .circle-detail-strip-wrap { display:flex; flex-direction:column; gap:18px; }
@@ -2368,6 +2378,14 @@ const styles = `
   .circle-leave-btn { background:transparent; color:#e05a5a; border:1px solid #4a1818; padding:12px 20px; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; transition:background 0.15s, border-color 0.15s; align-self:flex-start; }
   .circle-leave-btn:hover:not(:disabled) { background:#1a0808; border-color:#e05a5a; }
   .circle-leave-btn:disabled { opacity:0.5; cursor:default; }
+
+  /* Centered modal (Circle info — overlays main circle view, not a bottom sheet) */
+  .circles-modal-root { position:fixed; inset:0; z-index:2300; display:flex; align-items:center; justify-content:center; padding:max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); box-sizing:border-box; animation:fadeIn 0.2s ease; }
+  .circles-modal-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.72); border:none; padding:0; cursor:pointer; }
+  .circles-modal-panel { position:relative; width:100%; max-width:min(100%, 400px); max-height:min(85vh, 520px); display:flex; flex-direction:column; gap:12px; background:#141414; border:1px solid #2a2a2a; border-radius:16px; padding:20px; box-sizing:border-box; box-shadow:0 24px 64px rgba(0,0,0,0.55); overflow:hidden; animation:circlesModalIn 0.22s cubic-bezier(0.16,1,0.3,1); }
+  @keyframes circlesModalIn { from { opacity:0; transform:scale(0.96) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+  .circles-modal-title { font-family:'DM Serif Display',serif; font-size:22px; color:#f0ebe0; line-height:1.2; }
+  .circles-modal-sub { font-size:13px; color:#888; margin-top:-4px; line-height:1.4; word-break:break-word; }
 
   /* Bottom sheet / confirm shared shell */
   .circles-sheet-root { position:fixed; inset:0; z-index:2200; display:flex; flex-direction:column; justify-content:flex-end; animation:fadeIn 0.2s ease; }
@@ -2805,6 +2823,9 @@ export default function App() {
   const [leaveCircleBusy, setLeaveCircleBusy] = useState(false);
   const [leaveCircleError, setLeaveCircleError] = useState("");
   const [leaveConfirmCircle, setLeaveConfirmCircle] = useState(null);
+  const [showCircleInfoSheet, setShowCircleInfoSheet] = useState(false);
+  /** `user_id` → profile name when Circle info sheet loads `profiles` (RLS may return partial rows). */
+  const [circleInfoNamesById, setCircleInfoNamesById] = useState({});
   // v5.1.0: Circles Phase B — invites.
   const [pendingInvites, setPendingInvites] = useState([]);
   const [pendingInvitesLoaded, setPendingInvitesLoaded] = useState(false);
@@ -5256,6 +5277,8 @@ export default function App() {
     setCircleDetailError("");
     setLeaveCircleError("");
     setLeaveConfirmCircle(null);
+    setShowCircleInfoSheet(false);
+    setCircleInfoNamesById({});
     setCircleStripPayload(null);
     setCircleStripError("");
     setCircleStripExtraMovies(new Map());
@@ -5366,10 +5389,45 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    if (!showCircleInfoSheet || !circleDetailData?.members?.length) {
+      if (!showCircleInfoSheet) setCircleInfoNamesById({});
+      return;
+    }
+    let cancelled = false;
+    setCircleInfoNamesById({});
+    const ids = circleDetailData.members.map((m) => m.user_id);
+    (async () => {
+      const { data, error } = await supabase.from("profiles").select("id, name").in("id", ids);
+      if (cancelled) return;
+      if (error || !data) {
+        setCircleInfoNamesById({});
+        return;
+      }
+      const next = {};
+      for (const p of data) {
+        if (p?.id) next[p.id] = typeof p.name === "string" ? p.name : "";
+      }
+      setCircleInfoNamesById(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showCircleInfoSheet, circleDetailData?.id]);
+
+  useEffect(() => {
+    setShowCircleInfoSheet(false);
+  }, [selectedCircleId]);
+
   function requestLeaveCircle(circle) {
     if (!circle) return;
     setLeaveCircleError("");
     setLeaveConfirmCircle(circle);
+  }
+
+  function openLeaveFromCircleInfo() {
+    setShowCircleInfoSheet(false);
+    if (circleDetailData) requestLeaveCircle(circleDetailData);
   }
 
   function cancelLeaveCircle() {
@@ -6473,12 +6531,21 @@ export default function App() {
                         {circleDetailData.description && (
                           <div className="circle-hero__desc">{circleDetailData.description}</div>
                         )}
-                        <div className="circle-hero__meta-row">
-                          <span className="circle-card__vibe-badge">{meta.id}</span>
-                          <span className="circle-card__members">
-                            {circleDetailData.memberCount}{" "}
-                            {circleDetailData.memberCount === 1 ? "member" : "members"}
-                          </span>
+                        <div className="circle-hero__meta-row circle-hero__meta-row--one-line">
+                          <div className="circle-hero__meta-left">
+                            <span className="circle-card__vibe-badge">{meta.id}</span>
+                            <span className="circle-card__members">
+                              {circleDetailData.memberCount}{" "}
+                              {circleDetailData.memberCount === 1 ? "member" : "members"}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="circle-hero__info-btn"
+                            onClick={() => setShowCircleInfoSheet(true)}
+                          >
+                            Circle info
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -6673,21 +6740,64 @@ export default function App() {
                     </>
                   );
                 })()}
-                {leaveCircleError && (
-                  <div className="circles-error-banner">{leaveCircleError}</div>
-                )}
-                <button
-                  type="button"
-                  className="circle-leave-btn"
-                  onClick={() => requestLeaveCircle(circleDetailData)}
-                  disabled={leaveCircleBusy}
-                >
-                  Leave circle
-                </button>
               </div>
             )}
           </div>
           <BottomNav {...navProps} />
+        </div>
+      )}
+
+      {/* Circle info — centered modal over circle detail (not bottom sheet) */}
+      {showCircleInfoSheet && circleDetailData && (
+        <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Circle info">
+          <button
+            type="button"
+            className="circles-modal-backdrop"
+            aria-label="Close"
+            onClick={() => setShowCircleInfoSheet(false)}
+          />
+          <div className="circles-modal-panel">
+            <div className="circles-modal-title">Circle info</div>
+            <div className="circles-modal-sub">{circleDetailData.name}</div>
+            <div className="circle-info-member-list">
+              {[...(circleDetailData.members || [])]
+                .sort((a, b) => {
+                  if (a.role === "creator" && b.role !== "creator") return -1;
+                  if (b.role === "creator" && a.role !== "creator") return 1;
+                  const na = (circleInfoNamesById[a.user_id] || "").trim() || String(a.user_id);
+                  const nb = (circleInfoNamesById[b.user_id] || "").trim() || String(b.user_id);
+                  return na.localeCompare(nb);
+                })
+                .map((m) => {
+                  const isYou = user?.id === m.user_id;
+                  const rawName = (circleInfoNamesById[m.user_id] || "").trim();
+                  const label = isYou
+                    ? "You"
+                    : rawName || `…${String(m.user_id).slice(0, 8)}`;
+                  const roleLabel = m.role === "creator" ? "Creator" : "Member";
+                  return (
+                    <div className="circle-info-member-row" key={m.id || `${m.user_id}`}>
+                      <span className="circle-info-member-name">{label}</span>
+                      <span
+                        className={`circle-info-member-badge ${
+                          m.role === "creator" ? "circle-info-member-badge--creator" : ""
+                        }`}
+                      >
+                        {roleLabel}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+            <button
+              type="button"
+              className="circle-leave-btn circle-info-modal-leave"
+              onClick={openLeaveFromCircleInfo}
+              disabled={leaveCircleBusy}
+            >
+              Leave circle
+            </button>
+          </div>
         </div>
       )}
 

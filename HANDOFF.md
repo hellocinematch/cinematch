@@ -9,14 +9,14 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 1. **Read this file first** — `HANDOFF.md` at the repository root:  
    `/Users/tlmahesh/Library/Mobile Documents/com~apple~CloudDocs/Cinematch/HANDOFF.md`
 2. In Cursor chat, attach it: type **`@HANDOFF.md`** and select the file, or paste: *“Follow `HANDOFF.md`.”*
-3. **Version bump rule for the next vertical slice:** current release in repo is **5.4.2** (unchanged for docs-only or handoff-only commits). When **`watchlist.source_circle_id`** + dashboard attribution, **Phase D**, or the **next real feature** ships, bump to **`5.5.0`** and add a matching **`CHANGELOG.md`** section in the **same release commit** as the first shipping change—not in a handoff-only or docs-only commit.
+3. **Version bump rule for the next vertical slice:** current release in repo is **5.4.4** (unchanged for docs-only or handoff-only commits). When **`watchlist.source_circle_id`** + dashboard attribution, **Phase D**, or the **next real feature** ships, bump to **`5.5.0`** and add a matching **`CHANGELOG.md`** section in the **same release commit** as the first shipping change—not in a handoff-only or docs-only commit.
 
 ---
 
 ## Current state (as of last update)
 
 - **`main` is pushed** to `origin` (includes Circles Phase A + RLS hotfix + Phase B + Phase C strip backend + Phase C strip UI).
-- **`package.json` version:** `5.4.2` — Circles strip single row + end-of-strip load-more control.
+- **`package.json` version:** `5.4.4` — Circle **info** centered modal; hero meta one line (vibe + members + info).
 - **Prod DB:** Phase A circles schema + RLS recursion hotfix + Phase B SQL helpers + Phase C strip RPCs through **`20260429120000`** (pagination) and **`20260430120000_circles_strip_site_avgs_page_only.sql`** (fast path: site avgs for visible page only).
 - **Edge functions:** `send-circle-invite`, `accept-circle-invite`, and **`get-circle-rated-titles`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`).
 
@@ -78,6 +78,6 @@ git status && git log -5 --oneline
 grep '"version"' package.json
 ```
 
-Expected version line: **`"version": "5.4.2"`** until the next release bump (→ **`5.5.0`** for attribution / Phase D / next feature).
+Expected version line: **`"version": "5.4.4"`** until the next release bump (→ **`5.5.0`** for attribution / Phase D / next feature).
 
 If this file overwrote older notes, recover the previous text with: `git show HEAD~1:HANDOFF.md` (adjust `HEAD~1` if needed).

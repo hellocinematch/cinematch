@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.4.4
+
+- **Circles — Circle info UX.** Hero: **vibe**, **member count**, and **Circle info** on **one row** (left cluster + link right). Circle info opens as a **centered modal** over the circle view (`z-index: 2300`), not a bottom sheet. Circle name in the hero uses a **2-line clamp** so long titles don’t dominate the card.
+
+## 5.4.3
+
+- **Circles — Circle info sheet.** Hero layout **B**: vibe on its own row; **members** count left and **Circle info** link right on the row below. Sheet lists members (names from `profiles` when RLS allows) with Creator/Member labels; **Leave circle** moved here (removed from main detail body). Reuses existing leave confirmation.
+
 ## 5.4.2
 
 - **Circles strip UI.** Single horizontal row for **Rated in this circle** (together + solo in server order). **Load more** is a trailing **›** tile at the end of the strip (no separate second section; cap 20 unchanged).
