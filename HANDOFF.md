@@ -1,106 +1,84 @@
-# Cinematch / Cinemastro — handoff for next chat
+# Cinematch — session handoff (for the next chat)
 
-## Active ingest handoff (read first for DB load)
-- MovieLens 32M ingest tracking doc: `docs/ml32m-ingest-handoff.md`
-- Current ingest status is maintained there (steps, progress, and next actions).
+This file is the **source of truth** for what to do when you pick up work. In Cursor, open it from the repo or reference it with **`@HANDOFF.md`** (or **`@HANDOFF`**) so the model sees full context.
 
-## Active mood feature handoff (read for product continuity)
-- Mood feature tracking doc: `docs/mood-feature-handoff.md`
-- Contains shipped Mood behavior, rules, caveats, and next tasks.
+---
 
-**Focus:** Continue **next version of Cinemastro** (incremental features/polish). Prefer **small diffs** in `src/App.jsx` (very large file).
+## How the next chat should use this
 
-## Stack
-- **Frontend:** Vite + React 19 — main UI: `src/App.jsx` (single component + inline CSS string).
-- **Backend:** Supabase Auth, `public.profiles`, `public.ratings`, `public.watchlist`.
-- **Recommendations:** Edge Function `supabase/functions/match/index.ts` — client **only** `supabase.functions.invoke('match', …)`; service role loads neighbour ratings server-side.
-- **Data:** TMDB (bearer token in `App.jsx` — consider env for production).
-- **Deploy:** GitHub → Vercel. Edge functions deploy separately: `npx supabase functions deploy match`.
+1. **Read this file first** — `HANDOFF.md` at the repository root:  
+   `/Users/tlmahesh/Library/Mobile Documents/com~apple~CloudDocs/Cinematch/HANDOFF.md`
+2. In Cursor chat, attach it: type **`@HANDOFF.md`** and select the file, or paste: *“Follow `HANDOFF.md`.”*
+3. **Version bump rule for the next vertical slice:** current release is **5.1.0**. When the **next** feature ships (Phase C circle dashboard + rated strip, or any coordinated client + server change), bump to **`5.2.0`** and add a matching **`CHANGELOG.md`** section in the **same release commit** as the first shipping change. Do **not** bump version in a handoff-only commit—only when real code ships.
 
-## Env (Vite)
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+---
 
-## Version & changelog
-- App version from `package.json`, shown on Profile as **Cinemastro v…** (import in `App.jsx`).
-- **`CHANGELOG.md`** lists releases — **current release: 1.0.36** (see file for full history).
-- Remote: **`hellocinematch/cinematch`**, branch **`main`**. User often says **“push it”** when they want commits pushed.
+## Current state (as of last update)
 
-### Recent work (session summary — v1.0.14 → v1.0.36)
-Shipped a long sequence of mobile stability + profile sync + discover behavior changes (mostly `src/App.jsx` and small `src/index.css` hardening):
+- **`main` is pushed** to `origin` (includes Circles Phase A + RLS hotfix + Phase B).
+- **`package.json` version:** `5.1.0` — **Circles Phase B (invite by email)** is released.
+- **Prod DB:** Phase A circles schema + RLS recursion hotfix + Phase B SQL helpers should already be applied in Supabase SQL editor (user confirmed invites work).
+- **Edge functions:** `send-circle-invite` and `accept-circle-invite` must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`).
 
-| Area | What changed |
-|------|----------------|
-| **Detail desktop layout** | Poster kept narrow (grid-like), content widened, controls capped (v1.0.14/1.0.15). |
-| **Community stats** | Added public site-wide counts via RPC `get_public_site_stats` and showed beside logo; then tuned visibility to avoid mobile overflow (desktop keeps stats in top bars/home hero behavior). |
-| **Profile settings sync** | Removed localStorage fallback for streaming/genre/region; DB is source of truth. Fixed save-path issues and changed to `update(...).eq(id)` with in-app error banner on failure. |
-| **Discover search** | Changed from dynamic fetch while typing to **submit-only search** (tap lens / keyboard Search) in v1.0.33. |
-| **iOS mobile overflow** | Multiple iterations; current root approach in **v1.0.36** blocks page-level horizontal touch panning while allowing intentional horizontal scrollers (`.strip`, `.filter-row`). |
+---
 
-**Open concern:** User still reported intermittent mobile overflow in some flows even after several patches; verify v1.0.36 on real iPhone Safari before further feature work.
+## Architecture rules (do not break)
 
-## Brand / assets
-- UI name: **Cinemastro**. Logo: `public/cinemastro-logo.svg`. Favicon: `public/favicon.svg`.
+- **Landing page is Circles** — no Home-shaped shared shelf.
+- **No `React.useState` / `React.useEffect`** in `App.jsx` — use named imports only (prod bundle lesson from v4.0.9).
+- **Each page owns its RPC path** — no cross-page borrowing.
+- **Circle membership for anyone other than creator seed** → **Edge** + service role; RLS allows creator-seed-self only.
+- **Creator leave:** `circles.status = 'archived'`, `archived_at = now()` **before** deleting creator’s `circle_members` row (update policy gates on `status = 'active'`).
+- **Invite caps:** send-time 10-circle cap → `auto_declined`; accept-time cap → **error**, invite stays `pending` (spec in migration header).
 
-## Product / UX (current behaviour — read before changing)
+---
 
-### Home
-- Segments: **Picks** / **More** / **Friends**.
-- **Hero tagline** (“Movies and Shows - Picked for your TASTE!”) **only when segment is Picks**. More/Friends: no tagline; mobile uses tighter header; desktop hides empty hero strip (logo + avatar stay in **`home-topbar`**).
+## Key paths
 
-### Navigation & chrome
-- **`page-topbar`:** wordmark + avatar + bottom border — used on **Discover, Mood (picker + results), Profile, Rated, Detail**, and on **all breakpoints** (mobile included). **Home** does not use `page-topbar` on mobile (uses **`home-header`** with hero + avatar instead).
-- **Duplicate header wordmarks** under `page-topbar` were removed (discover/mood/profile blocks rely on top bar only).
-- **Cinemastro logo:** **`AppBrand`** accepts **`onPress`**; main app passes **`goHome`** → `setNavTab("home")`, `setScreen("home")`, clears detail selection / avatar menu. **Splash** uses **`variant="splash"`** (logo not clickable for home).
+| Area | Location |
+|------|----------|
+| Main app | `src/App.jsx` — Circles UI ~search `screen === "circles"`, `circle-detail`, `showInvitesPanel`, `showInviteSheet` |
+| Circles helpers | `src/circles.js` — vibes, caps, `fetchMyCircles`, invites, Edge invoke + `FunctionsHttpError` body parsing |
+| Circles schema + display contract | `supabase/migrations/20260422120000_circles_schema.sql` (read top comment block before Phase C) |
+| RLS hotfix (helpers) | `supabase/migrations/20260423120000_circles_rls_recursion_fix.sql` |
+| Phase B RPCs | `supabase/migrations/20260424120000_circles_phase_b_helpers.sql`. Optional: `20260425120000_circles_resolve_email_grant_service_role.sql` (grant-only if DB predates grant line) |
+| Edge: invite send/accept | `supabase/functions/send-circle-invite/index.ts`, `supabase/functions/accept-circle-invite/index.ts` |
+| Product spec | `Architechture/cinemastro-circles-requirements.md` (path spelling as in repo) |
 
-### Detail screen
-- **No in-app Back** — browser/OS back; **`history.pushState`** when opening detail so back stays in-app (`detailReturnScreenRef` + `popstate`).
-- Sticky **`page-topbar`** (logo + avatar); poster/body below.
+**Supabase project ref:** `lovpktgeutujljltlhdl`
 
-### Legal / footer
-- **`src/legal.jsx`** — `AppFooter`, placeholder **Privacy / Terms / About** pages.
-- **`src/legalConstants.js`** — placeholders (entity, email, URL). Replace before production.
-- Footer above bottom nav on main tabs; **`openLegalPage` / `closeLegalPage`** use **`history.pushState`** + **`legalHistoryPushedRef`** like detail.
+---
 
-### Profile / recommendations
-- **“Matches”** on Profile = **`recommendations.length`** from the match API (collaborative list size), **not** “films you rated.” CF needs **other users** with **overlapping rated titles**; small user base → often **0 matches** despite many ratings.
+## What’s next (priority)
 
-### Other
-- Profile settings: streaming / genres / regions now load/save from **Supabase profiles only** (no local fallback).
-- **Mobile:** section headers stack title above meta when narrow (avoid “More For You” wrapping).
-- **iOS:** shell uses `%` not `100vw` where noted in codebase.
+1. **Phase C — Circle dashboard + “Rated in this circle” strip**  
+   - `get-circle-rated-titles` Edge function (or equivalent) + real circle-detail UI per display contract in `20260422120000_circles_schema.sql`.  
+   - Gate: **`member_count >= 2`** for the strip; two sections; no individual scores / rated-count UI per spec.  
+   - **`watchlist.source_circle_id`** when dashboard adds attribution (deferred in schema comment until Phase C).
 
-## DB migrations (Supabase, if not applied)
-- `supabase/migrations/20260402120000_profiles_streaming_provider_ids.sql`
-- `supabase/migrations/20260406120000_profiles_show_genre_ids.sql`
-- `supabase/migrations/20260406133000_profiles_show_region_keys.sql`
-- `supabase/migrations/20260407140000_get_public_site_stats.sql` — RPC **`get_public_site_stats`** for public **community** (profile count) + **ratings** count (header marketing).
+2. **Phase D — Search & invite by handle** — blocked on `public.profiles.handle` (not in schema yet).
 
-## Key files
-| Area | File |
-|------|------|
-| UI + flows + styles | `src/App.jsx` |
-| Legal UI + footer | `src/legal.jsx`, `src/legalConstants.js` |
-| Supabase client | `src/supabase.js` |
-| Match Edge Function | `supabase/functions/match/index.ts` |
-| Global CSS | `src/index.css` |
-| Entry | `index.html`, `src/main.jsx` |
+3. **Phase E — Polish** — animations, cover upload, `icon_emoji`, per-circle color, archived circles section.
 
-## Backlog / not built
-- Admin/stats (RLS-safe aggregates or Edge + service role).
-- “Rate more” nudges / public community counts.
-- Richer region / TMDB discover product lines.
+4. **Backlog:** split `App.jsx` into `pages/*` (pure refactor, ~7k lines).
 
-## Quick local dev
+---
+
+## Ops reminders
+
+- **Supabase SQL:** user often applies migrations via SQL editor; keep repo migrations in sync with prod.  
+- **Client-only push** → Vercel auto-deploys.  
+- **Edge:** deploy after changing `supabase/functions/**`.  
+- **Do not git push / deploy** unless the user asks (house rule).
+
+---
+
+## Quick verify commands
+
 ```bash
-cd /path/to/Cinematch
-npm install
-npm run dev
-# Phone on LAN: npm run dev -- --host
+cd "/Users/tlmahesh/Library/Mobile Documents/com~apple~CloudDocs/Cinematch"
+git status && git log -5 --oneline
+grep '"version"' package.json
 ```
 
-## Notes for the next assistant
-- **No drive-by refactors** unless asked.
-- **CHANGELOG** + **version bump** (`package.json` / lockfile) when shipping user-visible releases (pattern through **1.0.36**).
-- Match **cold start / community size** affects CF output; don’t assume “bug” if Matches stays 0 with few users.
-- If touching mobile layout, test real iPhone Safari flow: login → Home → Discover search submit → back to Home.
+Expected version line: **`"version": "5.1.0"`** until the next release bump (next chat → **`5.2.0`** when Phase C or the next feature ships).
