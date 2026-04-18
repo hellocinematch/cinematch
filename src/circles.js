@@ -6,6 +6,7 @@
 // server-side policies (cap math is UI-level in phase A; Phase B's send-circle-invite
 // Edge function re-validates before minting new memberships).
 
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 /** Maximum active circles per user. Archived circles don't count. */
@@ -169,4 +170,83 @@ export function currentUserRole(circle, userId) {
   if (!circle || !userId) return null;
   const row = (circle.members || []).find((m) => m.user_id === userId);
   return row?.role ?? null;
+}
+
+// =================================================================================================
+// Phase B (v5.1.0) — invites. Sending and accepting go through Edge functions because they need
+// service-role writes into other users' circle_members rows and/or auth.users lookups. Declining
+// stays a client-direct update (the recipient's own invite row is RLS-writable).
+// =================================================================================================
+
+/** Ordered by newest first. Backed by the `get_my_pending_invites()` SECURITY DEFINER RPC so
+ *  we can pre-join circles + profiles without fighting their SELECT RLS. */
+export async function fetchPendingInvites() {
+  const { data, error } = await supabase.rpc("get_my_pending_invites");
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    id: row.invite_id,
+    circleId: row.circle_id,
+    createdAt: row.created_at,
+    circleName: row.circle_name,
+    circleVibe: row.circle_vibe ?? "Mixed Bag",
+    circleStatus: row.circle_status,
+    circleArchivedAt: row.circle_archived_at,
+    memberCount: Number(row.member_count) || 0,
+    inviterId: row.inviter_id,
+    inviterName: row.inviter_name || "Someone",
+  }));
+}
+
+/** Edge functions return JSON `{ error: string }` on 4xx/5xx. `supabase-js` surfaces that as
+ *  `FunctionsHttpError` with a generic message — the real string lives on `error.context`
+ *  (the Response). Parse it so the invite sheet shows the server message, not "non-2xx". */
+async function invokeCirclesEdge(fnName, body) {
+  const { data, error } = await supabase.functions.invoke(fnName, { body });
+  if (error) {
+    let msg = error.message || `Request failed (${fnName}).`;
+    if (error instanceof FunctionsHttpError && error.context) {
+      try {
+        const errBody = await error.context.json();
+        if (errBody && typeof errBody === "object" && typeof errBody.error === "string") {
+          msg = errBody.error;
+        }
+      } catch {
+        // Non-JSON body or empty — keep generic msg
+      }
+    }
+    throw new Error(msg);
+  }
+  if (data && typeof data === "object" && "error" in data && typeof data.error === "string") {
+    throw new Error(data.error);
+  }
+  return data;
+}
+
+/** Sends (or resurrects) an invite for `invitedEmail` to `circleId`. If the recipient is at the
+ *  10-active-circle cap the Edge function auto-declines (spec §3.2) — we surface that as a
+ *  dedicated status on the returned object so the UI can show the right toast. */
+export async function sendCircleInvite({ circleId, invitedEmail }) {
+  const email = (invitedEmail || "").trim();
+  if (!email) throw new Error("Enter an email address.");
+  return invokeCirclesEdge("send-circle-invite", {
+    circle_id: circleId,
+    invited_email: email,
+  });
+}
+
+/** Accepts a pending invite. Returns the full circle row (with members[]) so the caller can
+ *  prepend it to the list without a refetch. */
+export async function acceptCircleInvite({ inviteId }) {
+  if (!inviteId) throw new Error("Missing invite.");
+  return invokeCirclesEdge("accept-circle-invite", { invite_id: inviteId });
+}
+
+/** Decline runs directly under the "recipient can respond to invite" UPDATE policy. No Edge. */
+export async function declineCircleInvite({ inviteId }) {
+  if (!inviteId) throw new Error("Missing invite.");
+  const { error } = await supabase
+    .from("circle_invites")
+    .update({ status: "declined", responded_at: new Date().toISOString() })
+    .eq("id", inviteId);
+  if (error) throw error;
 }

@@ -13,6 +13,10 @@ import {
   createCircle,
   leaveCircle,
   currentUserRole,
+  fetchPendingInvites,
+  sendCircleInvite,
+  acceptCircleInvite,
+  declineCircleInvite,
 } from "./circles";
 
 const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
@@ -2377,6 +2381,50 @@ const styles = `
     .circle-card__name { font-size:20px; }
     .circle-hero__name { font-size:26px; }
   }
+
+  /* =============================================================================================
+     Circles Phase B (v5.1.0) — invites
+     ============================================================================================= */
+  .circles-bell--active { border-color:#e8c96a; color:#0a0a0a; background:#e8c96a; }
+  .circles-bell--active:hover { background:#f0d880; }
+  .circles-bell--active .circles-bell-count { color:#0a0a0a; font-weight:700; }
+
+  .circle-detail-actions { display:flex; flex-direction:column; gap:10px; }
+  .circle-invite-btn { align-self:flex-start; background:#141414; border:1px solid #2a2a2a; color:#e8c96a; padding:10px 18px; border-radius:999px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; letter-spacing:0.3px; cursor:pointer; transition:border-color 0.15s, background 0.15s; }
+  .circle-invite-btn:hover:not(:disabled) { border-color:#e8c96a; background:#1a1608; }
+  .circle-invite-btn:disabled { opacity:0.4; cursor:default; }
+
+  .invites-panel-root { position:fixed; inset:0; z-index:2250; display:flex; flex-direction:column; justify-content:flex-start; animation:fadeIn 0.2s ease; }
+  .invites-panel-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.6); border:none; padding:0; cursor:pointer; }
+  .invites-panel { position:relative; background:#141414; border-bottom:1px solid #2a2a2a; border-radius:0 0 20px 20px; padding:16px 20px 20px; width:100%; max-width:min(100%, 520px); margin:0 auto; max-height:85vh; overflow-y:auto; animation:slideDown 0.3s cubic-bezier(0.16,1,0.3,1); box-sizing:border-box; box-shadow:0 12px 32px rgba(0,0,0,0.5); display:flex; flex-direction:column; gap:14px; }
+  @keyframes slideDown { from{opacity:0;transform:translateY(-24px)} to{opacity:1;transform:translateY(0)} }
+  .invites-panel-header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .invites-panel-title { font-family:'DM Serif Display',serif; font-size:22px; color:#f0ebe0; }
+  .invites-panel-close { background:transparent; color:#888; border:none; font-size:20px; cursor:pointer; padding:4px 10px; border-radius:8px; line-height:1; }
+  .invites-panel-close:hover { color:#f0ebe0; background:#1a1a1a; }
+  .invites-empty { padding:20px 4px; text-align:center; color:#888; }
+  .invites-empty-title { font-family:'DM Serif Display',serif; font-size:18px; color:#c8c4bc; margin-bottom:4px; }
+  .invites-empty-sub { font-size:13px; color:#777; line-height:1.4; }
+  .invites-list { display:flex; flex-direction:column; gap:12px; }
+  .invite-card { position:relative; background:#111; border:1px solid #1e1e1e; border-radius:14px; padding:14px 16px; overflow:hidden; --vibe-accent:#e8c96a; --vibe-tint:#3a2a0a; animation:slideUp 0.3s cubic-bezier(0.16,1,0.3,1); }
+  .invite-card__tint { position:absolute; inset:0; background:radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--vibe-tint) 65%, transparent) 0%, transparent 65%); pointer-events:none; opacity:0.85; }
+  .invite-card__body { position:relative; z-index:1; display:flex; flex-direction:column; gap:6px; }
+  .invite-card__sender { font-size:12px; color:#aaa; letter-spacing:0.2px; }
+  .invite-card__sender-name { color:var(--vibe-accent); font-weight:600; }
+  .invite-card__sender-verb { color:#888; }
+  .invite-card__circle-name { font-family:'DM Serif Display',serif; font-size:20px; color:#f0ebe0; line-height:1.15; overflow-wrap:anywhere; }
+  .invite-card__meta-row { display:flex; align-items:center; gap:10px; margin-top:2px; flex-wrap:wrap; }
+  .invite-card__actions { display:flex; gap:10px; margin-top:10px; }
+  .invite-card__actions .circles-btn-primary,
+  .invite-card__actions .circles-btn-ghost { padding:10px 14px; font-size:13px; }
+  .invite-card__actions .circles-btn-primary { flex:1.4; }
+  .invite-card__actions .circles-btn-ghost { flex:1; }
+  .invite-card__cap-hint { margin-top:6px; font-size:12px; color:#e8c96a; opacity:0.85; }
+
+  .circles-toast { position:fixed; left:50%; bottom:max(96px, env(safe-area-inset-bottom, 0px) + 88px); transform:translateX(-50%); background:#111; border:1px solid #2a2a2a; color:#f0ebe0; padding:12px 18px; border-radius:999px; font-family:'DM Sans',sans-serif; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,0.4); z-index:2400; animation:toastSlide 0.3s cubic-bezier(0.16,1,0.3,1); max-width:min(90vw, 460px); text-align:center; }
+  .circles-toast--ok { border-color:#3d5a3d; }
+  .circles-toast--warn { border-color:#4a3e12; color:#e8c96a; }
+  @keyframes toastSlide { from{opacity:0;transform:translate(-50%, 12px)} to{opacity:1;transform:translate(-50%, 0)} }
 `;
 
 // ---------------------------------------------------------------------------
@@ -2709,6 +2757,20 @@ export default function App() {
   const [leaveCircleBusy, setLeaveCircleBusy] = useState(false);
   const [leaveCircleError, setLeaveCircleError] = useState("");
   const [leaveConfirmCircle, setLeaveConfirmCircle] = useState(null);
+  // v5.1.0: Circles Phase B — invites.
+  const [pendingInvites, setPendingInvites] = useState([]);
+  const [pendingInvitesLoaded, setPendingInvitesLoaded] = useState(false);
+  const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
+  const [pendingInvitesError, setPendingInvitesError] = useState("");
+  const [showInvitesPanel, setShowInvitesPanel] = useState(false);
+  /** Map<inviteId, "accepting" | "declining">. Per-invite, so multiple rows can animate. */
+  const [inviteActionBusy, setInviteActionBusy] = useState({});
+  const [inviteActionError, setInviteActionError] = useState("");
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
+  const [inviteEmailDraft, setInviteEmailDraft] = useState("");
+  const [inviteSheetSubmitting, setInviteSheetSubmitting] = useState(false);
+  const [inviteSheetError, setInviteSheetError] = useState("");
+  const [inviteToast, setInviteToast] = useState(null);
   const [profileSettingsError, setProfileSettingsError] = useState("");
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
   const [showGenreIds, setShowGenreIds] = useState([]);
@@ -5174,6 +5236,187 @@ export default function App() {
     }
   }
 
+  // ============================================================================================
+  // Circles Phase B (v5.1.0) — pending invites + invite-by-email.
+  // ============================================================================================
+
+  const reloadPendingInvites = useCallback(async () => {
+    if (!user) return;
+    setPendingInvitesLoading(true);
+    setPendingInvitesError("");
+    try {
+      const rows = await fetchPendingInvites();
+      setPendingInvites(rows);
+      setPendingInvitesLoaded(true);
+    } catch (e) {
+      console.error("Circles: fetchPendingInvites failed", e);
+      setPendingInvitesError(e?.message || "Could not load invites.");
+    } finally {
+      setPendingInvitesLoading(false);
+    }
+  }, [user]);
+
+  // Initial fetch once signed in; also refresh every time the user lands on the circles list.
+  useEffect(() => {
+    if (!user) {
+      setPendingInvites([]);
+      setPendingInvitesLoaded(false);
+      return;
+    }
+    if (!pendingInvitesLoaded) {
+      void reloadPendingInvites();
+    }
+  }, [user, pendingInvitesLoaded, reloadPendingInvites]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (screen !== "circles") return;
+    if (!pendingInvitesLoaded) return;
+    void reloadPendingInvites();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
+
+  const pendingInvitesCount = pendingInvites.length;
+
+  function openInvitesPanel() {
+    setInviteActionError("");
+    setShowInvitesPanel(true);
+    if (user && !pendingInvitesLoading) void reloadPendingInvites();
+  }
+
+  function closeInvitesPanel() {
+    setShowInvitesPanel(false);
+    setInviteActionError("");
+  }
+
+  function markInviteBusy(inviteId, action) {
+    setInviteActionBusy((prev) => ({ ...prev, [inviteId]: action }));
+  }
+
+  function clearInviteBusy(inviteId) {
+    setInviteActionBusy((prev) => {
+      if (!(inviteId in prev)) return prev;
+      const next = { ...prev };
+      delete next[inviteId];
+      return next;
+    });
+  }
+
+  async function handleAcceptInvite(invite) {
+    if (!user || !invite || inviteActionBusy[invite.id]) return;
+    setInviteActionError("");
+    markInviteBusy(invite.id, "accepting");
+    try {
+      const res = await acceptCircleInvite({ inviteId: invite.id });
+      setPendingInvites((prev) => prev.filter((row) => row.id !== invite.id));
+      // Prepend the full circle row so the user sees it in the Circles list immediately.
+      const raw = res?.circle;
+      if (raw && typeof raw === "object") {
+        const members = Array.isArray(raw.circle_members) ? raw.circle_members : [];
+        const normalized = {
+          id: raw.id,
+          name: raw.name,
+          description: raw.description ?? "",
+          vibe: raw.vibe ?? "Mixed Bag",
+          status: raw.status,
+          archivedAt: raw.archived_at,
+          createdAt: raw.created_at,
+          creatorId: raw.creator_id,
+          memberCount: members.length,
+          members,
+        };
+        if (normalized.status === "active") {
+          setCirclesList((prev) => {
+            const without = prev.filter((c) => c.id !== normalized.id);
+            return [normalized, ...without];
+          });
+        }
+      }
+      setInviteToast({
+        tone: "ok",
+        text: `Joined ${invite.circleName}.`,
+      });
+      if (pendingInvites.length <= 1) setShowInvitesPanel(false);
+    } catch (e) {
+      console.error("Circles: acceptCircleInvite failed", e);
+      setInviteActionError(e?.message || "Could not accept that invite.");
+    } finally {
+      clearInviteBusy(invite.id);
+    }
+  }
+
+  async function handleDeclineInvite(invite) {
+    if (!user || !invite || inviteActionBusy[invite.id]) return;
+    setInviteActionError("");
+    markInviteBusy(invite.id, "declining");
+    try {
+      await declineCircleInvite({ inviteId: invite.id });
+      setPendingInvites((prev) => prev.filter((row) => row.id !== invite.id));
+      if (pendingInvites.length <= 1) setShowInvitesPanel(false);
+    } catch (e) {
+      console.error("Circles: declineCircleInvite failed", e);
+      setInviteActionError(e?.message || "Could not decline that invite.");
+    } finally {
+      clearInviteBusy(invite.id);
+    }
+  }
+
+  function openInviteSheet() {
+    setInviteEmailDraft("");
+    setInviteSheetError("");
+    setShowInviteSheet(true);
+  }
+
+  function closeInviteSheet() {
+    if (inviteSheetSubmitting) return;
+    setShowInviteSheet(false);
+    setInviteSheetError("");
+  }
+
+  async function submitInviteByEmail() {
+    if (!user || inviteSheetSubmitting) return;
+    if (!circleDetailData) return;
+    const email = inviteEmailDraft.trim();
+    if (!email) {
+      setInviteSheetError("Enter an email address.");
+      return;
+    }
+    setInviteSheetSubmitting(true);
+    setInviteSheetError("");
+    try {
+      const res = await sendCircleInvite({
+        circleId: circleDetailData.id,
+        invitedEmail: email,
+      });
+      const recipientName = res?.recipient?.name || email;
+      if (res?.auto_declined) {
+        setInviteToast({
+          tone: "warn",
+          text: `${recipientName}'s circles are full — invite was auto-declined.`,
+        });
+      } else {
+        setInviteToast({
+          tone: "ok",
+          text: `Invite sent to ${recipientName}.`,
+        });
+      }
+      setShowInviteSheet(false);
+      setInviteEmailDraft("");
+    } catch (e) {
+      console.error("Circles: sendCircleInvite failed", e);
+      setInviteSheetError(e?.message || "Could not send the invite.");
+    } finally {
+      setInviteSheetSubmitting(false);
+    }
+  }
+
+  // Auto-dismiss the transient toast after ~3.2s.
+  useEffect(() => {
+    if (!inviteToast) return;
+    const t = setTimeout(() => setInviteToast(null), 3200);
+    return () => clearTimeout(t);
+  }, [inviteToast]);
+
   const shouldShowSecondaryRegionPage = Boolean(secondaryRegionKey);
   /** v4.0.8: `home` retired as a screen; `circles` is the landing. Kept `home` out of the set so
    *  lingering `setScreen("home")` (any we missed) would visibly fail instead of silently rendering
@@ -5917,13 +6160,22 @@ export default function App() {
                 <div className="circles-header-actions">
                   <button
                     type="button"
-                    className="circles-bell"
-                    aria-label="Pending invites"
-                    title="Pending invites (coming in Phase B)"
-                    disabled
+                    className={`circles-bell${pendingInvitesCount > 0 ? " circles-bell--active" : ""}`}
+                    aria-label={
+                      pendingInvitesCount > 0
+                        ? `Pending invites (${pendingInvitesCount})`
+                        : "Pending invites"
+                    }
+                    title={
+                      pendingInvitesCount > 0
+                        ? `${pendingInvitesCount} pending invite${pendingInvitesCount === 1 ? "" : "s"}`
+                        : "No pending invites"
+                    }
+                    onClick={openInvitesPanel}
+                    disabled={!user}
                   >
                     <span aria-hidden="true">🔔</span>
-                    <span className="circles-bell-count">0</span>
+                    <span className="circles-bell-count">{pendingInvitesCount}</span>
                   </button>
                   <button
                     type="button"
@@ -6073,6 +6325,24 @@ export default function App() {
 
             {circleDetailData && (
               <div className="circle-detail-body">
+                {currentUserRole(circleDetailData, user?.id) === "creator"
+                  && circleDetailData.status === "active" && (
+                  <div className="circle-detail-actions">
+                    <button
+                      type="button"
+                      className="circle-invite-btn"
+                      onClick={openInviteSheet}
+                      disabled={circleDetailData.memberCount >= 25}
+                    >
+                      + Invite by email
+                    </button>
+                    {circleDetailData.memberCount >= 25 && (
+                      <div className="circles-cap-banner">
+                        This circle is full (25/25 members).
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="circle-detail-placeholder">
                   <div className="circle-detail-placeholder__title">Rated in this circle</div>
                   <div className="circle-detail-placeholder__text">
@@ -6182,6 +6452,162 @@ export default function App() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Phase B: pending-invites panel. Slides down from the top. */}
+      {showInvitesPanel && (
+        <div className="invites-panel-root" role="dialog" aria-modal="true" aria-label="Pending invites">
+          <button
+            type="button"
+            className="invites-panel-backdrop"
+            aria-label="Close"
+            onClick={closeInvitesPanel}
+          />
+          <div className="invites-panel">
+            <div className="invites-panel-header">
+              <div className="invites-panel-title">Invites</div>
+              <button
+                type="button"
+                className="invites-panel-close"
+                onClick={closeInvitesPanel}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            {inviteActionError && (
+              <div className="circles-error-banner">{inviteActionError}</div>
+            )}
+            {pendingInvitesError && (
+              <div className="circles-error-banner">{pendingInvitesError}</div>
+            )}
+            {pendingInvitesLoading && pendingInvites.length === 0 ? (
+              <div className="invites-empty">Loading…</div>
+            ) : pendingInvites.length === 0 ? (
+              <div className="invites-empty">
+                <div className="invites-empty-title">No pending invites</div>
+                <div className="invites-empty-sub">When someone invites you to a circle, it'll show up here.</div>
+              </div>
+            ) : (
+              <div className="invites-list">
+                {pendingInvites.map((invite) => {
+                  const meta = vibeMeta(invite.circleVibe);
+                  const busy = inviteActionBusy[invite.id];
+                  return (
+                    <div
+                      key={invite.id}
+                      className="invite-card"
+                      style={{ "--vibe-accent": meta.accent, "--vibe-tint": meta.tint }}
+                    >
+                      <div className="invite-card__tint" aria-hidden="true" />
+                      <div className="invite-card__body">
+                        <div className="invite-card__sender">
+                          <span className="invite-card__sender-name">{invite.inviterName}</span>
+                          <span className="invite-card__sender-verb"> invited you to</span>
+                        </div>
+                        <div className="invite-card__circle-name">{invite.circleName}</div>
+                        <div className="invite-card__meta-row">
+                          <span className="circle-card__vibe-badge">{meta.id}</span>
+                          <span className="circle-card__members">
+                            {invite.memberCount} {invite.memberCount === 1 ? "member" : "members"}
+                          </span>
+                        </div>
+                        <div className="invite-card__actions">
+                          <button
+                            type="button"
+                            className="circles-btn-ghost"
+                            onClick={() => handleDeclineInvite(invite)}
+                            disabled={Boolean(busy)}
+                          >
+                            {busy === "declining" ? "Declining…" : "Decline"}
+                          </button>
+                          <button
+                            type="button"
+                            className="circles-btn-primary"
+                            onClick={() => handleAcceptInvite(invite)}
+                            disabled={Boolean(busy) || atCircleCap}
+                          >
+                            {busy === "accepting" ? "Joining…" : "Join circle"}
+                          </button>
+                        </div>
+                        {atCircleCap && (
+                          <div className="invite-card__cap-hint">
+                            You're at the {CIRCLE_CAP}-circle limit. Leave one first to join this.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Phase B: invite-by-email composer sheet (creator only, circle-detail). */}
+      {showInviteSheet && circleDetailData && (
+        <div className="circles-sheet-root" role="dialog" aria-modal="true" aria-label="Invite a member">
+          <button
+            type="button"
+            className="circles-sheet-backdrop"
+            aria-label="Close"
+            onClick={closeInviteSheet}
+          />
+          <div className="circles-sheet">
+            <div className="circles-sheet-handle" aria-hidden="true" />
+            <div className="circles-sheet-title">Invite a member</div>
+            <div className="circles-sheet-sub">
+              They'll need an existing Cinemastro account for the invite to land in their bell.
+            </div>
+
+            <div className="circles-field">
+              <label className="circles-field-label">Email</label>
+              <input
+                className="circles-input"
+                type="email"
+                autoComplete="email"
+                placeholder="friend@example.com"
+                value={inviteEmailDraft}
+                onChange={(e) => setInviteEmailDraft(e.target.value)}
+                disabled={inviteSheetSubmitting}
+                autoFocus
+              />
+            </div>
+
+            {inviteSheetError && <div className="circles-error-banner">{inviteSheetError}</div>}
+
+            <div className="circles-sheet-actions">
+              <button
+                type="button"
+                className="circles-btn-ghost"
+                onClick={closeInviteSheet}
+                disabled={inviteSheetSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="circles-btn-primary"
+                onClick={submitInviteByEmail}
+                disabled={inviteSheetSubmitting || !inviteEmailDraft.trim()}
+              >
+                {inviteSheetSubmitting ? "Sending…" : "Send invite"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Phase B: transient toast for invite-send / invite-accept feedback. */}
+      {inviteToast && (
+        <div
+          className={`circles-toast circles-toast--${inviteToast.tone}`}
+          role="status"
+          aria-live="polite"
+        >
+          {inviteToast.text}
         </div>
       )}
 
