@@ -245,7 +245,24 @@ export async function acceptCircleInvite({ inviteId }) {
 export async function fetchCircleRatedTitles({ circleId }) {
   const id = (circleId || "").trim();
   if (!id) throw new Error("Missing circle.");
-  return invokeCirclesEdge("get-circle-rated-titles", { circle_id: id });
+  try {
+    return await invokeCirclesEdge("get-circle-rated-titles", { circle_id: id });
+  } catch (e) {
+    const msg = e?.message || "";
+    if (msg.includes("not a member") || msg.includes("Unauthorized")) throw e;
+    console.warn("fetchCircleRatedTitles: Edge failed, trying RPC-only (no CF predictions)", msg);
+    const { data, error } = await supabase.rpc("get_circle_rated_strip", { p_circle_id: id });
+    if (error) throw new Error(error.message || msg || "Could not load circle titles.");
+    const strip = data && typeof data === "object" ? data : null;
+    if (!strip) throw new Error(msg || "Could not load circle titles.");
+    const titles = Array.isArray(strip.titles) ? strip.titles : [];
+    return {
+      ok: true,
+      member_count: Number(strip.member_count ?? 0),
+      gated: Boolean(strip.gated),
+      titles: titles.map((t) => ({ ...t, prediction: null })),
+    };
+  }
 }
 
 /** Decline runs directly under the "recipient can respond to invite" UPDATE policy. No Edge. */

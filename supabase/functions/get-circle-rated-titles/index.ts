@@ -183,8 +183,12 @@ Deno.serve(async (req: Request) => {
       if (msg.includes("not authenticated")) {
         return jsonResponse({ error: "Unauthorized" }, 401);
       }
+      const detail = [stripErr.message, (stripErr as { details?: string }).details, (stripErr as { hint?: string }).hint]
+        .filter((x): x is string => typeof x === "string" && x.length > 0)
+        .join(" — ");
       console.error("get-circle-rated-titles: get_circle_rated_strip failed", stripErr);
-      return jsonResponse({ error: "Could not load circle titles." }, 500);
+      const errOut = detail.length > 0 ? detail.slice(0, 900) : "Could not load circle titles.";
+      return jsonResponse({ error: errOut }, 500);
     }
 
     const strip = stripData as Record<string, unknown> | null;

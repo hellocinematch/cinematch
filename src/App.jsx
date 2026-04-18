@@ -17,6 +17,7 @@ import {
   sendCircleInvite,
   acceptCircleInvite,
   declineCircleInvite,
+  fetchCircleRatedTitles,
 } from "./circles";
 
 const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
@@ -2340,6 +2341,15 @@ const styles = `
   .circle-hero__meta-row { display:flex; align-items:center; gap:10px; margin-top:4px; flex-wrap:wrap; }
 
   .circle-detail-body { padding:20px 24px 40px; display:flex; flex-direction:column; gap:20px; }
+  .circle-detail-strip-wrap { display:flex; flex-direction:column; gap:18px; }
+  .circle-detail-strip-section { margin:0; }
+  .circle-detail-strip-header { padding-left:0 !important; padding-right:0 !important; }
+  .circle-detail-strip-block { margin-top:4px; }
+  .circle-strip-comm-line { font-size:11px; color:#888; margin-top:4px; letter-spacing:0.2px; }
+  .circle-strip-comm-line--muted { color:#555; }
+  .circle-detail-strip-empty { margin:0 !important; }
+  .circle-detail-strip-empty .empty-sub { margin-top:8px; font-size:12px; color:#777; line-height:1.45; }
+  .strip-card--circle-pending { opacity:0.8; pointer-events:none; }
   .circle-detail-placeholder { background:#111; border:1px dashed #222; border-radius:14px; padding:20px; }
   .circle-detail-placeholder__title { font-family:'DM Serif Display',serif; font-size:18px; color:#f0ebe0; margin-bottom:6px; }
   .circle-detail-placeholder__text { font-size:13px; color:#888; line-height:1.5; }
@@ -2496,6 +2506,26 @@ function formatPublicStat(n) {
   if (x < 10000) return `${(x / 1000).toFixed(1).replace(/\.0$/, "")}k`;
   if (x < 1_000_000) return `${Math.round(x / 1000)}k`;
   return `${(x / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+}
+
+/** Phase C circle strip: resolve poster row from catalogue or TMDB hydrate map. */
+function circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies) {
+  const id = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
+  return movieLookupById.get(id) ?? circleStripExtraMovies.get(id) ?? null;
+}
+
+/** `openDetail` prediction payload from Edge `prediction` object (null if user already rated). */
+function circleStripPredictionForDetail(row) {
+  if (row.viewer_score != null && Number.isFinite(Number(row.viewer_score))) return null;
+  const p = row.prediction;
+  if (!p || typeof p.predicted !== "number") return null;
+  return {
+    predicted: p.predicted,
+    low: typeof p.low === "number" ? p.low : Math.max(1, Math.round((p.predicted - 1) * 10) / 10),
+    high: typeof p.high === "number" ? p.high : Math.min(10, Math.round((p.predicted + 1) * 10) / 10),
+    neighborCount: Number(p.neighborCount ?? p.neighbor_count ?? 0),
+    confidence: p.confidence ?? "low",
+  };
 }
 
 function formatScore(n) {
@@ -2754,6 +2784,11 @@ export default function App() {
   const [circleDetailData, setCircleDetailData] = useState(null);
   const [circleDetailLoading, setCircleDetailLoading] = useState(false);
   const [circleDetailError, setCircleDetailError] = useState("");
+  /** Phase C: `get-circle-rated-titles` payload + TMDB rows not yet in `movieLookupById`. */
+  const [circleStripPayload, setCircleStripPayload] = useState(null);
+  const [circleStripLoading, setCircleStripLoading] = useState(false);
+  const [circleStripError, setCircleStripError] = useState("");
+  const [circleStripExtraMovies, setCircleStripExtraMovies] = useState(() => new Map());
   const [leaveCircleBusy, setLeaveCircleBusy] = useState(false);
   const [leaveCircleError, setLeaveCircleError] = useState("");
   const [leaveConfirmCircle, setLeaveConfirmCircle] = useState(null);
@@ -3387,6 +3422,42 @@ export default function App() {
     add(inTheatersPagePopularForRecs);
     return map;
   }, [catalogue, watchlist, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, secondaryStripCatalogRows, whatsHotForRecs, pulseTrendingForRecs, pulsePopularForRecs, inTheatersPagePopularForRecs]);
+
+  const circleStripIdsNeedingFetch = useMemo(() => {
+    if (!circleStripPayload?.titles?.length) return [];
+    const out = [];
+    for (const t of circleStripPayload.titles) {
+      const id = `${String(t.media_type)}-${Number(t.tmdb_id)}`;
+      if (movieLookupById.has(id)) continue;
+      if (circleStripExtraMovies.has(id)) continue;
+      out.push({ id, media_type: t.media_type, tmdb_id: t.tmdb_id });
+    }
+    return out;
+  }, [circleStripPayload, movieLookupById, circleStripExtraMovies]);
+
+  useEffect(() => {
+    if (screen !== "circle-detail" || circleStripIdsNeedingFetch.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const fetched = new Map();
+      for (let i = 0; i < circleStripIdsNeedingFetch.length; i += 8) {
+        const chunk = circleStripIdsNeedingFetch.slice(i, i + 8);
+        await Promise.all(
+          chunk.map(async (item) => {
+            const raw = await fetchTMDB(`/${item.media_type}/${item.tmdb_id}?language=en-US`);
+            if (cancelled || isTmdbApiErrorPayload(raw) || raw?.id == null) return;
+            fetched.set(item.id, normalizeTMDBItem(raw, item.media_type));
+          }),
+        );
+      }
+      if (!cancelled && fetched.size) {
+        setCircleStripExtraMovies((prev) => new Map([...prev, ...fetched]));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, circleStripIdsNeedingFetch]);
 
   /** Secondary region strip: TMDB fallback until `matchData.secondaryRecs` fills from `predict_cached`. */
   const secondaryStripRecsResolved = useMemo(() => {
@@ -5160,6 +5231,9 @@ export default function App() {
     setCircleDetailData(null);
     setCircleDetailError("");
     setLeaveCircleError("");
+    setCircleStripPayload(null);
+    setCircleStripError("");
+    setCircleStripExtraMovies(new Map());
     setScreen("circle-detail");
   }
 
@@ -5169,6 +5243,9 @@ export default function App() {
     setCircleDetailError("");
     setLeaveCircleError("");
     setLeaveConfirmCircle(null);
+    setCircleStripPayload(null);
+    setCircleStripError("");
+    setCircleStripExtraMovies(new Map());
     setScreen("circles");
   }
 
@@ -5201,6 +5278,37 @@ export default function App() {
       cancelled = true;
     };
   }, [screen, selectedCircleId]);
+
+  useEffect(() => {
+    setCircleStripExtraMovies(new Map());
+  }, [selectedCircleId]);
+
+  // Phase C: circle rated strip (Edge + RPC).
+  useEffect(() => {
+    if (screen !== "circle-detail" || !selectedCircleId || !user) {
+      return;
+    }
+    let cancelled = false;
+    setCircleStripLoading(true);
+    setCircleStripError("");
+    (async () => {
+      try {
+        const data = await fetchCircleRatedTitles({ circleId: selectedCircleId });
+        if (cancelled) return;
+        setCircleStripPayload(data);
+      } catch (e) {
+        if (cancelled) return;
+        console.error("Circles: fetchCircleRatedTitles failed", e);
+        setCircleStripError(e?.message || "Could not load circle titles.");
+        setCircleStripPayload(null);
+      } finally {
+        if (!cancelled) setCircleStripLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, selectedCircleId, user]);
 
   function requestLeaveCircle(circle) {
     if (!circle) return;
@@ -6272,7 +6380,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Circles — stub dashboard (Phase A). Phase C replaces this with the full hero + rated strip. */}
+      {/* Circles — circle detail: hero + Phase C rated strips + invite / leave */}
       {screen === "circle-detail" && (
         <div className="home">
           <div className="discover">
@@ -6343,13 +6451,136 @@ export default function App() {
                     )}
                   </div>
                 )}
-                <div className="circle-detail-placeholder">
-                  <div className="circle-detail-placeholder__title">Rated in this circle</div>
-                  <div className="circle-detail-placeholder__text">
-                    Once your circle has at least two members, the titles you've all rated will
-                    show up here with a group score and your personal prediction.
-                  </div>
-                </div>
+                {(() => {
+                  const mc = circleDetailData.memberCount;
+                  if (mc < 2) {
+                    return (
+                      <div className="circle-detail-placeholder">
+                        <div className="circle-detail-placeholder__title">Rated in this circle</div>
+                        <div className="circle-detail-placeholder__text">
+                          Once your circle has at least two members, the titles you&apos;ve all rated will
+                          show up here with a group score and your personal prediction.
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (circleStripError) {
+                    return (
+                      <div className="circles-error-banner" role="alert">
+                        {circleStripError}
+                      </div>
+                    );
+                  }
+                  if (circleStripLoading && !circleStripPayload) {
+                    return (
+                      <div className="circle-detail-strip-block">
+                        <div className="section-header circle-detail-strip-header">
+                          <div className="section-title">Rated in this circle</div>
+                        </div>
+                        <SkeletonStrip count={6} />
+                      </div>
+                    );
+                  }
+                  const titles = Array.isArray(circleStripPayload?.titles) ? circleStripPayload.titles : [];
+                  const together = titles.filter((t) => t.section === "together");
+                  const solo = titles.filter((t) => t.section === "solo");
+                  const renderStripRow = (row) => {
+                    const movie = circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies);
+                    const rowKey = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
+                    const predDetail = circleStripPredictionForDetail(row);
+                    const predictedForBadge =
+                      row.viewer_score != null && Number.isFinite(Number(row.viewer_score))
+                        ? null
+                        : row.prediction != null && typeof row.prediction.predicted === "number"
+                          ? row.prediction.predicted
+                          : null;
+                    const predictedNeighborCount =
+                      row.prediction != null
+                        ? Number(row.prediction.neighborCount ?? row.prediction.neighbor_count ?? 0)
+                        : 0;
+                    if (!movie) {
+                      return (
+                        <div className="strip-card strip-card--circle-pending" key={rowKey}>
+                          <div className="strip-poster">
+                            <div className="strip-poster-fallback">🎬</div>
+                          </div>
+                          <div className="strip-title">Loading…</div>
+                          <div className="strip-genre">—</div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        className="strip-card"
+                        key={rowKey}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openDetail(movie, predDetail)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDetail(movie, predDetail);
+                          }
+                        }}
+                      >
+                        <div className="strip-poster">
+                          {movie.poster ? (
+                            <img src={movie.poster} alt="" />
+                          ) : (
+                            <div className="strip-poster-fallback">🎬</div>
+                          )}
+                          <StripPosterBadge
+                            movie={movie}
+                            predicted={predictedForBadge}
+                            predictedNeighborCount={predictedForBadge != null ? predictedNeighborCount : 0}
+                          />
+                        </div>
+                        <div className="strip-title">{movie.title}</div>
+                        <div className="strip-genre">{formatStripMediaMeta(movie, tvStripMetaByTmdbId)}</div>
+                        <div className="circle-strip-comm-line">
+                          {row.section === "together" && row.group_rating != null && (
+                            <span>Circle {formatScore(row.group_rating)}</span>
+                          )}
+                          {row.section === "solo" && row.site_rating != null && (
+                            <span>Cinemastro {formatScore(row.site_rating)}</span>
+                          )}
+                          {row.section === "solo" && row.site_rating == null && (
+                            <span className="circle-strip-comm-line--muted">Cinemastro —</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  };
+                  return (
+                    <div className="circle-detail-strip-wrap">
+                      {together.length === 0 && solo.length === 0 ? (
+                        <div className="empty-box circle-detail-strip-empty">
+                          <div className="empty-text">No shared ratings in this circle yet.</div>
+                          <div className="empty-sub">Rate titles on your shelf — they&apos;ll show here when circle members have rated too.</div>
+                        </div>
+                      ) : (
+                        <>
+                          {together.length > 0 && (
+                            <div className="section circle-detail-strip-section">
+                              <div className="section-header circle-detail-strip-header">
+                                <div className="section-title">Rated in this circle</div>
+                              </div>
+                              <div className="strip">{together.map(renderStripRow)}</div>
+                            </div>
+                          )}
+                          {solo.length > 0 && (
+                            <div className="section circle-detail-strip-section">
+                              <div className="section-header circle-detail-strip-header">
+                                <div className="section-title">Also watched here</div>
+                              </div>
+                              <div className="strip">{solo.map(renderStripRow)}</div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
                 {leaveCircleError && (
                   <div className="circles-error-banner">{leaveCircleError}</div>
                 )}

@@ -1,10 +1,14 @@
 # Changelog
 
+## 5.3.0
+
+- **Circles — Phase C strip UI (`circle-detail`).** Replaces the ≥2-member placeholder with live data from `fetchCircleRatedTitles`. When the circle has fewer than two members, the original explainer stays. With two or more members, the screen loads the Edge response (skeleton while loading), then renders two horizontal strips — **Rated in this circle** (together: ≥2 circle raters, shows circle average + your `StripPosterBadge`) and **Also watched here** (solo: one circle rater, shows Cinemastro site average + your badge). Titles not already in the merged catalogue map are hydrated via TMDB detail (`normalizeTMDBItem`). Tap a card to open the standard title detail (`openDetail`). Empty state when no qualifying titles. Strip errors surface as a banner without blocking the rest of the page.
+
 ## 5.2.0
 
 - **Circles — Phase C backend (rated strip API).** Adds `public.get_circle_rated_strip(circle_id uuid)` (SECURITY DEFINER, `auth.uid()` membership check) implementing the Phase C display contract from `20260422120000_circles_schema.sql`: ≥2 members to return strip rows; **together** (≥2 distinct circle raters per title, group average) vs **solo** (exactly one circle rater, Cinemastro site-wide average via `get_cinemastro_title_avgs`); archived circles filter ratings to `rated_at < circles.archived_at`; up to 60 titles ordered by section then recency. Ensures `public.ratings.rated_at` exists when missing (for archive cutoff).
 - **New Edge function `get-circle-rated-titles`.** Authenticated callers invoke it with `{ circle_id }`; it runs the RPC with the user JWT, then fills per-title CF predictions (`match_predict_neighbor_raters` + `user_title_predictions` read-through cache) when the viewer has not rated. `npx supabase@latest functions deploy get-circle-rated-titles --project-ref lovpktgeutujljltlhdl`.
-- **Client helper `fetchCircleRatedTitles({ circleId })`** in `src/circles.js` (same `invoke` + `FunctionsHttpError` parsing as invite flows). **Circle-detail UI still shows the Phase A placeholder** until the strip is wired to this API.
+- **Client helper `fetchCircleRatedTitles({ circleId })`** in `src/circles.js` (same `invoke` + `FunctionsHttpError` parsing as invite flows). **Strip UI** ships in **v5.3.0**.
 - **Migration:** `supabase/migrations/20260426120000_circles_phase_c_get_circle_rated_strip.sql` — apply in Supabase SQL editor (or your usual migration path) before relying on the RPC or Edge function.
 
 ## 5.1.0
@@ -15,7 +19,7 @@
 - **Two new SECURITY DEFINER helpers.** `public.resolve_profile_id_by_email(text) → uuid` is called by send-circle-invite only (execute is revoked from `anon`/`authenticated` to prevent email enumeration; service role retains access via the bypass role). `public.get_my_pending_invites() → table` returns every pending invite for `auth.uid()` pre-joined with the circle's display fields, member count, and the sender's `profiles.name`, so the bell panel renders in a single round-trip without fighting SELECT RLS on profiles.
 - **New migration:** `supabase/migrations/20260424120000_circles_phase_b_helpers.sql`. Apply via the Supabase SQL editor (no schema changes — functions only).
 - **Deploy commands.** `npx supabase@latest functions deploy send-circle-invite --project-ref lovpktgeutujljltlhdl` and `npx supabase@latest functions deploy accept-circle-invite --project-ref lovpktgeutujljltlhdl`. Both require `SUPABASE_SERVICE_ROLE_KEY` in the project's Edge secrets (already configured for the existing `match` / `compute-neighbors` functions).
-- **Unchanged.** Creator-leave → archive flow, Phase A RLS model (the three SECURITY DEFINER helpers from the v5.0.0 hotfix still fully gate the client-side invite INSERT / decline UPDATE paths), circle + member cap math, vibe design tokens. No Phase C work yet — the "Rated in this circle" strip still shows the ≥2-member placeholder.
+- **Unchanged.** Creator-leave → archive flow, Phase A RLS model (the three SECURITY DEFINER helpers from the v5.0.0 hotfix still fully gate the client-side invite INSERT / decline UPDATE paths), circle + member cap math, vibe design tokens. Phase C strip UI landed in **v5.3.0** (after this release).
 
 ## 5.0.0
 
