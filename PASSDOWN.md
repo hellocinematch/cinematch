@@ -6,8 +6,8 @@ Attach this file in the next Cursor chat (`@PASSDOWN.md`) **or** use `@HANDOFF.m
 
 ## Repo version
 
-- **`package.json`:** **5.3.0** — Circles **Phase C** (strip **API** + **UI** on `circle-detail`).
-- Next version bump (**5.4.0**) when shipping the next vertical slice (e.g. `watchlist.source_circle_id`, Phase D, etc.) — include **`CHANGELOG.md`** in that release commit, not in docs-only commits.
+- **`package.json`:** **5.4.1** — Strip **perf**: SQL page-only site avgs; Edge batched prediction **cache** only (no per-title `match_predict`).
+- Next version bump (**5.5.0**) when shipping the next vertical slice (e.g. `watchlist.source_circle_id`, Phase D, etc.) — include **`CHANGELOG.md`** in that release commit, not in docs-only commits.
 
 ---
 
@@ -16,7 +16,7 @@ Attach this file in the next Cursor chat (`@PASSDOWN.md`) **or** use `@HANDOFF.m
 ### Backend (v5.2.0 area; may be same release train as UI)
 
 - **`get_circle_rated_strip(p_circle_id uuid)`** — `SECURITY DEFINER`, `auth.uid()` membership check; returns JSON: `member_count`, `gated`, `titles[]` (together | solo, group/site scores, `viewer_score`).
-- **`get-circle-rated-titles`** Edge — JWT → RPC → per-title CF predictions (`match_predict_neighbor_raters` + `user_title_predictions` cache).
+- **`get-circle-rated-titles`** Edge — JWT → RPC → batched **`user_title_predictions`** reads only (no per-title `match_predict`; cold cache → null).
 - **`fetchCircleRatedTitles`** in `src/circles.js` — invokes Edge; on Edge failure (except not-member / Unauthorized) **falls back** to direct `supabase.rpc('get_circle_rated_strip')` with **`prediction: null`** (strip still renders; badges fall back to Cinemastro/TMDB).
 
 ### UI (v5.3.0)
@@ -31,7 +31,9 @@ Attach this file in the next Cursor chat (`@PASSDOWN.md`) **or** use `@HANDOFF.m
 |------|---------|
 | `20260426120000_circles_phase_c_get_circle_rated_strip.sql` | `rated_at` column if missing; initial `get_circle_rated_strip` |
 | `20260427120000_circles_get_circle_rated_strip_fix.sql` | Archive filter fix; `jsonb_agg` via ordered subquery |
-| `20260428120000_circles_strip_timeout_and_index.sql` | **`ratings(user_id)`** index; **`statement_timeout = 120s`** on RPC |
+| `20260428120000_circles_strip_timeout_and_index.sql` | **`ratings(user_id)`** index; **`statement_timeout = 120s`** on RPC (one-arg `get_circle_rated_strip`; superseded by 291’s signature) |
+| `20260429120000_circles_strip_pagination.sql` | **`get_circle_rated_strip(uuid, int, int)`** — `p_limit` / `p_offset`, max **20** rows, **`total_eligible`** + **`has_more`** |
+| `20260430120000_circles_strip_site_avgs_page_only.sql` | **Perf:** `get_cinemastro_title_avgs` only for **current page** solo rows (not whole circle) |
 
 **Prod:** User applies these manually (common house rule). Keep repo = source of truth.
 
@@ -94,6 +96,6 @@ grep '"version"' package.json
 git status && git log -3 --oneline
 ```
 
-Expected: **`"version": "5.3.0"`**.
+Expected: **`"version": "5.4.1"`**.
 
 If this file replaced older notes, recover with: `git show HEAD~1:PASSDOWN.md` (adjust `HEAD~n` as needed).

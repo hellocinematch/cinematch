@@ -241,17 +241,29 @@ export async function acceptCircleInvite({ inviteId }) {
   return invokeCirclesEdge("accept-circle-invite", { invite_id: inviteId });
 }
 
+/** First page size for circle strip; subsequent pages use {@link CIRCLE_STRIP_PAGE}. Max rows server-side: {@link CIRCLE_STRIP_MAX}. */
+export const CIRCLE_STRIP_INITIAL = 10;
+export const CIRCLE_STRIP_PAGE = 5;
+export const CIRCLE_STRIP_MAX = 20;
+
 /** Phase C: circle strip (`get-circle-rated-titles` Edge + `get_circle_rated_strip` RPC). */
-export async function fetchCircleRatedTitles({ circleId }) {
+export async function fetchCircleRatedTitles({ circleId, limit, offset }) {
   const id = (circleId || "").trim();
   if (!id) throw new Error("Missing circle.");
+  const pLimit = limit ?? CIRCLE_STRIP_INITIAL;
+  const pOffset = offset ?? 0;
+  const body = { circle_id: id, p_limit: pLimit, p_offset: pOffset };
   try {
-    return await invokeCirclesEdge("get-circle-rated-titles", { circle_id: id });
+    return await invokeCirclesEdge("get-circle-rated-titles", body);
   } catch (e) {
     const msg = e?.message || "";
     if (msg.includes("not a member") || msg.includes("Unauthorized")) throw e;
     console.warn("fetchCircleRatedTitles: Edge failed, trying RPC-only (no CF predictions)", msg);
-    const { data, error } = await supabase.rpc("get_circle_rated_strip", { p_circle_id: id });
+    const { data, error } = await supabase.rpc("get_circle_rated_strip", {
+      p_circle_id: id,
+      p_limit: pLimit,
+      p_offset: pOffset,
+    });
     if (error) throw new Error(error.message || msg || "Could not load circle titles.");
     const strip = data && typeof data === "object" ? data : null;
     if (!strip) throw new Error(msg || "Could not load circle titles.");
@@ -260,6 +272,8 @@ export async function fetchCircleRatedTitles({ circleId }) {
       ok: true,
       member_count: Number(strip.member_count ?? 0),
       gated: Boolean(strip.gated),
+      total_eligible: Number(strip.total_eligible ?? 0),
+      has_more: Boolean(strip.has_more),
       titles: titles.map((t) => ({ ...t, prediction: null })),
     };
   }

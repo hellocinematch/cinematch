@@ -5,15 +5,14 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 // Circles Phase C — get-circle-rated-titles
 // ------------------------------------------------------------------------------------------------
 //
-// Body: { circle_id: string }
+// Body: { circle_id: string, p_limit?: number, p_offset?: number }
 // Auth: JWT — caller must be a member of the circle.
 //
-// 1) Calls public.get_circle_rated_strip(p_circle_id) with the caller's JWT (sets auth.uid()).
-// 2) For each title where the viewer has no ratings row, enriches with CF prediction via
-//    match_predict_neighbor_raters (service role) + user_title_predictions cache read-through.
+// 1) Calls public.get_circle_rated_strip(...) with the caller's JWT.
+// 2) Fills per-title CF predictions from user_title_predictions only (batched by media_type).
+//    Cold cache → prediction null (same as detail-page predict_cached; avoids N× match_predict RPCs).
 //
-// Response: { ok: true, member_count, gated, titles: [...] }
-// Each title includes RPC fields plus optional `prediction` when viewer_score is null.
+// Response: { ok: true, member_count, gated, titles: [...], total_eligible, has_more }
 // ------------------------------------------------------------------------------------------------
 
 const corsHeaders: Record<string, string> = {
@@ -21,12 +20,8 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SIMILARITY_FLOOR_READ = 0.10;
 const PREDICTION_MODEL_VERSION = "cf-v3-user-neighbors-v4";
 const PREDICTION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-
-const CONFIDENCE_HIGH_WEIGHT = 3.0;
-const CONFIDENCE_MEDIUM_WEIGHT = 1.5;
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -54,77 +49,68 @@ type RpcTitle = {
   viewer_score: number | null;
 };
 
-function predFromWeightedRaters(raters: { score: number; similarity: number }[]): Pred | null {
-  if (raters.length === 0) return null;
-  const weightedSum = raters.reduce((s, r) => s + r.score * r.similarity, 0);
-  const totalWeight = raters.reduce((s, r) => s + r.similarity, 0);
-  const predicted = Math.round((weightedSum / totalWeight) * 10) / 10;
-  const confidence = totalWeight >= CONFIDENCE_HIGH_WEIGHT
-    ? "high"
-    : totalWeight >= CONFIDENCE_MEDIUM_WEIGHT
-    ? "medium"
-    : "low";
-  const nRatings = raters.map((r) => r.score);
-  const mean = nRatings.reduce((a, b) => a + b, 0) / nRatings.length;
-  const stdDev = Math.sqrt(nRatings.reduce((s, r) => s + (r - mean) ** 2, 0) / nRatings.length);
-  const margin = stdDev * 0.8;
+function predFromCacheRow(row: Record<string, unknown>): Pred | null {
+  const computedAtMs = Date.parse(String(row.computed_at ?? ""));
+  const fresh = Number.isFinite(computedAtMs) && (Date.now() - computedAtMs <= PREDICTION_CACHE_TTL_MS);
+  const modelOk = String(row.model_version ?? "") === PREDICTION_MODEL_VERSION;
+  if (!fresh || !modelOk) return null;
   return {
-    predicted,
-    low: Math.max(1, Math.round((predicted - margin) * 10) / 10),
-    high: Math.min(10, Math.round((predicted + margin) * 10) / 10),
-    confidence,
-    neighborCount: raters.length,
+    predicted: Number(row.predicted),
+    low: Number(row.low),
+    high: Number(row.high),
+    confidence: String(row.confidence),
+    neighborCount: Number(row.neighbor_count ?? 0),
   };
 }
 
-async function predictForTitle(
+/** Two indexed reads (movie + tv) instead of 2N round-trips; no match_predict_neighbor_raters here. */
+async function predictionsFromCacheBatch(
   admin: SupabaseClient,
   userId: string,
-  mediaType: string,
-  tmdbId: number,
-): Promise<Pred | null> {
-  if (mediaType !== "movie" && mediaType !== "tv") return null;
+  titles: RpcTitle[],
+): Promise<Map<string, Pred>> {
+  const out = new Map<string, Pred>();
+  const unrated = titles.filter(
+    (t) => !(t.viewer_score != null && Number.isFinite(Number(t.viewer_score))),
+  );
+  if (unrated.length === 0) return out;
 
-  const { data: cached, error: cacheErr } = await admin
-    .from("user_title_predictions")
-    .select("predicted, low, high, confidence, neighbor_count, computed_at, model_version")
-    .eq("user_id", userId)
-    .eq("media_type", mediaType)
-    .eq("tmdb_id", tmdbId)
-    .maybeSingle();
+  const movieIds = [
+    ...new Set(unrated.filter((t) => t.media_type === "movie").map((t) => Number(t.tmdb_id))),
+  ];
+  const tvIds = [...new Set(unrated.filter((t) => t.media_type === "tv").map((t) => Number(t.tmdb_id)))];
 
-  if (!cacheErr && cached) {
-    const row = cached as Record<string, unknown>;
-    const computedAtMs = Date.parse(String(row.computed_at ?? ""));
-    const fresh = Number.isFinite(computedAtMs) && (Date.now() - computedAtMs <= PREDICTION_CACHE_TTL_MS);
-    const modelOk = String(row.model_version ?? "") === PREDICTION_MODEL_VERSION;
-    if (fresh && modelOk) {
-      return {
-        predicted: Number(row.predicted),
-        low: Number(row.low),
-        high: Number(row.high),
-        confidence: String(row.confidence),
-        neighborCount: Number(row.neighbor_count ?? 0),
-      };
+  if (movieIds.length > 0) {
+    const { data, error } = await admin
+      .from("user_title_predictions")
+      .select("predicted, low, high, confidence, neighbor_count, computed_at, model_version, tmdb_id")
+      .eq("user_id", userId)
+      .eq("media_type", "movie")
+      .in("tmdb_id", movieIds);
+    if (!error && data) {
+      for (const row of data) {
+        const r = row as Record<string, unknown>;
+        const pred = predFromCacheRow(r);
+        if (pred) out.set(`movie-${Number(r.tmdb_id)}`, pred);
+      }
     }
   }
-
-  const { data, error } = await admin.rpc("match_predict_neighbor_raters", {
-    p_user_id: userId,
-    p_media_type: mediaType,
-    p_tmdb_id: tmdbId,
-    p_min_similarity: SIMILARITY_FLOOR_READ,
-  });
-  if (error) {
-    console.warn("get-circle-rated-titles: match_predict_neighbor_raters failed", error.message);
-    return null;
+  if (tvIds.length > 0) {
+    const { data, error } = await admin
+      .from("user_title_predictions")
+      .select("predicted, low, high, confidence, neighbor_count, computed_at, model_version, tmdb_id")
+      .eq("user_id", userId)
+      .eq("media_type", "tv")
+      .in("tmdb_id", tvIds);
+    if (!error && data) {
+      for (const row of data) {
+        const r = row as Record<string, unknown>;
+        const pred = predFromCacheRow(r);
+        if (pred) out.set(`tv-${Number(r.tmdb_id)}`, pred);
+      }
+    }
   }
-  const rows = (data ?? []) as { score: number | string; similarity: number | string }[];
-  const raters = rows.map((r) => ({
-    score: Number(r.score),
-    similarity: Number(r.similarity),
-  }));
-  return predFromWeightedRaters(raters);
+  return out;
 }
 
 Deno.serve(async (req: Request) => {
@@ -171,8 +157,19 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "circle_id is required." }, 400);
     }
 
+    const rawLimit = body.p_limit;
+    const rawOffset = body.p_offset;
+    const pLimit = typeof rawLimit === "number" && Number.isFinite(rawLimit)
+      ? Math.max(1, Math.floor(rawLimit))
+      : 10;
+    const pOffset = typeof rawOffset === "number" && Number.isFinite(rawOffset)
+      ? Math.max(0, Math.floor(rawOffset))
+      : 0;
+
     const { data: stripData, error: stripErr } = await authed.rpc("get_circle_rated_strip", {
       p_circle_id: circleId,
+      p_limit: pLimit,
+      p_offset: pOffset,
     });
 
     if (stripErr) {
@@ -199,6 +196,8 @@ Deno.serve(async (req: Request) => {
     const memberCount = Number(strip.member_count ?? 0);
     const gated = Boolean(strip.gated);
     const rawTitles = Array.isArray(strip.titles) ? strip.titles as RpcTitle[] : [];
+    const totalEligible = Number(strip.total_eligible ?? 0);
+    const hasMore = Boolean(strip.has_more);
 
     if (gated || memberCount < 2) {
       return jsonResponse({
@@ -206,30 +205,29 @@ Deno.serve(async (req: Request) => {
         member_count: memberCount,
         gated: true,
         titles: [],
+        total_eligible: 0,
+        has_more: false,
       });
     }
 
-    const enriched = await Promise.all(
-      rawTitles.map(async (t) => {
-        const hasRated = t.viewer_score != null && Number.isFinite(Number(t.viewer_score));
-        if (hasRated) {
-          return { ...t, prediction: null as Pred | null };
-        }
-        const pred = await predictForTitle(
-          admin,
-          callerId,
-          String(t.media_type),
-          Number(t.tmdb_id),
-        );
-        return { ...t, prediction: pred };
-      }),
-    );
+    const cacheMap = await predictionsFromCacheBatch(admin, callerId, rawTitles);
+    const enriched = rawTitles.map((t) => {
+      const hasRated = t.viewer_score != null && Number.isFinite(Number(t.viewer_score));
+      if (hasRated) {
+        return { ...t, prediction: null as Pred | null };
+      }
+      const key = `${String(t.media_type)}-${Number(t.tmdb_id)}`;
+      const pred = cacheMap.get(key) ?? null;
+      return { ...t, prediction: pred };
+    });
 
     return jsonResponse({
       ok: true,
       member_count: memberCount,
       gated: false,
       titles: enriched,
+      total_eligible: totalEligible,
+      has_more: hasMore,
     });
   } catch (e) {
     console.error("get-circle-rated-titles: unhandled", (e as Error)?.message);

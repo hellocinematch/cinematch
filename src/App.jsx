@@ -18,6 +18,9 @@ import {
   acceptCircleInvite,
   declineCircleInvite,
   fetchCircleRatedTitles,
+  CIRCLE_STRIP_INITIAL,
+  CIRCLE_STRIP_PAGE,
+  CIRCLE_STRIP_MAX,
 } from "./circles";
 
 const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
@@ -2349,6 +2352,12 @@ const styles = `
   .circle-strip-comm-line--muted { color:#555; }
   .circle-detail-strip-empty { margin:0 !important; }
   .circle-detail-strip-empty .empty-sub { margin-top:8px; font-size:12px; color:#777; line-height:1.45; }
+  .circle-strip-pager { display:flex; justify-content:center; margin-top:4px; }
+  .circle-strip-load-more { background:#1a1a1a; color:#e8c96a; border:1px solid #3a3a3a; padding:10px 20px; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; transition:background 0.15s, border-color 0.15s; }
+  .circle-strip-load-more:hover:not(:disabled) { background:#222; border-color:#555; }
+  .circle-strip-load-more:disabled { opacity:0.55; cursor:default; }
+  .circle-strip-cap-hint { font-size:12px; color:#777; line-height:1.5; margin-top:8px; text-align:center; max-width:36em; margin-left:auto; margin-right:auto; }
+  .circle-strip-cap-hint button { margin-top:8px; background:transparent; border:none; color:#e8c96a; text-decoration:underline; cursor:pointer; font-size:inherit; padding:0; font-family:inherit; }
   .strip-card--circle-pending { opacity:0.8; pointer-events:none; }
   .circle-detail-placeholder { background:#111; border:1px dashed #222; border-radius:14px; padding:20px; }
   .circle-detail-placeholder__title { font-family:'DM Serif Display',serif; font-size:18px; color:#f0ebe0; margin-bottom:6px; }
@@ -2787,6 +2796,7 @@ export default function App() {
   /** Phase C: `get-circle-rated-titles` payload + TMDB rows not yet in `movieLookupById`. */
   const [circleStripPayload, setCircleStripPayload] = useState(null);
   const [circleStripLoading, setCircleStripLoading] = useState(false);
+  const [circleStripLoadingMore, setCircleStripLoadingMore] = useState(false);
   const [circleStripError, setCircleStripError] = useState("");
   const [circleStripExtraMovies, setCircleStripExtraMovies] = useState(() => new Map());
   const [leaveCircleBusy, setLeaveCircleBusy] = useState(false);
@@ -5283,17 +5293,23 @@ export default function App() {
     setCircleStripExtraMovies(new Map());
   }, [selectedCircleId]);
 
-  // Phase C: circle rated strip (Edge + RPC).
+  // Phase C: circle rated strip (Edge + RPC) — first page only; see loadCircleStripMore.
   useEffect(() => {
     if (screen !== "circle-detail" || !selectedCircleId || !user) {
       return;
     }
     let cancelled = false;
+    setCircleStripPayload(null);
+    setCircleStripLoadingMore(false);
     setCircleStripLoading(true);
     setCircleStripError("");
     (async () => {
       try {
-        const data = await fetchCircleRatedTitles({ circleId: selectedCircleId });
+        const data = await fetchCircleRatedTitles({
+          circleId: selectedCircleId,
+          limit: CIRCLE_STRIP_INITIAL,
+          offset: 0,
+        });
         if (cancelled) return;
         setCircleStripPayload(data);
       } catch (e) {
@@ -5309,6 +5325,43 @@ export default function App() {
       cancelled = true;
     };
   }, [screen, selectedCircleId, user]);
+
+  async function loadCircleStripMore() {
+    if (!selectedCircleId || !user || circleStripLoadingMore || circleStripLoading) return;
+    const prev = circleStripPayload;
+    if (!prev || prev.gated) return;
+    const cur = Array.isArray(prev.titles) ? prev.titles : [];
+    const offset = cur.length;
+    if (offset >= CIRCLE_STRIP_MAX || !prev.has_more) return;
+
+    setCircleStripLoadingMore(true);
+    setCircleStripError("");
+    try {
+      const data = await fetchCircleRatedTitles({
+        circleId: selectedCircleId,
+        limit: CIRCLE_STRIP_PAGE,
+        offset,
+      });
+      setCircleStripPayload((p) => {
+        const base = p || {};
+        const merged = [
+          ...(Array.isArray(base.titles) ? base.titles : []),
+          ...(Array.isArray(data.titles) ? data.titles : []),
+        ];
+        return {
+          ...data,
+          titles: merged,
+          total_eligible: data.total_eligible ?? base.total_eligible,
+          has_more: Boolean(data.has_more),
+        };
+      });
+    } catch (e) {
+      console.error("Circles: loadCircleStripMore failed", e);
+      setCircleStripError(e?.message || "Could not load more titles.");
+    } finally {
+      setCircleStripLoadingMore(false);
+    }
+  }
 
   function requestLeaveCircle(circle) {
     if (!circle) return;
@@ -6551,34 +6604,75 @@ export default function App() {
                       </div>
                     );
                   };
+                  const showLoadMore =
+                    circleStripPayload
+                    && !circleStripPayload.gated
+                    && circleStripPayload.has_more
+                    && titles.length < CIRCLE_STRIP_MAX;
+                  const showSearchHint =
+                    circleStripPayload
+                    && !circleStripPayload.gated
+                    && (circleStripPayload.total_eligible ?? 0) > CIRCLE_STRIP_MAX
+                    && titles.length >= CIRCLE_STRIP_MAX
+                    && !circleStripPayload.has_more;
                   return (
-                    <div className="circle-detail-strip-wrap">
-                      {together.length === 0 && solo.length === 0 ? (
-                        <div className="empty-box circle-detail-strip-empty">
-                          <div className="empty-text">No shared ratings in this circle yet.</div>
-                          <div className="empty-sub">Rate titles on your shelf — they&apos;ll show here when circle members have rated too.</div>
+                    <>
+                      <div className="circle-detail-strip-wrap">
+                        {together.length === 0 && solo.length === 0 ? (
+                          <div className="empty-box circle-detail-strip-empty">
+                            <div className="empty-text">No shared ratings in this circle yet.</div>
+                            <div className="empty-sub">Rate titles on your shelf — they&apos;ll show here when circle members have rated too.</div>
+                          </div>
+                        ) : (
+                          <>
+                            {together.length > 0 && (
+                              <div className="section circle-detail-strip-section">
+                                <div className="section-header circle-detail-strip-header">
+                                  <div className="section-title">Rated in this circle</div>
+                                </div>
+                                <div className="strip">{together.map(renderStripRow)}</div>
+                              </div>
+                            )}
+                            {solo.length > 0 && (
+                              <div className="section circle-detail-strip-section">
+                                <div className="section-header circle-detail-strip-header">
+                                  <div className="section-title">Also watched here</div>
+                                </div>
+                                <div className="strip">{solo.map(renderStripRow)}</div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      {showLoadMore && (
+                        <div className="circle-strip-pager">
+                          <button
+                            type="button"
+                            className="circle-strip-load-more"
+                            onClick={() => void loadCircleStripMore()}
+                            disabled={circleStripLoadingMore}
+                          >
+                            {circleStripLoadingMore ? "Loading…" : "Load more"}
+                          </button>
                         </div>
-                      ) : (
-                        <>
-                          {together.length > 0 && (
-                            <div className="section circle-detail-strip-section">
-                              <div className="section-header circle-detail-strip-header">
-                                <div className="section-title">Rated in this circle</div>
-                              </div>
-                              <div className="strip">{together.map(renderStripRow)}</div>
-                            </div>
-                          )}
-                          {solo.length > 0 && (
-                            <div className="section circle-detail-strip-section">
-                              <div className="section-header circle-detail-strip-header">
-                                <div className="section-title">Also watched here</div>
-                              </div>
-                              <div className="strip">{solo.map(renderStripRow)}</div>
-                            </div>
-                          )}
-                        </>
                       )}
-                    </div>
+                      {showSearchHint && (
+                        <div className="circle-strip-cap-hint">
+                          Showing {CIRCLE_STRIP_MAX} recent titles in this circle. For anything else, search by title in Discover.
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNavTab("discover");
+                                setScreen("discover");
+                              }}
+                            >
+                              Open Discover
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   );
                 })()}
                 {leaveCircleError && (

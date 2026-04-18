@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.4.1
+
+- **Circles strip performance.** `get_circle_rated_strip` now calls `get_cinemastro_title_avgs` only for titles on the **current page** (not every solo title in the circle). Edge `get-circle-rated-titles` uses **two batched reads** from `user_title_predictions` (movie + tv) and **no longer** invokes `match_predict_neighbor_raters` per title (cold cache → `prediction: null`, same as other strips). Migration: `supabase/migrations/20260430120000_circles_strip_site_avgs_page_only.sql`. Redeploy Edge after pull.
+
+## 5.4.0
+
+- **Circles — Phase C strip pagination.** The circle-detail strip loads **10** most recently rated titles first, then **Load more** fetches **5** at a time up to a **20**-title cap. `get_circle_rated_strip` now takes `p_limit` / `p_offset` (defaults 10 / 0) and returns `total_eligible` and `has_more`. After 20 titles, copy points users to **Discover** to search by title. Migration: `supabase/migrations/20260429120000_circles_strip_pagination.sql`. Redeploy Edge: `get-circle-rated-titles`.
+
 ## 5.3.0
 
 - **Circles — Phase C strip UI (`circle-detail`).** Replaces the ≥2-member placeholder with live data from `fetchCircleRatedTitles`. When the circle has fewer than two members, the original explainer stays. With two or more members, the screen loads the Edge response (skeleton while loading), then renders two horizontal strips — **Rated in this circle** (together: ≥2 circle raters, shows circle average + your `StripPosterBadge`) and **Also watched here** (solo: one circle rater, shows Cinemastro site average + your badge). Titles not already in the merged catalogue map are hydrated via TMDB detail (`normalizeTMDBItem`). Tap a card to open the standard title detail (`openDetail`). Empty state when no qualifying titles. Strip errors surface as a banner without blocking the rest of the page.
