@@ -5269,13 +5269,15 @@ export default function App() {
       try {
         const { data: sessWrap } = await supabase.auth.getSession();
         const sessionUser = sessWrap?.session?.user ?? null;
+        /** `getSession()` can lag behind React `user` after refresh; do not skip `predict_cached` in that gap. */
+        const authedForCf = Boolean(sessionUser?.id ?? user?.id);
         const hasRatings = Object.keys(userRatings).length > 0;
         const neighborN = Number(pred?.neighborCount ?? pred?.neighbor_count ?? 0);
         const alreadyHaveCf =
           pred != null &&
           neighborN >= 1 &&
           normalizeDetailPredictionPayload(pred) != null;
-        const needsPredict = Boolean(sessionUser) && hasRatings && !alreadyHaveCf;
+        const needsPredict = authedForCf && hasRatings && !alreadyHaveCf;
 
         if (!needsPredict) {
           setSelected((prev) => {
