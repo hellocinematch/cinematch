@@ -200,10 +200,14 @@ async function isSeedSubject(admin: SupabaseClient, userId: string): Promise<boo
   return Boolean(name?.toLowerCase().startsWith(SEED_PREFIX));
 }
 
+async function cleanupStagingRun(admin: SupabaseClient, runId: string): Promise<void> {
+  await admin.from("user_neighbors_staging").delete().eq("run_id", runId);
+}
+
 /**
- * Deletes existing rows for `user_id`, then inserts every neighbor with similarity >= NOISE_FLOOR
- * (no row-count cap). Inserts are batched for API limits. Candidate discovery is still bounded
- * by overlap paging / title-key cap so DB stays responsive.
+ * Recomputes neighbors entirely in memory first, then swaps into `user_neighbors` in one DB
+ * transaction (`commit_user_neighbors_swap`) so a failed run never leaves the user with rows
+ * deleted but not re-inserted.
  */
 async function computeNeighborsForUser(
   admin: SupabaseClient,
@@ -211,11 +215,14 @@ async function computeNeighborsForUser(
 ): Promise<{ stored: number; candidates: number }> {
   let userMap = await loadUserRatingsMap(admin, userId);
 
-  const { error: delErr } = await admin.from("user_neighbors").delete().eq("user_id", userId);
-  if (delErr) throw delErr;
-
   if (Object.keys(userMap).length === 0) {
-    return { stored: 0, candidates: 0 };
+    const runId = crypto.randomUUID();
+    const { data: cleared, error: rpcErr } = await admin.rpc("commit_user_neighbors_swap", {
+      p_user_id: userId,
+      p_run_id: runId,
+    });
+    if (rpcErr) throw rpcErr;
+    return { stored: typeof cleared === "number" ? cleared : 0, candidates: 0 };
   }
 
   /** Subset for overlap + cosine — avoids statement_timeout on blockbuster titles × huge `ratings`. */
@@ -263,12 +270,10 @@ async function computeNeighborsForUser(
 
   scored.sort((a, b) => b.similarity - a.similarity);
 
-  if (scored.length === 0) {
-    return { stored: 0, candidates: candidateMap.size };
-  }
-
   const now = new Date().toISOString();
-  const payload = scored.map((n) => ({
+  const runId = crypto.randomUUID();
+  const stagingRows = scored.map((n) => ({
+    run_id: runId,
     user_id: userId,
     neighbor_id: n.neighbor_id,
     similarity: n.similarity,
@@ -276,13 +281,25 @@ async function computeNeighborsForUser(
     computed_at: now,
   }));
 
-  for (let i = 0; i < payload.length; i += NEIGHBOR_INSERT_BATCH) {
-    const batch = payload.slice(i, i + NEIGHBOR_INSERT_BATCH);
-    const { error: insErr } = await admin.from("user_neighbors").insert(batch);
-    if (insErr) throw insErr;
-  }
+  try {
+    for (let i = 0; i < stagingRows.length; i += NEIGHBOR_INSERT_BATCH) {
+      const batch = stagingRows.slice(i, i + NEIGHBOR_INSERT_BATCH);
+      const { error: insErr } = await admin.from("user_neighbors_staging").insert(batch);
+      if (insErr) throw insErr;
+    }
 
-  return { stored: payload.length, candidates: candidateMap.size };
+    const { data: inserted, error: rpcErr } = await admin.rpc("commit_user_neighbors_swap", {
+      p_user_id: userId,
+      p_run_id: runId,
+    });
+    if (rpcErr) throw rpcErr;
+
+    const n = typeof inserted === "number" ? inserted : stagingRows.length;
+    return { stored: n, candidates: candidateMap.size };
+  } catch (e) {
+    await cleanupStagingRun(admin, runId);
+    throw e;
+  }
 }
 
 Deno.serve(async (req: Request) => {
