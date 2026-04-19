@@ -1,0 +1,12 @@
+---
+description: Read PASSDOWN-NEXT-CHAT each session; update passdown on milestones; point to cron runbook
+alwaysApply: true
+---
+
+# Cinematch handoff (every chat)
+
+1. **At the start of substantive work** in this repo, open **`PASSDOWN-NEXT-CHAT.md`** for current context, commits, prod notes, and product guardrails.
+2. **Recurring reminder:** neighbor **`pg_cron`** only covers **`jobs × limit`** users per wave. When **`user_neighbors`**, **compute-neighbors**, **cron**, **pg_net**, or **user / MAU growth** comes up, remind to check **`COMPUTE-NEIGHBORS-CRON.md`** and expand staggered **`offset`** / **`cron.schedule`** rows so all eligible non-seed users are covered.
+3. When the user asks to **“update passdown”**, **“passdown”**, or after shipping meaningful neighbor/match/cron changes: **edit `PASSDOWN-NEXT-CHAT.md`** (date, recent work, open follow-ups).
+
+Partner rule: **`.cursor/rules/compute-neighbors-cron.mdc`** (cron scaling detail).

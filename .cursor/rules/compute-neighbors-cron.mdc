@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Compute-neighbors cron coverage
 
+Session handoff: **`PASSDOWN-NEXT-CHAT.md`**.
+
 When the conversation touches **compute-neighbors**, **`user_neighbors`**, **neighbor rebuild**, **pg_cron**, **pg_net**, or **scaling users**:
 
 1. **Remind the user** to open **`COMPUTE-NEIGHBORS-CRON.md`** and verify that **cron chunk count × limit** still covers **all eligible (non-seed) users** after growth. If not, add staggered jobs with higher **`offset`** values (or adjust **`limit`** only if Edge timeouts allow).
