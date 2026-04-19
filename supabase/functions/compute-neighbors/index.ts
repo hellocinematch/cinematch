@@ -69,7 +69,10 @@ function cosineSimilarity(ratingsA: RatingsMap, ratingsB: RatingsMap): number {
   const dot = shared.reduce((s, id) => s + ratingsA[id] * ratingsB[id], 0);
   const magA = Math.sqrt(shared.reduce((s, id) => s + ratingsA[id] ** 2, 0));
   const magB = Math.sqrt(shared.reduce((s, id) => s + ratingsB[id] ** 2, 0));
-  return magA && magB ? dot / (magA * magB) : 0;
+  const raw = magA && magB ? dot / (magA * magB) : 0;
+  if (!Number.isFinite(raw)) return 0;
+  /** DB `user_neighbors_similarity_check`: similarity between 0 and 1 inclusive. */
+  return Math.min(1, Math.max(0, raw));
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -159,7 +162,7 @@ async function fetchOverlapRowsForChunk(
       if (error) throw error;
       const rows = (data ?? []) as RatingRow[];
       if (rows.length === 0) break;
-      out.push(...rows);
+      for (const r of rows) out.push(r);
       if (rows.length < OVERLAP_PAGE_SIZE) break;
       from += OVERLAP_PAGE_SIZE;
     }
@@ -232,10 +235,12 @@ async function computeNeighborsForUser(
 
   const rows: RatingRow[] = [];
   if (movieIds.length) {
-    rows.push(...await fetchOverlapRowsForChunk(admin, userId, "movie", movieIds));
+    const movieOverlap = await fetchOverlapRowsForChunk(admin, userId, "movie", movieIds);
+    for (const r of movieOverlap) rows.push(r);
   }
   if (tvIds.length) {
-    rows.push(...await fetchOverlapRowsForChunk(admin, userId, "tv", tvIds));
+    const tvOverlap = await fetchOverlapRowsForChunk(admin, userId, "tv", tvIds);
+    for (const r of tvOverlap) rows.push(r);
   }
 
   const candidateMap = buildCandidateMapsFromOverlap(userMap, rows);

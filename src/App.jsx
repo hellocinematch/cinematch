@@ -2991,10 +2991,25 @@ export default function App() {
     computeNeighborsPendingRef.current = false;
     computeNeighborsInFlightRef.current = true;
     try {
-      const { error } = await supabase.functions.invoke("compute-neighbors", {
+      const { data, error } = await supabase.functions.invoke("compute-neighbors", {
         body: { userId: user.id },
       });
       if (error) console.warn("compute-neighbors invoke failed:", error.message);
+      else if (data && data.ok === false) {
+        const bad = Array.isArray(data.results) ? data.results.filter((r) => !r.ok) : [];
+        console.warn(
+          "compute-neighbors finished with failures (user_neighbors may be empty until this succeeds):",
+          bad.length ? bad : data,
+        );
+      } else if (data?.ok === true && Array.isArray(data.results)) {
+        const mine = data.results.find((r) => r.userId === user.id);
+        if (mine?.ok === true && mine.stored === 0) {
+          console.warn(
+            "compute-neighbors stored 0 neighbors for this user (check Edge logs / overlap). candidates:",
+            mine.candidates,
+          );
+        }
+      }
     } catch (e) {
       console.warn("compute-neighbors invoke failed:", e);
     } finally {
