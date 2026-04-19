@@ -963,8 +963,13 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     const action = (body.action as string) || "full";
-    const userRatings = (body.userRatings as RatingsMap) || {};
-    const catalogue = (body.catalogue as Movie[]) || [];
+    const rawRatings = body.userRatings;
+    const userRatings: RatingsMap =
+      rawRatings != null && typeof rawRatings === "object" && !Array.isArray(rawRatings)
+        ? (rawRatings as RatingsMap)
+        : {};
+    const rawCatalogue = body.catalogue;
+    const catalogue: Movie[] = Array.isArray(rawCatalogue) ? (rawCatalogue as Movie[]) : [];
 
     if (admin && (await isSeedSubject(admin, user.id))) {
       return new Response(JSON.stringify({ error: "Not available for seed users" }), {

@@ -105,130 +105,25 @@ const RATE_NOW_OVERLAP_CANDIDATE_CAP = 48;
 const RATE_NOW_TMDB_FETCH_CONCURRENCY = 8;
 
 /**
- * More tab “Your picks”: strip 1 **For you**, strip 2 **Worth a Look**.
- * With **no** streaming filter: both strips are filled from the scored pool (prediction order).
- * With **selected** providers: strip 1 favors titles on those TMDB **flatrate** ids; strip 2 must be
- * **off** those services only. Strip-2 top-up/rebalance must stay provider-aware — see
- * `topUpYourPicksStripsRespectingStreaming`.
+ * Your Picks: **CF predicted** (neighbor-backed), then **high predicted** (match rows without overlap),
+ * then **popular** (catalogue / TMDB). **Worth a look** is on-demand only (button → 5 titles from match).
+ * Main row loads **5 at a time** up to 20.
  */
-const MORE_TAB_ON_SERVICE_MAX = 15;
-const MORE_TAB_OFF_SERVICE_MAX = 20;
-/** Strip 2 floor; also used to backfill strip 1 from scored theater / streaming / worth-a-look rows. */
-const MORE_TAB_OFF_SERVICE_PRED_MIN = 6.5;
+const YOUR_PICKS_BATCH_SIZE = 5;
+const YOUR_PICKS_VISIBLE_MAX = 20;
+/** Titles per tap on **Worth a look** (match `worthALookRecs` pool). */
+const YOUR_PICKS_WORTH_A_LOOK_BATCH = 5;
 /** Max titles per Discover `predict_cached` batch (Edge + DB bound). */
 const DISCOVER_PREDICT_CACHED_CAP = 120;
 /** After `your_picks_page`, compute CF overlays for this many rec ids (cold cache — Edge only reads DB in `your_picks_page`). */
 const YOUR_PICKS_PREDICT_CACHED_CAP = 80;
-
+/** Parallel TMDB `/watch/providers` fetches when building Your Picks strips (streaming filter on). */
+const YOUR_PICKS_WATCH_PROVIDER_FETCH_CONCURRENCY = 8;
 /**
- * When CF `recommendations` is short, strip 2 would be empty after taking strip 1. The Edge function
- * already returns `worthALookRecs` (catalogue + predictions); merge those in up to MORE_TAB_OFF_SERVICE_MAX.
+ * Unrated catalogue titles (by popularity) to run `predict_cached` on for Your Picks — same per-title
+ * CF path as Pulse / Streaming when `match_recommendations_from_neighbors` omits a title (top-220 + catalogue join).
  */
-function fillWorthLookStripFromPool(strip1Ids, strip2, pool) {
-  const used = new Set([...strip1Ids, ...strip2.map((r) => r.movie.id)]);
-  const out = [...strip2];
-  const rest = pool
-    .filter((r) => r?.movie?.id && !used.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
-    .sort((a, b) => b.predicted - a.predicted);
-  for (const r of rest) {
-    if (out.length >= MORE_TAB_OFF_SERVICE_MAX) break;
-    out.push(r);
-    used.add(r.movie.id);
-  }
-  return out;
-}
-
-/**
- * Grow strips toward row caps from the scored pool (predictions only). Fills partial rows, not only empty strips.
- * Used when **no** streaming providers are selected — strip 2 has no “off service” rule.
- */
-function topUpYourPicksStrips(strip1, strip2, pool) {
-  const used = new Set([...strip1, ...strip2].map((r) => r.movie.id));
-  let out1 = [...strip1];
-  let out2 = [...strip2];
-  for (const r of pool) {
-    if (out1.length >= MORE_TAB_ON_SERVICE_MAX) break;
-    if (!used.has(r.movie.id)) {
-      out1.push(r);
-      used.add(r.movie.id);
-    }
-  }
-  for (const r of pool) {
-    if (out2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
-    if (!used.has(r.movie.id)) {
-      out2.push(r);
-      used.add(r.movie.id);
-    }
-  }
-  if (out2.length === 0 && out1.length > 1) {
-    const weakest = [...out1].sort((a, b) => a.predicted - b.predicted)[0];
-    out1 = out1.filter((r) => r.movie.id !== weakest.movie.id);
-    out2 = [weakest];
-  }
-  return [out1, out2];
-}
-
-/**
- * Streaming-filter variant of `topUpYourPicksStrips`.
- *
- * Strip 1 top-up: unchanged (same pool walk as the sync helper).
- * Strip 2 top-up: each candidate must be **not** on any selected provider (`flatrate` vs profile ids);
- * on-service titles stay out of strip 2 (they belong in **For you** or elsewhere).
- * Rebalance (empty strip 2): move the **lowest-predicted strip-1 row that is off-service**, not the
- * global weakest — moving an on-service title would violate Worth a Look.
- *
- * Returns `null` if `isCancelled()` is true after an await (effect teardown).
- */
-async function topUpYourPicksStripsRespectingStreaming(
-  strip1,
-  strip2,
-  pool,
-  selectedStreamingProviderIds,
-  getFlatrateProviderIds,
-  isCancelled,
-) {
-  const used = new Set([...strip1, ...strip2].map((r) => r.movie.id));
-  let out1 = [...strip1];
-  let out2 = [...strip2];
-  for (const r of pool) {
-    if (isCancelled()) return null;
-    if (out1.length >= MORE_TAB_ON_SERVICE_MAX) break;
-    if (!used.has(r.movie.id)) {
-      out1.push(r);
-      used.add(r.movie.id);
-    }
-  }
-  for (const r of pool) {
-    if (isCancelled()) return null;
-    if (out2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
-    if (used.has(r.movie.id)) continue;
-    const ids = await getFlatrateProviderIds(r.movie);
-    if (isCancelled()) return null;
-    const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
-    if (!on) {
-      out2.push(r);
-      used.add(r.movie.id);
-    }
-  }
-  if (out2.length === 0 && out1.length > 1) {
-    const sortedByWeak = [...out1].sort((a, b) => a.predicted - b.predicted);
-    let move = null;
-    for (const r of sortedByWeak) {
-      const ids = await getFlatrateProviderIds(r.movie);
-      if (isCancelled()) return null;
-      const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
-      if (!on) {
-        move = r;
-        break;
-      }
-    }
-    if (move) {
-      out1 = out1.filter((r) => r.movie.id !== move.movie.id);
-      out2 = [move];
-    }
-  }
-  return [out1, out2];
-}
+const YOUR_PICKS_CATALOG_PREDICT_CAP = 96;
 
 /** Stable id for catalogue rows (handles `id` vs type+tmdbId after JSON). */
 function mediaIdKey(movie) {
@@ -242,6 +137,25 @@ function mediaIdKey(movie) {
   const ty = movie.type;
   if (tid != null && ty) return `${String(ty).toLowerCase()}-${Number(tid)}`;
   return null;
+}
+
+/** Match `userRatings` keys when `movie.id` is missing after JSON (Your Picks pools only). */
+function recMovieRowId(rec) {
+  return mediaIdKey(rec?.movie);
+}
+
+/** Grow **For you** toward `cap` from `pool` (rotation / sort already applied upstream). */
+function topUpYourPicksStrip1Only(strip1, pool, cap) {
+  const used = new Set(strip1.map((r) => recMovieRowId(r)).filter(Boolean));
+  const out = [...strip1];
+  for (const r of pool) {
+    if (out.length >= cap) break;
+    const rid = recMovieRowId(r);
+    if (!rid || used.has(rid)) continue;
+    out.push(r);
+    used.add(rid);
+  }
+  return out;
 }
 
 /** v3.0.0: Parse catalogue id (`movie-123`, `tv-456`) for `get_cinemastro_title_avgs` RPC payloads. */
@@ -1921,6 +1835,7 @@ const styles = `
   /* v3.0.0: Cinemastro community avg — Option B gold edge; TMDB uses base .strip-badge only. */
   .strip-badge.strip-badge--cinemastro { border:1px solid rgba(201,162,39,0.65); box-shadow:0 0 0 1px rgba(232,201,106,0.1); }
   .strip-badge.strip-badge--predicted { border:1px solid rgba(59,130,246,0.7); box-shadow:0 0 0 1px rgba(59,130,246,0.2); }
+  .strip-badge.strip-badge--predicted-provisional { border:1px solid rgba(96,165,250,0.55); box-shadow:0 0 0 1px rgba(96,165,250,0.12); opacity:0.95; }
   /* v3.1.0: Gold underline = community sample weight (tiered fill). */
   .strip-badge.strip-badge--with-meter { display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 8px 5px; }
   .cinemastro-vote-meter { width:100%; min-width:28px; max-width:72px; height:3px; border-radius:2px; border:1px solid rgba(201,162,39,0.55); background:rgba(0,0,0,0.35); box-sizing:border-box; overflow:hidden; }
@@ -2706,7 +2621,14 @@ function CinemastroVoteMeter({ count, className = "" }) {
  * v3.5.1: Poster / Discover / mood badge priority — user rating, then personal prediction, then community.
  * `pillClass` adds source-specific accents (Cinemastro gold, predicted blue).
  */
-function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey, predictedNeighborCount = 0) {
+function stripBadgeDisplay(
+  movie,
+  userRating,
+  predicted,
+  cinemastroAvgByKey,
+  predictedNeighborCount = 0,
+  preferPersonalPredicted = false,
+) {
   if (userRating != null && Number.isFinite(Number(userRating))) {
     return {
       text: `★ ${formatScore(userRating)}`,
@@ -2722,6 +2644,20 @@ function stripBadgeDisplay(movie, userRating, predicted, cinemastroAvgByKey, pre
       title: "Predicted for you",
       color: "#3b82f6",
       pillClass: "strip-badge--predicted",
+      cinemastroCount: null,
+    };
+  }
+  if (
+    preferPersonalPredicted &&
+    predicted != null &&
+    Number.isFinite(Number(predicted)) &&
+    Number(predictedNeighborCount) < 1
+  ) {
+    return {
+      text: formatScore(predicted),
+      title: "Predicted for you (refines as more neighbors overlap)",
+      color: "#60a5fa",
+      pillClass: "strip-badge--predicted-provisional",
       cinemastroCount: null,
     };
   }
@@ -2877,6 +2813,13 @@ export default function App() {
   const [moodSelections, setMoodSelections] = useState({ region: [], indian_lang: [], genre: [], vibe: [] });
   const [moodResults, setMoodResults] = useState([]);
   const [topPickOffset, setTopPickOffset] = useState(0);
+  /** Your Picks: on-demand strip from `worthALookRecs` (see YOUR_PICKS_WORTH_A_LOOK_BATCH). */
+  const [yourPicksWorthALookStrip, setYourPicksWorthALookStrip] = useState([]);
+  const worthALookStripOffsetRef = useRef(0);
+  /** Your Picks: visible count = min(pool, 20, step × YOUR_PICKS_BATCH_SIZE). */
+  const [yourPicksBatchStep, setYourPicksBatchStep] = useState(1);
+  /** `predict_cached` over popular unrated catalogue rows (neighbor-backed preds merged into For you). */
+  const [yourPicksCatalogPredictions, setYourPicksCatalogPredictions] = useState({});
   const [inTheaters, setInTheaters] = useState([]);
   const [streamingMovies, setStreamingMovies] = useState([]);
   const [streamingTV, setStreamingTV] = useState([]);
@@ -3640,6 +3583,7 @@ export default function App() {
 
     let cancelled = false;
     setMatchLoading(true);
+    /** Short debounce only — coalesces rapid catalogue/ratings churn without the old 350ms “blank Your Picks” gap. */
     const t = setTimeout(async () => {
       try {
         const yourPicksResult = await invokeMatch({
@@ -3721,7 +3665,10 @@ export default function App() {
         const overlayIds = new Set();
         for (const r of nextRecs) if (r?.movie?.id) overlayIds.add(r.movie.id);
         for (const r of nextWorth) if (r?.movie?.id) overlayIds.add(r.movie.id);
-        const idList = [...overlayIds].slice(0, YOUR_PICKS_PREDICT_CACHED_CAP);
+        /** Skip ids `your_picks_page` already hydrated from `user_title_predictions` — avoids a second heavy `predict_cached` batch. */
+        const idList = [...overlayIds]
+          .filter((id) => !predictionMapLookup(mergedYourPicksPredictions, id))
+          .slice(0, YOUR_PICKS_PREDICT_CACHED_CAP);
         if (idList.length > 0) {
           const predResult = await invokeMatch({
             action: "predict_cached",
@@ -3757,7 +3704,7 @@ export default function App() {
       } finally {
         if (!cancelled) setMatchLoading(false);
       }
-    }, 350);
+    }, 100);
     return () => {
       cancelled = true;
       clearTimeout(t);
@@ -4021,7 +3968,13 @@ export default function App() {
     ]);
     if (ratingsData) {
       const ratingsMap = {};
-      ratingsData.forEach(r => { ratingsMap[`${r.media_type}-${r.tmdb_id}`] = r.score; });
+      ratingsData.forEach((r) => {
+        const ty = String(r.media_type ?? "").toLowerCase();
+        if (ty !== "movie" && ty !== "tv") return;
+        const tid = Number(r.tmdb_id);
+        if (!Number.isFinite(tid)) return;
+        ratingsMap[`${ty}-${tid}`] = r.score;
+      });
       setUserRatings(ratingsMap);
     }
     if (watchlistData && catalogue.length > 0) {
@@ -4565,62 +4518,217 @@ export default function App() {
       const k = mediaIdKey(r?.movie);
       if (k) s.add(k);
     }
+    for (const rawId of Object.keys(yourPicksCatalogPredictions)) {
+      const pred = yourPicksCatalogPredictions[rawId];
+      if (Number(pred?.neighborCount ?? pred?.neighbor_count ?? 0) < 1) continue;
+      const p = parseMediaKey(String(rawId));
+      if (p) s.add(`${p.type}-${p.tmdbId}`);
+    }
     return s;
-  }, [recommendations]);
+  }, [recommendations, yourPicksCatalogPredictions]);
 
-  /**
-   * Your Picks fallback pool: `worthALookRecs` only (from `recommendations_only`). Kept independent of
-   * In Theaters / Streaming / Pulse pools so route data stays page-local (see architecture brief).
-   */
-  const yourPicksFallbackPool = useMemo(() => {
+  /** Match `worthALookRecs` — used only when the user taps **Worth a look** (not mixed into the main strip). */
+  const yourPicksWorthALookPool = useMemo(() => {
     const rated = new Set(Object.keys(userRatings));
     const byId = new Map();
     for (const r of worthALookRecs) {
-      if (!r?.movie?.id || rated.has(r.movie.id)) continue;
-      const prev = byId.get(r.movie.id);
-      if (!prev || r.predicted > prev.predicted) byId.set(r.movie.id, r);
+      const rid = recMovieRowId(r);
+      if (!rid || rated.has(rid)) continue;
+      const prev = byId.get(rid);
+      if (!prev || r.predicted > prev.predicted) byId.set(rid, r);
     }
     return [...byId.values()].sort((a, b) => b.predicted - a.predicted);
   }, [userRatings, worthALookRecs]);
 
-  /**
-   * Scored rows for Your Picks strips. Partitions by prediction quality so **predicted rows
-   * (`neighborCount ≥ 1`) come first** — even if a TMDB-only fallback has a higher `predicted`
-   * score — then unpredicted rows fill the tail. Each partition is sorted by `predicted` desc;
-   * rotation in `rebuildMoreTabStrips` cycles within each partition independently to keep the
-   * blue pills at the top of the strip on refresh.
-   */
-  const yourPicksStripSorted = useMemo(() => {
-    const primary = [...recommendations];
-    const seen = new Set(primary.map((r) => r.movie.id));
-    const extras = [];
-    for (const r of yourPicksFallbackPool) {
-      if (!r?.movie?.id || seen.has(r.movie.id)) continue;
-      seen.add(r.movie.id);
-      extras.push(r);
-    }
-    const all = [...primary, ...extras];
-    const predicted = all
-      .filter((r) => recNeighborCount(r) >= 1)
-      .sort((a, b) => b.predicted - a.predicted);
-    const unpredicted = all
-      .filter((r) => recNeighborCount(r) < 1)
-      .sort((a, b) => b.predicted - a.predicted);
-    return [...predicted, ...unpredicted];
-  }, [recommendations, yourPicksFallbackPool]);
-
-  /** First index in `yourPicksStripSorted` without `neighborCount ≥ 1`. Used for partition-aware rotation. */
-  const yourPicksPredictedCount = useMemo(
-    () => yourPicksStripSorted.findIndex((r) => recNeighborCount(r) < 1),
-    [yourPicksStripSorted],
+  const yourPicksWorthALookPoolSig = useMemo(
+    () => yourPicksWorthALookPool.map((r) => recMovieRowId(r)).filter(Boolean).join("\x1e"),
+    [yourPicksWorthALookPool],
   );
 
-  const hasYourPicksStripSource = yourPicksStripSorted.length > 0;
+  useEffect(() => {
+    worthALookStripOffsetRef.current = 0;
+    setYourPicksWorthALookStrip([]);
+  }, [yourPicksWorthALookPoolSig]);
 
-  /** Strip 1 For you / strip 2 Worth a Look — ordering and provider split built in `rebuildMoreTabStrips`. */
+  /** Catalogue ids for a Pulse-style `predict_cached` batch (unrated, not in RPC `recommendations`). */
+  const yourPicksCatalogPredictTitleIds = useMemo(() => {
+    if (!user || Object.keys(userRatings).length === 0) return [];
+    const catalogueRows =
+      Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0
+        ? catalogueForRecs
+        : Array.isArray(catalogue) && catalogue.length > 0
+          ? catalogue
+          : [];
+    const rated = new Set(Object.keys(userRatings));
+    const inRpc = new Set();
+    for (const r of recommendations) {
+      const k = recMovieRowId(r);
+      if (k) inRpc.add(k);
+    }
+    const candidates = catalogueRows.filter((m) => {
+      const k = mediaIdKey(m);
+      if (!k || rated.has(k) || inRpc.has(k)) return false;
+      const mid = m.id != null && m.id !== "" ? String(m.id) : k;
+      return parseMediaKey(mid) != null;
+    });
+    candidates.sort((a, b) => Number(b.popularity ?? 0) - Number(a.popularity ?? 0));
+    return candidates
+      .slice(0, YOUR_PICKS_CATALOG_PREDICT_CAP)
+      .map((m) => (m.id != null && m.id !== "" ? String(m.id) : mediaIdKey(m)))
+      .filter((id) => id && parseMediaKey(id));
+  }, [user, userRatings, catalogueForRecs, catalogue, recommendations]);
+
+  useEffect(() => {
+    if (!user) {
+      setYourPicksCatalogPredictions({});
+      return;
+    }
+    if (yourPicksCatalogPredictTitleIds.length === 0) {
+      setYourPicksCatalogPredictions({});
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const predResult = await invokeMatch({
+          action: "predict_cached",
+          userRatings,
+          titles: yourPicksCatalogPredictTitleIds,
+        });
+        const predPayload = unwrapMatchFunctionData(predResult.data);
+        if (predResult.error) logMatchInvokeFailure("predict_cached (your picks catalogue)", predResult);
+        if (cancelled || predResult.error || !predPayload?.predictions) return;
+        setYourPicksCatalogPredictions(mergeNonNullPredictions({}, predPayload.predictions));
+      } catch (e) {
+        if (!cancelled) console.error(e);
+      }
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [user, userRatings, yourPicksCatalogPredictTitleIds]);
+
+  /**
+   * Main Your Picks pool: RPC **`recommendations`** plus **catalogue `predict_cached`** rows with
+   * neighbor overlap (same path as Pulse), merged and sorted by **predicted desc**, then **popular**.
+   */
+  const yourPicksMainCandidates = useMemo(() => {
+    const catalogueRows =
+      Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0
+        ? catalogueForRecs
+        : Array.isArray(catalogue) && catalogue.length > 0
+          ? catalogue
+          : [];
+    const rated = new Set(Object.keys(userRatings));
+    const seen = new Set();
+    const cfList = [];
+    for (const r of recommendations) {
+      const rid = recMovieRowId(r);
+      if (!rid || seen.has(rid)) continue;
+      seen.add(rid);
+      cfList.push(r);
+    }
+    for (const m of catalogueRows) {
+      const rid = mediaIdKey(m);
+      if (!rid || seen.has(rid) || rated.has(rid)) continue;
+      const movieIdForPred = m.id != null && m.id !== "" ? String(m.id) : rid;
+      const pred =
+        predictionMapLookup(yourPicksCatalogPredictions, movieIdForPred) ??
+        predictionMapLookup(yourPicksCatalogPredictions, rid);
+      if (pred == null || typeof pred !== "object") continue;
+      if (Number(pred.neighborCount ?? pred.neighbor_count ?? 0) < 1) continue;
+      const rec = recFromMatchPrediction(m, pred);
+      if (recNeighborCount(rec) < 1) continue;
+      seen.add(rid);
+      cfList.push(rec);
+    }
+    cfList.sort((a, b) => {
+      const dp = Number(b.predicted) - Number(a.predicted);
+      if (dp !== 0) return dp;
+      return recNeighborCount(b) - recNeighborCount(a);
+    });
+    const cfNeighborSorted = cfList;
+
+    const popular = [];
+    for (const m of catalogueRows) {
+      const rid = mediaIdKey(m);
+      if (!rid || rated.has(rid) || seen.has(rid)) continue;
+      seen.add(rid);
+      popular.push(tmdbOnlyRec(m));
+    }
+    popular.sort((a, b) => Number(b.movie.popularity ?? 0) - Number(a.movie.popularity ?? 0));
+    let restSorted = popular.slice(0, 120);
+
+    if (cfNeighborSorted.length === 0 && restSorted.length === 0 && catalogueRows.length > 0) {
+      const emerg = [];
+      for (const m of catalogueRows) {
+        const rid = mediaIdKey(m);
+        if (!rid || rated.has(rid)) continue;
+        emerg.push(tmdbOnlyRec(m));
+      }
+      emerg.sort((a, b) => Number(b.movie.popularity ?? 0) - Number(a.movie.popularity ?? 0));
+      restSorted = emerg.slice(0, 120);
+    }
+    return { cfNeighborSorted, restSorted };
+  }, [recommendations, catalogueForRecs, catalogue, userRatings, yourPicksCatalogPredictions]);
+
+  const hasYourPicksStripSource =
+    yourPicksMainCandidates.cfNeighborSorted.length > 0 || yourPicksMainCandidates.restSorted.length > 0;
+
+  const yourPicksPoolSig = useMemo(
+    () =>
+      [...yourPicksMainCandidates.cfNeighborSorted, ...yourPicksMainCandidates.restSorted]
+        .map((r) => recMovieRowId(r))
+        .filter(Boolean)
+        .join("\x1e"),
+    [yourPicksMainCandidates],
+  );
+
+  useEffect(() => {
+    setYourPicksBatchStep(1);
+  }, [yourPicksPoolSig]);
+
+  const yourPicksTotalCandidates = useMemo(
+    () => yourPicksMainCandidates.cfNeighborSorted.length + yourPicksMainCandidates.restSorted.length,
+    [yourPicksMainCandidates],
+  );
+
+  const yourPicksVisibleCap = useMemo(() => {
+    const n = yourPicksTotalCandidates;
+    if (n === 0) return 0;
+    return Math.min(n, YOUR_PICKS_VISIBLE_MAX, yourPicksBatchStep * YOUR_PICKS_BATCH_SIZE);
+  }, [yourPicksTotalCandidates, yourPicksBatchStep]);
+
+  const yourPicksMaxBatchSteps = useMemo(() => {
+    const n = yourPicksTotalCandidates;
+    if (n === 0) return 1;
+    return Math.min(
+      YOUR_PICKS_VISIBLE_MAX / YOUR_PICKS_BATCH_SIZE,
+      Math.ceil(Math.min(n, YOUR_PICKS_VISIBLE_MAX) / YOUR_PICKS_BATCH_SIZE),
+    );
+  }, [yourPicksTotalCandidates]);
+
+  const loadYourPicksWorthALookFive = useCallback(() => {
+    const pool = yourPicksWorthALookPool;
+    if (pool.length === 0) {
+      worthALookStripOffsetRef.current = 0;
+      setYourPicksWorthALookStrip([]);
+      return;
+    }
+    const n = pool.length;
+    const o = worthALookStripOffsetRef.current;
+    const batch = [];
+    for (let k = 0; k < YOUR_PICKS_WORTH_A_LOOK_BATCH && k < n; k++) {
+      batch.push(pool[(o + k) % n]);
+    }
+    worthALookStripOffsetRef.current = (o + YOUR_PICKS_WORTH_A_LOOK_BATCH) % n;
+    setYourPicksWorthALookStrip(toYourPicksStripRows(batch, cfRecommendationPickIdSet));
+  }, [yourPicksWorthALookPool, cfRecommendationPickIdSet]);
+
+  /** Your Picks **For you** row — built in `rebuildMoreTabStrips`. */
   const [moreForYouStrip, setMoreForYouStrip] = useState([]);
-  const [worthLookStrip, setWorthLookStrip] = useState([]);
-  /** True while resolving TMDB watch providers for More strips (sequential fetches). */
+  /** True while resolving TMDB watch providers for Your Picks (streaming filter on). */
   const [moreStripsLoading, setMoreStripsLoading] = useState(false);
 
   useEffect(() => {
@@ -4637,130 +4745,101 @@ export default function App() {
     };
 
     const rebuildMoreTabStrips = async () => {
-      const sorted = yourPicksStripSorted;
-      if (sorted.length === 0) {
+      const { cfNeighborSorted, restSorted } = yourPicksMainCandidates;
+      if (cfNeighborSorted.length === 0 && restSorted.length === 0) {
         if (!cancelled) {
           setMoreStripsLoading(false);
           setMoreForYouStrip([]);
-          setWorthLookStrip([]);
         }
         return;
       }
 
-      // Partition-preserving rotation: cycle predicted + unpredicted independently so blue-pill rows
-      // always stay ahead of TMDB-only rows on refresh (sorted is already [predicted…, unpredicted…]).
-      const predictedCount =
-        yourPicksPredictedCount === -1 ? sorted.length : yourPicksPredictedCount;
-      const pred = sorted.slice(0, predictedCount);
-      const unpred = sorted.slice(predictedCount);
       const rotatePart = (arr) => {
         if (arr.length === 0) return arr;
         const s = topPickOffset % arr.length;
         return [...arr.slice(s), ...arr.slice(0, s)];
       };
-      const rotated = [...rotatePart(pred), ...rotatePart(unpred)];
+      const pred = rotatePart(cfNeighborSorted);
+      const unpred = rotatePart(restSorted);
+      const rotated = [...pred, ...unpred];
+      const visibleCap = Math.min(
+        rotated.length,
+        YOUR_PICKS_VISIBLE_MAX,
+        yourPicksBatchStep * YOUR_PICKS_BATCH_SIZE,
+      );
+      const cfN = cfNeighborSorted.length;
+      const restAligned = rotated.slice(cfN);
 
       if (selectedStreamingProviderIds.length === 0) {
-        let strip1Recs = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
-        const strip1Ids = new Set(strip1Recs.map((r) => r.movie.id));
-        let strip2Recs = sorted
-          .filter((r) => !strip1Ids.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
-          .slice(0, MORE_TAB_OFF_SERVICE_MAX);
-        strip2Recs = fillWorthLookStripFromPool(strip1Ids, strip2Recs, worthALookRecs);
-        ;[strip1Recs, strip2Recs] = topUpYourPicksStrips(strip1Recs, strip2Recs, sorted);
-        const strip1Rows = toYourPicksStripRows(strip1Recs, cfRecommendationPickIdSet);
-        const strip2Rows = toYourPicksStripRows(strip2Recs, cfRecommendationPickIdSet);
+        let main = rotated.slice(0, visibleCap);
+        main = topUpYourPicksStrip1Only(main, rotated, visibleCap);
         if (!cancelled) {
           setMoreStripsLoading(false);
-          setMoreForYouStrip(strip1Rows);
-          setWorthLookStrip(strip2Rows);
+          setMoreForYouStrip(toYourPicksStripRows(main, cfRecommendationPickIdSet));
         }
         return;
       }
 
       if (!cancelled) setMoreStripsLoading(true);
       try {
-        let strip1 = [];
-        for (const rec of rotated) {
-          if (strip1.length >= MORE_TAB_ON_SERVICE_MAX) break;
-          const ids = await getFlatrateProviderIds(rec.movie);
-          if (cancelled) return;
-          if (ids.some((id) => selectedStreamingProviderIds.includes(id))) strip1.push(rec);
+        let main = [];
+        for (const r of pred) {
+          if (main.length >= visibleCap) break;
+          main.push(r);
         }
-        if (strip1.length === 0 && sorted.length > 0) {
-          strip1 = rotated.slice(0, MORE_TAB_ON_SERVICE_MAX);
-        } else if (strip1.length < MORE_TAB_ON_SERVICE_MAX && strip1.length > 0) {
-          const inStrip1 = new Set(strip1.map((r) => r.movie.id));
-          const seen = new Set(inStrip1);
-          const backfillPool = [];
-          for (const rec of worthALookRecs) {
-            if (!rec?.movie?.id || seen.has(rec.movie.id)) continue;
-            seen.add(rec.movie.id);
-            if (rec.predicted < MORE_TAB_OFF_SERVICE_PRED_MIN) continue;
-            backfillPool.push(rec);
-          }
-          backfillPool.sort((a, b) => b.predicted - a.predicted);
-          for (const rec of backfillPool) {
-            if (strip1.length >= MORE_TAB_ON_SERVICE_MAX) break;
-            const ids = await getFlatrateProviderIds(rec.movie);
+        let rIdx = 0;
+        while (main.length < visibleCap && rIdx < restAligned.length) {
+          const batch = restAligned.slice(
+            rIdx,
+            Math.min(rIdx + YOUR_PICKS_WATCH_PROVIDER_FETCH_CONCURRENCY, restAligned.length),
+          );
+          rIdx += batch.length;
+          await Promise.all(batch.map((rec) => getFlatrateProviderIds(rec.movie)));
+          for (const rec of batch) {
             if (cancelled) return;
-            if (ids.some((id) => selectedStreamingProviderIds.includes(id))) strip1.push(rec);
+            if (main.length >= visibleCap) break;
+            const ids = await getFlatrateProviderIds(rec.movie);
+            if (ids.some((id) => selectedStreamingProviderIds.includes(id))) main.push(rec);
           }
         }
-
-        // On-service matches alone are often < row cap; append next-best predictions so "For you" still fills (may not stream on selected apps).
-        const strip1IdsForPad = new Set(strip1.map((r) => r.movie.id));
-        for (const rec of sorted) {
-          if (strip1.length >= MORE_TAB_ON_SERVICE_MAX) break;
-          if (strip1IdsForPad.has(rec.movie.id)) continue;
-          strip1.push(rec);
-          strip1IdsForPad.add(rec.movie.id);
+        if (main.length === 0 && pred.length > 0) {
+          for (const r of pred) {
+            if (main.length >= visibleCap) break;
+            main.push(r);
+          }
+        } else if (main.length < visibleCap && main.length > 0) {
+          const inMain = new Set(main.map((r) => recMovieRowId(r)).filter(Boolean));
+          const backfillPool = restSorted.filter((rec) => {
+            const bid = recMovieRowId(rec);
+            return bid && !inMain.has(bid);
+          });
+          let bfIdx = 0;
+          while (main.length < visibleCap && bfIdx < backfillPool.length) {
+            const batch = backfillPool.slice(
+              bfIdx,
+              Math.min(bfIdx + YOUR_PICKS_WATCH_PROVIDER_FETCH_CONCURRENCY, backfillPool.length),
+            );
+            bfIdx += batch.length;
+            await Promise.all(batch.map((rec) => getFlatrateProviderIds(rec.movie)));
+            for (const rec of batch) {
+              if (cancelled) return;
+              if (main.length >= visibleCap) break;
+              const ids = await getFlatrateProviderIds(rec.movie);
+              if (ids.some((id) => selectedStreamingProviderIds.includes(id))) main.push(rec);
+            }
+          }
         }
 
         if (cancelled) return;
-
-        const strip1Ids = new Set(strip1.map((r) => r.movie.id));
-        let strip2 = [];
-        for (const rec of sorted) {
-          if (strip2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
-          if (strip1Ids.has(rec.movie.id)) continue;
-          if (rec.predicted < MORE_TAB_OFF_SERVICE_PRED_MIN) continue;
-          const ids = await getFlatrateProviderIds(rec.movie);
-          if (cancelled) return;
-          const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
-          if (!on) strip2.push(rec);
+        if (main.length === 0 && rotated.length > 0) {
+          main = topUpYourPicksStrip1Only([], rotated, visibleCap);
         }
-        if (strip2.length < MORE_TAB_OFF_SERVICE_MAX) {
-          const used2 = new Set([...strip1Ids, ...strip2.map((r) => r.movie.id)]);
-          const pool2 = worthALookRecs
-            .filter((r) => r?.movie?.id && !used2.has(r.movie.id) && r.predicted >= MORE_TAB_OFF_SERVICE_PRED_MIN)
-            .sort((a, b) => b.predicted - a.predicted);
-          for (const rec of pool2) {
-            if (strip2.length >= MORE_TAB_OFF_SERVICE_MAX) break;
-            const ids = await getFlatrateProviderIds(rec.movie);
-            if (cancelled) return;
-            const on = ids.some((id) => selectedStreamingProviderIds.includes(id));
-            if (!on) strip2.push(rec);
-          }
-        }
-
-        // Provider-selected mode: sync top-up ignores flatrate; use provider-aware helper for strip 2 + rebalance.
-        const topped = await topUpYourPicksStripsRespectingStreaming(
-          strip1,
-          strip2,
-          sorted,
-          selectedStreamingProviderIds,
-          getFlatrateProviderIds,
-          () => cancelled,
-        );
-        if (cancelled || topped == null) return;
-        ;[strip1, strip2] = topped;
-        const strip1Rows = toYourPicksStripRows(strip1, cfRecommendationPickIdSet);
-        const strip2Rows = toYourPicksStripRows(strip2, cfRecommendationPickIdSet);
-
+        if (!cancelled) setMoreForYouStrip(toYourPicksStripRows(main, cfRecommendationPickIdSet));
+      } catch (e) {
         if (!cancelled) {
-          setMoreForYouStrip(strip1Rows);
-          setWorthLookStrip(strip2Rows);
+          console.warn("Your Picks strip rebuild (streaming):", e);
+          const fb = topUpYourPicksStrip1Only([], rotated, visibleCap);
+          setMoreForYouStrip(toYourPicksStripRows(fb, cfRecommendationPickIdSet));
         }
       } finally {
         if (!cancelled) setMoreStripsLoading(false);
@@ -4773,12 +4852,11 @@ export default function App() {
       setMoreStripsLoading(false);
     };
   }, [
-    yourPicksStripSorted,
-    yourPicksPredictedCount,
+    yourPicksMainCandidates,
+    yourPicksBatchStep,
     cfRecommendationPickIdSet,
     selectedStreamingProviderIds,
     topPickOffset,
-    worthALookRecs,
   ]);
 
   useEffect(() => {
@@ -4792,7 +4870,7 @@ export default function App() {
       ...inTheatersPagePopularRecsResolved.map((r) => r.movie),
       ...secondaryStripRecsResolved.map((r) => r.movie),
       ...moreForYouStrip.map((row) => row.rec.movie),
-      ...worthLookStrip.map((row) => row.rec.movie),
+      ...yourPicksWorthALookStrip.map((row) => row.rec.movie),
     ]
       .filter((m) => m?.type === "tv" && Number.isFinite(Number(m?.tmdbId)));
     const missingTmdbIds = [...new Set(tvCandidates.map((m) => Number(m.tmdbId)))]
@@ -4816,7 +4894,7 @@ export default function App() {
     };
     void hydrateTvStripMeta();
     return () => { cancelled = true; };
-  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, moreForYouStrip, worthLookStrip]);
+  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, moreForYouStrip, yourPicksWorthALookStrip]);
 
   const discoverItems = useMemo(() => {
     let base;
@@ -4878,6 +4956,17 @@ export default function App() {
     };
   }, [user, userRatings, screen, discoverItems]);
 
+  const yourPicksCatalogPredRecMap = useMemo(() => {
+    const out = {};
+    for (const [rawId, pred] of Object.entries(yourPicksCatalogPredictions)) {
+      if (pred == null || typeof pred !== "object") continue;
+      const movie = movieLookupById.get(String(rawId));
+      if (!movie?.id) continue;
+      out[movie.id] = recFromMatchPrediction(movie, pred);
+    }
+    return out;
+  }, [yourPicksCatalogPredictions, movieLookupById]);
+
   const recMap = useMemo(() => ({
     ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingMovieRecsResolved.map(r => [r.movie.id, r])),
@@ -4889,10 +4978,11 @@ export default function App() {
     ...Object.fromEntries(secondaryStripRecsResolved.map((r) => [r.movie.id, r])),
     ...Object.fromEntries(theaterRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(moreForYouStrip.map((row) => [row.rec.movie.id, row.rec])),
-    ...Object.fromEntries(worthLookStrip.map((row) => [row.rec.movie.id, row.rec])),
+    ...Object.fromEntries(yourPicksWorthALookStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
+    ...yourPicksCatalogPredRecMap,
     ...Object.fromEntries(discoverRecsResolved.map((r) => [r.movie.id, r])),
-  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, worthLookStrip, recommendations, discoverRecsResolved]);
+  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, yourPicksWorthALookStrip, recommendations, yourPicksCatalogPredRecMap, discoverRecsResolved]);
   const FILTERS = ["All", "Movies", "TV Shows"];
   const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
@@ -4933,7 +5023,7 @@ export default function App() {
     for (const r of streamingTvRecsResolved) addRec(r);
     for (const r of secondaryStripRecsResolved) addRec(r);
     for (const row of moreForYouStrip) addRec(row.rec);
-    for (const row of worthLookStrip) addRec(row.rec);
+    for (const row of yourPicksWorthALookStrip) addRec(row.rec);
     for (const m of discoverItems) addMovie(m);
     for (const r of moodResults) addRec(r);
     if (selectedMovie?.movie) addMovie(selectedMovie.movie);
@@ -4950,7 +5040,7 @@ export default function App() {
     streamingTvRecsResolved,
     secondaryStripRecsResolved,
     moreForYouStrip,
-    worthLookStrip,
+    yourPicksWorthALookStrip,
     discoverItems,
     moodResults,
     selectedMovie,
@@ -5045,8 +5135,15 @@ export default function App() {
     }));
   }
 
-  function StripPosterBadge({ movie, predicted, predictedNeighborCount = 0 }) {
-    const bd = stripBadgeDisplay(movie, userRatings[movie.id], predicted, cinemastroAvgByKey, predictedNeighborCount);
+  function StripPosterBadge({ movie, predicted, predictedNeighborCount = 0, preferPersonalPredicted = false }) {
+    const bd = stripBadgeDisplay(
+      movie,
+      userRatings[movie.id],
+      predicted,
+      cinemastroAvgByKey,
+      predictedNeighborCount,
+      preferPersonalPredicted,
+    );
     const showMeter =
       bd.pillClass === "strip-badge--cinemastro" &&
       bd.cinemastroCount != null &&
@@ -7570,8 +7667,8 @@ export default function App() {
 
       {screen === "your-picks" && (
         <div className="home">
-          <PageShell title="Your Picks" subtitle="Personalized picks from your ratings — on and off your streaming apps">
-            {/* Your picks strips: score badge bottom-right; ✨/📈 icon-only pill bottom-left; no range/confidence (detail only). */}
+          <PageShell title="Your Picks" subtitle="CF predictions first, then high predicted, then popular — five at a time (up to 20)">
+            {/* Strips: score badge bottom-right; ✨/📈 icon-only pill bottom-left. */}
             {(hasYourPicksStripSource || yourPicksLoading) && (
               <div className="section" style={{ paddingTop: 0 }}>
                 <div className="section-header">
@@ -7580,11 +7677,19 @@ export default function App() {
                     <div
                       className="section-meta"
                       style={{ cursor: "pointer" }}
-                      onClick={() => setTopPickOffset((p) => p + 3)}
+                      onClick={() => setTopPickOffset((p) => p + 1)}
                     >
                       {"↻ Refresh"}
                     </div>
                   )}
+                </div>
+                <div
+                  className="section-meta"
+                  style={{ marginTop: "0.15rem", marginBottom: "0.65rem", lineHeight: 1.45, opacity: 0.92 }}
+                >
+                  {selectedStreamingProviderIds.length > 0
+                    ? "Match CF scores (weighted predicted) highest first, then popular catalogue titles. Streaming apps filter the popular segment. Worth a look: five extra match titles per tap."
+                    : "Highest predicted from match first (CF weighted score), then popular catalogue. Five at a time, up to 20. Worth a look: five titles per tap."}
                 </div>
                 {moreForYouStrip.length > 0 ? (
                   <div className="strip">
@@ -7607,7 +7712,12 @@ export default function App() {
                           >
                             {row.kind === "pick" ? "✨" : "📈"}
                           </span>
-                          <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={recNeighborCount(row.rec)} />
+                          <StripPosterBadge
+                            movie={row.rec.movie}
+                            predicted={row.rec.predicted}
+                            predictedNeighborCount={recNeighborCount(row.rec)}
+                            preferPersonalPredicted={row.kind === "pick"}
+                          />
                         </div>
                         <div className="strip-title">{row.rec.movie.title}</div>
                         <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
@@ -7615,50 +7725,104 @@ export default function App() {
                     ))}
                   </div>
                 ) : (
-                  <SkeletonStrip showKind />
+                  <SkeletonStrip showKind count={YOUR_PICKS_BATCH_SIZE} />
                 )}
-              </div>
-            )}
-            {(hasYourPicksStripSource || yourPicksLoading) && (
-              <div className="section">
-                <div className="section-header">
-                  <div className="section-title">✨ Worth a Look</div>
-                  <div className="section-meta">
-                    {selectedStreamingProviderIds.length > 0
-                      ? "Strong predictions — not on your selected services"
-                      : "Strong predictions — beyond the first strip"}
+                {hasYourPicksStripSource &&
+                  moreForYouStrip.length > 0 &&
+                  yourPicksBatchStep < yourPicksMaxBatchSteps && (
+                  <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                    <button
+                      type="button"
+                      className="filter-pill"
+                      onClick={() =>
+                        setYourPicksBatchStep((s) => Math.min(yourPicksMaxBatchSteps, s + 1))}
+                    >
+                      {`More picks (+${Math.min(
+                        YOUR_PICKS_BATCH_SIZE,
+                        Math.min(yourPicksTotalCandidates, YOUR_PICKS_VISIBLE_MAX) - yourPicksVisibleCap,
+                      )})`}
+                    </button>
                   </div>
+                )}
+                <div style={{ marginTop: 18, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="filter-pill"
+                    disabled={yourPicksWorthALookPool.length === 0}
+                    onClick={loadYourPicksWorthALookFive}
+                  >
+                    Worth a look (5)
+                  </button>
+                  {yourPicksWorthALookPool.length === 0 ? (
+                    <span className="section-meta" style={{ opacity: 0.85 }}>
+                      No worth-a-look pool yet — rate more titles or refresh after your next match load.
+                    </span>
+                  ) : null}
                 </div>
-                {worthLookStrip.length > 0 ? (
-                  <div className="strip">
-                    {worthLookStrip.map((row) => (
-                      <div
-                        className="strip-card"
-                        key={row.rec.movie.id}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
-                        onClick={() => openDetail(row.rec.movie, row.rec)}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
-                      >
-                        <div className="strip-poster">
-                          {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
-                          <span
-                            className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
-                            aria-hidden
-                            title={row.kind === "pick" ? "Personal pick" : "Popular pool"}
-                          >
-                            {row.kind === "pick" ? "✨" : "📈"}
-                          </span>
-                          <StripPosterBadge movie={row.rec.movie} predicted={row.rec.predicted} predictedNeighborCount={recNeighborCount(row.rec)} />
+                {yourPicksWorthALookStrip.length > 0 ? (
+                  <div style={{ paddingTop: 16 }}>
+                    <div className="section-header">
+                      <div className="section-title">✨ Worth a look</div>
+                      <div className="section-meta">From match · tap button again for the next five</div>
+                    </div>
+                    <div className="strip">
+                      {yourPicksWorthALookStrip.map((row) => (
+                        <div
+                          className="strip-card"
+                          key={recMovieRowId(row.rec) ?? row.rec.movie.id}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
+                          onClick={() => openDetail(row.rec.movie, row.rec)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
+                        >
+                          <div className="strip-poster">
+                            {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
+                            <span
+                              className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
+                              aria-hidden
+                              title={row.kind === "pick" ? "Personal pick" : "Popular pool"}
+                            >
+                              {row.kind === "pick" ? "✨" : "📈"}
+                            </span>
+                            <StripPosterBadge
+                              movie={row.rec.movie}
+                              predicted={row.rec.predicted}
+                              predictedNeighborCount={recNeighborCount(row.rec)}
+                              preferPersonalPredicted={row.kind === "pick"}
+                            />
+                          </div>
+                          <div className="strip-title">{row.rec.movie.title}</div>
+                          <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
                         </div>
-                        <div className="strip-title">{row.rec.movie.title}</div>
-                        <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                ) : (
-                  <SkeletonStrip showKind />
+                ) : null}
+                {hasYourPicksStripSource &&
+                  yourPicksBatchStep >= yourPicksMaxBatchSteps &&
+                  moreForYouStrip.length > 0 && (
+                  <div
+                    className="section-meta"
+                    style={{ marginTop: 16, lineHeight: 1.45, maxWidth: 520 }}
+                  >
+                    <p style={{ margin: "0 0 10px", opacity: 0.95 }}>
+                      You’ve opened every batch in this list — try Mood for a different angle on your taste.
+                    </p>
+                    <button
+                      type="button"
+                      className="filter-pill active"
+                      onClick={() => {
+                        setMoodStep(0);
+                        setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
+                        setMoodResults([]);
+                        setNavTab("mood");
+                        setScreen("mood-picker");
+                      }}
+                    >
+                      Try Mood
+                    </button>
+                  </div>
                 )}
               </div>
             )}
