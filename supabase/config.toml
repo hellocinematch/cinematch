@@ -1,0 +1,7 @@
+# Supabase CLI — https://supabase.com/docs/guides/cli/config
+#
+# New publishable keys (sb_publishable_…) are not JWTs; the Edge gateway rejects
+# Authorization: Bearer <publishable>. Cron + pg_net should send apikey + x-compute-neighbors-secret.
+# This function enforces trust via COMPUTE_NEIGHBORS_CRON_SECRET / service role inside the handler.
+[functions.compute-neighbors]
+verify_jwt = false

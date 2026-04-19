@@ -1,0 +1,13 @@
+---
+description: Remind to scale compute-neighbors pg_cron chunks as user count grows; point to COMPUTE-NEIGHBORS-CRON.md
+alwaysApply: true
+---
+
+# Compute-neighbors cron coverage
+
+When the conversation touches **compute-neighbors**, **`user_neighbors`**, **neighbor rebuild**, **pg_cron**, **pg_net**, or **scaling users**:
+
+1. **Remind the user** to open **`COMPUTE-NEIGHBORS-CRON.md`** and verify that **cron chunk count × limit** still covers **all eligible (non-seed) users** after growth. If not, add staggered jobs with higher **`offset`** values (or adjust **`limit`** only if Edge timeouts allow).
+2. After changing user population expectations, suggest they run **`select jobname, schedule from cron.job where jobname like 'compute-neighbors-w%'`** to audit scheduled chunks.
+
+Do not assume the original 50-user (or similar) window is still sufficient without checking.
