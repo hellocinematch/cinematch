@@ -106,13 +106,10 @@ const RATE_NOW_TMDB_FETCH_CONCURRENCY = 8;
 
 /**
  * Your Picks: **CF predicted** (neighbor-backed), then **high predicted** (match rows without overlap),
- * then **popular** (catalogue / TMDB). **Worth a look** is on-demand only (button → 5 titles from match).
- * Main row loads **5 at a time** up to 20.
+ * then **popular** (catalogue / TMDB). Main row loads **5 at a time** up to 20.
  */
 const YOUR_PICKS_BATCH_SIZE = 5;
 const YOUR_PICKS_VISIBLE_MAX = 20;
-/** Titles per tap on **Worth a look** (match `worthALookRecs` pool). */
-const YOUR_PICKS_WORTH_A_LOOK_BATCH = 5;
 /** Max titles per Discover `predict_cached` batch (Edge + DB bound). */
 const DISCOVER_PREDICT_CACHED_CAP = 120;
 /** After `your_picks_page`, compute CF overlays for this many rec ids (cold cache — Edge only reads DB in `your_picks_page`). */
@@ -201,7 +198,7 @@ function recNeighborCount(rec) {
 
 /**
  * ✨ Pick = strict CF list only (`match` `recommendations` from `getRecommendations`).
- * 📈 Popular = worth-a-look / theater / streaming pool and client `tmdbOnlyRec` fallbacks (same strip, different source).
+ * 📈 Popular = theater / streaming pool and client `tmdbOnlyRec` fallbacks (same strip, different source).
  */
 function toYourPicksStripRows(recs, cfRecommendationIdSet) {
   return recs.map((r) => {
@@ -1193,7 +1190,15 @@ function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelection
 }
 
 /** TMDB-style horizontal primary nav (desktop-first; links scroll on narrow widths). */
-function AppPrimaryNav({ menuItems, activeSectionId, onNavigateSection, onDiscover, onHome, discoverActive }) {
+function AppPrimaryNav({
+  menuItems,
+  activeSectionId,
+  onNavigateSection,
+  onDiscover,
+  onHome,
+  discoverActive,
+  onDetailBack,
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -1222,7 +1227,11 @@ function AppPrimaryNav({ menuItems, activeSectionId, onNavigateSection, onDiscov
   }
 
   return (
-    <header className="app-primary-nav" role="navigation" aria-label="Primary">
+    <header
+      className={`app-primary-nav${onDetailBack ? " app-primary-nav--with-detail-back" : ""}`}
+      role="navigation"
+      aria-label="Primary"
+    >
       <div className="app-primary-nav__inner">
         <button
           type="button"
@@ -1260,6 +1269,16 @@ function AppPrimaryNav({ menuItems, activeSectionId, onNavigateSection, onDiscov
           </button>
         </div>
       </div>
+      {onDetailBack ? (
+        <button
+          type="button"
+          className="app-primary-nav__detail-back"
+          onClick={onDetailBack}
+          aria-label="Back"
+        >
+          <span aria-hidden="true">&lt;</span>
+        </button>
+      ) : null}
       {mobileOpen && (
         <>
           <button
@@ -1668,6 +1687,50 @@ const styles = `
     min-height:56px;
     box-sizing:border-box;
   }
+  .app-primary-nav--with-detail-back {
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+  }
+  @media (min-width: 900px) {
+    .app-primary-nav--with-detail-back {
+      flex-direction:row;
+      flex-wrap:nowrap;
+      align-items:center;
+      gap:10px;
+    }
+    .app-primary-nav--with-detail-back .app-primary-nav__detail-back {
+      order:0;
+      flex-shrink:0;
+      align-self:center;
+    }
+    .app-primary-nav--with-detail-back .app-primary-nav__inner {
+      order:1;
+      flex:1;
+      min-width:0;
+    }
+  }
+  .app-primary-nav__detail-back {
+    flex-shrink:0;
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    border:1px solid #333;
+    background:#1a1a1a;
+    color:#e8c96a;
+    font-size:17px;
+    line-height:1;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    font-family:'DM Sans',sans-serif;
+    padding:0;
+    margin:0;
+    transition:border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .app-primary-nav__detail-back:hover { border-color:#555; background:#222; color:#f0d880; }
+  .app-primary-nav__detail-back span { position:relative; left:-0.5px; }
   .app-primary-nav__brand { flex-shrink:0; }
   .app-primary-nav__brand .brand-logo--header {
     height:40px;
@@ -1779,6 +1842,12 @@ const styles = `
   .app-primary-nav__drawer-link:hover { color:#e8c96a; background:rgba(232, 201, 106, 0.08); }
   .app-primary-nav__drawer-link--active { color:#e8c96a; background:#2a2610; }
   .app--primary-nav { padding-top:calc(60px + env(safe-area-inset-top, 0px)); }
+  /* Title detail on phone: second nav row (back) — match fixed header height so content is not covered. */
+  @media (max-width: 899px) {
+    .app--primary-nav.app--primary-nav-detail-back {
+      padding-top:calc(126px + env(safe-area-inset-top, 0px));
+    }
+  }
   .app--primary-nav .home-header { padding-top:20px; }
   .topbar-brand-cluster { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:nowrap; }
   .topbar-brand-cluster .app-brand-button { flex-shrink:1; }
@@ -2189,13 +2258,30 @@ const styles = `
     .home-header .public-site-stats { display:none; }
     .discover-header { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); min-width:0; }
     .app-primary-nav__inner {
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      align-items:center;
+      column-gap:8px;
       padding-left:max(12px, env(safe-area-inset-left, 0px));
       padding-right:max(20px, env(safe-area-inset-right, 0px));
     }
-    .app-primary-nav__hamburger { display:inline-flex; }
+    .app-primary-nav__hamburger { display:inline-flex; grid-column:1; grid-row:1; }
+    .app-primary-nav__brand { grid-column:2; grid-row:1; justify-self:center; min-width:0; }
+    .app-primary-nav__right { grid-column:3; grid-row:1; }
     .app-primary-nav__links { display:none; }
     .app-primary-nav__scrim { display:block; }
     .app-primary-nav__drawer { display:flex; }
+    .app-primary-nav--with-detail-back .app-primary-nav__detail-back {
+      align-self:flex-start;
+      margin:2px 0 10px max(12px, env(safe-area-inset-left, 0px));
+    }
+    .app-primary-nav--with-detail-back .app-primary-nav__scrim {
+      top:calc(126px + env(safe-area-inset-top, 0px));
+    }
+    .app-primary-nav--with-detail-back .app-primary-nav__drawer {
+      top:calc(126px + env(safe-area-inset-top, 0px));
+      max-height:calc(100vh - 126px - env(safe-area-inset-top, 0px));
+    }
     .filter-row { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .disc-grid { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .discover { width:100%; max-width:100%; }
@@ -2380,6 +2466,17 @@ const styles = `
   .circle-strip-more-poster { display:flex; align-items:center; justify-content:center; border-style:dashed; }
   .circle-strip-more-arrow { font-size:42px; font-weight:300; color:#e8c96a; line-height:1; user-select:none; }
   .circle-strip-more-spinner { font-size:13px; color:#888; }
+  /* Your Picks: end-cap CTA when all batches visible (same footprint as a strip card). */
+  .strip-card--your-picks-mood { flex-shrink:0; align-self:flex-start; pointer-events:auto; }
+  .your-picks-mood-poster { padding:10px 8px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; }
+  .your-picks-mood-inner { display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:10px; width:100%; min-height:0; }
+  .your-picks-mood-copy { margin:0; font-size:11px; line-height:1.45; color:#888; text-align:center; font-family:'DM Sans',sans-serif; }
+  .your-picks-mood-cta {
+    flex-shrink:0; padding:8px 12px; border-radius:20px; font-size:12px; font-weight:500; font-family:'DM Sans',sans-serif;
+    cursor:pointer; border:1px solid #e8c96a; background:#e8c96a; color:#0a0a0a; transition:opacity 0.2s;
+  }
+  .your-picks-mood-cta:hover { opacity:0.92; }
+  .your-picks-mood-cta:active { opacity:0.85; }
   .strip-card--circle-pending { opacity:0.8; pointer-events:none; }
   .circle-detail-placeholder { background:#111; border:1px dashed #222; border-radius:14px; padding:20px; }
   .circle-detail-placeholder__title { font-family:'DM Serif Display',serif; font-size:18px; color:#f0ebe0; margin-bottom:6px; }
@@ -2813,9 +2910,6 @@ export default function App() {
   const [moodSelections, setMoodSelections] = useState({ region: [], indian_lang: [], genre: [], vibe: [] });
   const [moodResults, setMoodResults] = useState([]);
   const [topPickOffset, setTopPickOffset] = useState(0);
-  /** Your Picks: on-demand strip from `worthALookRecs` (see YOUR_PICKS_WORTH_A_LOOK_BATCH). */
-  const [yourPicksWorthALookStrip, setYourPicksWorthALookStrip] = useState([]);
-  const worthALookStripOffsetRef = useRef(0);
   /** Your Picks: visible count = min(pool, 20, step × YOUR_PICKS_BATCH_SIZE). */
   const [yourPicksBatchStep, setYourPicksBatchStep] = useState(1);
   /** `predict_cached` over popular unrated catalogue rows (neighbor-backed preds merged into For you). */
@@ -3627,7 +3721,7 @@ export default function App() {
                 error = full.error;
               } else {
                 error = null;
-                data = { recommendations: [], worthALookRecs: [] };
+                data = { recommendations: [] };
               }
             }
           }
@@ -3655,7 +3749,6 @@ export default function App() {
           return;
         }
         const nextRecs = Array.isArray(data?.recommendations) ? data.recommendations : [];
-        const nextWorth = Array.isArray(data?.worthALookRecs) ? data.worthALookRecs : [];
         const nextPredictions =
           data?.predictions && typeof data.predictions === "object" ? data.predictions : null;
         let mergedYourPicksPredictions =
@@ -3664,7 +3757,6 @@ export default function App() {
         if (cancelled) return;
         const overlayIds = new Set();
         for (const r of nextRecs) if (r?.movie?.id) overlayIds.add(r.movie.id);
-        for (const r of nextWorth) if (r?.movie?.id) overlayIds.add(r.movie.id);
         /** Skip ids `your_picks_page` already hydrated from `user_title_predictions` — avoids a second heavy `predict_cached` batch. */
         const idList = [...overlayIds]
           .filter((id) => !predictionMapLookup(mergedYourPicksPredictions, id))
@@ -3695,7 +3787,6 @@ export default function App() {
         setMatchData((prev) => ({
           ...(prev && typeof prev === "object" ? prev : {}),
           recommendations: nextRecs,
-          worthALookRecs: nextWorth,
           /** Always set (even `{}`) so stale id→pred entries cannot overlay the wrong strip after a refresh. */
           yourPicksPredictions: mergedYourPicksPredictions,
         }));
@@ -4505,13 +4596,7 @@ export default function App() {
   /** `homePicksLoadFailed` removed in v4.0.8 — the Home screen retired and every remaining primary
    *  page owns its own empty/error state. */
 
-  const rawWorthALookRecs = matchData?.worthALookRecs ?? EMPTY_MATCH_RECS;
-  const worthALookRecs = useMemo(
-    () => overlayYourPicksPredictions(rawWorthALookRecs),
-    [rawWorthALookRecs, overlayYourPicksPredictions],
-  );
-
-  /** Strict CF neighbour picks only — not worth-a-look / theater / streaming pools (otherwise every strip row became Pick). */
+  /** Strict CF neighbour picks only — not theater / streaming pools (otherwise every strip row became Pick). */
   const cfRecommendationPickIdSet = useMemo(() => {
     const s = new Set();
     for (const r of recommendations) {
@@ -4526,29 +4611,6 @@ export default function App() {
     }
     return s;
   }, [recommendations, yourPicksCatalogPredictions]);
-
-  /** Match `worthALookRecs` — used only when the user taps **Worth a look** (not mixed into the main strip). */
-  const yourPicksWorthALookPool = useMemo(() => {
-    const rated = new Set(Object.keys(userRatings));
-    const byId = new Map();
-    for (const r of worthALookRecs) {
-      const rid = recMovieRowId(r);
-      if (!rid || rated.has(rid)) continue;
-      const prev = byId.get(rid);
-      if (!prev || r.predicted > prev.predicted) byId.set(rid, r);
-    }
-    return [...byId.values()].sort((a, b) => b.predicted - a.predicted);
-  }, [userRatings, worthALookRecs]);
-
-  const yourPicksWorthALookPoolSig = useMemo(
-    () => yourPicksWorthALookPool.map((r) => recMovieRowId(r)).filter(Boolean).join("\x1e"),
-    [yourPicksWorthALookPool],
-  );
-
-  useEffect(() => {
-    worthALookStripOffsetRef.current = 0;
-    setYourPicksWorthALookStrip([]);
-  }, [yourPicksWorthALookPoolSig]);
 
   /** Catalogue ids for a Pulse-style `predict_cached` batch (unrated, not in RPC `recommendations`). */
   const yourPicksCatalogPredictTitleIds = useMemo(() => {
@@ -4709,23 +4771,6 @@ export default function App() {
     );
   }, [yourPicksTotalCandidates]);
 
-  const loadYourPicksWorthALookFive = useCallback(() => {
-    const pool = yourPicksWorthALookPool;
-    if (pool.length === 0) {
-      worthALookStripOffsetRef.current = 0;
-      setYourPicksWorthALookStrip([]);
-      return;
-    }
-    const n = pool.length;
-    const o = worthALookStripOffsetRef.current;
-    const batch = [];
-    for (let k = 0; k < YOUR_PICKS_WORTH_A_LOOK_BATCH && k < n; k++) {
-      batch.push(pool[(o + k) % n]);
-    }
-    worthALookStripOffsetRef.current = (o + YOUR_PICKS_WORTH_A_LOOK_BATCH) % n;
-    setYourPicksWorthALookStrip(toYourPicksStripRows(batch, cfRecommendationPickIdSet));
-  }, [yourPicksWorthALookPool, cfRecommendationPickIdSet]);
-
   /** Your Picks **For you** row — built in `rebuildMoreTabStrips`. */
   const [moreForYouStrip, setMoreForYouStrip] = useState([]);
   /** True while resolving TMDB watch providers for Your Picks (streaming filter on). */
@@ -4870,7 +4915,6 @@ export default function App() {
       ...inTheatersPagePopularRecsResolved.map((r) => r.movie),
       ...secondaryStripRecsResolved.map((r) => r.movie),
       ...moreForYouStrip.map((row) => row.rec.movie),
-      ...yourPicksWorthALookStrip.map((row) => row.rec.movie),
     ]
       .filter((m) => m?.type === "tv" && Number.isFinite(Number(m?.tmdbId)));
     const missingTmdbIds = [...new Set(tvCandidates.map((m) => Number(m.tmdbId)))]
@@ -4894,7 +4938,7 @@ export default function App() {
     };
     void hydrateTvStripMeta();
     return () => { cancelled = true; };
-  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, moreForYouStrip, yourPicksWorthALookStrip]);
+  }, [theaterRecs, streamingRecs, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, moreForYouStrip]);
 
   const discoverItems = useMemo(() => {
     let base;
@@ -4968,7 +5012,6 @@ export default function App() {
   }, [yourPicksCatalogPredictions, movieLookupById]);
 
   const recMap = useMemo(() => ({
-    ...Object.fromEntries(worthALookRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingMovieRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(streamingTvRecsResolved.map(r => [r.movie.id, r])),
     ...Object.fromEntries(whatsHotRecsResolved.map(r => [r.movie.id, r])),
@@ -4978,11 +5021,10 @@ export default function App() {
     ...Object.fromEntries(secondaryStripRecsResolved.map((r) => [r.movie.id, r])),
     ...Object.fromEntries(theaterRecs.map(r => [r.movie.id, r])),
     ...Object.fromEntries(moreForYouStrip.map((row) => [row.rec.movie.id, row.rec])),
-    ...Object.fromEntries(yourPicksWorthALookStrip.map((row) => [row.rec.movie.id, row.rec])),
     ...Object.fromEntries(recommendations.map(r => [r.movie.id, r])),
     ...yourPicksCatalogPredRecMap,
     ...Object.fromEntries(discoverRecsResolved.map((r) => [r.movie.id, r])),
-  }), [worthALookRecs, streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, yourPicksWorthALookStrip, recommendations, yourPicksCatalogPredRecMap, discoverRecsResolved]);
+  }), [streamingMovieRecsResolved, streamingTvRecsResolved, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, theaterRecs, moreForYouStrip, recommendations, yourPicksCatalogPredRecMap, discoverRecsResolved]);
   const FILTERS = ["All", "Movies", "TV Shows"];
   const rateMoreQueue = rateMoreMovies.length > 0 ? rateMoreMovies : obMovies;
   const rateMoreMovie = rateMoreQueue[obStep] ?? null;
@@ -5023,7 +5065,6 @@ export default function App() {
     for (const r of streamingTvRecsResolved) addRec(r);
     for (const r of secondaryStripRecsResolved) addRec(r);
     for (const row of moreForYouStrip) addRec(row.rec);
-    for (const row of yourPicksWorthALookStrip) addRec(row.rec);
     for (const m of discoverItems) addMovie(m);
     for (const r of moodResults) addRec(r);
     if (selectedMovie?.movie) addMovie(selectedMovie.movie);
@@ -5040,7 +5081,6 @@ export default function App() {
     streamingTvRecsResolved,
     secondaryStripRecsResolved,
     moreForYouStrip,
-    yourPicksWorthALookStrip,
     discoverItems,
     moodResults,
     selectedMovie,
@@ -5962,6 +6002,7 @@ export default function App() {
     "rated",
     "mood-picker",
     "mood-results",
+    "detail",
   ]);
   const menuItems = [
     { id: "circles", label: "Circles" },
@@ -5976,7 +6017,20 @@ export default function App() {
   // v5.0.0: keep the "Circles" section link highlighted while the user is drilled into a circle.
   const activeSectionId = screen === "discover" ? null : screen === "circle-detail" ? "circles" : screen;
 
+  /** Leaving title detail via top nav (not browser back): drop overlay URL + selection without `history.back()`. */
+  function clearDetailOverlayToNavigate() {
+    if (screen !== "detail") return;
+    if (detailHistoryPushedRef.current) {
+      history.replaceState(null, "", spaUrlWithoutOverlays());
+      detailHistoryPushedRef.current = false;
+    }
+    detailReturnScreenRef.current = null;
+    setSelected(null);
+    setDetailEditRating(false);
+  }
+
   function navigatePrimarySection(nextScreen) {
+    clearDetailOverlayToNavigate();
     if (nextScreen === "pulse") {
       setNavTab("home");
       setScreen("pulse");
@@ -6466,7 +6520,11 @@ export default function App() {
 
   return (
     <div className="viewport-shell">
-      <div className={`app${showPrimaryNav ? " app--primary-nav" : ""}`}>
+      <div
+        className={`app${showPrimaryNav ? " app--primary-nav" : ""}${
+          showPrimaryNav && screen === "detail" ? " app--primary-nav-detail-back" : ""
+        }`}
+      >
         <style>{styles}</style>
         {showPrimaryNav && (
           <AppPrimaryNav
@@ -6474,11 +6532,13 @@ export default function App() {
             activeSectionId={activeSectionId}
             onNavigateSection={navigatePrimarySection}
             onDiscover={() => {
+              clearDetailOverlayToNavigate();
               setNavTab("discover");
               setScreen("discover");
             }}
             onHome={goHome}
             discoverActive={screen === "discover"}
+            onDetailBack={screen === "detail" ? goBack : undefined}
           />
         )}
 
@@ -7683,14 +7743,6 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <div
-                  className="section-meta"
-                  style={{ marginTop: "0.15rem", marginBottom: "0.65rem", lineHeight: 1.45, opacity: 0.92 }}
-                >
-                  {selectedStreamingProviderIds.length > 0
-                    ? "Match CF scores (weighted predicted) highest first, then popular catalogue titles. Streaming apps filter the popular segment. Worth a look: five extra match titles per tap."
-                    : "Highest predicted from match first (CF weighted score), then popular catalogue. Five at a time, up to 20. Worth a look: five titles per tap."}
-                </div>
                 {moreForYouStrip.length > 0 ? (
                   <div className="strip">
                     {moreForYouStrip.map((row) => (
@@ -7716,113 +7768,66 @@ export default function App() {
                             movie={row.rec.movie}
                             predicted={row.rec.predicted}
                             predictedNeighborCount={recNeighborCount(row.rec)}
-                            preferPersonalPredicted={row.kind === "pick"}
+                            preferPersonalPredicted
                           />
                         </div>
                         <div className="strip-title">{row.rec.movie.title}</div>
                         <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
                       </div>
                     ))}
+                    {hasYourPicksStripSource &&
+                      yourPicksBatchStep < yourPicksMaxBatchSteps && (
+                      <button
+                        type="button"
+                        className="strip-card strip-card--circle-more"
+                        aria-label={`Show more picks (${Math.min(
+                          YOUR_PICKS_BATCH_SIZE,
+                          Math.min(yourPicksTotalCandidates, YOUR_PICKS_VISIBLE_MAX) - yourPicksVisibleCap,
+                        )} more)`}
+                        onClick={() =>
+                          setYourPicksBatchStep((s) => Math.min(yourPicksMaxBatchSteps, s + 1))}
+                      >
+                        <div className="strip-poster circle-strip-more-poster">
+                          <span className="circle-strip-more-arrow" aria-hidden>→</span>
+                        </div>
+                        <div className="strip-title">More</div>
+                        <div className="strip-genre">&nbsp;</div>
+                      </button>
+                    )}
+                    {hasYourPicksStripSource &&
+                      yourPicksBatchStep >= yourPicksMaxBatchSteps && (
+                      <div
+                        className="strip-card strip-card--your-picks-mood"
+                        role="region"
+                        aria-label="Try Mood for more suggestions"
+                      >
+                        <div className="strip-poster circle-strip-more-poster your-picks-mood-poster">
+                          <div className="your-picks-mood-inner">
+                            <p className="your-picks-mood-copy">
+                              You&apos;ve opened every batch in this list — try Mood for a different angle on your taste.
+                            </p>
+                            <button
+                              type="button"
+                              className="your-picks-mood-cta"
+                              onClick={() => {
+                                setMoodStep(0);
+                                setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
+                                setMoodResults([]);
+                                setNavTab("mood");
+                                setScreen("mood-picker");
+                              }}
+                            >
+                              Try Mood
+                            </button>
+                          </div>
+                        </div>
+                        <div className="strip-title">&nbsp;</div>
+                        <div className="strip-genre">&nbsp;</div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <SkeletonStrip showKind count={YOUR_PICKS_BATCH_SIZE} />
-                )}
-                {hasYourPicksStripSource &&
-                  moreForYouStrip.length > 0 &&
-                  yourPicksBatchStep < yourPicksMaxBatchSteps && (
-                  <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-                    <button
-                      type="button"
-                      className="filter-pill"
-                      onClick={() =>
-                        setYourPicksBatchStep((s) => Math.min(yourPicksMaxBatchSteps, s + 1))}
-                    >
-                      {`More picks (+${Math.min(
-                        YOUR_PICKS_BATCH_SIZE,
-                        Math.min(yourPicksTotalCandidates, YOUR_PICKS_VISIBLE_MAX) - yourPicksVisibleCap,
-                      )})`}
-                    </button>
-                  </div>
-                )}
-                <div style={{ marginTop: 18, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-                  <button
-                    type="button"
-                    className="filter-pill"
-                    disabled={yourPicksWorthALookPool.length === 0}
-                    onClick={loadYourPicksWorthALookFive}
-                  >
-                    Worth a look (5)
-                  </button>
-                  {yourPicksWorthALookPool.length === 0 ? (
-                    <span className="section-meta" style={{ opacity: 0.85 }}>
-                      No worth-a-look pool yet — rate more titles or refresh after your next match load.
-                    </span>
-                  ) : null}
-                </div>
-                {yourPicksWorthALookStrip.length > 0 ? (
-                  <div style={{ paddingTop: 16 }}>
-                    <div className="section-header">
-                      <div className="section-title">✨ Worth a look</div>
-                      <div className="section-meta">From match · tap button again for the next five</div>
-                    </div>
-                    <div className="strip">
-                      {yourPicksWorthALookStrip.map((row) => (
-                        <div
-                          className="strip-card"
-                          key={recMovieRowId(row.rec) ?? row.rec.movie.id}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={row.kind === "pick" ? `${row.rec.movie.title}, personal pick` : `${row.rec.movie.title}, popular recommendation`}
-                          onClick={() => openDetail(row.rec.movie, row.rec)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
-                        >
-                          <div className="strip-poster">
-                            {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" /> : <div className="strip-poster-fallback">🎬</div>}
-                            <span
-                              className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
-                              aria-hidden
-                              title={row.kind === "pick" ? "Personal pick" : "Popular pool"}
-                            >
-                              {row.kind === "pick" ? "✨" : "📈"}
-                            </span>
-                            <StripPosterBadge
-                              movie={row.rec.movie}
-                              predicted={row.rec.predicted}
-                              predictedNeighborCount={recNeighborCount(row.rec)}
-                              preferPersonalPredicted={row.kind === "pick"}
-                            />
-                          </div>
-                          <div className="strip-title">{row.rec.movie.title}</div>
-                          <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {hasYourPicksStripSource &&
-                  yourPicksBatchStep >= yourPicksMaxBatchSteps &&
-                  moreForYouStrip.length > 0 && (
-                  <div
-                    className="section-meta"
-                    style={{ marginTop: 16, lineHeight: 1.45, maxWidth: 520 }}
-                  >
-                    <p style={{ margin: "0 0 10px", opacity: 0.95 }}>
-                      You’ve opened every batch in this list — try Mood for a different angle on your taste.
-                    </p>
-                    <button
-                      type="button"
-                      className="filter-pill active"
-                      onClick={() => {
-                        setMoodStep(0);
-                        setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
-                        setMoodResults([]);
-                        setNavTab("mood");
-                        setScreen("mood-picker");
-                      }}
-                    >
-                      Try Mood
-                    </button>
-                  </div>
                 )}
               </div>
             )}
@@ -8472,11 +8477,13 @@ export default function App() {
         const showFloatingPoster = Boolean(movie.poster && movie.backdrop);
         return (
           <div className="detail">
-            <div className="page-topbar">
-              <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-              <div />
-              <AccountAvatarMenu />
-            </div>
+            {!showPrimaryNav ? (
+              <div className="page-topbar">
+                <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
+                <div />
+                <AccountAvatarMenu />
+              </div>
+            ) : null}
             <div className="detail-hero">
               <div className="detail-hero-backdrop">
                 {heroBackdropSrc ? (
