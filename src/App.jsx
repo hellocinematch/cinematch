@@ -2654,12 +2654,23 @@ const styles = `
       padding-left:max(20px, env(safe-area-inset-left, 0px));
       padding-right:max(20px, env(safe-area-inset-right, 0px));
     }
+    /* Detail title: sans on narrow viewports — DM Serif Display hairlines/subpixel badly on Mobile Safari. */
+    .d-title {
+      font-family:'DM Sans',sans-serif;
+      font-weight:500;
+      letter-spacing:-0.02em;
+      line-height:1.22;
+    }
   }
 
   /* Desktop/tablet: let app breathe beyond the mobile shell while keeping phone UX unchanged. */
   @media (min-width: 900px) {
     .app { --shell:1120px; }
-    .app-brand.brand-logo--header { width:320px; }
+    .app-brand.brand-logo--header { width:min(360px, 100%); }
+    .app-primary-nav__brand .brand-logo--header {
+      height:48px;
+      max-width:min(300px, 34vw);
+    }
     .topbar-brand-cluster { gap:14px; }
     .public-site-stats-val { font-size:12px; }
     .public-site-stats-lbl { font-size:9px; }
@@ -2714,6 +2725,14 @@ const styles = `
     .mood-result-actions { margin-top:auto; padding-top:10px; }
     .empty-box,
     .no-recs { margin-left:32px; margin-right:32px; }
+    .circles-detail-topbar { padding-left:32px; padding-right:32px; padding-top:14px; }
+    .circle-hero--detail .circle-hero__body { padding-left:32px; padding-right:32px; }
+    .circle-hero--detail.circle-hero--has-invite .circle-hero__name-row {
+      padding-left:52px;
+      padding-right:172px;
+    }
+    .circles-detail-error-wrap { padding-left:32px; padding-right:32px; }
+    .circles-detail-loading { padding-left:32px; padding-right:32px; }
     /* Home Now Playing: What’s hot + optional Region block. */
   }
 
@@ -2776,11 +2795,115 @@ const styles = `
   .circle-card__vibe-badge { display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; border:1px solid var(--vibe-accent); color:var(--vibe-accent); background:color-mix(in srgb, var(--vibe-accent) 12%, transparent); font-size:11px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; }
   .circle-card__members { font-size:12px; color:#888; letter-spacing:0.3px; }
 
-  .circles-detail-header { padding:12px 24px 0; }
-  .circles-detail-back { background:none; border:none; color:#888; font-family:'DM Sans',sans-serif; font-size:13px; padding:6px 0; margin-bottom:4px; cursor:pointer; }
-  .circles-detail-back:hover { color:#e8c96a; }
-  .circles-detail-loading { padding:40px 0; color:#666; font-size:13px; text-align:center; }
+  .circles-detail-shell { width:100%; min-width:0; box-sizing:border-box; }
+  .circles-detail-topbar {
+    padding:12px max(20px, env(safe-area-inset-left, 0px)) 8px max(20px, env(safe-area-inset-right, 0px));
+    box-sizing:border-box;
+  }
+  .circles-detail-back-circle {
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    border:1px solid rgba(255,255,255,0.22);
+    background:rgba(0,0,0,0.42);
+    color:#e8c96a;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    padding:0;
+    flex-shrink:0;
+    font-size:17px;
+    font-weight:600;
+    line-height:1;
+    font-family:'DM Sans',sans-serif;
+    transition:background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .circles-detail-back-circle:hover { background:rgba(0,0,0,0.58); border-color:rgba(232,201,106,0.45); color:#f0dc9a; }
+  .circles-detail-back-circle:active { opacity:0.9; }
+  .circles-detail-back-circle__glyph { display:block; margin-top:-1px; }
+  .circle-hero--detail .circles-detail-back-circle {
+    position:absolute;
+    z-index:2;
+    top:max(10px, env(safe-area-inset-top, 0px));
+    left:max(12px, env(safe-area-inset-left, 0px));
+  }
+  .circle-hero__invite-corner {
+    position:absolute;
+    z-index:2;
+    top:max(10px, env(safe-area-inset-top, 0px));
+    right:max(12px, env(safe-area-inset-right, 0px));
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:6px;
+    max-width:min(220px, calc(100% - 56px));
+    pointer-events:auto;
+  }
+  .circle-invite-btn--hero {
+    padding:8px 14px;
+    font-size:12px;
+    white-space:nowrap;
+  }
+  .circle-hero__invite-cap {
+    margin:0;
+    font-size:11px;
+    color:#887755;
+    text-align:right;
+    line-height:1.35;
+    max-width:11em;
+  }
+  /* Extra horizontal inset only on the title row so the top-right invite pill doesn’t overlap;
+     keep meta row (Circle info) on the normal body inset — flush to hero edge with safe-area. */
+  .circle-hero--detail.circle-hero--has-invite .circle-hero__name-row {
+    padding-left:max(48px, calc(env(safe-area-inset-left, 0px) + 36px));
+    padding-right:max(158px, calc(env(safe-area-inset-right, 0px) + 140px));
+    box-sizing:border-box;
+  }
+  .circles-detail-loading { padding:40px max(20px, env(safe-area-inset-left, 0px)) 40px max(20px, env(safe-area-inset-right, 0px)); color:#666; font-size:13px; text-align:center; }
+  .circles-detail-error-wrap {
+    padding:0 max(20px, env(safe-area-inset-left, 0px)) 20px max(20px, env(safe-area-inset-right, 0px));
+    box-sizing:border-box;
+  }
+  .circles-detail-error-wrap .circles-error-banner { margin-top:0; }
   .circle-hero { position:relative; background:#111; border:1px solid #1e1e1e; border-radius:16px; overflow:hidden; --vibe-accent:#e8c96a; --vibe-tint:#3a2a0a; animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1); }
+  /* Circle detail: full-bleed band so the header feels like the room, not a card in a column. */
+  .circle-hero--detail {
+    width:100%;
+    max-width:none;
+    border-radius:0;
+    border-left:none;
+    border-right:none;
+    border-top-color:#1e1e1e;
+  }
+  .circle-hero--detail .circle-hero__body {
+    padding:max(18px, calc(env(safe-area-inset-top, 0px) + 50px)) max(20px, env(safe-area-inset-left, 0px)) 22px max(20px, env(safe-area-inset-right, 0px));
+  }
+  .circle-hero--detail .circle-hero__name-row {
+    justify-content:center;
+    align-items:center;
+    gap:10px;
+  }
+  .circle-hero--detail .circle-hero__name {
+    flex:0 1 auto;
+    max-width:100%;
+    text-align:center;
+    -webkit-line-clamp:3;
+    line-clamp:3;
+  }
+  .circle-hero--detail .circle-hero__meta-row--one-line {
+    margin-top:10px;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    flex-wrap:nowrap;
+  }
+  .circle-hero--detail .circle-hero__meta-left {
+    flex:1 1 auto;
+    min-width:0;
+    justify-content:flex-start;
+  }
+  .circle-hero--detail .circle-hero__info-btn { align-self:center; }
   .circle-hero__tint { position:absolute; inset:0; background:linear-gradient(135deg, color-mix(in srgb, var(--vibe-tint) 90%, transparent) 0%, transparent 70%); pointer-events:none; }
   .circle-hero__body { position:relative; z-index:1; padding:24px 20px; display:flex; flex-direction:column; gap:8px; }
   .circle-hero__name-row { display:flex; align-items:center; gap:10px; }
@@ -2839,10 +2962,30 @@ const styles = `
   /* Centered modal (Circle info — overlays main circle view, not a bottom sheet) */
   .circles-modal-root { position:fixed; inset:0; z-index:2300; display:flex; align-items:center; justify-content:center; padding:max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); box-sizing:border-box; animation:fadeIn 0.2s ease; }
   .circles-modal-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.72); border:none; padding:0; cursor:pointer; }
-  .circles-modal-panel { position:relative; width:100%; max-width:min(100%, 400px); max-height:min(85vh, 520px); display:flex; flex-direction:column; gap:12px; background:#141414; border:1px solid #2a2a2a; border-radius:16px; padding:20px; box-sizing:border-box; box-shadow:0 24px 64px rgba(0,0,0,0.55); overflow:hidden; animation:circlesModalIn 0.22s cubic-bezier(0.16,1,0.3,1); }
+  .circles-modal-panel { position:relative; width:100%; max-width:min(100%, 400px); max-height:min(85vh, 520px); display:flex; flex-direction:column; gap:12px; background:#141414; border:1px solid #2a2a2a; border-radius:16px; padding:16px 20px 20px; box-sizing:border-box; box-shadow:0 24px 64px rgba(0,0,0,0.55); overflow:hidden; animation:circlesModalIn 0.22s cubic-bezier(0.16,1,0.3,1); }
   @keyframes circlesModalIn { from { opacity:0; transform:scale(0.96) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
-  .circles-modal-title { font-family:'DM Serif Display',serif; font-size:22px; color:#f0ebe0; line-height:1.2; }
-  .circles-modal-sub { font-size:13px; color:#888; margin-top:-4px; line-height:1.4; word-break:break-word; }
+  .circles-modal-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-shrink:0; }
+  .circles-modal-title { font-family:'DM Serif Display',serif; font-size:22px; color:#f0ebe0; line-height:1.2; margin:0; flex:1; min-width:0; padding-right:4px; }
+  .circles-modal-close {
+    flex-shrink:0;
+    background:transparent;
+    border:none;
+    color:#888;
+    font-size:26px;
+    line-height:1;
+    width:40px;
+    height:40px;
+    margin:-8px -10px -4px 0;
+    padding:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    border-radius:10px;
+    font-family:'DM Sans',sans-serif;
+  }
+  .circles-modal-close:hover { color:#f0ebe0; background:rgba(255,255,255,0.06); }
+  .circles-modal-sub { font-size:13px; color:#888; margin-top:-2px; line-height:1.4; word-break:break-word; }
 
   /* Bottom sheet / confirm shared shell */
   .circles-sheet-root { position:fixed; inset:0; z-index:2200; display:flex; flex-direction:column; justify-content:flex-end; animation:fadeIn 0.2s ease; }
@@ -2886,7 +3029,6 @@ const styles = `
   .circles-bell--active:hover { background:#f0d880; }
   .circles-bell--active .circles-bell-count { color:#0a0a0a; font-weight:700; }
 
-  .circle-detail-actions { display:flex; flex-direction:column; gap:10px; }
   .circle-invite-btn { align-self:flex-start; background:#141414; border:1px solid #2a2a2a; color:#e8c96a; padding:10px 18px; border-radius:999px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; letter-spacing:0.3px; cursor:pointer; transition:border-color 0.15s, background 0.15s; }
   .circle-invite-btn:hover:not(:disabled) { border-color:#e8c96a; background:#1a1608; }
   .circle-invite-btn:disabled { opacity:0.4; cursor:default; }
@@ -7257,42 +7399,86 @@ export default function App() {
       {screen === "circle-detail" && (
         <div className="home">
           <div className="discover">
-            <div className="discover-header circles-detail-header">
-              <button
-                type="button"
-                className="circles-detail-back"
-                onClick={backFromCircleDetail}
-              >
-                ← Back
-              </button>
+            <div className="circles-detail-shell">
               {circleDetailLoading && !circleDetailData ? (
-                <div className="circles-detail-loading">Loading…</div>
+                <>
+                  <div className="circles-detail-topbar">
+                    <button
+                      type="button"
+                      className="circles-detail-back-circle"
+                      onClick={backFromCircleDetail}
+                      aria-label="Back to circles"
+                    >
+                      <span className="circles-detail-back-circle__glyph" aria-hidden="true">&lt;</span>
+                    </button>
+                  </div>
+                  <div className="circles-detail-loading">Loading…</div>
+                </>
               ) : circleDetailError ? (
-                <div className="circles-error-banner">{circleDetailError}</div>
+                <>
+                  <div className="circles-detail-topbar">
+                    <button
+                      type="button"
+                      className="circles-detail-back-circle"
+                      onClick={backFromCircleDetail}
+                      aria-label="Back to circles"
+                    >
+                      <span className="circles-detail-back-circle__glyph" aria-hidden="true">&lt;</span>
+                    </button>
+                  </div>
+                  <div className="circles-detail-error-wrap">
+                    <div className="circles-error-banner">{circleDetailError}</div>
+                  </div>
+                </>
               ) : circleDetailData ? (
                 (() => {
                   const meta = vibeMeta(circleDetailData.vibe);
                   const isCreator = currentUserRole(circleDetailData, user?.id) === "creator";
+                  const showInviteInHero =
+                    isCreator && circleDetailData.status === "active";
                   return (
                     <div
-                      className="circle-hero"
+                      className={`circle-hero circle-hero--detail${
+                        showInviteInHero ? " circle-hero--has-invite" : ""
+                      }`}
                       style={{
                         "--vibe-accent": meta.accent,
                         "--vibe-tint": meta.tint,
                       }}
                     >
                       <div className="circle-hero__tint" aria-hidden="true" />
+                      <button
+                        type="button"
+                        className="circles-detail-back-circle"
+                        onClick={backFromCircleDetail}
+                        aria-label="Back to circles"
+                      >
+                        <span className="circles-detail-back-circle__glyph" aria-hidden="true">&lt;</span>
+                      </button>
+                      {showInviteInHero && (
+                        <div className="circle-hero__invite-corner">
+                          <button
+                            type="button"
+                            className="circle-invite-btn circle-invite-btn--hero"
+                            onClick={openInviteSheet}
+                            disabled={circleDetailData.memberCount >= 25}
+                          >
+                            + Invite by email
+                          </button>
+                          {circleDetailData.memberCount >= 25 && (
+                            <p className="circle-hero__invite-cap">
+                              This circle is full (25/25).
+                            </p>
+                          )}
+                        </div>
+                      )}
                       <div className="circle-hero__body">
                         <div className="circle-hero__name-row">
                           <div className="circle-hero__name">{circleDetailData.name}</div>
                           {isCreator && <div className="circle-hero__crown" title="You're the creator">👑</div>}
                         </div>
-                        {circleDetailData.description && (
-                          <div className="circle-hero__desc">{circleDetailData.description}</div>
-                        )}
                         <div className="circle-hero__meta-row circle-hero__meta-row--one-line">
                           <div className="circle-hero__meta-left">
-                            <span className="circle-card__vibe-badge">{meta.id}</span>
                             <span className="circle-card__members">
                               {circleDetailData.memberCount}{" "}
                               {circleDetailData.memberCount === 1 ? "member" : "members"}
@@ -7315,24 +7501,6 @@ export default function App() {
 
             {circleDetailData && (
               <div className="circle-detail-body">
-                {currentUserRole(circleDetailData, user?.id) === "creator"
-                  && circleDetailData.status === "active" && (
-                  <div className="circle-detail-actions">
-                    <button
-                      type="button"
-                      className="circle-invite-btn"
-                      onClick={openInviteSheet}
-                      disabled={circleDetailData.memberCount >= 25}
-                    >
-                      + Invite by email
-                    </button>
-                    {circleDetailData.memberCount >= 25 && (
-                      <div className="circles-cap-banner">
-                        This circle is full (25/25 members).
-                      </div>
-                    )}
-                  </div>
-                )}
                 {(() => {
                   const mc = circleDetailData.memberCount;
                   if (mc < 2) {
@@ -7516,7 +7684,17 @@ export default function App() {
             onClick={() => setShowCircleInfoSheet(false)}
           />
           <div className="circles-modal-panel">
-            <div className="circles-modal-title">Circle info</div>
+            <div className="circles-modal-header">
+              <h2 className="circles-modal-title">Circle info</h2>
+              <button
+                type="button"
+                className="circles-modal-close"
+                aria-label="Close"
+                onClick={() => setShowCircleInfoSheet(false)}
+              >
+                ×
+              </button>
+            </div>
             <div className="circles-modal-sub">{circleDetailData.name}</div>
             <div className="circle-info-member-list">
               {[...(circleDetailData.members || [])]
