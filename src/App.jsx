@@ -3046,6 +3046,30 @@ const styles = `
   .circle-detail-strip-empty .empty-sub { margin-top:8px; font-size:12px; color:#777; line-height:1.45; }
   .circle-strip-cap-hint { font-size:12px; color:#777; line-height:1.5; margin-top:8px; text-align:center; max-width:36em; margin-left:auto; margin-right:auto; }
   .circle-strip-cap-hint button { margin-top:8px; background:transparent; border:none; color:#e8c96a; text-decoration:underline; cursor:pointer; font-size:inherit; padding:0; font-family:inherit; }
+  .circle-rate-title-pill-wrap {
+    display:flex;
+    justify-content:center;
+    margin-top:18px;
+    padding-bottom:4px;
+    width:100%;
+    box-sizing:border-box;
+  }
+  .circle-rate-title-pill {
+    appearance:none;
+    background:transparent;
+    border:1px solid #e8c96a;
+    color:#e8c96a;
+    padding:10px 22px;
+    border-radius:999px;
+    font-family:'DM Sans',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:0.2px;
+    cursor:pointer;
+    transition:border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .circle-rate-title-pill:hover { background:rgba(232,201,106,0.08); border-color:#f0dc9a; color:#f0dc9a; }
+  .circle-rate-title-pill:active { opacity:0.92; }
   .strip-card--circle-more { border:none; background:transparent; padding:0; font:inherit; text-align:left; align-self:flex-start; }
   .strip-card--circle-more:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:12px; }
   .strip-card--circle-more:disabled { opacity:0.55; cursor:default; }
@@ -3603,6 +3627,8 @@ export default function App() {
   /** Latest title keys for Cinemastro batch RPC (read when debounced fetch runs, not when effect first fires). */
   const cinemastroFetchKeysRef = useRef([]);
 
+  /** When set, opening title detail from Discover returns to `circle-detail` after rating/back (see `openDetail`). */
+  const rateTitleReturnCircleIdRef = useRef(null);
   /** Browser Back should return to the in-app screen that opened detail, not leave the site (SPA history). */
   const detailReturnScreenRef = useRef(null);
   const detailHistoryPushedRef = useRef(false);
@@ -3622,6 +3648,12 @@ export default function App() {
   const [tvStripMetaByTmdbId, setTvStripMetaByTmdbId] = useState({});
   useEffect(() => {
     screenRef.current = screen;
+  }, [screen]);
+
+  useEffect(() => {
+    if (screen !== "discover" && screen !== "detail") {
+      rateTitleReturnCircleIdRef.current = null;
+    }
   }, [screen]);
 
   function shouldDeferComputeNeighbors() {
@@ -6018,7 +6050,12 @@ export default function App() {
   /** v3.2.1: Navigate immediately; fetch `predict` in background and show skeleton until settled. */
   function openDetail(movie, prediction, opts = {}) {
     const pred = prediction ?? null;
-    detailReturnScreenRef.current = screenRef.current;
+    const s = screenRef.current;
+    if (s === "discover" && rateTitleReturnCircleIdRef.current != null) {
+      detailReturnScreenRef.current = "circle-detail";
+    } else {
+      detailReturnScreenRef.current = s;
+    }
     // Distinct URL per detail step so iOS edge-swipe / Mac trackpad back can popstate (v2.1.0). Community avg on detail from v3.0.0 RPC.
     if (opts.skipHistoryPush) {
       detailHistoryPushedRef.current = false;
@@ -6666,6 +6703,15 @@ export default function App() {
     detailReturnScreenRef.current = null;
     setSelected(null);
     setDetailEditRating(false);
+  }
+
+  /** Discover → pick a title → rate; `goBack` / after submit returns to this circle. */
+  function openDiscoverFromCircleForRating() {
+    if (!selectedCircleId || !circleDetailData || circleDetailData.status !== "active") return;
+    rateTitleReturnCircleIdRef.current = selectedCircleId;
+    clearDetailOverlayToNavigate();
+    setNavTab("discover");
+    setScreen("discover");
   }
 
   function navigatePrimarySection(nextScreen) {
@@ -7811,13 +7857,7 @@ export default function App() {
                         <div className="circle-strip-cap-hint">
                           Showing {CIRCLE_STRIP_MAX} recent titles in this circle. For anything else, search by title in Discover.
                           <div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setNavTab("discover");
-                                setScreen("discover");
-                              }}
-                            >
+                            <button type="button" onClick={openDiscoverFromCircleForRating}>
                               Open Discover
                             </button>
                           </div>
@@ -7826,6 +7866,17 @@ export default function App() {
                     </>
                   );
                 })()}
+                {circleDetailData.status === "active" && (
+                  <div className="circle-rate-title-pill-wrap">
+                    <button
+                      type="button"
+                      className="circle-rate-title-pill"
+                      onClick={openDiscoverFromCircleForRating}
+                    >
+                      Rate a title
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

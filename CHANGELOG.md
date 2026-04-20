@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.5.13
+
+- **Circles — Rate a title.** On **circle detail** (active circles), a centered **Rate a title** pill below the strip opens **Discover** unchanged. Opening a title from Discover and submitting a rating (or back) returns to **this circle** via `detailReturnScreenRef` + `rateTitleReturnCircleIdRef`. **Open Discover** in the post–20-cap hint uses the same return behavior.
+
 ## 5.5.12
 
 - **Circles — strip copy & card.** Section header is **Recent activity** (skeleton + loaded strip). Empty state unchanged: **No shared ratings in this circle yet.** **Circle** score (muted label + gold number) sits **centered above the title** for **together** rows; bottom line is **solo only** (Cinemastro), so no duplicate Circle line.
