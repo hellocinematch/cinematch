@@ -4,10 +4,10 @@
 
 ## For the assistant (every Cinematch session)
 
-1. **Read this file early** when working in this repo — it’s the live handoff for CF, neighbors, cron, and recent commits.
+1. **Read this file early** when working in this repo — it’s the live handoff for CF, neighbors, cron, UI chrome, and recent commits.
 2. **Recurring ops reminder:** as MAU grows, **`cron` chunk coverage must grow**. Staggered `compute-neighbors` jobs use `offset` steps; ensure **`(# of jobs) × (limit per job)`** covers all eligible (non-seed) users. Details: **`COMPUTE-NEIGHBORS-CRON.md`**. Audit:  
    `select jobname, schedule from cron.job where jobname like 'compute-neighbors-w%';`
-3. **When the user asks to “update passdown”** or after a milestone (neighbors, cron, match, circles): **edit this file** so the next session stays accurate.
+3. **When the user asks to “update passdown”** or after a milestone (neighbors, cron, match, circles, nav): **edit this file** so the next session stays accurate.
 
 **Cursor rules:** `.cursor/rules/cinematch-handoff.mdc` + `.cursor/rules/compute-neighbors-cron.mdc` are **`alwaysApply: true`** so reminders surface in chats without relying on memory.
 
@@ -17,6 +17,17 @@
 
 - **`COMPUTE-NEIGHBORS-CRON.md`** — full ops runbook: Vault, `apikey` + `x-compute-neighbors-secret`, `pg_net` timeouts, staggered schedules, scaling formula.
 - **Neighbor cron:** expand **`offset`** / add **`cron.schedule`** rows when user count exceeds current weekly coverage; do **not** assume the first batch of `w00…w09` is enough forever.
+
+## Recent work (client — primary nav & detail)
+
+**File:** `src/App.jsx` (large inline `<style>{styles}</style>` block for `.app-primary-nav*`).
+
+| Commit    | Contents |
+|-----------|----------|
+| `d7df773` | **Mobile primary nav (≤899px):** top row is CSS grid **hamburger \| centered Cinemastro brand \| Discover (lens)**. **Title detail** adds a **second row** with the circular **back** control so it does not overlap the hamburger. Header modifier: **`app-primary-nav--with-detail-back`**; root app padding when detail: **`app--primary-nav-detail-back`** (extra `padding-top` on narrow viewports). **Scrim + drawer** `top` / `max-height` use **`calc(126px + env(safe-area-inset-top))`** on detail mobile so the overlay starts below the full chrome. **Desktop (≥900px):** single row, back leads via flex **`order`**. |
+| `5639fc1` | **v5.5.1 Your Picks:** catalogue **`predict_cached`**, match body guards (see commit message). |
+
+**Detail / navigation glue (still relevant):** `"detail"` in **`primaryNavScreens`**; **`clearDetailOverlayToNavigate()`** at start of **`navigatePrimarySection`** and in **`onDiscover`** so URL/selection clear without **`history.back()`**. **`AppPrimaryNav`** receives **`onDetailBack={screen === "detail" ? goBack : undefined}`**.
 
 ## Recent work (neighbor CF + cron)
 
@@ -60,7 +71,7 @@
 ## Open / follow-ups
 
 - **Cron:** audit coverage vs eligible user count after growth; see **`COMPUTE-NEIGHBORS-CRON.md`**.
-- **Git:** push **`main`** if still ahead of **`origin/main`**.
+- **Nav (optional):** If **`126px`** header offset feels tight on some devices, tune **`padding-top`** / scrim **`top`** together in `App.jsx` styles (keep them in sync).
 
 ---
 *Replace or trim this file after the next milestone; keep “Last updated” and the assistant block current.*
