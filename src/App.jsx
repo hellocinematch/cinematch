@@ -1163,28 +1163,86 @@ const MOOD_CARDS = [
   }
 ];
 
-function BottomNav({ navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults }) {
-  const tabs = [["🎭", "Mood", "mood"], ["👤", "Profile", "profile"]];
+function BottomNav({
+  navTab,
+  setNavTab,
+  setScreen,
+  setMoodStep,
+  setMoodSelections,
+  setMoodResults,
+  community,
+  ratings,
+  onSignOut,
+}) {
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileNavRef = useRef(null);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const close = (e) => {
+      if (profileNavRef.current && !profileNavRef.current.contains(e.target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [profileMenuOpen]);
+
   return (
     <div className="bottom-nav">
-      {tabs.map(([icon, label, tab]) => (
-        <div key={label}
-          className={`nav-item ${navTab === tab ? "active" : ""}`}
-          onClick={() => {
-            setNavTab(tab);
-            if (tab === "mood") {
-              setMoodStep(0);
-              setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
-              setMoodResults([]);
-              setScreen("mood-picker");
-            } else {
-              setScreen(tab);
-            }
-          }}>
-          <div className="nav-icon">{icon}</div>
-          {navTab === tab && <div className="nav-label">{label}</div>}
-        </div>
-      ))}
+      <div
+        className={`nav-item ${navTab === "mood" ? "active" : ""}`}
+        onClick={() => {
+          setProfileMenuOpen(false);
+          setNavTab("mood");
+          setMoodStep(0);
+          setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
+          setMoodResults([]);
+          setScreen("mood-picker");
+        }}
+      >
+        <div className="nav-icon">🎭</div>
+        {navTab === "mood" && <div className="nav-label">Mood</div>}
+      </div>
+      <div className="bottom-nav__stats">
+        <PublicSiteStats community={community} ratings={ratings} />
+      </div>
+      <div
+        ref={profileNavRef}
+        className={`nav-item nav-item--profile ${navTab === "profile" || profileMenuOpen ? "active" : ""}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setProfileMenuOpen((v) => !v);
+        }}
+      >
+        <div className="nav-icon">👤</div>
+        {navTab === "profile" && !profileMenuOpen ? <div className="nav-label">Profile</div> : null}
+        {profileMenuOpen ? (
+          <div className="bottom-nav__profile-menu" onClick={(ev) => ev.stopPropagation()}>
+            <button
+              type="button"
+              className="avatar-menu-btn"
+              onClick={() => {
+                setProfileMenuOpen(false);
+                setNavTab("profile");
+                setScreen("profile");
+              }}
+            >
+              Profile
+            </button>
+            <button
+              type="button"
+              className="avatar-menu-btn danger"
+              onClick={() => {
+                setProfileMenuOpen(false);
+                onSignOut();
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1221,6 +1279,10 @@ function AppPrimaryNav({
     };
   }, []);
 
+  useEffect(() => {
+    if (onDetailBack) setMobileOpen(false);
+  }, [onDetailBack]);
+
   function handleDrawerSelect(id) {
     setMobileOpen(false);
     onNavigateSection(id);
@@ -1233,6 +1295,16 @@ function AppPrimaryNav({
       aria-label="Primary"
     >
       <div className="app-primary-nav__inner">
+        {onDetailBack ? (
+          <button
+            type="button"
+            className="app-primary-nav__detail-back app-primary-nav__detail-back--mobile"
+            onClick={onDetailBack}
+            aria-label="Back"
+          >
+            <span aria-hidden="true">&lt;</span>
+          </button>
+        ) : null}
         <button
           type="button"
           className={`app-primary-nav__hamburger ${mobileOpen ? "app-primary-nav__hamburger--open" : ""}`}
@@ -1272,7 +1344,7 @@ function AppPrimaryNav({
       {onDetailBack ? (
         <button
           type="button"
-          className="app-primary-nav__detail-back"
+          className="app-primary-nav__detail-back app-primary-nav__detail-back--desktop"
           onClick={onDetailBack}
           aria-label="Back"
         >
@@ -1731,6 +1803,8 @@ const styles = `
   }
   .app-primary-nav__detail-back:hover { border-color:#555; background:#222; color:#f0d880; }
   .app-primary-nav__detail-back span { position:relative; left:-0.5px; }
+  .app-primary-nav__detail-back--mobile { display:none; }
+  .app-primary-nav__detail-back--desktop { display:inline-flex; }
   .app-primary-nav__brand { flex-shrink:0; }
   .app-primary-nav__brand .brand-logo--header {
     height:40px;
@@ -1842,12 +1916,6 @@ const styles = `
   .app-primary-nav__drawer-link:hover { color:#e8c96a; background:rgba(232, 201, 106, 0.08); }
   .app-primary-nav__drawer-link--active { color:#e8c96a; background:#2a2610; }
   .app--primary-nav { padding-top:calc(60px + env(safe-area-inset-top, 0px)); }
-  /* Title detail on phone: second nav row (back) — match fixed header height so content is not covered. */
-  @media (max-width: 899px) {
-    .app--primary-nav.app--primary-nav-detail-back {
-      padding-top:calc(126px + env(safe-area-inset-top, 0px));
-    }
-  }
   .app--primary-nav .home-header { padding-top:20px; }
   .topbar-brand-cluster { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:nowrap; }
   .topbar-brand-cluster .app-brand-button { flex-shrink:1; }
@@ -1948,11 +2016,18 @@ const styles = `
   .empty-box { margin:0 24px; padding:24px; border:1px dashed #222; border-radius:10px; text-align:center; }
   .empty-text { font-size:13px; color:#444; }
 
-  .bottom-nav { position:fixed; bottom:0; left:0; right:0; margin-left:auto; margin-right:auto; width:100%; max-width:var(--shell); box-sizing:border-box; background:rgba(10,10,10,0.95); border-top:1px solid #1a1a1a; display:flex; padding:12px 0 calc(20px + env(safe-area-inset-bottom,0px)); padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px); backdrop-filter:blur(20px); z-index:100; }
-  .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; opacity:0.4; transition:opacity 0.2s; }
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; margin-left:auto; margin-right:auto; width:100%; max-width:var(--shell); box-sizing:border-box; background:rgba(10,10,10,0.95); border-top:1px solid #1a1a1a; display:flex; align-items:flex-end; justify-content:space-between; gap:6px; padding:10px 8px calc(18px + env(safe-area-inset-bottom,0px)); padding-left:max(8px, env(safe-area-inset-left,0px)); padding-right:max(8px, env(safe-area-inset-right,0px)); backdrop-filter:blur(20px); z-index:100; }
+  .bottom-nav__stats { flex:0 1 auto; min-width:0; display:flex; align-items:center; justify-content:center; align-self:center; padding:0 2px; max-width:42%; }
+  .bottom-nav__stats .public-site-stats { flex-direction:row; flex-wrap:wrap; gap:6px 12px; justify-content:center; padding:0; }
+  .bottom-nav__stats .public-site-stats-row { gap:4px; }
+  .bottom-nav__stats .public-site-stats-val { font-size:10px; }
+  .bottom-nav__stats .public-site-stats-lbl { font-size:7px; }
+  .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; opacity:0.4; transition:opacity 0.2s; min-width:0; }
+  .nav-item--profile { position:relative; }
   .nav-item.active { opacity:1; }
   .nav-icon { font-size:20px; }
   .nav-label { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#e8c96a; }
+  .bottom-nav__profile-menu { position:absolute; right:0; bottom:calc(100% + 10px); min-width:150px; background:#141414; border:1px solid #2a2a2a; border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,0.45); padding:6px; z-index:130; }
 
   .app-footer { padding:20px 24px 28px; border-top:1px solid #1a1a1a; margin-top:8px; }
   .app-footer-links { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 10px; margin-bottom:12px; }
@@ -2266,22 +2341,14 @@ const styles = `
       padding-right:max(20px, env(safe-area-inset-right, 0px));
     }
     .app-primary-nav__hamburger { display:inline-flex; grid-column:1; grid-row:1; }
+    .app-primary-nav--with-detail-back .app-primary-nav__hamburger { display:none !important; }
+    .app-primary-nav__detail-back--mobile { display:inline-flex !important; grid-column:1; grid-row:1; justify-self:start; align-self:center; }
+    .app-primary-nav__detail-back--desktop { display:none !important; }
     .app-primary-nav__brand { grid-column:2; grid-row:1; justify-self:center; min-width:0; }
     .app-primary-nav__right { grid-column:3; grid-row:1; }
     .app-primary-nav__links { display:none; }
     .app-primary-nav__scrim { display:block; }
     .app-primary-nav__drawer { display:flex; }
-    .app-primary-nav--with-detail-back .app-primary-nav__detail-back {
-      align-self:flex-start;
-      margin:2px 0 10px max(12px, env(safe-area-inset-left, 0px));
-    }
-    .app-primary-nav--with-detail-back .app-primary-nav__scrim {
-      top:calc(126px + env(safe-area-inset-top, 0px));
-    }
-    .app-primary-nav--with-detail-back .app-primary-nav__drawer {
-      top:calc(126px + env(safe-area-inset-top, 0px));
-      max-height:calc(100vh - 126px - env(safe-area-inset-top, 0px));
-    }
     .filter-row { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .disc-grid { padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px)); }
     .discover { width:100%; max-width:100%; }
@@ -6475,7 +6542,17 @@ export default function App() {
     ? ratedMovies.filter(({ movie }) => (movie.title || "").toLowerCase().includes(ratedSearchLower))
     : ratedMovies;
 
-  const navProps = { navTab, setNavTab, setScreen, setMoodStep, setMoodSelections, setMoodResults };
+  const navProps = {
+    navTab,
+    setNavTab,
+    setScreen,
+    setMoodStep,
+    setMoodSelections,
+    setMoodResults,
+    community: siteStats?.community,
+    ratings: siteStats?.ratings,
+    onSignOut: handleSignOut,
+  };
 
   function AccountAvatarMenu() {
     return (
@@ -6521,9 +6598,7 @@ export default function App() {
   return (
     <div className="viewport-shell">
       <div
-        className={`app${showPrimaryNav ? " app--primary-nav" : ""}${
-          showPrimaryNav && screen === "detail" ? " app--primary-nav-detail-back" : ""
-        }`}
+        className={`app${showPrimaryNav ? " app--primary-nav" : ""}`}
       >
         <style>{styles}</style>
         {showPrimaryNav && (
@@ -8004,11 +8079,6 @@ export default function App() {
       {/* DISCOVER */}
       {screen === "discover" && (
         <div className="discover">
-          <div className="page-topbar">
-            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-            <div />
-            <AccountAvatarMenu />
-          </div>
           <div className="discover-header">
             <div className="discover-title">Discover</div>
             <form
