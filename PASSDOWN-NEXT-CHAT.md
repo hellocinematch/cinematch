@@ -41,7 +41,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Repo version & git
 
-- **`package.json`:** **5.5.8** — **`CHANGELOG.md`** has sections **5.5.2** through **5.5.8**. Profile shows **Cinemastro v…** via **`APP_VERSION`** (from `package.json` in `src/App.jsx`).
+- **`package.json`:** **5.5.11** — **`CHANGELOG.md`** through **5.5.11**. Profile shows **Cinemastro v…** via **`APP_VERSION`** (from `package.json` in `src/App.jsx`).
 - Confirm **`main` tip** with `git log -3 --oneline` after local commits; recent shipped work includes **circle-detail hero** iterations, **Circles bell** pending count, **discussion-first** Cursor rule, optional **`profiles` name NOT NULL** migration (**`20260504120000_profiles_name_not_null.sql`** — apply on DB when ready).
 
 ## Recent work (client — `src/App.jsx`)
@@ -60,8 +60,8 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ### Circles — `circle-detail` hero
 
-- **Layout:** Full-bleed **`circle-hero--detail`** (**compact** top/body padding). **Top bar (grid):** **Back** (left) · **circle name** centered (**inherits `.circle-hero__name`** — **DM Serif**, **32px** / **26px** narrow; creator **`★`** **before** name, small) · empty **spacer** column for balance.
-- **Meta row (single line, baseline-aligned):** **members** (left) · **Circle info** (center) · **+ Invite more** (right when creator + active). Cap copy under invite when **25/25**.
+- **Layout:** Full-bleed **`circle-hero--detail`**. **Top bar** **`circle-hero__top-bar--detail-chat`:** frosted strip (**`backdrop-filter`**). **Back** · **centered cluster:** **avatar** (two-letter initials via **`circleAvatarInitials`**) + **name** (one-line ellipsis, centered; narrow: **DM Sans**) + **subtitle** (people icon + count, centered) · circular **(i)** → **Circle info**.
+- **Invite:** **+ Invite more** lives in the **Circle info** modal (creator, active); **`openInviteSheet`** closes the info sheet first.
 - **Circle info modal:** **`get_circle_member_names`** RPC + `profiles` fallback when **`showCircleInfoSheet`** opens (`circleInfoNamesById`).
 
 ### Desktop wordmark

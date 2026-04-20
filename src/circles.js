@@ -37,8 +37,58 @@ export function vibeMeta(vibeId) {
   return VIBE_BY_ID.get(vibeId) ?? DEFAULT_VIBE;
 }
 
-export const CIRCLE_NAME_MAX = 40;
+/** Circle display name: letters (any script), spaces, hyphen, apostrophe; digits only after a leading letter; 2–32 chars after trim. */
+export const CIRCLE_NAME_MIN = 2;
+export const CIRCLE_NAME_MAX = 32;
 export const CIRCLE_DESCRIPTION_MAX = 100;
+
+/** After trim: first char letter, rest letters/digits/space/'/- only; max length enforced separately. */
+const CIRCLE_NAME_CHARS_RE = /^[\p{L}][\p{L}0-9'\- ]{0,31}$/u;
+
+/** Normalize pasted smart quotes / dashes; trim ends only. */
+export function normalizeCircleNameInput(raw) {
+  if (typeof raw !== "string") return "";
+  return raw
+    .replace(/\u2019/g, "'")
+    .replace(/\u2018/g, "'")
+    .replace(/[\u2010\u2011\u2012\u2013\u2014]/g, "-")
+    .trim();
+}
+
+/**
+ * @returns {{ ok: true, name: string } | { ok: false, error: string }}
+ */
+export function validateCircleName(raw) {
+  const s = normalizeCircleNameInput(raw);
+  if (!s) {
+    return { ok: false, error: "Give your circle a name." };
+  }
+  if (s.length < CIRCLE_NAME_MIN) {
+    return { ok: false, error: "Use at least 2 characters." };
+  }
+  if (s.length > CIRCLE_NAME_MAX) {
+    return { ok: false, error: `Use at most ${CIRCLE_NAME_MAX} characters.` };
+  }
+  if (!CIRCLE_NAME_CHARS_RE.test(s)) {
+    return {
+      ok: false,
+      error:
+        "Use letters, spaces, hyphens, and apostrophes. Numbers only after a letter. No emoji or symbols.",
+    };
+  }
+  return { ok: true, name: s };
+}
+
+/** Two-letter placeholder initials for circle avatar (Unicode letters; duplicates if only one). */
+export function circleAvatarInitials(name) {
+  const s = String(name ?? "").trim();
+  if (!s) return "?";
+  const letters = s.match(/\p{L}/gu);
+  if (!letters || letters.length === 0) return "?";
+  const a = letters[0];
+  const b = letters.length >= 2 ? letters[1] : letters[0];
+  return (a + b).toLocaleUpperCase();
+}
 
 /** RLS on `circles` restricts selects to circles the current user belongs to, so the scope is
  *  naturally correct without a `where user_id = auth.uid()` clause. We embed circle_members so we
@@ -103,11 +153,9 @@ function normalizeCircleRow(row) {
 /** Two sequential inserts. The "creator can seed own membership" RLS policy lets the second one
  *  pass. If it fails we best-effort roll the circle row back so we don't leave orphan circles. */
 export async function createCircle({ name, description, vibe, creatorId }) {
-  const trimmedName = (name || "").trim();
-  if (!trimmedName) throw new Error("Circle name is required.");
-  if (trimmedName.length > CIRCLE_NAME_MAX) {
-    throw new Error(`Name must be ${CIRCLE_NAME_MAX} characters or fewer.`);
-  }
+  const validation = validateCircleName(name);
+  if (!validation.ok) throw new Error(validation.error);
+  const trimmedName = validation.name;
   const trimmedDescription = (description || "").trim();
   if (trimmedDescription.length > CIRCLE_DESCRIPTION_MAX) {
     throw new Error(`Description must be ${CIRCLE_DESCRIPTION_MAX} characters or fewer.`);

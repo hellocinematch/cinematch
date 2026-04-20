@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.5.11
+
+- **Circles — circle detail hero.** Avatar, title, and member subtitle are **centered** as a block between back and info (identity column no longer stretches full width; title/subtitle text aligned center).
+
+## 5.5.10
+
+- **Circles — circle detail hero (chat-style).** Header is a single row: **back** · **avatar** (two-letter initials) + **circle name** (one-line ellipsis) + **subtitle** (people icon + member count) · circular **(i)** button for **Circle info**. **+ Invite more** moved into the **Circle info** modal (creator, active circles); opening invite closes the info sheet. Frosted bar (`backdrop-filter`) on the header strip.
+
+## 5.5.9
+
+- **Circles — create name rules.** Circle names are **2–32** characters (was 40). Allowed characters: **letters** (Unicode), **spaces**, **hyphen**, **apostrophe**; **digits** only after a leading letter; no emoji or other symbols. Pasted **smart quotes** and **Unicode dashes** normalize to `'` and `-`. Validation lives in **`validateCircleName`** / **`normalizeCircleNameInput`** (`src/circles.js`) and runs on create. DB: migration **`20260505120000_circles_name_length_2_32.sql`** tightens **`circles.name`** to length **2–32** (apply on Supabase when ready).
+
 ## 5.5.8
 
 - **Circles — circle detail hero.** Circle name in the top bar again uses the same **font size** as before (**32px** / **26px** on narrow viewports), inheriting **DM Serif Display** from `.circle-hero__name`; compact layout and meta alignment from **5.5.7** unchanged.

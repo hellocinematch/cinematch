@@ -5,6 +5,8 @@ import { supabase } from "./supabase";
 import {
   CIRCLE_CAP,
   CIRCLE_NAME_MAX,
+  validateCircleName,
+  circleAvatarInitials,
   CIRCLE_DESCRIPTION_MAX,
   VIBES,
   vibeMeta,
@@ -2735,8 +2737,7 @@ const styles = `
     .empty-box,
     .no-recs { margin-left:32px; margin-right:32px; }
     .circles-detail-topbar { padding-left:32px; padding-right:32px; padding-top:14px; }
-    .circle-hero--detail .circle-hero__body { padding-left:32px; padding-right:32px; }
-    .circle-hero--detail .circle-hero__top-bar {
+    .circle-hero--detail .circle-hero__top-bar--detail-chat {
       padding-left:32px;
       padding-right:32px;
       padding-top:max(14px, env(safe-area-inset-top, 0px));
@@ -2832,16 +2833,20 @@ const styles = `
   .circles-detail-back-circle:hover { background:rgba(0,0,0,0.58); border-color:rgba(232,201,106,0.45); color:#f0dc9a; }
   .circles-detail-back-circle:active { opacity:0.9; }
   .circles-detail-back-circle__glyph { display:block; margin-top:-1px; }
-  /* Circle detail: top row — back | centered name (+ creator ★ before name) | spacer; meta row — members | Circle info | Invite more. */
-  .circle-hero--detail .circle-hero__top-bar {
+  /* Circle detail: chat-style header — back | avatar + title + member subtitle | (i). Invite is in Circle info modal. */
+  .circle-hero--detail .circle-hero__top-bar--detail-chat {
     position:relative;
     z-index:2;
     display:grid;
-    grid-template-columns:1fr auto 1fr;
+    grid-template-columns:auto minmax(0, 1fr) auto;
     align-items:center;
-    gap:6px;
-    padding:max(6px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-left, 0px)) 4px max(12px, env(safe-area-inset-right, 0px));
+    gap:10px;
+    padding:max(6px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px));
     box-sizing:border-box;
+    background:rgba(10,10,10,0.5);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(255,255,255,0.06);
   }
   .circle-hero--detail .circle-hero__top-bar-side--left {
     justify-self:start;
@@ -2850,50 +2855,101 @@ const styles = `
     min-height:36px;
   }
   .circle-hero--detail .circle-hero__top-bar-center {
-    justify-self:center;
+    justify-self:stretch;
     display:flex;
     align-items:center;
     justify-content:center;
     min-width:0;
     max-width:100%;
-    padding:0 4px;
+    padding:0;
   }
-  .circle-hero--detail .circle-hero__top-bar-center-title {
-    display:inline-flex;
+  .circle-hero--detail .circle-hero__identity {
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    min-width:0;
+    width:100%;
+    max-width:100%;
+  }
+  .circle-hero__avatar {
+    width:44px;
+    height:44px;
+    border-radius:50%;
+    flex-shrink:0;
+    border:1px solid color-mix(in srgb, var(--vibe-accent, #e8c96a) 55%, transparent);
+    background:rgba(0,0,0,0.35);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-sizing:border-box;
+  }
+  .circle-hero__avatar-initials {
+    font-family:'DM Sans',sans-serif;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:0.04em;
+    color:var(--vibe-accent, #e8c96a);
+  }
+  .circle-hero__identity-text {
+    min-width:0;
+    flex:0 1 auto;
+    max-width:calc(100% - 54px);
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    align-items:center;
+  }
+  .circle-hero--detail .circle-hero__title-line {
+    display:flex;
     align-items:center;
     justify-content:center;
     gap:6px;
     min-width:0;
-    max-width:100%;
+    width:100%;
   }
   .circle-hero--detail .circle-hero__creator-star {
     flex-shrink:0;
-    font-size:14px;
+    font-size:13px;
     line-height:1;
     color:var(--vibe-accent, #e8c96a);
   }
   .circle-hero--detail .circle-hero__top-bar-side--right {
     justify-self:end;
-    width:100%;
-    min-height:1px;
+    display:flex;
+    align-items:center;
+    flex-shrink:0;
   }
-  .circle-invite-btn--hero {
-    padding:6px 12px;
-    font-size:12px;
-    line-height:1.25;
-    white-space:nowrap;
-    display:inline-flex;
+  .circle-hero__subtitle-members {
+    display:flex;
     align-items:center;
     justify-content:center;
+    gap:5px;
+    font-size:12px;
+    line-height:1.25;
+    color:#9a9690;
+    font-family:'DM Sans',sans-serif;
+    width:100%;
   }
-  .circle-hero__invite-cap {
+  .circle-hero__members-icon { display:flex; color:#9a9690; flex-shrink:0; }
+  .circle-hero__members-num { font-weight:600; color:#c8c4bc; }
+  .circle-hero__members-label { color:#888; }
+  .circle-info-invite-block {
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:8px;
+    margin:12px 0 4px;
+  }
+  .circle-info-invite-cap {
     margin:0;
-    font-size:11px;
+    font-size:12px;
     color:#887755;
-    text-align:right;
     line-height:1.35;
-    max-width:11em;
+    text-align:center;
   }
+  .circle-invite-btn--modal { display:flex; align-self:stretch; justify-content:center; }
   .circles-detail-loading { padding:40px max(20px, env(safe-area-inset-left, 0px)) 40px max(20px, env(safe-area-inset-right, 0px)); color:#666; font-size:13px; text-align:center; }
   .circles-detail-error-wrap {
     padding:0 max(20px, env(safe-area-inset-left, 0px)) 20px max(20px, env(safe-area-inset-right, 0px));
@@ -2910,63 +2966,19 @@ const styles = `
     border-right:none;
     border-top-color:#1e1e1e;
   }
-  .circle-hero--detail .circle-hero__body {
-    padding:0 max(20px, env(safe-area-inset-left, 0px)) 10px max(20px, env(safe-area-inset-right, 0px));
-  }
-  /* Inherits .circle-hero__name size (32px / 26px narrow) + DM Serif; only layout + 3-line clamp for top bar. */
+  /* Single-line title in detail header (full name still in Circle info modal). */
   .circle-hero--detail .circle-hero__name--top-bar {
     flex:0 1 auto;
     min-width:0;
-    text-align:center;
-    -webkit-line-clamp:3;
-    line-clamp:3;
-    display:-webkit-box;
-    -webkit-box-orient:vertical;
-    overflow:hidden;
-  }
-  .circle-hero--detail .circle-hero__meta-row--detail-line {
-    display:grid;
-    grid-template-columns:1fr auto 1fr;
-    align-items:center;
-    gap:8px 10px;
-    margin-top:2px;
-  }
-  .circle-hero--detail .circle-hero__meta-cell--left {
-    justify-self:start;
-    min-width:0;
-    display:flex;
-    align-items:center;
-    min-height:32px;
-  }
-  .circle-hero--detail .circle-hero__meta-cell--left .circle-card__members {
-    font-size:13px;
-    line-height:1.25;
-    font-family:'DM Sans',sans-serif;
-  }
-  .circle-hero--detail .circle-hero__meta-cell--center {
-    justify-self:center;
-    text-align:center;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    min-height:32px;
-  }
-  .circle-hero--detail .circle-hero__meta-cell--right {
-    justify-self:end;
-    display:flex;
-    flex-direction:column;
-    align-items:flex-end;
-    justify-content:center;
-    gap:4px;
-    min-width:0;
     max-width:100%;
-  }
-  .circle-hero--detail .circle-hero__info-btn {
-    align-self:center;
-    line-height:1.25;
-    padding:2px 4px;
-    display:inline-flex;
-    align-items:center;
+    text-align:center;
+    display:block;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    -webkit-line-clamp:unset;
+    line-clamp:unset;
+    -webkit-box-orient:unset;
   }
   .circle-hero__tint { position:absolute; inset:0; background:linear-gradient(135deg, color-mix(in srgb, var(--vibe-tint) 90%, transparent) 0%, transparent 70%); pointer-events:none; }
   .circle-hero__body { position:relative; z-index:1; padding:24px 20px; display:flex; flex-direction:column; gap:8px; }
@@ -2979,6 +2991,32 @@ const styles = `
   .circle-hero__meta-left { display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0; flex:1 1 auto; }
   .circle-hero__info-btn { flex-shrink:0; background:transparent; border:none; color:#e8c96a; font-size:13px; font-family:'DM Sans',sans-serif; font-weight:600; letter-spacing:0.02em; cursor:pointer; padding:4px 2px; text-decoration:underline; text-underline-offset:3px; align-self:center; }
   .circle-hero__info-btn:hover { color:#f0dc9a; }
+  .circle-hero__info-btn.circle-hero__info-btn--icon {
+    width:36px;
+    height:36px;
+    border-radius:50%;
+    padding:0;
+    border:1px solid rgba(232,201,106,0.45);
+    background:rgba(0,0,0,0.35);
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    box-sizing:border-box;
+  }
+  .circle-hero__info-btn.circle-hero__info-btn--icon:hover {
+    border-color:rgba(232,201,106,0.7);
+    background:rgba(0,0,0,0.5);
+    color:#f0dc9a;
+  }
+  .circle-hero__info-btn-i {
+    font-family:'DM Serif Display',serif;
+    font-size:15px;
+    font-weight:400;
+    font-style:italic;
+    line-height:1;
+    color:inherit;
+  }
   .circle-info-member-list { display:flex; flex-direction:column; gap:12px; margin:8px 0 16px; max-height:min(50vh, 320px); overflow-y:auto; }
   .circle-info-member-row { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; color:#e0dcd4; }
   .circle-info-member-name { min-width:0; overflow-wrap:anywhere; }
@@ -6141,13 +6179,9 @@ export default function App() {
 
   async function submitCreateCircle() {
     if (!user || createCircleSubmitting) return;
-    const trimmed = createCircleName.trim();
-    if (!trimmed) {
-      setCreateCircleError("Give your circle a name.");
-      return;
-    }
-    if (trimmed.length > CIRCLE_NAME_MAX) {
-      setCreateCircleError(`Name must be ${CIRCLE_NAME_MAX} characters or fewer.`);
+    const nameCheck = validateCircleName(createCircleName);
+    if (!nameCheck.ok) {
+      setCreateCircleError(nameCheck.error);
       return;
     }
     if (createCircleDescription.length > CIRCLE_DESCRIPTION_MAX) {
@@ -6162,7 +6196,7 @@ export default function App() {
     setCreateCircleError("");
     try {
       const fresh = await createCircle({
-        name: trimmed,
+        name: nameCheck.name,
         description: createCircleDescription,
         vibe: createCircleVibe,
         creatorId: user.id,
@@ -6523,6 +6557,7 @@ export default function App() {
   }
 
   function openInviteSheet() {
+    setShowCircleInfoSheet(false);
     setInviteEmailDraft("");
     setInviteSheetError("");
     setShowInviteSheet(true);
@@ -7520,8 +7555,8 @@ export default function App() {
                 (() => {
                   const meta = vibeMeta(circleDetailData.vibe);
                   const isCreator = currentUserRole(circleDetailData, user?.id) === "creator";
-                  const showInviteInHero =
-                    isCreator && circleDetailData.status === "active";
+                  const mc = circleDetailData.memberCount;
+                  const initials = circleAvatarInitials(circleDetailData.name);
                   return (
                     <div
                       className="circle-hero circle-hero--detail"
@@ -7531,7 +7566,7 @@ export default function App() {
                       }}
                     >
                       <div className="circle-hero__tint" aria-hidden="true" />
-                      <div className="circle-hero__top-bar">
+                      <div className="circle-hero__top-bar circle-hero__top-bar--detail-chat">
                         <div className="circle-hero__top-bar-side circle-hero__top-bar-side--left">
                           <button
                             type="button"
@@ -7543,57 +7578,60 @@ export default function App() {
                           </button>
                         </div>
                         <div className="circle-hero__top-bar-center">
-                          <div className="circle-hero__top-bar-center-title">
-                            {isCreator ? (
-                              <span
-                                className="circle-hero__creator-star"
-                                title="You're the creator"
-                                aria-hidden="true"
-                              >
-                                ★
-                              </span>
-                            ) : null}
-                            <div className="circle-hero__name circle-hero__name--top-bar">{circleDetailData.name}</div>
+                          <div className="circle-hero__identity">
+                            <div className="circle-hero__avatar" aria-hidden="true">
+                              <span className="circle-hero__avatar-initials">{initials}</span>
+                            </div>
+                            <div className="circle-hero__identity-text">
+                              <div className="circle-hero__title-line">
+                                {isCreator ? (
+                                  <span
+                                    className="circle-hero__creator-star"
+                                    title="You're the creator"
+                                    aria-hidden="true"
+                                  >
+                                    ★
+                                  </span>
+                                ) : null}
+                                <span className="circle-hero__name circle-hero__name--top-bar">{circleDetailData.name}</span>
+                              </div>
+                              <div className="circle-hero__subtitle-members">
+                                <span className="circle-hero__members-icon" aria-hidden="true">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="15"
+                                    height="15"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.75"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                    <circle cx="9" cy="7" r="4" />
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                                  </svg>
+                                </span>
+                                <span className="circle-hero__members-num">{mc}</span>
+                                <span className="circle-hero__members-label">
+                                  {mc === 1 ? "member" : "members"}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="circle-hero__top-bar-side circle-hero__top-bar-side--right" aria-hidden="true" />
-                      </div>
-                      <div className="circle-hero__body">
-                        <div className="circle-hero__meta-row circle-hero__meta-row--detail-line">
-                          <div className="circle-hero__meta-cell circle-hero__meta-cell--left">
-                            <span className="circle-card__members">
-                              {circleDetailData.memberCount}{" "}
-                              {circleDetailData.memberCount === 1 ? "member" : "members"}
+                        <div className="circle-hero__top-bar-side circle-hero__top-bar-side--right">
+                          <button
+                            type="button"
+                            className="circle-hero__info-btn circle-hero__info-btn--icon"
+                            onClick={() => setShowCircleInfoSheet(true)}
+                            aria-label="Circle info"
+                          >
+                            <span className="circle-hero__info-btn-i" aria-hidden="true">
+                              i
                             </span>
-                          </div>
-                          <div className="circle-hero__meta-cell circle-hero__meta-cell--center">
-                            <button
-                              type="button"
-                              className="circle-hero__info-btn"
-                              onClick={() => setShowCircleInfoSheet(true)}
-                            >
-                              Circle info
-                            </button>
-                          </div>
-                          <div className="circle-hero__meta-cell circle-hero__meta-cell--right">
-                            {showInviteInHero ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="circle-invite-btn circle-invite-btn--hero"
-                                  onClick={openInviteSheet}
-                                  disabled={circleDetailData.memberCount >= 25}
-                                >
-                                  + Invite more
-                                </button>
-                                {circleDetailData.memberCount >= 25 && (
-                                  <p className="circle-hero__invite-cap">
-                                    This circle is full (25/25).
-                                  </p>
-                                )}
-                              </>
-                            ) : null}
-                          </div>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -7829,6 +7867,21 @@ export default function App() {
                   );
                 })}
             </div>
+            {currentUserRole(circleDetailData, user?.id) === "creator" && circleDetailData.status === "active" && (
+              <div className="circle-info-invite-block">
+                <button
+                  type="button"
+                  className="circle-invite-btn circle-invite-btn--modal"
+                  onClick={openInviteSheet}
+                  disabled={circleDetailData.memberCount >= 25}
+                >
+                  + Invite more
+                </button>
+                {circleDetailData.memberCount >= 25 && (
+                  <p className="circle-info-invite-cap">This circle is full (25/25).</p>
+                )}
+              </div>
+            )}
             <button
               type="button"
               className="circle-leave-btn circle-info-modal-leave"

@@ -53,7 +53,7 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 
 1. **Phase D — Search & invite by handle** — blocked on `public.profiles.handle` (not in schema yet).
 
-2. **Circles — edit name & info** — Creator (or whoever `circles` UPDATE policy allows) can change **`circles.name`** and **`circles.description`** from the Circle info entry point; optionally **vibe** if it belongs in that sheet. Respect char limits in schema (`name` 1–40, `description` ≤100), bump **`updated_at`**, and only while **`status = 'active'`** (archived read-only).
+2. **Circles — edit name & info** — Creator (or whoever `circles` UPDATE policy allows) can change **`circles.name`** and **`circles.description`** from the Circle info entry point; optionally **vibe** if it belongs in that sheet. Reuse **`validateCircleName`** / limits (**`name`** 2–32, letter-led charset rules — see **`src/circles.js`**); **`description`** ≤100; bump **`updated_at`**, and only while **`status = 'active'`** (archived read-only).
 
 3. **Phase E — Polish** — animations, cover upload, `icon_emoji`, per-circle color, archived circles section.
 
