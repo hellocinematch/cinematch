@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-20
+**Last updated:** 2026-04-21
 
 ---
 
@@ -42,7 +42,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 ## Repo version & git
 
 - **`package.json`:** **5.5.13** — **`CHANGELOG.md`** through **5.5.13**. Profile shows **Cinemastro v…** via **`APP_VERSION`** (from `package.json` in `src/App.jsx`).
-- Confirm **`main` tip** with `git log -3 --oneline` after local commits; recent shipped work includes **circle-detail hero** iterations, **Circles bell** pending count, **discussion-first** Cursor rule, optional **`profiles` name NOT NULL** migration (**`20260504120000_profiles_name_not_null.sql`** — apply on DB when ready).
+- Confirm **`main` tip** with `git log -3 --oneline` after local commits. Recent **`main`** includes **v5.5.8–v5.5.13**: circle-detail **chat-style hero**, **circle name** rules (**`validateCircleName`** / **`circleAvatarInitials`** in **`src/circles.js`**), DB migration **`20260505120000_circles_name_length_2_32.sql`** (apply on hosted DB if not yet), **Recent activity** strip + **circle score** above title, **Rate a title** pill (Discover + return to circle). Optional **`profiles` name NOT NULL`** — **`20260504120000_profiles_name_not_null.sql`**.
 
 ## Recent work (client — `src/App.jsx`)
 
@@ -60,10 +60,16 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ### Circles — `circle-detail` hero
 
-- **Layout:** Full-bleed **`circle-hero--detail`**. **Top bar** **`circle-hero__top-bar--detail-chat`:** frosted strip (**`backdrop-filter`**). **Back** · **centered cluster:** **avatar** (two-letter initials via **`circleAvatarInitials`**) + **name** (one-line ellipsis, centered; narrow: **DM Sans**) + **subtitle** (people icon + count, centered) · circular **(i)** → **Circle info**.
-- **Rate a title:** Centered pill under strip (**`openDiscoverFromCircleForRating`**) sets **`rateTitleReturnCircleIdRef`**; **`openDetail`** from Discover sets **`detailReturnScreenRef`** to **`circle-detail`** so submit/back returns to the circle. Ref clears when **`screen`** leaves discover/detail.
+- **Layout:** Full-bleed **`circle-hero--detail`**. **Top bar** **`circle-hero__top-bar--detail-chat`:** frosted strip (**`backdrop-filter`**). **Back** · **centered cluster:** **avatar** (two-letter initials via **`circleAvatarInitials`** in **`src/circles.js`**) + **name** (one-line ellipsis, centered; narrow: **DM Sans**) + **subtitle** (people icon + count, centered) · circular **(i)** → **Circle info**.
 - **Invite:** **+ Invite more** lives in the **Circle info** modal (creator, active); **`openInviteSheet`** closes the info sheet first.
 - **Circle info modal:** **`get_circle_member_names`** RPC + `profiles` fallback when **`showCircleInfoSheet`** opens (`circleInfoNamesById`).
+
+### Circles — strip + “Rate a title”
+
+- **Section title:** **Recent activity** (loading skeleton + loaded strip). **Empty strip** copy unchanged: *No shared ratings in this circle yet.* **&lt;2 members** placeholder title still **Rated in this circle** (gate copy).
+- **Cards:** **Together:** muted **Circle** + gold **number** centered **above** the title (**`circle-strip-circle-score`**); no duplicate Circle line below. **Solo:** **Cinemastro** line only under meta.
+- **Rate a title:** Centered pill below the body (**`circle-rate-title-pill`**, active circles only). **`openDiscoverFromCircleForRating`** sets **`rateTitleReturnCircleIdRef`**; from **Discover**, **`openDetail`** forces **`detailReturnScreenRef`** → **`circle-detail`** so **Submit rating** / back returns to the same circle. **`useEffect` on `screen`** clears the ref when not on **discover** / **detail**. Cap-hint **Open Discover** uses the same handler.
+- **Create circle names:** **`validateCircleName`** in **`src/circles.js`** — 2–32 chars, letter-led charset (see Supabase migrations below).
 
 ### Desktop wordmark
 
@@ -76,6 +82,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 ## Recent work (Supabase / Circles / profiles)
 
 - **`20260503120000_get_circle_member_names.sql`** — **`get_circle_member_names(p_circle_id)`** — apply on hosted DB if missing.
+- **`20260505120000_circles_name_length_2_32.sql`** — **`circles.name`** length **2–32** (replaces legacy 1–40 check). Apply on hosted DB if not applied (existing rows must satisfy length before it succeeds).
 - **`20260504120000_profiles_name_not_null.sql`** — backfill + **`NOT NULL`** on **`profiles.name`** — optional; run when product is ready.
 
 ## Neighbor CF + cron (unchanged thread)
@@ -107,7 +114,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Open / follow-ups
 
-- **Circles (full backlog):** **`HANDOFF.md`** “What’s next” — includes **edit name & info**, **watchlist on Circles main page** (layout TBD), **circle name on watchlist rows** (`source_circle_id`), **invite email for non-users**, **phone verification at signup**, **Bayesian rating normalization**, **quick-rate pill inside a circle** (propagates to all groups).
+- **Circles (full backlog):** **`HANDOFF.md`** “What’s next” — includes **edit name & info**, **watchlist on Circles main page** (layout TBD), **circle name on watchlist rows** (`source_circle_id`), **invite email for non-users**, **phone verification at signup**, **Bayesian rating normalization**. *Quick-rate from inside a circle* is partially covered by **Rate a title** (Discover + return); a slimmer **in-place** pill without leaving the circle is still backlog if desired.
 - **Cron:** audit **`jobs × limit`** vs eligible users; **`COMPUTE-NEIGHBORS-CRON.md`**.
 - **Nav (optional):** **`126px`** header / scrim offsets — **`App.jsx`**.
 - **Lint:** possible **`react-hooks/set-state-in-effect`** on **`AppPrimaryNav`** — pre-existing.
