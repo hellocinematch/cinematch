@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-18
+**Last updated:** 2026-04-19
 
 ## For the assistant (every Cinematch session)
 
@@ -18,13 +18,21 @@
 - **`COMPUTE-NEIGHBORS-CRON.md`** — full ops runbook: Vault, `apikey` + `x-compute-neighbors-secret`, `pg_net` timeouts, staggered schedules, scaling formula.
 - **Neighbor cron:** expand **`offset`** / add **`cron.schedule`** rows when user count exceeds current weekly coverage; do **not** assume the first batch of `w00…w09` is enough forever.
 
-## Recent work (client — primary nav & detail)
+## Repo version & git (client milestone)
 
-**File:** `src/App.jsx` (large inline `<style>{styles}</style>` block for `.app-primary-nav*`).
+- **`package.json`:** **5.5.2** — detail + nav polish; **`CHANGELOG.md`** has a **5.5.2** section. Profile shows **Cinemastro v…** via **`APP_VERSION`** (sourced from `package.json` in `src/App.jsx`).
+- **`main` on origin** includes through **`f93ad60`** (pushed 2026-04-19): detail commit **`0798345`**, nav commit **`3a07d72`**, version/changelog **`f93ad60`**.
+
+## Recent work (client — primary nav & title detail)
+
+**Primary file:** `src/App.jsx` (large inline `<style>{styles}</style>` for `.app-primary-nav*`, detail hero, scores, facts bar, rating block).
 
 | Commit    | Contents |
 |-----------|----------|
-| `d7df773` | **Mobile primary nav (≤899px):** top row is CSS grid **hamburger \| centered Cinemastro brand \| Discover (lens)**. **Title detail** adds a **second row** with the circular **back** control so it does not overlap the hamburger. Header modifier: **`app-primary-nav--with-detail-back`**; root app padding when detail: **`app--primary-nav-detail-back`** (extra `padding-top` on narrow viewports). **Scrim + drawer** `top` / `max-height` use **`calc(126px + env(safe-area-inset-top))`** on detail mobile so the overlay starts below the full chrome. **Desktop (≥900px):** single row, back leads via flex **`order`**. |
+| `f93ad60` | **v5.5.2:** bump `package.json`, **`CHANGELOG.md`** entry for detail + nav recap. |
+| `0798345` | **Title detail (TMDB-style):** Centered hero title (smaller title + smaller year in parens); poster vertically centered on backdrop (right, TMDB-like); compact **two-column scores** with divider; stacked range/confidence beside “For you”; Cinemastro column with TMDB-based line + vote meter; **facts bar** (certification, US release date, runtime, genres) from enriched TMDB fetch (`append_to_response` release dates / TV content ratings); tagline under facts, then overview; **Where to watch** in a subtle panel. **Rating UX:** slider default **5**, bubble tracks value; **`detailTouched`** / submit flow so default 5 is submittable when unrated; centered **“Select your rating and submit”** (`.d-rate-label--sentence`). |
+| `3a07d72` | **Nav:** Mobile **title detail** — back on first row, **no hamburger** on that screen; **Discover** — drop redundant top row; **bottom bar** — **public stats** between Mood and **Profile (👤)**; Profile opens **Profile / Sign out** consistently. |
+| `d7df773` | **Mobile primary nav layout:** grid **hamburger \| brand \| Discover**; detail **second row** circular back; classes **`app-primary-nav--with-detail-back`**, **`app--primary-nav-detail-back`**; scrim/drawer `top` / `max-height` **`calc(126px + env(safe-area-inset-top))`** on detail mobile. Desktop **≥900px:** single row, back via flex **`order`**. |
 | `5639fc1` | **v5.5.1 Your Picks:** catalogue **`predict_cached`**, match body guards (see commit message). |
 
 **Detail / navigation glue (still relevant):** `"detail"` in **`primaryNavScreens`**; **`clearDetailOverlayToNavigate()`** at start of **`navigatePrimarySection`** and in **`onDiscover`** so URL/selection clear without **`history.back()`**. **`AppPrimaryNav`** receives **`onDetailBack={screen === "detail" ? goBack : undefined}`**.
@@ -72,6 +80,7 @@
 
 - **Cron:** audit coverage vs eligible user count after growth; see **`COMPUTE-NEIGHBORS-CRON.md`**.
 - **Nav (optional):** If **`126px`** header offset feels tight on some devices, tune **`padding-top`** / scrim **`top`** together in `App.jsx` styles (keep them in sync).
+- **Lint:** `npm run lint` may still report **`react-hooks/set-state-in-effect`** on **`AppPrimaryNav`** (`setMobileOpen` inside `useEffect` when `onDetailBack`) — pre-existing; fix by deriving closed state from props or closing in the navigation handler instead of syncing in an effect.
 
 ---
 *Replace or trim this file after the next milestone; keep “Last updated” and the assistant block current.*
