@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.5.6
+
+- **Circles — circle detail hero.** **Back** (left) and **circle name** centered in the top bar with a small **★** before the name for creators (replaces **👑**). **Members** (left), **Circle info** (center), and **+ Invite more** (right when creator + active) share one **bottom** row; full-circle cap copy stays under the invite control.
+
 ## 5.5.5
 
 - **Circles — circle detail hero.** Single **top bar** (grid): **Back** (left), creator **👑** (center, aligned with controls), **+ Invite by email** (right when applicable). **Circle name** is centered alone below; back/invite are no longer absolutely positioned over the title.

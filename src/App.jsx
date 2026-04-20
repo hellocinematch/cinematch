@@ -2832,7 +2832,7 @@ const styles = `
   .circles-detail-back-circle:hover { background:rgba(0,0,0,0.58); border-color:rgba(232,201,106,0.45); color:#f0dc9a; }
   .circles-detail-back-circle:active { opacity:0.9; }
   .circles-detail-back-circle__glyph { display:block; margin-top:-1px; }
-  /* Circle detail: one top row — back | creator crown | invite — then centered title below. */
+  /* Circle detail: top row — back | centered name (+ creator ★ before name) | spacer; meta row — members | Circle info | Invite more. */
   .circle-hero--detail .circle-hero__top-bar {
     position:relative;
     z-index:2;
@@ -2840,7 +2840,7 @@ const styles = `
     grid-template-columns:1fr auto 1fr;
     align-items:center;
     gap:8px;
-    padding:max(10px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-left, 0px)) 6px max(12px, env(safe-area-inset-right, 0px));
+    padding:max(10px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-left, 0px)) 8px max(12px, env(safe-area-inset-right, 0px));
     box-sizing:border-box;
   }
   .circle-hero--detail .circle-hero__top-bar-side--left {
@@ -2854,27 +2854,28 @@ const styles = `
     display:flex;
     align-items:center;
     justify-content:center;
-    min-height:40px;
+    min-width:0;
+    max-width:100%;
+    padding:0 4px;
   }
-  .circle-hero--detail .circle-hero__top-bar-center .circle-hero__crown {
-    font-size:17px;
+  .circle-hero--detail .circle-hero__top-bar-center-title {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    min-width:0;
+    max-width:100%;
+  }
+  .circle-hero--detail .circle-hero__creator-star {
+    flex-shrink:0;
+    font-size:14px;
     line-height:1;
+    color:var(--vibe-accent, #e8c96a);
   }
   .circle-hero--detail .circle-hero__top-bar-side--right {
     justify-self:end;
-    display:flex;
-    align-items:center;
-    justify-content:flex-end;
-    min-width:0;
-  }
-  .circle-hero--detail .circle-hero__invite-corner {
-    position:static;
-    display:flex;
-    flex-direction:column;
-    align-items:flex-end;
-    gap:6px;
-    max-width:min(220px, 100%);
-    pointer-events:auto;
+    width:100%;
+    min-height:1px;
   }
   .circle-invite-btn--hero {
     padding:8px 14px;
@@ -2906,31 +2907,41 @@ const styles = `
     border-top-color:#1e1e1e;
   }
   .circle-hero--detail .circle-hero__body {
-    padding:8px max(20px, env(safe-area-inset-left, 0px)) 22px max(20px, env(safe-area-inset-right, 0px));
+    padding:4px max(20px, env(safe-area-inset-left, 0px)) 22px max(20px, env(safe-area-inset-right, 0px));
   }
-  .circle-hero--detail .circle-hero__name-row {
-    justify-content:center;
-    align-items:center;
-    gap:10px;
-  }
-  .circle-hero--detail .circle-hero__name {
+  .circle-hero--detail .circle-hero__name--top-bar {
     flex:0 1 auto;
-    max-width:100%;
+    min-width:0;
     text-align:center;
     -webkit-line-clamp:3;
     line-clamp:3;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
   }
-  .circle-hero--detail .circle-hero__meta-row--one-line {
-    margin-top:10px;
-    justify-content:space-between;
-    align-items:center;
-    gap:12px;
-    flex-wrap:nowrap;
+  .circle-hero--detail .circle-hero__meta-row--detail-line {
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:start;
+    gap:10px 12px;
+    margin-top:4px;
   }
-  .circle-hero--detail .circle-hero__meta-left {
-    flex:1 1 auto;
+  .circle-hero--detail .circle-hero__meta-cell--left {
+    justify-self:start;
     min-width:0;
-    justify-content:flex-start;
+  }
+  .circle-hero--detail .circle-hero__meta-cell--center {
+    justify-self:center;
+    text-align:center;
+  }
+  .circle-hero--detail .circle-hero__meta-cell--right {
+    justify-self:end;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:6px;
+    min-width:0;
+    max-width:100%;
   }
   .circle-hero--detail .circle-hero__info-btn { align-self:center; }
   .circle-hero__tint { position:absolute; inset:0; background:linear-gradient(135deg, color-mix(in srgb, var(--vibe-tint) 90%, transparent) 0%, transparent 70%); pointer-events:none; }
@@ -7345,7 +7356,11 @@ export default function App() {
                     disabled={!user}
                   >
                     <span aria-hidden="true">🔔</span>
-                    <span className="circles-bell-count">{pendingInvitesCount}</span>
+                    {pendingInvitesCount > 0 ? (
+                      <span className="circles-bell-count">
+                        {pendingInvitesCount > 99 ? "99+" : pendingInvitesCount}
+                      </span>
+                    ) : null}
                   </button>
                   <button
                     type="button"
@@ -7504,55 +7519,57 @@ export default function App() {
                           </button>
                         </div>
                         <div className="circle-hero__top-bar-center">
-                          {isCreator ? (
-                            <span
-                              className="circle-hero__crown"
-                              title="You're the creator"
-                              role="img"
-                              aria-label="You are the circle creator"
-                            >
-                              👑
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="circle-hero__top-bar-side circle-hero__top-bar-side--right">
-                          {showInviteInHero ? (
-                            <div className="circle-hero__invite-corner">
-                              <button
-                                type="button"
-                                className="circle-invite-btn circle-invite-btn--hero"
-                                onClick={openInviteSheet}
-                                disabled={circleDetailData.memberCount >= 25}
+                          <div className="circle-hero__top-bar-center-title">
+                            {isCreator ? (
+                              <span
+                                className="circle-hero__creator-star"
+                                title="You're the creator"
+                                aria-hidden="true"
                               >
-                                + Invite by email
-                              </button>
-                              {circleDetailData.memberCount >= 25 && (
-                                <p className="circle-hero__invite-cap">
-                                  This circle is full (25/25).
-                                </p>
-                              )}
-                            </div>
-                          ) : null}
+                                ★
+                              </span>
+                            ) : null}
+                            <div className="circle-hero__name circle-hero__name--top-bar">{circleDetailData.name}</div>
+                          </div>
                         </div>
+                        <div className="circle-hero__top-bar-side circle-hero__top-bar-side--right" aria-hidden="true" />
                       </div>
                       <div className="circle-hero__body">
-                        <div className="circle-hero__name-row">
-                          <div className="circle-hero__name">{circleDetailData.name}</div>
-                        </div>
-                        <div className="circle-hero__meta-row circle-hero__meta-row--one-line">
-                          <div className="circle-hero__meta-left">
+                        <div className="circle-hero__meta-row circle-hero__meta-row--detail-line">
+                          <div className="circle-hero__meta-cell circle-hero__meta-cell--left">
                             <span className="circle-card__members">
                               {circleDetailData.memberCount}{" "}
                               {circleDetailData.memberCount === 1 ? "member" : "members"}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            className="circle-hero__info-btn"
-                            onClick={() => setShowCircleInfoSheet(true)}
-                          >
-                            Circle info
-                          </button>
+                          <div className="circle-hero__meta-cell circle-hero__meta-cell--center">
+                            <button
+                              type="button"
+                              className="circle-hero__info-btn"
+                              onClick={() => setShowCircleInfoSheet(true)}
+                            >
+                              Circle info
+                            </button>
+                          </div>
+                          <div className="circle-hero__meta-cell circle-hero__meta-cell--right">
+                            {showInviteInHero ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="circle-invite-btn circle-invite-btn--hero"
+                                  onClick={openInviteSheet}
+                                  disabled={circleDetailData.memberCount >= 25}
+                                >
+                                  + Invite more
+                                </button>
+                                {circleDetailData.memberCount >= 25 && (
+                                  <p className="circle-hero__invite-cap">
+                                    This circle is full (25/25).
+                                  </p>
+                                )}
+                              </>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     </div>

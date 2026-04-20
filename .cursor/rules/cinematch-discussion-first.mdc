@@ -1,0 +1,18 @@
+---
+description: Default to discussion only; implement only after explicit code approval; bump version when shipping code
+alwaysApply: true
+---
+
+# Cinematch — discussion first, then code
+
+1. **Unless the user clearly asks for implementation in the same message**, treat their message as **discussion only**: ideas, suggestions, tradeoffs, SQL snippets as examples, no repo edits and no tool-driven implementation.
+
+2. **Do not write or change code** (including `apply_patch`, file writes, and “I went ahead and implemented…”) until the user either:
+   - says **`code now`**, or  
+   - answers **yes** after you ask something like **“Should I implement this now?”**
+
+3. If a change sounds ready and they haven’t given the go-ahead, you **may** ask once whether to implement — still **wait** for **`code now`** or **yes** before coding.
+
+4. **When you do implement** (after the above): follow repo practice and **bump the app version** — typically **`package.json`** version and a matching **`CHANGELOG.md`** section in the **same release** as the change (see **`PASSDOWN-NEXT-CHAT.md`** / **`HANDOFF.md`** for version bump habits).
+
+5. **Exception:** If the user explicitly says to implement, fix, migrate, or “do it” in that message, that counts as permission to code for **that** request.
