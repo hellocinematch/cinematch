@@ -2259,7 +2259,8 @@ const styles = `
   /* Hero: backdrop + TMDB-style poster float on the right, overlapping the band. */
   .detail-hero { position:relative; width:100%; max-width:100%; box-sizing:border-box; }
   .detail-hero-backdrop { position:relative; height:min(38vw, 240px); min-height:180px; max-height:300px; overflow:visible; background:#141414; }
-  .detail-hero-backdrop img { width:100%; height:100%; object-fit:cover; object-position:center top; }
+  /* Bias left so the floating poster (right) doesn’t sit over the main focal area of the still. */
+  .detail-hero-backdrop img { width:100%; height:100%; object-fit:cover; object-position:30% top; }
   .detail-hero-backdrop-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:clamp(48px, 15vw, 100px); background:#141414; }
   .detail-hero-backdrop .d-overlay { position:absolute; inset:0; background:linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.55) 40%, transparent 70%); pointer-events:none; z-index:1; }
   .detail-hero-poster--float {
@@ -2286,7 +2287,7 @@ const styles = `
     box-sizing:border-box;
   }
   .detail-hero-copy { min-width:0; text-align:center; }
-  .detail-hero-copy .d-type-genre { flex-wrap:wrap; margin-bottom:4px; justify-content:center; }
+  .detail-hero-copy .d-type-genre { flex-wrap:wrap; margin-bottom:4px; justify-content:flex-start; }
   .d-title {
     font-family:'DM Serif Display',serif;
     font-size:clamp(1rem, 3.6vw, 1.42rem);
