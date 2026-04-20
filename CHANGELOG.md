@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.5.4
+
+- **Circles — circle detail (mobile).** Narrow viewports: circle name uses **DM Sans** at a slightly smaller clamp; creator **crown** is **top-right** in the title row (absolute) with reduced size so wrapped titles don’t sit beside the emoji.
+
 ## 5.5.3
 
 - **Circles — Circle info member names.** The Circle info modal lists each member’s display name from `profiles.name`. Direct client `select` on `profiles` only returns rows visible under RLS (usually just yourself), so the app now calls **`get_circle_member_names(p_circle_id)`** (SECURITY DEFINER, gated on `is_circle_member`) and merges any gaps with the legacy `profiles` query. Apply migration **`supabase/migrations/20260503120000_get_circle_member_names.sql`** on Supabase before relying on names for co-members.

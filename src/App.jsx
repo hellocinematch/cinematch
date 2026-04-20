@@ -2662,6 +2662,30 @@ const styles = `
       letter-spacing:-0.02em;
       line-height:1.22;
     }
+    /* Circle detail: sans title + crown top-right so long names don’t wrap beside the emoji. */
+    .circle-hero--detail .circle-hero__name-row {
+      position:relative;
+      align-items:flex-start;
+      justify-content:center;
+      gap:0;
+    }
+    .circle-hero--detail .circle-hero__name-row:has(.circle-hero__crown) {
+      padding-right:34px;
+    }
+    .circle-hero--detail .circle-hero__crown {
+      position:absolute;
+      right:0;
+      top:1px;
+      font-size:15px;
+      line-height:1;
+    }
+    .circle-hero--detail .circle-hero__name {
+      font-family:'DM Sans',sans-serif;
+      font-size:clamp(1.05rem, 4.1vw, 1.32rem);
+      font-weight:600;
+      letter-spacing:-0.02em;
+      line-height:1.22;
+    }
   }
 
   /* Desktop/tablet: let app breathe beyond the mobile shell while keeping phone UX unchanged. */
