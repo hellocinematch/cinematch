@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.5.2
+
+- **Title detail (TMDB-style).** Centered hero title (smaller title + smaller year); poster vertically centered on backdrop; inline two-column scores with stacked range/confidence and Cinemastro meter; shaded facts bar (cert, US date, runtime, genres) from TMDB `append_to_response`; centered tagline, overview, and Where to Watch panel. Rating block: default **5**, value bubble on slider, **“Select your rating and submit”**, centered controls.
+- **Primary nav (recap).** Mobile detail: back on first row, no hamburger; Discover drops duplicate top bar; bottom bar shows public stats between Mood and Profile; Profile opens account menu app-wide.
+
 ## 5.5.0
 
 - **Watchlist — group hint.** `watchlist.source_circle_id` (optional FK to `circles`). When you save from title detail opened **from a circle** (`circle-detail` → strip card), the row stores the circle id; **Profile → Watchlist** shows a small **Group** label (no circle name). Migration: `supabase/migrations/20260501120000_watchlist_source_circle_id.sql`.
