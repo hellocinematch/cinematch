@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.5.5
+
+- **Circles — circle detail hero.** Single **top bar** (grid): **Back** (left), creator **👑** (center, aligned with controls), **+ Invite by email** (right when applicable). **Circle name** is centered alone below; back/invite are no longer absolutely positioned over the title.
+
 ## 5.5.4
 
 - **Circles — circle detail (mobile).** Narrow viewports: circle name uses **DM Sans** at a slightly smaller clamp; creator **crown** is **top-right** in the title row (absolute) with reduced size so wrapped titles don’t sit beside the emoji.
