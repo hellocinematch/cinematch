@@ -79,6 +79,91 @@ function isTmdbApiErrorPayload(json) {
   return Boolean(json && json.success === false);
 }
 
+function formatRuntimeMinutes(total) {
+  const m = Number(total);
+  if (!Number.isFinite(m) || m < 1) return null;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (h < 1) return `${r}m`;
+  if (r === 0) return `${h}h`;
+  return `${h}h ${r}m`;
+}
+
+/** TMDB `YYYY-MM-DD` → `MM/DD/YYYY (US)` for detail facts bar. */
+function formatUsReleaseDisplay(isoDate) {
+  if (!isoDate || typeof isoDate !== "string") return null;
+  const d = isoDate.slice(0, 10);
+  const parts = d.split("-").map((x) => Number(x));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [y, mo, day] = parts;
+  return `${String(mo).padStart(2, "0")}/${String(day).padStart(2, "0")}/${y} (US)`;
+}
+
+function usMovieCertificationFromReleaseDatesPayload(releasePayload) {
+  if (!releasePayload || !Array.isArray(releasePayload.results)) return null;
+  const us = releasePayload.results.find((r) => r?.iso_3166_1 === "US");
+  const dates = us?.release_dates;
+  if (!Array.isArray(dates)) return null;
+  const withCert = dates.filter((x) => typeof x?.certification === "string" && x.certification.trim());
+  if (withCert.length === 0) return null;
+  const theatrical = withCert.find((x) => Number(x.type) === 3);
+  const pick = theatrical || withCert[0];
+  return pick.certification.trim() || null;
+}
+
+function genresLineFromTmdbDetail(raw) {
+  const g = raw?.genres;
+  if (!Array.isArray(g) || g.length === 0) return null;
+  const names = g.map((x) => x?.name).filter(Boolean);
+  if (names.length === 0) return null;
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/**
+ * Single `/movie/{id}` or `/tv/{id}` response (optionally with append_to_release_*).
+ * Returns strings for the shaded facts bar + tagline.
+ */
+function detailMetaFromTmdbDetail(raw, mediaType) {
+  const empty = { tagline: null, genresLine: null, certification: null, runtimeLabel: null, releaseLabel: null };
+  if (!raw || isTmdbApiErrorPayload(raw)) return empty;
+  const tag = typeof raw.tagline === "string" ? raw.tagline.trim() : "";
+  const genresLine = genresLineFromTmdbDetail(raw);
+  if (mediaType === "tv") {
+    let certification = null;
+    const cr = raw.content_ratings?.results;
+    if (Array.isArray(cr)) {
+      const us = cr.find((r) => r?.iso_3166_1 === "US");
+      if (us?.rating) certification = String(us.rating).trim() || null;
+    }
+    let runtimeLabel = null;
+    const ert = raw.episode_run_time;
+    if (Array.isArray(ert) && ert.length > 0) {
+      const mm = Number(ert[0]);
+      if (Number.isFinite(mm) && mm > 0) runtimeLabel = `~${mm}m / ep`;
+    }
+    const releaseLabel = formatUsReleaseDisplay(raw.first_air_date);
+    return {
+      tagline: tag || null,
+      genresLine,
+      certification,
+      runtimeLabel,
+      releaseLabel,
+    };
+  }
+  const certification = usMovieCertificationFromReleaseDatesPayload(raw.release_dates);
+  const runtimeLabel = formatRuntimeMinutes(raw.runtime);
+  const releaseLabel = formatUsReleaseDisplay(raw.release_date);
+  return {
+    tagline: tag || null,
+    genresLine,
+    certification,
+    runtimeLabel,
+    releaseLabel,
+  };
+}
+
 async function fetchTmdbSearchPages(mediaType, query, pageCount) {
   const pages = await Promise.all(
     Array.from({ length: pageCount }, (_, i) =>
@@ -2145,6 +2230,20 @@ const styles = `
 
   .wtw-section { margin-top:16px; }
   .wtw-title { font-size:12px; color:#666; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; }
+  .detail-wtw-wrap {
+    margin-top:18px;
+    padding:14px 16px 16px;
+    background:rgba(20,20,20,0.65);
+    border-radius:10px;
+    text-align:center;
+  }
+  .detail-wtw-wrap .wtw-section { margin-top:0; text-align:center; }
+  .detail-wtw-wrap .wtw-title { text-align:center; }
+  .detail-wtw-wrap .wtw-group-label,
+  .detail-wtw-wrap .wtw-loading,
+  .detail-wtw-wrap .wtw-none { text-align:center; }
+  .detail-wtw-wrap .wtw-providers { justify-content:center; }
+  .detail-wtw-wrap .wtw-link { text-align:center; }
   .wtw-loading { font-size:12px; color:#444; }
   .wtw-group { margin-bottom:12px; }
   .wtw-group-label { font-size:10px; color:#555; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
@@ -2157,53 +2256,234 @@ const styles = `
   .wtw-link:hover { text-decoration:underline; }
 
   .detail { height:100%; min-height:0; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; position:relative; width:100%; max-width:100%; }
-  /* v3.3.0: Backdrop + overlapping poster (lower-right, aligned with title row). */
+  /* Hero: backdrop + TMDB-style poster float on the right, overlapping the band. */
   .detail-hero { position:relative; width:100%; max-width:100%; box-sizing:border-box; }
-  .detail-hero-backdrop { position:relative; height:min(42vw, 280px); min-height:200px; max-height:320px; overflow:hidden; background:#141414; }
+  .detail-hero-backdrop { position:relative; height:min(38vw, 240px); min-height:180px; max-height:300px; overflow:visible; background:#141414; }
   .detail-hero-backdrop img { width:100%; height:100%; object-fit:cover; object-position:center top; }
   .detail-hero-backdrop-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:clamp(48px, 15vw, 100px); background:#141414; }
-  .detail-hero-backdrop .d-overlay { position:absolute; inset:0; background:linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.5) 35%, transparent 72%); pointer-events:none; }
-  .detail-hero-band { position:relative; z-index:2; margin-top:-76px; padding:0 24px 4px; box-sizing:border-box; }
-  .detail-hero-band-inner { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; }
-  .detail-hero-copy { flex:1; min-width:0; padding-bottom:2px; }
-  .detail-hero-copy .d-type-genre { flex-wrap:wrap; }
-  .detail-hero-copy .d-title { margin-top:8px; text-shadow:0 2px 14px rgba(0,0,0,0.75); }
-  .d-tagline { font-size:14px; color:#9a9a90; font-style:italic; margin-top:10px; line-height:1.45; text-shadow:0 1px 10px rgba(0,0,0,0.65); }
-  .detail-hero-poster { flex-shrink:0; width:31%; max-width:136px; border-radius:10px; overflow:hidden; border:1px solid #2a2a2a; box-shadow:0 14px 36px rgba(0,0,0,0.5); background:#1a1a1a; }
-  .detail-hero-poster img { width:100%; display:block; aspect-ratio:2/3; object-fit:cover; }
-  .detail-content-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; }
+  .detail-hero-backdrop .d-overlay { position:absolute; inset:0; background:linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.55) 40%, transparent 70%); pointer-events:none; z-index:1; }
+  .detail-hero-poster--float {
+    position:absolute;
+    top:50%;
+    right:max(14px, env(safe-area-inset-right, 0px));
+    bottom:auto;
+    transform:translateY(-50%);
+    width:clamp(72px, 22vw, 104px);
+    z-index:3;
+    border-radius:8px;
+    overflow:hidden;
+    border:1px solid #333;
+    box-shadow:0 12px 32px rgba(0,0,0,0.55);
+    background:#1a1a1a;
+  }
+  .detail-hero-poster--float img { width:100%; display:block; aspect-ratio:2/3; object-fit:cover; }
+  .detail-hero-band {
+    position:relative;
+    z-index:2;
+    margin-top:clamp(-52px, -11vw, -40px);
+    padding:0 max(20px, env(safe-area-inset-left, 0px)) 2px;
+    padding-right:max(20px, env(safe-area-inset-right, 0px));
+    box-sizing:border-box;
+  }
+  .detail-hero-copy { min-width:0; text-align:center; }
+  .detail-hero-copy .d-type-genre { flex-wrap:wrap; margin-bottom:4px; justify-content:center; }
+  .d-title {
+    font-family:'DM Serif Display',serif;
+    font-size:clamp(1rem, 3.6vw, 1.42rem);
+    color:#f0ebe0;
+    line-height:1.18;
+    margin-top:2px;
+    text-align:center;
+    text-shadow:0 2px 14px rgba(0,0,0,0.75);
+    overflow-wrap:anywhere;
+    word-break:normal;
+  }
+  .d-title .d-title-year {
+    color:#8a8a82;
+    font-weight:400;
+    font-size:0.62em;
+    letter-spacing:0.01em;
+  }
+  .detail .d-tagline { font-size:14px; color:#888; line-height:1.7; font-style:italic; margin:14px 0 10px; text-align:center; }
+  .d-overview-heading { font-family:'DM Serif Display',serif; font-size:18px; color:#ddd7cd; margin:6px 0 8px; text-align:center; }
+  .detail .d-synopsis { text-align:center; }
+  .detail-content-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; padding-top:0; }
   .detail-rate-section { width:100%; }
   .d-overlay { position:absolute; inset:0; background:linear-gradient(to top, #0a0a0a 0%, transparent 50%); }
-  .d-body { padding:12px 24px 24px; }
-  .detail-score-row { display:flex; gap:12px; margin:6px 0 20px; }
-  .detail-score-card { flex:1; min-width:0; background:#141414; border:1px solid #252525; border-radius:12px; padding:12px 12px 13px; display:flex; flex-direction:column; align-items:stretch; gap:6px; }
-  .detail-score-card--you-gold { border-color:#5a4a24; }
-  .detail-score-card--you-pred { border-color:rgba(59,130,246,0.75); box-shadow:0 0 0 1px rgba(59,130,246,0.18); }
-  .detail-score-card--you-rated { border-color:#2a4a2a; }
-  .detail-score-card--crowd-cine { border-color:rgba(201,162,39,0.5); box-shadow:0 0 0 1px rgba(232,201,106,0.06); }
-  .detail-score-card-lbl { font-size:12px; letter-spacing:0.6px; text-transform:uppercase; color:#8f8f8f; }
-  .detail-score-card-val { font-family:'DM Serif Display',serif; font-size:clamp(26px, 7vw, 32px); line-height:1; color:#e8c96a; }
-  .detail-score-card-val--yours { color:#a8d4a8; }
-  .detail-score-card-val--predicted { color:#6ca8ff; }
-  .detail-score-card-val--muted { color:#555; font-size:28px; }
-  .detail-score-card-sub { font-size:11px; color:#555; line-height:1.35; }
-  .detail-score-pred-row { display:flex; align-items:flex-start; gap:10px; }
-  .detail-score-pred-row .detail-score-card-val { flex-shrink:0; }
-  .detail-score-meta-col { display:flex; flex-direction:column; gap:4px; margin-top:1px; min-width:0; }
-  .detail-score-meta-line { font-size:12px; line-height:1.2; white-space:nowrap; }
-  .detail-score-meta-line--range { color:#b7b7b7; }
-  .detail-score-meta-line--high { color:#6aaa6a; }
-  .detail-score-meta-line--medium { color:#d0be68; }
-  .detail-score-meta-line--low { color:#ca7c7c; }
-  .detail-score-card .d-rate-now-btn { margin-top:6px; align-self:flex-start; }
+  .detail .d-body { padding:2px max(20px, env(safe-area-inset-left, 0px)) 24px; padding-right:max(20px, env(safe-area-inset-right, 0px)); }
+  /* Detail scores: 2-row grid — labels, then values (compact). */
+  .detail-score-block {
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows:auto auto;
+    column-gap:10px;
+    row-gap:2px;
+    align-items:center;
+    margin:2px 0 12px;
+  }
+  .detail-score-lbl {
+    font-size:11px;
+    font-weight:600;
+    color:#8f8f8f;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    text-align:center;
+  }
+  .detail-score-lbl--left { grid-column:1; grid-row:1; }
+  .detail-score-lbl--right { grid-column:3; grid-row:1; }
+  .detail-score-divider-v {
+    grid-column:2;
+    grid-row:1 / span 2;
+    width:1px;
+    justify-self:center;
+    background:linear-gradient(180deg, transparent, #3a3a3a 12%, #3a3a3a 88%, transparent);
+    align-self:stretch;
+    min-height:48px;
+  }
+  .detail-score-val--left {
+    grid-column:1;
+    grid-row:2;
+    justify-self:center;
+    min-width:0;
+    width:100%;
+  }
+  .detail-score-val--right {
+    grid-column:3;
+    grid-row:2;
+    justify-self:center;
+    min-width:0;
+    width:100%;
+  }
+  .detail-score-val-cluster {
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    justify-content:center;
+    gap:10px 12px;
+  }
+  .detail-score-meta-stack {
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    justify-content:center;
+    gap:3px;
+    text-align:left;
+    min-width:0;
+  }
+  .detail-score-meta-stack .detail-score-side-meta { line-height:1.2; }
+  .detail-score-meta-stack .detail-score-conf-inline { line-height:1.2; }
+  .cinemastro-vote-meter--detail-stack {
+    width:100%;
+    min-width:52px;
+    max-width:80px;
+    height:3px;
+    margin:0;
+    align-self:flex-start;
+  }
+  .detail-score-values-line {
+    display:flex;
+    flex-direction:row;
+    align-items:baseline;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:6px 10px;
+    text-align:center;
+  }
+  .detail-score-side-meta { font-size:10px; color:#8a8a8a; white-space:nowrap; }
+  .detail-score-conf-inline { font-size:10px; line-height:1.2; white-space:nowrap; }
+  .detail-score-conf-inline--high { color:#6aaa6a; }
+  .detail-score-conf-inline--medium { color:#d0be68; }
+  .detail-score-conf-inline--low { color:#ca7c7c; }
+  .detail-inline-score-val {
+    font-family:'DM Serif Display',serif;
+    font-size:clamp(1.35rem, 4.5vw, 1.75rem);
+    line-height:1;
+    color:#e8c96a;
+  }
+  .detail-inline-score-val--yours { color:#a8d4a8; }
+  .detail-inline-score-val--pred { color:#6ca8ff; }
+  .detail-inline-score-val--muted { color:#555; font-size:clamp(1.2rem, 4vw, 1.5rem); }
+  .detail-cine-sub--inline { font-size:10px; color:#666; line-height:1.2; white-space:nowrap; }
+  .detail-score-skel-inline {
+    grid-column:1 / -1;
+    grid-row:1 / -1;
+    min-height:52px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    margin:10px 0 12px;
+  }
+  .detail-rate-pill-wrap { display:flex; flex-direction:column; align-items:center; margin:0 0 14px; }
+  .d-rate-now-btn--center { margin-top:0; }
+  .detail-facts-bar {
+    background:rgba(22,22,22,0.75);
+    border:none;
+    border-radius:10px;
+    padding:10px 12px 12px;
+    margin-bottom:4px;
+  }
+  .detail-facts-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px 10px; font-size:11px; color:#b0b0a8; line-height:1.4; }
+  .detail-facts-cert {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:26px;
+    padding:2px 6px;
+    border:none;
+    border-radius:4px;
+    font-size:10px;
+    font-weight:700;
+    color:#e0e0d8;
+    background:rgba(0,0,0,0.35);
+  }
+  .detail-facts-sep { color:#444; font-weight:300; user-select:none; }
+  .detail-facts-genres { font-size:11px; color:#888; text-align:center; margin-top:8px; line-height:1.35; }
   .detail-score-card-skel .skel-line { margin-top:0; }
-  .detail-score-card .cinemastro-vote-meter--detail { width:100%; max-width:100px; margin-top:2px; }
+  .cinemastro-vote-meter--detail-inline { max-width:120px; margin-top:4px; }
   .rated-box--compact { padding:16px 18px; }
   .rated-box--compact .rated-score { display:none; }
   .d-type-genre { display:flex; align-items:center; gap:8px; }
   .d-type-pill { background:#222; border:1px solid #333; padding:3px 8px; border-radius:8px; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#888; }
   .d-genre-text { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666; }
-  .d-title { font-family:'DM Serif Display',serif; font-size:32px; color:#f0ebe0; line-height:1.1; margin-top:6px; }
+  .detail .d-rate-label {
+    font-size:12px;
+    color:#666;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    margin-bottom:10px;
+    text-align:center;
+  }
+  .detail .d-rate-label--sentence {
+    text-transform:none;
+    letter-spacing:0.02em;
+    line-height:1.4;
+    font-weight:500;
+  }
+  .detail-rate-section--slider { text-align:center; }
+  .detail-rate-section--slider .d-rate-slider-col { max-width:min(100%, 320px); margin-left:auto; margin-right:auto; }
+  .detail-rate-section--slider .d-actions { justify-content:center; }
+  .detail .rated-label {
+    font-size:12px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:#6aaa6a;
+  }
+  .d-rate-slider-col { flex:1; min-width:0; }
+  .d-rate-slider-wrap { position:relative; padding-top:26px; margin-top:2px; }
+  .d-rate-slider-bubble {
+    position:absolute;
+    top:0;
+    transform:translateX(-50%);
+    font-family:'DM Serif Display',serif;
+    font-size:20px;
+    line-height:1;
+    color:#e8c96a;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  .detail .d-rate-row { align-items:flex-end; gap:0; }
   .d-pred-box { background:#141414; border:1px solid #222; border-radius:12px; padding:16px 20px; margin:18px 0; display:flex; justify-content:space-between; align-items:center; }
   /* v3.2.1: Same shimmer treatment as strip skeletons while match predict loads. */
   .d-pred-box-skeleton { align-items:stretch; gap:16px; border-color:#2a2a2a; }
@@ -2410,7 +2690,10 @@ const styles = `
     .disc-grid { padding:0 32px; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
     /* Detail: readable hero + content width (v3.3.0 hero spans shell). */
     .detail-hero { max-width:min(100%, calc((min(100%, var(--shell)) - 64px - 48px) / 4 * 2 + 48px)); margin-left:auto; margin-right:auto; }
+    .detail-hero-poster--float { width:118px; right:32px; top:50%; bottom:auto; transform:translateY(-50%); }
     .detail-hero-band { padding-left:32px; padding-right:32px; }
+    .d-title { font-size:1.52rem; }
+    .detail-inline-score-val { font-size:1.85rem; }
     .detail-content-wrap {
       max-width:calc((min(100%, var(--shell)) - 112px) / 2 + 16px);
     }
@@ -2440,6 +2723,7 @@ const styles = `
     .strip-poster { width:198px; height:276px; }
     .disc-grid { grid-template-columns:repeat(5, minmax(0, 1fr)); gap:18px; }
     .detail-hero { max-width:min(100%, calc((min(100%, var(--shell)) - 64px - 72px) / 5 * 2 + 72px)); }
+    .detail-hero-poster--float { width:124px; }
     .detail-content-wrap {
       max-width:calc(2 * (min(100%, var(--shell)) - 64px - 72px) / 5 + 18px);
     }
@@ -2958,7 +3242,7 @@ export default function App() {
   const [watchlist, setWatchlist] = useState([]);
   const [selectedToWatch, setSelectedToWatch] = useState({});
   const [selectedMovie, setSelected] = useState(null);
-  const [detailRating, setDetailRating] = useState(7);
+  const [detailRating, setDetailRating] = useState(5);
   const [detailTouched, setDetailTouched] = useState(false);
   const [detailEditRating, setDetailEditRating] = useState(false);
   const [rateMoreMovies, setRateMoreMovies] = useState([]);
@@ -3151,23 +3435,40 @@ export default function App() {
     if (computeNeighborsTimerRef.current) clearTimeout(computeNeighborsTimerRef.current);
   }, []);
 
-  /** v3.3.0: TMDB detail `tagline` (movies); TV often empty — fetched when detail opens. */
-  const [detailTagline, setDetailTagline] = useState(null);
+  /** TMDB detail: tagline, genres, US certification, runtime, release — for facts bar + caption. */
+  const [detailMeta, setDetailMeta] = useState({
+    tagline: null,
+    genresLine: null,
+    certification: null,
+    runtimeLabel: null,
+    releaseLabel: null,
+  });
   useEffect(() => {
     if (screen !== "detail" || !selectedMovie?.movie) {
-      setDetailTagline(null);
+      setDetailMeta({
+        tagline: null,
+        genresLine: null,
+        certification: null,
+        runtimeLabel: null,
+        releaseLabel: null,
+      });
       return;
     }
     const m = selectedMovie.movie;
-    setDetailTagline(null);
+    setDetailMeta({
+      tagline: null,
+      genresLine: null,
+      certification: null,
+      runtimeLabel: null,
+      releaseLabel: null,
+    });
     let cancelled = false;
     const type = m.type === "tv" ? "tv" : "movie";
+    const append = type === "tv" ? "content_ratings" : "release_dates";
     void (async () => {
-      const raw = await fetchTMDB(`/${type}/${m.tmdbId}?language=en-US`);
+      const raw = await fetchTMDB(`/${type}/${m.tmdbId}?language=en-US&append_to_response=${append}`);
       if (cancelled) return;
-      if (isTmdbApiErrorPayload(raw)) return;
-      const tag = typeof raw?.tagline === "string" ? raw.tagline.trim() : "";
-      setDetailTagline(tag || null);
+      setDetailMeta(detailMetaFromTmdbDetail(raw, type));
     })();
     return () => {
       cancelled = true;
@@ -5479,8 +5780,9 @@ export default function App() {
       setDetailTouched(true);
     } else {
       setDetailEditRating(false);
-      setDetailRating(7);
-      setDetailTouched(false);
+      setDetailRating(5);
+      /** Default 5 is a deliberate starting point — allow submit without forcing a slider wiggle. */
+      setDetailTouched(userRatings[movie.id] == null);
     }
     setScreen("detail");
     const movieId = movie.id;
@@ -6523,7 +6825,6 @@ export default function App() {
   }
 
   const inWatchlist = (id) => watchlist.some(m => m.id === id);
-  const confToneClass = (c) => c === "high" ? "detail-score-meta-line--high" : c === "medium" ? "detail-score-meta-line--medium" : "detail-score-meta-line--low";
   const confToneLabel = (c) => c === "high" ? "High" : c === "medium" ? "Medium" : "Low";
   const shouldShowPredictionRange = (pred) => {
     if (!pred) return false;
@@ -8544,7 +8845,25 @@ export default function App() {
         const detailHasCinemastro = typeof detailCinemastroAvg === "number" && Number.isFinite(detailCinemastroAvg);
         const detailTmdbNum = movie.tmdbRating != null && Number.isFinite(Number(movie.tmdbRating)) ? Number(movie.tmdbRating) : null;
         const heroBackdropSrc = movie.backdrop || movie.poster || null;
-        const showFloatingPoster = Boolean(movie.poster && movie.backdrop);
+        const showRatePill = !myRating && hasPersonalPrediction(prediction) && !showPredSkeleton;
+        const hasFactsBar = Boolean(
+          detailMeta.certification ||
+            detailMeta.releaseLabel ||
+            detailMeta.runtimeLabel ||
+            detailMeta.genresLine,
+        );
+        const sliderBubbleLeftPct = (v) => {
+          const x = Number(v);
+          if (!Number.isFinite(x)) return 50;
+          const clamped = Math.min(10, Math.max(1, x));
+          return ((clamped - 1) / 9) * 100;
+        };
+        const confInlineClass =
+          prediction?.confidence === "high"
+            ? "detail-score-conf-inline--high"
+            : prediction?.confidence === "medium"
+              ? "detail-score-conf-inline--medium"
+              : "detail-score-conf-inline--low";
         return (
           <div className="detail">
             {!showPrimaryNav ? (
@@ -8562,114 +8881,127 @@ export default function App() {
                   <div className="detail-hero-backdrop-fallback" aria-hidden>🎬</div>
                 )}
                 <div className="d-overlay" />
+                {movie.poster ? (
+                  <div className="detail-hero-poster--float">
+                    <img src={movie.poster} alt="" />
+                  </div>
+                ) : null}
               </div>
               <div className="detail-hero-band">
-                <div className="detail-hero-band-inner">
-                  <div className="detail-hero-copy">
-                    <div className="d-type-genre">
-                      <span className="d-type-pill">{movie.type === "movie" ? "Movie" : "TV Show"}</span>
-                      {movie.year ? <span className="d-genre-text">{movie.year}</span> : null}
-                    </div>
-                    <div className="d-title">{movie.title}</div>
-                    {detailTagline ? <p className="d-tagline">{detailTagline}</p> : null}
+                <div className="detail-hero-copy">
+                  <div className="d-type-genre">
+                    <span className="d-type-pill">{movie.type === "movie" ? "Movie" : "TV Show"}</span>
                   </div>
-                  {showFloatingPoster ? (
-                    <div className="detail-hero-poster">
-                      <img src={movie.poster} alt="" />
-                    </div>
-                  ) : null}
+                  <h1 className="d-title">
+                    {movie.title}
+                    {movie.year ? <span className="d-title-year"> ({movie.year})</span> : null}
+                  </h1>
                 </div>
               </div>
             </div>
             <div className="detail-content-wrap">
               <div className="d-body">
-                <div className="detail-score-row">
-                  <div
-                    className={`detail-score-card${
-                      myRating != null && Number.isFinite(Number(myRating))
-                        ? " detail-score-card--you-rated"
-                        : hasPersonalPrediction(prediction) && !showPredSkeleton
-                          ? " detail-score-card--you-pred"
-                          : " detail-score-card--you-gold"
-                    }`}
-                  >
-                    <div className="detail-score-card-lbl">For you</div>
-                    {myRating != null && Number.isFinite(Number(myRating)) ? (
-                      <>
-                        <div className="detail-score-card-val detail-score-card-val--yours">{formatScore(Number(myRating))}</div>
-                        <div className="detail-score-card-sub">Saved on your profile</div>
-                      </>
-                    ) : showPredSkeleton ? (
-                      <div className="detail-score-card-skel" aria-busy="true" aria-label="Loading prediction">
-                        <div className="skel-line skel-line-title" style={{ width: "55%", marginTop: 4 }} />
-                        <div className="skel-line skel-line-meta" style={{ width: "40%", marginTop: 10 }} />
-                      </div>
-                    ) : hasPersonalPrediction(prediction) ? (
-                      <>
-                        <div className="detail-score-pred-row">
-                          <div className="detail-score-card-val detail-score-card-val--predicted">
-                            {formatScore(prediction.predicted)}
-                          </div>
-                          <div className="detail-score-meta-col">
+                {showPredSkeleton ? (
+                  <div className="detail-score-skel-inline" aria-busy="true" aria-label="Loading prediction">
+                    <div className="skel-line skel-line-title" style={{ width: "55%" }} />
+                    <div className="skel-line skel-line-meta" style={{ width: "40%" }} />
+                  </div>
+                ) : (
+                  <div className="detail-score-block">
+                    <div className="detail-score-lbl detail-score-lbl--left">
+                      {myRating != null && Number.isFinite(Number(myRating)) ? "You rated" : "For you"}
+                    </div>
+                    <div className="detail-score-lbl detail-score-lbl--right">{detailHasCinemastro ? "Cinemastro" : "TMDB"}</div>
+                    <div className="detail-score-divider-v" aria-hidden="true" />
+                    <div className="detail-score-val--left">
+                      {myRating != null && Number.isFinite(Number(myRating)) ? (
+                        <div className="detail-score-values-line">
+                          <span className="detail-inline-score-val detail-inline-score-val--yours">{formatScore(Number(myRating))}</span>
+                        </div>
+                      ) : hasPersonalPrediction(prediction) ? (
+                        <div className="detail-score-val-cluster">
+                          <span className="detail-inline-score-val detail-inline-score-val--pred">{formatScore(prediction.predicted)}</span>
+                          <div className="detail-score-meta-stack">
                             {shouldShowPredictionRange(prediction) ? (
-                              <div className="detail-score-meta-line detail-score-meta-line--range">
+                              <span className="detail-score-side-meta">
                                 {formatScore(prediction.low)}–{formatScore(prediction.high)}
-                              </div>
+                              </span>
                             ) : null}
-                            <div className={`detail-score-meta-line ${confToneClass(prediction.confidence)}`}>
-                              {confToneLabel(prediction.confidence)}
-                            </div>
+                            <span className={`detail-score-conf-inline ${confInlineClass}`}>{confToneLabel(prediction.confidence)}</span>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          className="d-rate-now-btn"
-                          disabled={rateSimilarLoading}
-                          onClick={() => { void handleRateNowForPrediction(movie); }}
-                        >
-                          {rateSimilarLoading
-                            ? "Loading..."
-                            : prediction.confidence === "high"
-                              ? "Rate more"
-                              : "Rate to refine"}
-                        </button>
-                        {rateSimilarError ? <div className="d-pred-improve-err">{rateSimilarError}</div> : null}
-                      </>
-                    ) : (
-                      <>
-                        <div className="detail-score-card-val detail-score-card-val--muted">TBD</div>
-                        <div className="detail-score-card-sub">Rate more to predict.</div>
-                      </>
-                    )}
+                      ) : (
+                        <div className="detail-score-values-line">
+                          <span className="detail-inline-score-val detail-inline-score-val--muted">TBD</span>
+                          <span className="detail-score-side-meta">Rate more to predict.</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="detail-score-val--right">
+                      {detailHasCinemastro ? (
+                        <div className="detail-score-val-cluster">
+                          <span className="detail-inline-score-val">{formatScore(detailCinemastroAvg)}</span>
+                          <div className="detail-score-meta-stack">
+                            <span className="detail-cine-sub--inline">TMDB-based</span>
+                            {detailCinemastroCount != null && detailCinemastroCount >= 1 ? (
+                              <CinemastroVoteMeter count={detailCinemastroCount} className="cinemastro-vote-meter--detail-stack" />
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : detailTmdbNum != null ? (
+                        <div className="detail-score-values-line">
+                          <span className="detail-inline-score-val">{formatScore(detailTmdbNum)}</span>
+                        </div>
+                      ) : (
+                        <div className="detail-score-values-line">
+                          <span className="detail-inline-score-val detail-inline-score-val--muted">—</span>
+                          <span className="detail-score-side-meta">No score yet</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div
-                    className={`detail-score-card${
-                      detailHasCinemastro ? " detail-score-card--crowd-cine" : ""
-                    }`}
-                  >
-                    <div className="detail-score-card-lbl">{detailHasCinemastro ? "Cinemastro" : "TMDB Score"}</div>
-                    {detailHasCinemastro ? (
-                      <>
-                        <div className="detail-score-card-val">{formatScore(detailCinemastroAvg)}</div>
-                        <div className="detail-score-card-sub">TMDB-based</div>
-                        {detailCinemastroCount != null && detailCinemastroCount >= 1 ? (
-                          <CinemastroVoteMeter count={detailCinemastroCount} className="cinemastro-vote-meter--detail" />
+                )}
+                {showRatePill ? (
+                  <div className="detail-rate-pill-wrap">
+                    <button
+                      type="button"
+                      className="d-rate-now-btn d-rate-now-btn--center"
+                      disabled={rateSimilarLoading}
+                      onClick={() => { void handleRateNowForPrediction(movie); }}
+                    >
+                      {rateSimilarLoading
+                        ? "Loading..."
+                        : prediction.confidence === "high"
+                          ? "Rate more"
+                          : "Rate to refine"}
+                    </button>
+                    {rateSimilarError ? <div className="d-pred-improve-err">{rateSimilarError}</div> : null}
+                  </div>
+                ) : null}
+                {hasFactsBar ? (
+                  <div className="detail-facts-bar">
+                    {detailMeta.certification || detailMeta.releaseLabel || detailMeta.runtimeLabel ? (
+                      <div className="detail-facts-row">
+                        {detailMeta.certification ? (
+                          <span className="detail-facts-cert">{detailMeta.certification}</span>
                         ) : null}
-                      </>
-                    ) : detailTmdbNum != null ? (
-                      <>
-                        <div className="detail-score-card-val">{formatScore(detailTmdbNum)}</div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="detail-score-card-val detail-score-card-val--muted">—</div>
-                        <div className="detail-score-card-sub">No score yet</div>
-                      </>
-                    )}
+                        {detailMeta.certification && (detailMeta.releaseLabel || detailMeta.runtimeLabel) ? (
+                          <span className="detail-facts-sep">·</span>
+                        ) : null}
+                        {detailMeta.releaseLabel ? <span>{detailMeta.releaseLabel}</span> : null}
+                        {detailMeta.releaseLabel && detailMeta.runtimeLabel ? <span className="detail-facts-sep">·</span> : null}
+                        {detailMeta.runtimeLabel ? <span>{detailMeta.runtimeLabel}</span> : null}
+                      </div>
+                    ) : null}
+                    {detailMeta.genresLine ? <div className="detail-facts-genres">{detailMeta.genresLine}</div> : null}
                   </div>
-                </div>
+                ) : null}
+                {detailMeta.tagline ? <p className="d-tagline">{detailMeta.tagline}</p> : null}
+                <h2 className="d-overview-heading">Overview</h2>
                 <div className="d-synopsis">{movie.synopsis}</div>
-                <WhereToWatch tmdbId={movie.tmdbId} type={movie.type} />
+                <div className="detail-wtw-wrap">
+                  <WhereToWatch tmdbId={movie.tmdbId} type={movie.type} />
+                </div>
                 <div className="detail-rate-section">
                   {myRating && !detailEditRating ? (
                     <div className="rated-box rated-box--compact" style={{ marginTop: 20 }}>
@@ -8681,13 +9013,28 @@ export default function App() {
                       </button>
                     </div>
                   ) : myRating && detailEditRating ? (
-                    <div style={{ marginTop: 20 }}>
+                    <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
                       <div className="d-rate-label">Update your rating</div>
                       <div className="d-rate-row">
-                        <input className="slider" type="range" min="1" max="10" step="0.5"
-                          value={detailRating} style={{ flex: 1 }}
-                          onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }} />
-                        <div className="d-rate-val" style={{ color: "#e8c96a" }}>{detailRating}</div>
+                        <div className="d-rate-slider-col">
+                          <div className="d-rate-slider-wrap">
+                            <output
+                              className="d-rate-slider-bubble"
+                              style={{ left: `${sliderBubbleLeftPct(detailRating)}%` }}
+                            >
+                              {detailRating}
+                            </output>
+                            <input
+                              className="slider d-rate-slider"
+                              type="range"
+                              min="1"
+                              max="10"
+                              step="0.5"
+                              value={detailRating}
+                              onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }}
+                            />
+                          </div>
+                        </div>
                       </div>
                       <div className="d-actions" style={{ marginTop: 14 }}>
                         <button className="btn-full btn-full-gold" disabled={!detailTouched}
@@ -8701,14 +9048,27 @@ export default function App() {
                       </div>
                     </div>
                   ) : !myRating ? (
-                    <div style={{ marginTop: 20 }}>
-                      <div className="d-rate-label">Your rating</div>
+                    <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
+                      <div className="d-rate-label d-rate-label--sentence">Select your rating and submit</div>
                       <div className="d-rate-row">
-                        <input className="slider" type="range" min="1" max="10" step="0.5"
-                          value={detailRating} style={{ flex: 1 }}
-                          onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }} />
-                        <div className="d-rate-val" style={{ color: detailTouched ? "#e8c96a" : "#444" }}>
-                          {detailTouched ? detailRating : "—"}
+                        <div className="d-rate-slider-col">
+                          <div className="d-rate-slider-wrap">
+                            <output
+                              className="d-rate-slider-bubble"
+                              style={{ left: `${sliderBubbleLeftPct(detailRating)}%`, color: "#e8c96a" }}
+                            >
+                              {detailRating}
+                            </output>
+                            <input
+                              className="slider d-rate-slider"
+                              type="range"
+                              min="1"
+                              max="10"
+                              step="0.5"
+                              value={detailRating}
+                              onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }}
+                            />
+                          </div>
                         </div>
                       </div>
                       <div className="d-actions">
