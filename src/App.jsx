@@ -3449,7 +3449,7 @@ export default function App() {
   const [leaveCircleError, setLeaveCircleError] = useState("");
   const [leaveConfirmCircle, setLeaveConfirmCircle] = useState(null);
   const [showCircleInfoSheet, setShowCircleInfoSheet] = useState(false);
-  /** `user_id` → profile name when Circle info sheet loads `profiles` (RLS may return partial rows). */
+  /** `user_id` → display name for Circle info sheet (`get_circle_member_names` RPC + profiles fallback). */
   const [circleInfoNamesById, setCircleInfoNamesById] = useState({});
   // v5.1.0: Circles Phase B — invites.
   const [pendingInvites, setPendingInvites] = useState([]);
@@ -6254,17 +6254,35 @@ export default function App() {
     }
     let cancelled = false;
     setCircleInfoNamesById({});
+    const circleId = circleDetailData.id;
     const ids = circleDetailData.members.map((m) => m.user_id);
     (async () => {
-      const { data, error } = await supabase.from("profiles").select("id, name").in("id", ids);
+      const { data: rpcRows, error: rpcError } = await supabase.rpc("get_circle_member_names", {
+        p_circle_id: circleId,
+      });
       if (cancelled) return;
-      if (error || !data) {
-        setCircleInfoNamesById({});
-        return;
-      }
       const next = {};
-      for (const p of data) {
-        if (p?.id) next[p.id] = typeof p.name === "string" ? p.name : "";
+      if (!rpcError && Array.isArray(rpcRows)) {
+        for (const row of rpcRows) {
+          if (row?.user_id) {
+            next[row.user_id] = typeof row.member_name === "string" ? row.member_name : "";
+          }
+        }
+      }
+      const needProfiles = ids.filter((id) => !(id in next));
+      if (needProfiles.length) {
+        const { data: profs, error: profErr } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", needProfiles);
+        if (cancelled) return;
+        if (!profErr && Array.isArray(profs)) {
+          for (const p of profs) {
+            if (p?.id && !(p.id in next)) {
+              next[p.id] = typeof p.name === "string" ? p.name : "";
+            }
+          }
+        }
       }
       setCircleInfoNamesById(next);
     })();

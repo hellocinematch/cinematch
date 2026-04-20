@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.5.3
+
+- **Circles — Circle info member names.** The Circle info modal lists each member’s display name from `profiles.name`. Direct client `select` on `profiles` only returns rows visible under RLS (usually just yourself), so the app now calls **`get_circle_member_names(p_circle_id)`** (SECURITY DEFINER, gated on `is_circle_member`) and merges any gaps with the legacy `profiles` query. Apply migration **`supabase/migrations/20260503120000_get_circle_member_names.sql`** on Supabase before relying on names for co-members.
+
 ## 5.5.2
 
 - **Title detail (TMDB-style).** Centered hero title (smaller title + smaller year); poster vertically centered on backdrop; inline two-column scores with stacked range/confidence and Cinemastro meter; shaded facts bar (cert, US date, runtime, genres) from TMDB `append_to_response`; centered tagline, overview, and Where to Watch panel. Rating block: default **5**, value bubble on slider, **“Select your rating and submit”**, centered controls.
