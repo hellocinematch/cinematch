@@ -59,6 +59,18 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 
 4. **Backlog:** split `App.jsx` into `pages/*` (pure refactor, ~7k lines).
 
+5. **Watchlist on Circles main page** — Move the user’s watchlist onto the Circles landing/main surface. **Where and how** to present it is still being planned.
+
+6. **Watchlist — circle name when sourced from a circle** — Show the **circle name** on watchlist rows when the item was saved from a circle flow (see **`watchlist.source_circle_id`**).
+
+7. **Circle invite → non-user email** — When an invite is sent to an address **with no Cinematch account**, deliver an email that asks them to **join Cinematch** (in addition to or as the path for accepting the circle invite — product detail TBD).
+
+8. **Signup verification — mobile phone** — When a user joins Cinematch, use **phone number verification** to reduce **multiple accounts** for the same person.
+
+9. **Ratings — Bayesian normalization** — Apply a **Bayesian** (or Bayesian-style) formula to **normalize** ratings (design + where in pipeline TBD).
+
+10. **Circle — quick rate pill** — Inside a circle, a **pill** (or entry point) for the user to **add a rating** for a movie/show; once added, it **propagates** to **all their groups** (shared rating graph behavior — align with existing rating flows).
+
 ---
 
 ## Ops reminders

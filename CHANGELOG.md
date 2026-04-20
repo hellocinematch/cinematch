@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.5.8
+
+- **Circles — circle detail hero.** Circle name in the top bar again uses the same **font size** as before (**32px** / **26px** on narrow viewports), inheriting **DM Serif Display** from `.circle-hero__name`; compact layout and meta alignment from **5.5.7** unchanged.
+
+## 5.5.7
+
+- **Circles — circle detail hero (tighten).** More compact top bar and hero body padding; **members / Circle info / Invite more** aligned on one baseline (**grid** `align-items: center`, flex cells); slightly smaller invite pill; less gap before **Rated in this circle**. Circle title uses **DM Sans** semibold at **34px** (desktop) / **28px** (narrow), **★** scaled to match.
+
 ## 5.5.6
 
 - **Circles — circle detail hero.** **Back** (left) and **circle name** centered in the top bar with a small **★** before the name for creators (replaces **👑**). **Members** (left), **Circle info** (center), and **+ Invite more** (right when creator + active) share one **bottom** row; full-circle cap copy stays under the invite control.
