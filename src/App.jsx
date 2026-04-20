@@ -3029,6 +3029,17 @@ const styles = `
   .circle-detail-strip-section { margin:0; }
   .circle-detail-strip-header { padding-left:0 !important; padding-right:0 !important; }
   .circle-detail-strip-block { margin-top:4px; }
+  .circle-strip-circle-score {
+    text-align:center;
+    font-size:11px;
+    line-height:1.3;
+    margin-top:6px;
+    margin-bottom:2px;
+    font-family:'DM Sans',sans-serif;
+    letter-spacing:0.2px;
+  }
+  .circle-strip-circle-score__label { color:#888; margin-right:5px; }
+  .circle-strip-circle-score__num { color:#e8c96a; font-weight:600; }
   .circle-strip-comm-line { font-size:11px; color:#888; margin-top:4px; letter-spacing:0.2px; }
   .circle-strip-comm-line--muted { color:#555; }
   .circle-detail-strip-empty { margin:0 !important; }
@@ -7666,7 +7677,7 @@ export default function App() {
                     return (
                       <div className="circle-detail-strip-block">
                         <div className="section-header circle-detail-strip-header">
-                          <div className="section-title">Rated in this circle</div>
+                          <div className="section-title">Recent activity</div>
                         </div>
                         <SkeletonStrip count={6} />
                       </div>
@@ -7724,19 +7735,26 @@ export default function App() {
                             predictedNeighborCount={predictedForBadge != null ? predictedNeighborCount : 0}
                           />
                         </div>
+                        {row.section === "together" && row.group_rating != null && (
+                          <div
+                            className="circle-strip-circle-score"
+                            aria-label={`Circle score ${formatScore(row.group_rating)}`}
+                          >
+                            <span className="circle-strip-circle-score__label">Circle</span>
+                            <span className="circle-strip-circle-score__num">{formatScore(row.group_rating)}</span>
+                          </div>
+                        )}
                         <div className="strip-title">{movie.title}</div>
                         <div className="strip-genre">{formatStripMediaMeta(movie, tvStripMetaByTmdbId)}</div>
-                        <div className="circle-strip-comm-line">
-                          {row.section === "together" && row.group_rating != null && (
-                            <span>Circle {formatScore(row.group_rating)}</span>
-                          )}
-                          {row.section === "solo" && row.site_rating != null && (
-                            <span>Cinemastro {formatScore(row.site_rating)}</span>
-                          )}
-                          {row.section === "solo" && row.site_rating == null && (
-                            <span className="circle-strip-comm-line--muted">Cinemastro —</span>
-                          )}
-                        </div>
+                        {row.section === "solo" && (
+                          <div className="circle-strip-comm-line">
+                            {row.site_rating != null ? (
+                              <span>Cinemastro {formatScore(row.site_rating)}</span>
+                            ) : (
+                              <span className="circle-strip-comm-line--muted">Cinemastro —</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   };
@@ -7762,7 +7780,7 @@ export default function App() {
                         ) : (
                           <div className="section circle-detail-strip-section">
                             <div className="section-header circle-detail-strip-header">
-                              <div className="section-title">Rated in this circle</div>
+                              <div className="section-title">Recent activity</div>
                             </div>
                             <div className="strip">
                               {titles.map(renderStripRow)}

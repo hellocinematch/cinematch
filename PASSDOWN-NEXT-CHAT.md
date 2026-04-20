@@ -41,7 +41,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Repo version & git
 
-- **`package.json`:** **5.5.11** — **`CHANGELOG.md`** through **5.5.11**. Profile shows **Cinemastro v…** via **`APP_VERSION`** (from `package.json` in `src/App.jsx`).
+- **`package.json`:** **5.5.12** — **`CHANGELOG.md`** through **5.5.12**. Profile shows **Cinemastro v…** via **`APP_VERSION`** (from `package.json` in `src/App.jsx`).
 - Confirm **`main` tip** with `git log -3 --oneline` after local commits; recent shipped work includes **circle-detail hero** iterations, **Circles bell** pending count, **discussion-first** Cursor rule, optional **`profiles` name NOT NULL** migration (**`20260504120000_profiles_name_not_null.sql`** — apply on DB when ready).
 
 ## Recent work (client — `src/App.jsx`)

@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.5.12
+
+- **Circles — strip copy & card.** Section header is **Recent activity** (skeleton + loaded strip). Empty state unchanged: **No shared ratings in this circle yet.** **Circle** score (muted label + gold number) sits **centered above the title** for **together** rows; bottom line is **solo only** (Cinemastro), so no duplicate Circle line.
+
 ## 5.5.11
 
 - **Circles — circle detail hero.** Avatar, title, and member subtitle are **centered** as a block between back and info (identity column no longer stretches full width; title/subtitle text aligned center).
