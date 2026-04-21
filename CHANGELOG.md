@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.5
+
+- **Circles — Recent scroll hint.** When the strip is horizontally scrollable and not at the **left** edge (e.g. after centering on the newest title), a **faded ← in a round** appears on the **left** over the poster row; **pointer-events: none** so it does not block dragging. Shown when `scrollLeft > 4` and `scrollWidth > clientWidth`.
+
 ## 5.6.4
 
 - **Circles — Recent add width.** The add column is **half the width** of a title strip card (**76px** vs **152** poster), with a **smaller** round **+**; still **212px** tall poster row for alignment with neighbors.

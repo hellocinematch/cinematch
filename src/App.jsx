@@ -3233,6 +3233,15 @@ const styles = `
   .circle-strip-cap-hint { font-size:12px; color:#777; line-height:1.5; margin-top:8px; text-align:center; max-width:36em; margin-left:auto; margin-right:auto; }
   .circle-strip-cap-hint button { margin-top:8px; background:transparent; border:none; color:#e8c96a; text-decoration:underline; cursor:pointer; font-size:inherit; padding:0; font-family:inherit; }
   .strip--circle-recent--solo-cta { justify-content:center; }
+  .circle-detail-recent-strip-outer { position:relative; width:100%; min-width:0; max-width:100%; }
+  .circle-recent-scroll-hint {
+    position:absolute; left:4px; top:106px; z-index:3; transform:translateY(-50%); pointer-events:none; display:flex; align-items:center; justify-content:center;
+  }
+  .circle-recent-scroll-hint__bubble {
+    width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-sizing:border-box;
+    background:rgba(10,10,10,0.35); border:1px solid rgba(232,201,106,0.2); color:rgba(232,201,106,0.5);
+    font-size:17px; font-weight:500; line-height:1; user-select:none; backdrop-filter:blur(4px);
+  }
   /* Add control: half-width “poster” column (76 = 152/2), + centered in 212px poster row. */
   .strip-card.strip-card--circle-add-rate {
     width:76px; max-width:76px; flex-shrink:0; border:none; background:transparent; padding:0; font:inherit; cursor:pointer; text-align:left;
@@ -3767,6 +3776,8 @@ export default function App() {
   const [circleStripLoading, setCircleStripLoading] = useState(false);
   const [circleStripLoadingMore, setCircleStripLoadingMore] = useState(false);
   const [circleStripError, setCircleStripError] = useState("");
+  /** Recent strip: more content exists to the left of current scroll (center-on-land). */
+  const [circleRecentLeftScrollHint, setCircleRecentLeftScrollHint] = useState(false);
   const [circleStripExtraMovies, setCircleStripExtraMovies] = useState(() => new Map());
   /** Circle detail rated block: recent (horizontal strip) | all | top (grids). */
   const [circleRatingsView, setCircleRatingsView] = useState("recent");
@@ -6808,6 +6819,17 @@ export default function App() {
     }
   }
 
+  const updateCircleRecentScrollLeftHint = useCallback(() => {
+    const scroller = circleRecentStripRef.current;
+    if (!scroller) {
+      setCircleRecentLeftScrollHint(false);
+      return;
+    }
+    const { scrollWidth, clientWidth, scrollLeft } = scroller;
+    const canScrollX = scrollWidth - clientWidth > 2;
+    setCircleRecentLeftScrollHint(canScrollX && scrollLeft > 4);
+  }, []);
+
   // Circle Recent: on first load / circle change, scroll so newest title is ~centered; skip re-center after “Load earlier”.
   useLayoutEffect(() => {
     if (screen !== "circle-detail" || circleRatingsView !== "recent" || !circleStripPayload) return;
@@ -6827,10 +6849,49 @@ export default function App() {
     };
     if (t.length === 0) {
       center(circleRecentAddCtaRef.current);
+    } else {
+      center(circleRecentNewestRef.current);
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateCircleRecentScrollLeftHint();
+      });
+    });
+  }, [screen, circleRatingsView, selectedCircleId, circleStripPayload, circleStripLoading, circleStripLoadingMore, circleRatedRefreshKey, updateCircleRecentScrollLeftHint]);
+
+  useEffect(() => {
+    if (screen !== "circle-detail" || circleRatingsView !== "recent" || !circleStripPayload || circleStripLoading) {
+      setCircleRecentLeftScrollHint(false);
       return;
     }
-    center(circleRecentNewestRef.current);
-  }, [screen, circleRatingsView, selectedCircleId, circleStripPayload, circleStripLoading, circleStripLoadingMore, circleRatedRefreshKey]);
+    const scroller = circleRecentStripRef.current;
+    if (!scroller) return;
+    const onScroll = () => {
+      updateCircleRecentScrollLeftHint();
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    const ro = new ResizeObserver(() => {
+      onScroll();
+    });
+    ro.observe(scroller);
+    window.addEventListener("resize", onScroll, { passive: true });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateCircleRecentScrollLeftHint();
+      });
+    });
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [
+    screen,
+    circleRatingsView,
+    circleStripPayload,
+    circleStripLoading,
+    updateCircleRecentScrollLeftHint,
+  ]);
 
   async function loadCircleGridAllMore() {
     if (!selectedCircleId || !user || circleGridAllLoadingMore || circleGridAllLoading) return;
@@ -8670,14 +8731,24 @@ export default function App() {
                             ) : (
                               <>
                                 {recentStripActiveEmptyCopy}
-                                <div
-                                  ref={circleRecentStripRef}
-                                  className={`strip strip--circle-recent${
-                                    titles.length === 0
-                                      ? " strip--circle-recent--solo-cta"
-                                      : ""
-                                  }`}
-                                >
+                                <div className="circle-detail-recent-strip-outer">
+                                  {circleRecentLeftScrollHint ? (
+                                    <div
+                                      className="circle-recent-scroll-hint"
+                                      aria-hidden="true"
+                                      title="Scroll for earlier titles"
+                                    >
+                                      <span className="circle-recent-scroll-hint__bubble" aria-hidden>←</span>
+                                    </div>
+                                  ) : null}
+                                  <div
+                                    ref={circleRecentStripRef}
+                                    className={`strip strip--circle-recent${
+                                      titles.length === 0
+                                        ? " strip--circle-recent--solo-cta"
+                                        : ""
+                                    }`}
+                                  >
                                   {showLoadMore && (
                                     <button
                                       type="button"
@@ -8717,6 +8788,7 @@ export default function App() {
                                       <div className="strip-genre">&nbsp;</div>
                                     </button>
                                   )}
+                                </div>
                                 </div>
                               </>
                             )
