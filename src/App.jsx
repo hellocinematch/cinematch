@@ -7236,15 +7236,17 @@ export default function App() {
     }
   }
 
-  async function moveWatchlistItemUp(movieId) {
+  async function swapWatchlistOrder(movieId, direction) {
     if (!user) return;
     const list = [...watchlist].sort((a, b) => (a.sort_index ?? 0) - (b.sort_index ?? 0));
     const i = list.findIndex((m) => m.id === movieId);
-    if (i <= 0) return;
+    if (i < 0) return;
+    const j = direction === "up" ? i - 1 : i + 1;
+    if (j < 0 || j >= list.length) return;
     const cur = list[i];
-    const prev = list[i - 1];
+    const other = list[j];
     const a = cur.sort_index ?? i;
-    const b = prev.sort_index ?? i - 1;
+    const b = other.sort_index ?? j;
     const uid = user.id;
     const TEMP = 2147483646;
     try {
@@ -7259,8 +7261,8 @@ export default function App() {
         .from("watchlist")
         .update({ sort_index: a })
         .eq("user_id", uid)
-        .eq("tmdb_id", prev.tmdbId)
-        .eq("media_type", prev.type);
+        .eq("tmdb_id", other.tmdbId)
+        .eq("media_type", other.type);
       if (e2) throw e2;
       const { error: e3 } = await supabase
         .from("watchlist")
@@ -7276,11 +7278,65 @@ export default function App() {
     setWatchlist((w) => {
       const byId = new Map(w.map((m) => [m.id, { ...m }]));
       const c = byId.get(cur.id);
-      const p = byId.get(prev.id);
+      const o = byId.get(other.id);
       if (c) c.sort_index = b;
-      if (p) p.sort_index = a;
+      if (o) o.sort_index = a;
       return w.map((m) => byId.get(m.id) ?? m);
     });
+    setWatchlistRowMenuId(null);
+  }
+
+  async function moveWatchlistItemToTop(movieId) {
+    if (!user) return;
+    const list = [...watchlist].sort((a, b) => (a.sort_index ?? 0) - (b.sort_index ?? 0));
+    const i = list.findIndex((m) => m.id === movieId);
+    if (i <= 0) return;
+    const cur = list[i];
+    const top = list[0];
+    const newSort = (Number(top.sort_index) || 0) - 1;
+    const uid = user.id;
+    try {
+      const { error } = await supabase
+        .from("watchlist")
+        .update({ sort_index: newSort })
+        .eq("user_id", uid)
+        .eq("tmdb_id", cur.tmdbId)
+        .eq("media_type", cur.type);
+      if (error) throw error;
+    } catch (e) {
+      console.warn("Watchlist reorder failed:", e);
+      return;
+    }
+    setWatchlist((w) =>
+      w.map((m) => (m.id === cur.id ? { ...m, sort_index: newSort } : m)),
+    );
+    setWatchlistRowMenuId(null);
+  }
+
+  async function moveWatchlistItemToBottom(movieId) {
+    if (!user) return;
+    const list = [...watchlist].sort((a, b) => (a.sort_index ?? 0) - (b.sort_index ?? 0));
+    const i = list.findIndex((m) => m.id === movieId);
+    if (i < 0 || i >= list.length - 1) return;
+    const cur = list[i];
+    const bot = list[list.length - 1];
+    const newSort = (Number(bot.sort_index) || 0) + 1;
+    const uid = user.id;
+    try {
+      const { error } = await supabase
+        .from("watchlist")
+        .update({ sort_index: newSort })
+        .eq("user_id", uid)
+        .eq("tmdb_id", cur.tmdbId)
+        .eq("media_type", cur.type);
+      if (error) throw error;
+    } catch (e) {
+      console.warn("Watchlist reorder failed:", e);
+      return;
+    }
+    setWatchlist((w) =>
+      w.map((m) => (m.id === cur.id ? { ...m, sort_index: newSort } : m)),
+    );
     setWatchlistRowMenuId(null);
   }
 
@@ -9895,6 +9951,7 @@ export default function App() {
               <div className="wl-list">
                 {watchlistDisplay.map((m, rowIndex) => {
                   const canMoveUp = rowIndex > 0;
+                  const canMoveDown = rowIndex < watchlistDisplay.length - 1;
                   return (
                   <div className="wl-list-row" key={m.id}>
                     <button
@@ -9945,10 +10002,43 @@ export default function App() {
                             disabled={!canMoveUp}
                             onClick={() => {
                               if (!canMoveUp) return;
-                              void moveWatchlistItemUp(m.id);
+                              void moveWatchlistItemToTop(m.id);
                             }}
                           >
-                            Move up
+                            ⇈ Top
+                          </button>
+                          <button
+                            type="button"
+                            className="wl-list-row__menu-item"
+                            disabled={!canMoveUp}
+                            onClick={() => {
+                              if (!canMoveUp) return;
+                              void swapWatchlistOrder(m.id, "up");
+                            }}
+                          >
+                            ↑ Up
+                          </button>
+                          <button
+                            type="button"
+                            className="wl-list-row__menu-item"
+                            disabled={!canMoveDown}
+                            onClick={() => {
+                              if (!canMoveDown) return;
+                              void swapWatchlistOrder(m.id, "down");
+                            }}
+                          >
+                            ↓ Down
+                          </button>
+                          <button
+                            type="button"
+                            className="wl-list-row__menu-item"
+                            disabled={!canMoveDown}
+                            onClick={() => {
+                              if (!canMoveDown) return;
+                              void moveWatchlistItemToBottom(m.id);
+                            }}
+                          >
+                            ⇊ Bottom
                           </button>
                           <button
                             type="button"

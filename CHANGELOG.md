@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.5.21
+
+- **Watchlist ⋯ menu.** Reorder actions: **⇈ Top**, **↑ Up**, **↓ Down**, **⇊ Bottom** (with **Details** and **Remove**). Top/bottom use a new **`sort_index`** above/below the current extremes; up/down swap with the adjacent row (same as before for **Up**).
+
 ## 5.5.20
 
 - **Watchlist strip / list meta.** Type, year, TMDB score, and genre are combined into **one line** under the title (e.g. `Movie · 2024 · TMDB 7.2 · Drama`); narrow strip cards still ellipsis when needed.
