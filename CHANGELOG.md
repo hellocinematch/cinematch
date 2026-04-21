@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.6.0
+
+- **Circles — publish ratings per group.** New table **`rating_circle_shares`** (`user_id`, `tmdb_id`, `media_type`, `circle_id`): a title appears in a circle’s Recent / All / Top feeds only if the member **published** it there. **No backfill** — existing circles start empty until users publish. **Leave circle** (trigger on `circle_members` delete) removes that member’s shares for that circle only; global **`ratings`** rows unchanged.
+- **RPCs** **`get_circle_rated_strip`**, **`get_circle_rated_all_grid`**, **`get_circle_rated_top_grid`** now join **`ratings`** through **`rating_circle_shares`** for the requested `circle_id`. **`viewer_score`** only when the viewer has published to that circle.
+- **Client:** After a **first-time** rating from detail, **Publish to circles** modal (skip allowed; defaults include circle when opened from circle flow). **Publish to circles…** on detail when already rated. Helpers **`syncRatingCircleShares`**, **`fetchRatingCircleShareIds`** in **`src/circles.js`**. Apply migration **`20260524120000_rating_circle_shares.sql`** on Supabase (Edge **`get-circle-rated-titles`** unchanged — redeploy not required for RPC-only change).
+
 ## 5.5.23
 
 - **Watchlist ⋯ menu.** Dropdown is **vertically centered** on the row (was opening above the button and clipping under the header). **`z-index: 2190`** so it paints above **primary nav** / drawer while staying below Circles sheet/modal layers.

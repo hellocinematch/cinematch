@@ -214,6 +214,76 @@ export async function leaveCircle({ circleId, userId, isCreator }) {
   if (deleteErr) throw deleteErr;
 }
 
+function parseMovieIdForShare(movieId) {
+  const [media_type, tmdbStr] = (movieId || "").split("-");
+  const tmdb_id = parseInt(tmdbStr, 10);
+  if (!media_type || !Number.isFinite(tmdb_id)) {
+    throw new Error("Invalid title.");
+  }
+  return { media_type, tmdb_id };
+}
+
+/** Circle ids where this title is published (current user). */
+export async function fetchRatingCircleShareIds(movieId) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { media_type, tmdb_id } = parseMovieIdForShare(movieId);
+  const { data, error } = await supabase
+    .from("rating_circle_shares")
+    .select("circle_id")
+    .eq("user_id", user.id)
+    .eq("tmdb_id", tmdb_id)
+    .eq("media_type", media_type);
+  if (error) throw new Error(error.message || "Could not load circle picks.");
+  return (data || []).map((r) => r.circle_id).filter(Boolean);
+}
+
+/** Replace publish set for this title: `circleIds` is the full desired set (diffed against DB). */
+export async function syncRatingCircleShares(movieId, circleIds) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Sign in required.");
+  const { media_type, tmdb_id } = parseMovieIdForShare(movieId);
+  const ids = [...new Set((circleIds || []).filter(Boolean))];
+
+  const { data: existing, error: selErr } = await supabase
+    .from("rating_circle_shares")
+    .select("circle_id")
+    .eq("user_id", user.id)
+    .eq("tmdb_id", tmdb_id)
+    .eq("media_type", media_type);
+  if (selErr) throw new Error(selErr.message || "Could not sync circles.");
+
+  const existingSet = new Set((existing || []).map((r) => r.circle_id));
+  const targetSet = new Set(ids);
+  const toRemove = [...existingSet].filter((id) => !targetSet.has(id));
+  const toAdd = [...targetSet].filter((id) => !existingSet.has(id));
+
+  if (toRemove.length > 0) {
+    const { error: delErr } = await supabase
+      .from("rating_circle_shares")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("tmdb_id", tmdb_id)
+      .eq("media_type", media_type)
+      .in("circle_id", toRemove);
+    if (delErr) throw new Error(delErr.message || "Could not update circles.");
+  }
+  if (toAdd.length > 0) {
+    const rows = toAdd.map((circle_id) => ({
+      user_id: user.id,
+      tmdb_id,
+      media_type,
+      circle_id,
+    }));
+    const { error: insErr } = await supabase.from("rating_circle_shares").insert(rows);
+    if (insErr) throw new Error(insErr.message || "Could not publish to circles.");
+  }
+}
+
 export function currentUserRole(circle, userId) {
   if (!circle || !userId) return null;
   const row = (circle.members || []).find((m) => m.user_id === userId);

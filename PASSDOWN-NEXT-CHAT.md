@@ -8,10 +8,10 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.5.21** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** **5.5.21** (watchlist **⋯** reorder + passdown) pushed to **`origin`**. |
-| **Supabase — apply if not already** | **`20260523120000_watchlist_sort_index.sql`** adds **`watchlist.sort_index`** (required for **⋯ reorder** + ordered selects). Run on hosted DB when ready. |
-| **Edge** | Git push does **not** deploy functions. After RPC changes to Circles, redeploy **`get-circle-rated-titles`** (see migrations below). |
+| **App version** | **5.6.0** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main`** **5.6.0** (circle **rating publish** + migration); push to **`origin`** when you ship. |
+| **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`** — **`rating_circle_shares`** + RPC updates (circle feeds use **published** titles only). **`20260523120000_watchlist_sort_index.sql`** for watchlist **⋯** order. |
+| **Edge** | **`get-circle-rated-titles`** unchanged (still RPC-only); redeploy **optional** after this release. |
 
 **Watchlist (current behavior)**
 
@@ -64,6 +64,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.0** — **`rating_circle_shares`**; circle strip/grids only show **published** titles; publish modal after first rating; **Publish to circles…** on detail; leave circle drops shares for that group.
 - **5.5.21** — Watchlist **⋯**: **⇈ Top**, **↑ Up**, **↓ Down**, **⇊ Bottom** (+ Details, Remove); **`swapWatchlistOrder`**, **`moveWatchlistItemToTop`**, **`moveWatchlistItemToBottom`** in **`App.jsx`**.
 - **5.5.20** — Single-line watchlist meta (type · year · TMDB · genre); strip ellipsis when narrow.
 - **5.5.19** — **`sort_index`** migration; DB order; removed localStorage ordering for watchlist.
@@ -85,9 +86,10 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 - **`clearDetailOverlayToNavigate`** before leaving detail via Mood / Watchlist / Profile.
 - **Watchlist reorder:** **`swapWatchlistOrder(id, "up" | "down")`** (TEMP swap, same pattern as prior **Move up**); **`moveWatchlistItemToTop`** / **`moveWatchlistItemToBottom`** (single **`sort_index`** update).
 
-### Circles (unchanged thread from prior releases)
+### Circles
 
-- **Circle detail:** Ratings **Recent / All / Top**; **`fetchCircleRatedTitles`** + Edge **`get-circle-rated-titles`** with **`view`**; migrations **`20260522120000_...`**, strip **`20260506120000_...`**, names **`20260503120000_...`**, circle name rules **`20260505120000_...`**.
+- **Circle detail:** Ratings **Recent / All / Top**; feeds = **`ratings` ∩ `rating_circle_shares`** for that circle. **`fetchCircleRatedTitles`** + Edge **`get-circle-rated-titles`**. Migrations: **`20260524120000_rating_circle_shares.sql`**, **`20260522120000_...`**, strip **`20260506120000_...`**, etc.
+- **Publish:** first-time rating from detail → modal (skip OK); from circle flow, defaults include that circle. **Publish to circles…** on detail when already rated.
 - **Rate a title** pill → Discover → return to circle via refs.
 
 ### Title detail (basics)
@@ -108,6 +110,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 | Migration | Purpose |
 |-----------|---------|
+| **`20260524120000_rating_circle_shares.sql`** | **`rating_circle_shares`** + strip/all/top RPCs — **required** for circle rated feeds (publish model). |
 | **`20260523120000_watchlist_sort_index.sql`** | **`watchlist.sort_index`** — **required** for watchlist ordering / **⋯** Top·Up·Down·Bottom. |
 | **`20260522120000_circles_rated_all_top_grid.sql`** | All/Top grid RPCs; then **redeploy** **`get-circle-rated-titles`**. |
 | **`20260506120000_circles_strip_recent_activity.sql`** | Strip ordering + `rated_at` bump. |
@@ -136,7 +139,8 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 ## Open / follow-ups
 
-- **`HANDOFF.md`** — Phase D (handle), **edit circle name/info**, watchlist on **Circles** landing (layout TBD; global Watchlist done), **`source_circle_id`** labels on rows, invites to non-users, phone verify, Bayesian ratings, in-circle quick rate, etc.
+- **`ACCOUNT-SECURITY.md`** — Tightening user accounts: **Apple/Google OAuth** + **CAPTCHA** (preferred); optional **phone**; layers vs duplicate-account rating abuse.
+- **`HANDOFF.md`** — Phase D (handle), **edit circle name/info**, watchlist on **Circles** landing (layout TBD; global Watchlist done), **`source_circle_id`** labels on rows, invites to non-users, Bayesian ratings, in-circle quick rate, etc.
 - **Marketing stats:** can return in top bar / About — not in bottom nav.
 - **Cron:** audit coverage vs eligible users.
 - **Lint:** possible **`react-hooks/set-state-in-effect`** on **`AppPrimaryNav`** — pre-existing.

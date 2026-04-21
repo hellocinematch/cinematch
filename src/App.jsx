@@ -19,6 +19,8 @@ import {
   sendCircleInvite,
   acceptCircleInvite,
   declineCircleInvite,
+  fetchRatingCircleShareIds,
+  syncRatingCircleShares,
   fetchCircleRatedTitles,
   CIRCLE_STRIP_INITIAL,
   CIRCLE_STRIP_PAGE,
@@ -3307,6 +3309,10 @@ const styles = `
   }
   .circles-modal-close:hover { color:#f0ebe0; background:rgba(255,255,255,0.06); }
   .circles-modal-sub { font-size:13px; color:#888; margin-top:-2px; line-height:1.4; word-break:break-word; }
+  .publish-rating-circle-list { max-height:min(45vh, 280px); overflow-y:auto; margin-top:4px; display:flex; flex-direction:column; gap:0; }
+  .publish-rating-circle-row { display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid #222; font-family:'DM Sans',sans-serif; font-size:14px; color:#e8e8e8; cursor:pointer; }
+  .publish-rating-circle-row:last-child { border-bottom:none; }
+  .publish-rating-circle-row input { width:18px; height:18px; accent-color:#e8c96a; cursor:pointer; flex-shrink:0; }
 
   /* Bottom sheet / confirm shared shell */
   .circles-sheet-root { position:fixed; inset:0; z-index:2200; display:flex; flex-direction:column; justify-content:flex-end; animation:fadeIn 0.2s ease; }
@@ -3780,6 +3786,12 @@ export default function App() {
   const [leaveCircleBusy, setLeaveCircleBusy] = useState(false);
   const [leaveCircleError, setLeaveCircleError] = useState("");
   const [leaveConfirmCircle, setLeaveConfirmCircle] = useState(null);
+  /** After first-time rating: pick circles to publish. Manage: edit publish set. */
+  const [publishRatingModal, setPublishRatingModal] = useState(null);
+  const [publishModalBusy, setPublishModalBusy] = useState(false);
+  const [publishModalError, setPublishModalError] = useState("");
+  const [publishModalSelection, setPublishModalSelection] = useState(() => new Set());
+  const [circleRatedRefreshKey, setCircleRatedRefreshKey] = useState(0);
   const [showCircleInfoSheet, setShowCircleInfoSheet] = useState(false);
   /** `user_id` → display name for Circle info sheet (`get_circle_member_names` RPC + profiles fallback). */
   const [circleInfoNamesById, setCircleInfoNamesById] = useState({});
@@ -6071,7 +6083,12 @@ export default function App() {
     );
   }
 
-  async function addRating(movieId, score) {
+  async function addRating(movieId, score, options = {}) {
+    const skipPublishModal = options.skipPublishModal === true;
+    const pendingNavigate = options.pendingNavigate ?? "none";
+    const navigateDelayMs = options.navigateDelayMs ?? 800;
+    const hadRating = userRatings[movieId] != null;
+
     setUserRatings(prev => ({ ...prev, [movieId]: score }));
     setWatchlist(prev => prev.filter(m => m.id !== movieId));
     setSelectedToWatch(prev => { const n = { ...prev }; delete n[movieId]; return n; });
@@ -6085,6 +6102,62 @@ export default function App() {
       }
       await supabase.from("watchlist").delete().eq("user_id", user.id).eq("tmdb_id", parseInt(tmdbId)).eq("media_type", type);
     }
+
+    const shouldOpenPublish = Boolean(user) && !skipPublishModal && !hadRating;
+    if (shouldOpenPublish) {
+      const defaults = [];
+      if (rateTitleReturnCircleIdRef.current) defaults.push(rateTitleReturnCircleIdRef.current);
+      if (detailReturnScreenRef.current === "circle-detail" && selectedCircleId) {
+        defaults.push(selectedCircleId);
+      }
+      setPublishRatingModal({
+        movieId,
+        mode: "afterRate",
+        pendingNavigate,
+        defaultCircleIds: [...new Set(defaults)],
+      });
+      return;
+    }
+
+    if (pendingNavigate === "back") {
+      setTimeout(() => goBack(), navigateDelayMs);
+    }
+  }
+
+  async function completePublishRatingModal(selectedIds) {
+    const ctx = publishRatingModal;
+    if (!ctx) return;
+    setPublishModalBusy(true);
+    setPublishModalError("");
+    try {
+      await syncRatingCircleShares(ctx.movieId, selectedIds);
+      const nav = ctx.pendingNavigate;
+      setPublishRatingModal(null);
+      setPublishModalBusy(false);
+      setCircleRatedRefreshKey((k) => k + 1);
+      if (nav === "back") goBack();
+    } catch (e) {
+      setPublishModalBusy(false);
+      setPublishModalError(e?.message || "Could not save.");
+    }
+  }
+
+  function cancelPublishRatingModal() {
+    const ctx = publishRatingModal;
+    const nav = ctx?.pendingNavigate;
+    setPublishRatingModal(null);
+    setPublishModalBusy(false);
+    setPublishModalError("");
+    if (ctx?.mode === "afterRate" && nav === "back") goBack();
+  }
+
+  function togglePublishCirclePick(circleId) {
+    setPublishModalSelection((prev) => {
+      const n = new Set(prev);
+      if (n.has(circleId)) n.delete(circleId);
+      else n.add(circleId);
+      return n;
+    });
   }
 
   function startDefaultRateMore() {
@@ -6259,7 +6332,7 @@ export default function App() {
   }
 
   function confirmRating() {
-    if (rateMoreQueue[obStep]) addRating(rateMoreQueue[obStep].id, sliderVal);
+    if (rateMoreQueue[obStep]) void addRating(rateMoreQueue[obStep].id, sliderVal, { skipPublishModal: true });
     advanceOb();
   }
 
@@ -6442,6 +6515,11 @@ export default function App() {
     return map;
   }, [circlesList]);
 
+  const publishModalCircles = useMemo(
+    () => circlesList.filter((c) => c?.status === "active"),
+    [circlesList],
+  );
+
   function openCreateCircleSheet() {
     if (atCircleCap) return;
     setCreateCircleName("");
@@ -6598,7 +6676,36 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [screen, selectedCircleId, user]);
+  }, [screen, selectedCircleId, user, circleRatedRefreshKey]);
+
+  useEffect(() => {
+    if (screen !== "circle-detail") return;
+    setCircleGridAllPayload(null);
+    setCircleGridTopPayload(null);
+  }, [circleRatedRefreshKey, screen, selectedCircleId]);
+
+  useEffect(() => {
+    if (!publishRatingModal) {
+      setPublishModalSelection(new Set());
+      setPublishModalError("");
+      return;
+    }
+    let cancelled = false;
+    if (publishRatingModal.mode === "manage") {
+      fetchRatingCircleShareIds(publishRatingModal.movieId)
+        .then((ids) => {
+          if (!cancelled) setPublishModalSelection(new Set(ids));
+        })
+        .catch((e) => {
+          if (!cancelled) setPublishModalError(e?.message || "Could not load.");
+        });
+    } else {
+      setPublishModalSelection(new Set(publishRatingModal.defaultCircleIds || []));
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [publishRatingModal]);
 
   useEffect(() => {
     if (screen !== "circle-detail" || !selectedCircleId || !user) return;
@@ -8953,7 +9060,7 @@ export default function App() {
             <div className="circles-confirm-text">
               {currentUserRole(leaveConfirmCircle, user?.id) === "creator"
                 ? "You're the creator. Leaving will archive the circle — members can still view it, but no new invites or ratings will flow through."
-                : "Your past ratings stay visible in the circle, but you'll lose access to future activity."}
+                : "Titles you published here will be removed from this circle. Your personal ratings stay on your account."}
             </div>
             {leaveCircleError && <div className="circles-error-banner">{leaveCircleError}</div>}
             <div className="circles-sheet-actions">
@@ -8972,6 +9079,73 @@ export default function App() {
                 disabled={leaveCircleBusy}
               >
                 {leaveCircleBusy ? "Leaving…" : "Leave circle"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish rating to circles (first-time rate or manage) */}
+      {publishRatingModal && (
+        <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Publish to circles">
+          <button
+            type="button"
+            className="circles-modal-backdrop"
+            aria-label="Close"
+            onClick={cancelPublishRatingModal}
+          />
+          <div className="circles-modal-panel">
+            <div className="circles-modal-header">
+              <h2 className="circles-modal-title">
+                {publishRatingModal.mode === "manage" ? "Circles for this title" : "Publish to circles"}
+              </h2>
+              <button
+                type="button"
+                className="circles-modal-close"
+                aria-label="Close"
+                onClick={cancelPublishRatingModal}
+              >
+                ×
+              </button>
+            </div>
+            <p className="circles-modal-sub">
+              {publishRatingModal.mode === "manage"
+                ? "Choose which groups see this title with your score. Your rating stays the same everywhere."
+                : "Pick which groups see this title. You can skip and add circles later from the title detail."}
+            </p>
+            {publishModalCircles.length === 0 ? (
+              <p className="circles-modal-sub">You’re not in any active circles yet.</p>
+            ) : (
+              <div className="publish-rating-circle-list">
+                {publishModalCircles.map((c) => (
+                  <label key={c.id} className="publish-rating-circle-row">
+                    <input
+                      type="checkbox"
+                      checked={publishModalSelection.has(c.id)}
+                      onChange={() => togglePublishCirclePick(c.id)}
+                    />
+                    <span>{c.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {publishModalError ? <div className="circles-error-banner">{publishModalError}</div> : null}
+            <div className="circles-sheet-actions">
+              <button
+                type="button"
+                className="circles-btn-ghost"
+                onClick={cancelPublishRatingModal}
+                disabled={publishModalBusy}
+              >
+                {publishRatingModal.mode === "afterRate" ? "Skip" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                className="circles-btn-primary"
+                disabled={publishModalBusy || publishModalCircles.length === 0}
+                onClick={() => void completePublishRatingModal([...publishModalSelection])}
+              >
+                {publishModalBusy ? "Saving…" : "Done"}
               </button>
             </div>
           </div>
@@ -10289,6 +10463,23 @@ export default function App() {
                         onClick={() => { setDetailEditRating(true); setDetailRating(myRating); setDetailTouched(true); }}>
                         Change rating
                       </button>
+                      {user && publishModalCircles.length > 0 ? (
+                        <button
+                          type="button"
+                          className="btn-full btn-full-dark"
+                          style={{ marginTop: 10, width: "100%" }}
+                          onClick={() => {
+                            setPublishRatingModal({
+                              movieId: movie.id,
+                              mode: "manage",
+                              pendingNavigate: "none",
+                              defaultCircleIds: [],
+                            });
+                          }}
+                        >
+                          Publish to circles…
+                        </button>
+                      ) : null}
                     </div>
                   ) : myRating && detailEditRating ? (
                     <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
@@ -10316,7 +10507,7 @@ export default function App() {
                       </div>
                       <div className="d-actions" style={{ marginTop: 14 }}>
                         <button className="btn-full btn-full-gold" disabled={!detailTouched}
-                          onClick={() => { addRating(movie.id, detailRating); setDetailEditRating(false); }}>
+                          onClick={() => { void addRating(movie.id, detailRating, { skipPublishModal: true }); setDetailEditRating(false); }}>
                           Save new rating
                         </button>
                         <button type="button" className="btn-full btn-full-dark"
@@ -10351,7 +10542,7 @@ export default function App() {
                       </div>
                       <div className="d-actions">
                         <button className="btn-full btn-full-gold" disabled={!detailTouched}
-                          onClick={() => { addRating(movie.id, detailRating); setTimeout(() => goBack(), 800); }}>
+                          onClick={() => { void addRating(movie.id, detailRating, { pendingNavigate: "back", navigateDelayMs: 800 }); }}>
                           Submit Rating
                         </button>
                         <button className={`btn-full btn-full-dark ${inWatchlist(movie.id) ? "saved-style" : ""}`}

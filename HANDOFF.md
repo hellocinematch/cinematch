@@ -9,15 +9,15 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 1. **Read this file first** — `HANDOFF.md` at the repository root:  
    `/Users/tlmahesh/Library/Mobile Documents/com~apple~CloudDocs/Cinematch/HANDOFF.md`
 2. In Cursor chat, attach it: type **`@HANDOFF.md`** and select the file, or paste: *“Follow `HANDOFF.md`.”*
-3. **Version bump rule for the next vertical slice:** current release in repo is **5.5.15** (bump **`package.json`** + **`CHANGELOG.md`** whenever you ship product code). When **Phase D**, **Phase E**, or a **major circles / match vertical** ships, consider **`5.6.0`** and add a matching **`CHANGELOG.md`** section in the **same release commit** as the first shipping change—not in a handoff-only or docs-only commit.
+3. **Version bump rule:** trust **`package.json`** / **`CHANGELOG.md`** for the current release (now **5.6.0** — circle **rating publish**). Bump both whenever you ship product code; add **`CHANGELOG.md`** in the **same release commit** as the first shipping change—not in a handoff-only or docs-only commit.
 
 ---
 
 ## Current state (as of last update)
 
 - **`main` is pushed** to `origin` (includes Circles Phase A + RLS hotfix + Phase B + Phase C strip backend + Phase C strip UI).
-- **`package.json` version:** `5.5.15` — Circles **Ratings** tabs (**Recent** / **All** / **Top** grids); see **`CHANGELOG.md`**.
-- **Prod DB:** Phase A circles schema + RLS recursion hotfix + Phase B SQL helpers + Phase C strip RPCs (**`20260429120000`**, **`20260430120000`**) + **`20260501120000_watchlist_source_circle_id.sql`** (`watchlist.source_circle_id`). Apply **`20260506120000_circles_strip_recent_activity.sql`** when ready (strip ordering + **`rated_at`** on score change). Apply **`20260522120000_circles_rated_all_top_grid.sql`** for **All** / **Top** grids.
+- **`package.json` version:** **`5.6.0`** — circle feeds use **`rating_circle_shares`** (published titles only); see **`CHANGELOG.md`** and **`PASSDOWN-NEXT-CHAT.md`**.
+- **Prod DB:** Circles schema through strip/grids + watchlist + **rating publish** — ensure **`20260524120000_rating_circle_shares.sql`** is applied (feeds join through shares; leave-circle trigger clears shares for that member+circle). Earlier migrations as in repo / **`PASSDOWN-NEXT-CHAT.md`** checklist.
 - **Edge functions:** `send-circle-invite`, `accept-circle-invite`, and **`get-circle-rated-titles`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`).
 
 ---
@@ -43,7 +43,9 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 | RLS hotfix (helpers) | `supabase/migrations/20260423120000_circles_rls_recursion_fix.sql` |
 | Phase B RPCs | `supabase/migrations/20260424120000_circles_phase_b_helpers.sql`. Optional: `20260425120000_circles_resolve_email_grant_service_role.sql` (grant-only if DB predates grant line) |
 | Edge: invite send/accept / strip | `supabase/functions/send-circle-invite/index.ts`, `supabase/functions/accept-circle-invite/index.ts`, `supabase/functions/get-circle-rated-titles/index.ts` |
+| Circle publish (per-group visibility) | `supabase/migrations/20260524120000_rating_circle_shares.sql`; **`syncRatingCircleShares`** / **`fetchRatingCircleShareIds`** in `src/circles.js` |
 | Product spec | `Architechture/cinemastro-circles-requirements.md` (path spelling as in repo) |
+| Account security roadmap | `ACCOUNT-SECURITY.md` — OAuth, CAPTCHA, optional phone, duplicate-account posture |
 
 **Supabase project ref:** `lovpktgeutujljltlhdl`
 
@@ -65,13 +67,32 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 
 7. **Circle invite → non-user email** — When an invite is sent to an address **with no Cinematch account**, deliver an email that asks them to **join Cinematch** (in addition to or as the path for accepting the circle invite — product detail TBD).
 
-8. **Signup verification — mobile phone** — When a user joins Cinematch, use **phone number verification** to reduce **multiple accounts** for the same person.
+8. **Tightening account security** — See **`ACCOUNT-SECURITY.md`**. **Likely path:** **Sign in with Apple / Google** plus **CAPTCHA** on signup. **Optional stronger anchor:** **phone verification** (Supabase Auth + SMS provider) to further reduce duplicate accounts used for ratings.
 
 9. **Ratings — Bayesian normalization** — Apply a **Bayesian** (or Bayesian-style) formula to **normalize** ratings (design + where in pipeline TBD).
 
-10. **Circle — quick rate pill** — Inside a circle, a **pill** (or entry point) for the user to **add a rating** for a movie/show; once added, it **propagates** to **all their groups** (shared rating graph behavior — align with existing rating flows).
+10. **Circle — quick rate pill** — Inside a circle, a **pill** to rate via Discover/detail; after rating, use the same **publish to circles** flow (defaults can include this circle). Global **`ratings`** row; visibility per **`rating_circle_shares`** (**5.6.0**).
 
 11. ~~**Circles — strip tabs on circle detail**~~ **Done in 5.5.15:** **Recent** / **All** / **Top** (see `CHANGELOG.md`). Possible follow-up: rename **Top** copy, combine **Most rated** (by count) if product wants both.
+
+---
+
+## Circle rating publish (shipped **5.6.0**)
+
+**Spec:** One **`ratings`** row per user per title. **`rating_circle_shares`** controls which circles show that pick. Leaving a circle deletes shares for `(user, circle)` via trigger on **`circle_members`** delete. No historical backfill.
+
+| Phase | Status |
+|--------|--------|
+| 1 — DB table **`rating_circle_shares`**, RLS, indexes | Done — **`supabase/migrations/20260524120000_rating_circle_shares.sql`** |
+| 2 — RPCs strip / all / top join through shares | Done — same migration |
+| 3 — Edge **`get-circle-rated-titles`** | N/A (calls RPCs only); redeploy optional |
+| 4 — Client publish modal + **`syncRatingCircleShares`** / **`fetchRatingCircleShareIds`** | Done — **`src/App.jsx`**, **`src/circles.js`** |
+| 5 — Leave circle cleanup | Done — DB trigger (+ copy update on leave confirm) |
+| 6 — QA / edge cases | Ongoing |
+
+**Apply on prod:** run migration **`20260524120000_rating_circle_shares.sql`**.
+
+**Follow-ups:** In-circle **quick rate** pill (item 10 above) should open the same publish flow; optional inline multi-select before submit from circle detail.
 
 ---
 
@@ -92,6 +113,6 @@ git status && git log -5 --oneline
 grep '"version"' package.json
 ```
 
-Expected version line: match **`package.json`** / **`CHANGELOG.md`** (e.g. **`5.5.15`**); next minor feature wave may target **`5.6.0`**.
+Expected version line: match **`package.json`** / **`CHANGELOG.md`** (currently **`5.6.0`**).
 
 If this file overwrote older notes, recover the previous text with: `git show HEAD~1:HANDOFF.md` (adjust `HEAD~1` if needed).

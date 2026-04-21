@@ -1,13 +1,15 @@
 # Passdown — next chat (Cinematch Circles + watchlist)
 
-Attach **`@PASSDOWN.md`** for **this doc** (thread context + what shipped recently). Use **`@HANDOFF.md`** for standing rules, version bumps, architecture, and the global “what’s next” list.
+**Prefer [`PASSDOWN-NEXT-CHAT.md`](PASSDOWN-NEXT-CHAT.md)** for the live session snapshot (version, migrations, prod notes). This file is a longer historical note; the version line below must match **`package.json`**.
+
+Attach **`@PASSDOWN.md`** only if you rely on the narrative below. Use **`@HANDOFF.md`** for standing rules, architecture, and the global “what’s next” list.
 
 ---
 
 ## Repo version
 
-- **`package.json`:** **5.5.0** — `watchlist.source_circle_id` + Profile watchlist **Group** label; Circles strip + Circle info (see below).
-- **Next bump:** **5.6.0** when Phase D, Phase E, or the next **feature** ships — include **`CHANGELOG.md`** in that release commit (not docs-only commits).
+- **`package.json`:** **5.6.0** — circle **rating publish** (`rating_circle_shares`); see **`CHANGELOG.md`** and **`PASSDOWN-NEXT-CHAT.md`**.
+- **Next bump:** follow repo convention — bump **`package.json`** + **`CHANGELOG.md`** together when the next feature ships.
 
 ---
 
@@ -100,6 +102,6 @@ grep '"version"' package.json
 git status && git log -3 --oneline
 ```
 
-Expected: **`"version": "5.5.0"`**.
+Expected: **`"version": "5.6.0"`** (always match **`package.json`**).
 
 If this file overwrote older notes: `git show HEAD~1:PASSDOWN.md` (adjust `HEAD~n` as needed).
