@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.5.23
+
+- **Watchlist ⋯ menu.** Dropdown is **vertically centered** on the row (was opening above the button and clipping under the header). **`z-index: 2190`** so it paints above **primary nav** / drawer while staying below Circles sheet/modal layers.
+
+## 5.5.22
+
+- **Circles — Ratings tabs (Recent / All / Top).** Fixed **active tab label** contrast on **iOS Safari**: sticky **`:hover`** no longer overrides **`color`** on the selected tab (hover only applies to inactive tabs). Active rule uses **two-class** specificity; tabs use **`appearance: none`** and narrower **`transition`** props to avoid native button / transition glitches.
+
 ## 5.5.21
 
 - **Watchlist ⋯ menu.** Reorder actions: **⇈ Top**, **↑ Up**, **↓ Down**, **⇊ Bottom** (with **Details** and **Remove**). Top/bottom use a new **`sort_index`** above/below the current extremes; up/down swap with the adjacent row (same as before for **Up**).
