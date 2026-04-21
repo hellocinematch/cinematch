@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.5.16
+
+- **Navigation — Watchlist in bottom bar.** The bottom nav **center** slot is now **Watchlist** (list icon + label when active). Community / ratings counts are removed from the bottom bar (can be restored elsewhere later). New **`watchlist`** screen shows the same list as Profile’s watchlist. **Title detail** includes the bottom bar so Watchlist is reachable from detail; switching tab clears the detail overlay when needed.
+
 ## 5.5.15
 
 - **Circles — Ratings tabs on circle detail.** **Ratings** row with **Recent** (horizontal strip, unchanged cap/behavior), **All** (Discover-style **3-column** grid, **10** titles per page + **More**), and **Top** (same grid, sorted by **highest circle average** with ties by rater count then recency, **max 25** titles + **More**). Edge **`get-circle-rated-titles`** accepts **`view`**: `recent` | `all` | `top`. New RPCs: **`get_circle_rated_all_grid`**, **`get_circle_rated_top_grid`**. Migration: **`supabase/migrations/20260522120000_circles_rated_all_top_grid.sql`** (apply on Supabase). Redeploy Edge **`get-circle-rated-titles`**.

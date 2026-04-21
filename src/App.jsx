@@ -307,7 +307,7 @@ const SPA_QS_DETAIL = "detail";
 const SPA_QS_LEGAL = "legal";
 const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about"]);
 /** Only hydrate `?detail=` / `?legal=` after primary nav is up — avoids racing splash/auth/onboarding. */
-const SPA_DEEPLINK_READY_SCREENS = new Set(["circles", "pulse", "in-theaters", "streaming-page", "secondary-region", "your-picks", "discover", "profile", "rated", "mood-results"]);
+const SPA_DEEPLINK_READY_SCREENS = new Set(["circles", "pulse", "in-theaters", "streaming-page", "secondary-region", "your-picks", "discover", "profile", "watchlist", "rated", "mood-results"]);
 
 /** One overlay at a time: title id (`movie-769`) or legal screen id (`privacy`). */
 function spaUrlForOverlay(overlay) {
@@ -1252,6 +1252,14 @@ const MOOD_CARDS = [
   }
 ];
 
+function BottomNavListIcon() {
+  return (
+    <svg className="bottom-nav-list-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function BottomNav({
   navTab,
   setNavTab,
@@ -1259,9 +1267,8 @@ function BottomNav({
   setMoodStep,
   setMoodSelections,
   setMoodResults,
-  community,
-  ratings,
   onSignOut,
+  clearDetailForBottomNav,
 }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileNavRef = useRef(null);
@@ -1282,6 +1289,7 @@ function BottomNav({
       <div
         className={`nav-item ${navTab === "mood" ? "active" : ""}`}
         onClick={() => {
+          clearDetailForBottomNav?.();
           setProfileMenuOpen(false);
           setNavTab("mood");
           setMoodStep(0);
@@ -1293,8 +1301,31 @@ function BottomNav({
         <div className="nav-icon">🎭</div>
         {navTab === "mood" && <div className="nav-label">Mood</div>}
       </div>
-      <div className="bottom-nav__stats">
-        <PublicSiteStats community={community} ratings={ratings} />
+      <div
+        className={`nav-item ${navTab === "watchlist" ? "active" : ""}`}
+        role="button"
+        tabIndex={0}
+        aria-label="Watchlist"
+        onClick={() => {
+          clearDetailForBottomNav?.();
+          setProfileMenuOpen(false);
+          setNavTab("watchlist");
+          setScreen("watchlist");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            clearDetailForBottomNav?.();
+            setProfileMenuOpen(false);
+            setNavTab("watchlist");
+            setScreen("watchlist");
+          }
+        }}
+      >
+        <div className="nav-icon nav-icon--svg">
+          <BottomNavListIcon />
+        </div>
+        {navTab === "watchlist" ? <div className="nav-label">Watchlist</div> : null}
       </div>
       <div
         ref={profileNavRef}
@@ -1312,6 +1343,7 @@ function BottomNav({
               type="button"
               className="avatar-menu-btn"
               onClick={() => {
+                clearDetailForBottomNav?.();
                 setProfileMenuOpen(false);
                 setNavTab("profile");
                 setScreen("profile");
@@ -2106,11 +2138,9 @@ const styles = `
   .empty-text { font-size:13px; color:#444; }
 
   .bottom-nav { position:fixed; bottom:0; left:0; right:0; margin-left:auto; margin-right:auto; width:100%; max-width:var(--shell); box-sizing:border-box; background:rgba(10,10,10,0.95); border-top:1px solid #1a1a1a; display:flex; align-items:flex-end; justify-content:space-between; gap:6px; padding:10px 8px calc(18px + env(safe-area-inset-bottom,0px)); padding-left:max(8px, env(safe-area-inset-left,0px)); padding-right:max(8px, env(safe-area-inset-right,0px)); backdrop-filter:blur(20px); z-index:100; }
-  .bottom-nav__stats { flex:0 1 auto; min-width:0; display:flex; align-items:center; justify-content:center; align-self:center; padding:0 2px; max-width:42%; }
-  .bottom-nav__stats .public-site-stats { flex-direction:row; flex-wrap:wrap; gap:6px 12px; justify-content:center; padding:0; }
-  .bottom-nav__stats .public-site-stats-row { gap:4px; }
-  .bottom-nav__stats .public-site-stats-val { font-size:10px; }
-  .bottom-nav__stats .public-site-stats-lbl { font-size:7px; }
+  .nav-icon--svg { display:flex; align-items:center; justify-content:center; color:#c9c9c9; }
+  .nav-item.active .nav-icon--svg { color:#e8c96a; }
+  .bottom-nav-list-svg { display:block; }
   .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; opacity:0.4; transition:opacity 0.2s; min-width:0; }
   .nav-item--profile { position:relative; }
   .nav-item.active { opacity:1; }
@@ -2562,6 +2592,9 @@ const styles = `
   .settings-genre-action-btn { background:#1a1a1a; color:#888; border:1px solid #2a2a2a; padding:8px 14px; font-size:12px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.2s; }
   .settings-genre-action-btn:hover { border-color:#555; color:#ccc; }
   .profile-watchlist-section { padding:0 0 8px; }
+  .watchlist-page-intro { padding:8px 24px 4px; }
+  .watchlist-page-intro .discover-title { margin:0; }
+  .watchlist-page-intro .section-meta { margin-top:6px; color:#666; font-size:12px; }
   .wl-from-group { font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#6a6a6a; margin-top:4px; font-weight:600; }
   .stat-box { background:#141414; border:1px solid #1e1e1e; border-radius:12px; padding:16px; text-align:center; }
   .stat-box-clickable { cursor:pointer; transition:border-color 0.2s, background 0.2s; }
@@ -6220,7 +6253,15 @@ export default function App() {
     setDetailEditRating(false);
     setSelected(null);
     // navTab === "home" is the idle bottom-nav sentinel; the landing screen is now "circles".
-    setScreen(navTab === "mood" ? "mood-results" : navTab === "home" ? "circles" : navTab);
+    setScreen(
+      navTab === "mood"
+        ? "mood-results"
+        : navTab === "home"
+          ? "circles"
+          : navTab === "watchlist"
+            ? "watchlist"
+            : navTab,
+    );
   }
 
   function openLegalPage(target) {
@@ -6914,6 +6955,7 @@ export default function App() {
     "secondary-region",
     "discover",
     "profile",
+    "watchlist",
     "rated",
     "mood-picker",
     "mood-results",
@@ -7405,9 +7447,8 @@ export default function App() {
     setMoodStep,
     setMoodSelections,
     setMoodResults,
-    community: siteStats?.community,
-    ratings: siteStats?.ratings,
     onSignOut: handleSignOut,
+    clearDetailForBottomNav: clearDetailOverlayToNavigate,
   };
 
   function AccountAvatarMenu() {
@@ -9650,6 +9691,53 @@ export default function App() {
         </div>
       )}
 
+      {screen === "watchlist" && (
+        <div className="profile">
+          <div className="page-topbar">
+            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
+            <div />
+            <AccountAvatarMenu />
+          </div>
+          <div className="watchlist-page-intro">
+            <div className="discover-title">Watchlist</div>
+            <div className="section-meta">
+              {watchlist.length} {watchlist.length === 1 ? "title" : "titles"}
+            </div>
+          </div>
+          <div className="section profile-watchlist-section">
+            {watchlist.length === 0 ? (
+              <div className="empty-box">
+                <div className="empty-text">Save titles from detail to watch later</div>
+              </div>
+            ) : (
+              <div className="strip">
+                {watchlist.map((m) => (
+                  <div className="wl-card" key={m.id} onClick={() => openDetail(m, recMap[m.id])}>
+                    <div className="wl-poster">
+                      {m.poster ? (
+                        <img src={m.poster} alt={m.title} />
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 36 }}>
+                          🎬
+                        </div>
+                      )}
+                    </div>
+                    <div className="strip-title">{m.title}</div>
+                    {m.fromGroup ? <div className="wl-from-group">Group</div> : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <AppFooter
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+            onAbout={() => openLegalPage("about")}
+          />
+          <BottomNav {...navProps} />
+        </div>
+      )}
+
       {screen === "privacy" && (
         <Suspense fallback={<LegalLazyFallback />}>
           <LegalPagePrivacy onBack={closeLegalPage} />
@@ -9919,6 +10007,7 @@ export default function App() {
                 </div>
               </div>
             </div>
+            <BottomNav {...navProps} />
           </div>
         );
         })()}
