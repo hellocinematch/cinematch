@@ -335,6 +335,8 @@ const WHATS_HOT_FETCH_DEFER_MS = 450;
 const SECONDARY_STRIP_FETCH_DEFER_MS = 550;
 /** Streaming page TMDB fetch: short defer after route paint. */
 const STREAMING_PAGE_FETCH_DEFER_MS = 200;
+/** Max titles per user watchlist (keep in sync with migration `enforce_watchlist_max_per_user`). */
+const WATCHLIST_MAX = 30;
 
 function getRegionLanguageCodes(regionKeys) {
   if (!Array.isArray(regionKeys) || regionKeys.length === 0) return [];
@@ -2137,6 +2139,59 @@ const styles = `
   .strip::-webkit-scrollbar { display:none; }
   .strip-card { flex-shrink:0; width:152px; cursor:pointer; transition:transform 0.2s; }
   .strip-card:hover { transform:translateY(-3px); }
+  .strip-card--circle-recent { position:relative; }
+  .strip-card__menu-btn {
+    position:absolute;
+    top:4px;
+    right:2px;
+    z-index:4;
+    width:32px;
+    height:32px;
+    border:none;
+    border-radius:10px;
+    background:rgba(10,10,10,0.65);
+    color:#ccc;
+    font-size:18px;
+    line-height:1;
+    cursor:pointer;
+    padding:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'DM Sans',sans-serif;
+  }
+  .strip-card__menu-btn:hover { background:rgba(0,0,0,0.85); color:#fff; }
+  .circle-recent-strip-menu {
+    position:absolute;
+    top:38px;
+    right:2px;
+    z-index:2200;
+    min-width:188px;
+    max-width:min(100vw - 24px, 260px);
+    background:#141414;
+    border:1px solid #2a2a2a;
+    border-radius:10px;
+    box-shadow:0 10px 28px rgba(0,0,0,0.45);
+    padding:4px;
+  }
+  .circle-recent-strip-menu__item {
+    display:block;
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
+    color:#e8c96a;
+    font-size:13px;
+    font-family:'DM Sans',sans-serif;
+    padding:10px 12px;
+    border-radius:6px;
+    cursor:pointer;
+  }
+  .circle-recent-strip-menu__item:hover:not(:disabled) { background:rgba(232, 201, 106, 0.08); }
+  .circle-recent-strip-menu__item:disabled { opacity:0.5; cursor:default; color:#666; }
+  .circle-recent-strip-menu__item + .circle-recent-strip-menu__item { border-top:1px solid #222; }
+  .circle-recent-strip-menu__item--danger { color:#e8a0a0 !important; }
+  .circle-recent-strip-menu__item--danger:hover:not(:disabled) { background:rgba(224,80,80,0.08); }
   .strip-poster { width:152px; height:212px; border-radius:12px; overflow:hidden; position:relative; border:1px solid #1e1e1e; background:#1a1a1a; }
   .strip-poster img { width:100%; height:100%; object-fit:cover; }
   .strip-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:40px; }
@@ -2311,7 +2366,8 @@ const styles = `
   .mood-result-synopsis { font-size:12px; color:#777; margin-top:8px; line-height:1.5; }
   .mood-result-actions { display:flex; gap:8px; margin-top:12px; }
   .btn-select-watch { flex:2; background:#e8c96a; color:#0a0a0a; border:none; padding:12px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; cursor:pointer; border-radius:2px; transition:all 0.2s; }
-  .btn-select-watch:hover { background:#f0d880; }
+  .btn-select-watch:hover:not(:disabled) { background:#f0d880; }
+  .btn-select-watch:disabled { opacity:0.45; cursor:not-allowed; }
   .btn-select-watch.selected { background:#2a4a1a; color:#6aaa6a; border:1px solid #2a4a2a; }
   .btn-detail { flex:1; background:transparent; color:#888; border:1px solid #2a2a2a; padding:12px; font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; border-radius:2px; transition:all 0.2s; }
   .btn-detail:hover { border-color:#555; color:#ccc; }
@@ -2614,6 +2670,7 @@ const styles = `
   .btn-full-gold:not(:disabled):hover { background:#f0d880; }
   .btn-full-dark { background:#1a1a1a; color:#ccc; border:1px solid #2a2a2a; }
   .btn-full-dark:hover { border-color:#555; }
+  .btn-full-dark:disabled { opacity:0.45; cursor:not-allowed; border-color:#2a2a2a; }
   .saved-style { background:#1a2a1a !important; color:#6aaa6a !important; border-color:#2a4a2a !important; }
   .rated-box { background:#141414; border:1px solid #2a4a2a; border-radius:12px; padding:20px; text-align:center; }
   .rated-score { font-family:'DM Serif Display',serif; font-size:48px; color:#e8c96a; }
@@ -3984,6 +4041,12 @@ export default function App() {
   const [publishModalError, setPublishModalError] = useState("");
   const [publishModalSelection, setPublishModalSelection] = useState(() => new Set());
   const [circleRatedRefreshKey, setCircleRatedRefreshKey] = useState(0);
+  /** Recent strip: which row key has the ⋯ / long-press menu open. */
+  const [circleRecentStripMenuRowKey, setCircleRecentStripMenuRowKey] = useState(null);
+  const circleRecentStripLongPressTimerRef = useRef(null);
+  const circleRecentStripLongPressStartRef = useRef({ x: 0, y: 0 });
+  const circleRecentStripSuppressClickRef = useRef(false);
+  const [circleStripUnpublishBusy, setCircleStripUnpublishBusy] = useState(false);
   const [showCircleInfoSheet, setShowCircleInfoSheet] = useState(false);
   /** `user_id` → display name for Circle info sheet (`get_circle_member_names` RPC + profiles fallback). */
   const [circleInfoNamesById, setCircleInfoNamesById] = useState({});
@@ -7516,6 +7579,39 @@ export default function App() {
     };
   }, [watchlistRowMenuId]);
 
+  useEffect(() => {
+    if (!circleRecentStripMenuRowKey) return;
+    const close = () => setCircleRecentStripMenuRowKey(null);
+    const t = window.setTimeout(() => window.addEventListener("click", close), 0);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("click", close);
+    };
+  }, [circleRecentStripMenuRowKey]);
+
+  useEffect(() => {
+    if (!circleRecentStripMenuRowKey) return;
+    const el = circleRecentStripRef.current;
+    if (!el) return;
+    const onScroll = () => setCircleRecentStripMenuRowKey(null);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [circleRecentStripMenuRowKey]);
+
+  useEffect(() => {
+    setCircleRecentStripMenuRowKey(null);
+  }, [selectedCircleId, circleRatingsView, screen]);
+
+  useEffect(
+    () => () => {
+      if (circleRecentStripLongPressTimerRef.current != null) {
+        window.clearTimeout(circleRecentStripLongPressTimerRef.current);
+        circleRecentStripLongPressTimerRef.current = null;
+      }
+    },
+    [],
+  );
+
   const watchlistDisplay = useMemo(() => {
     return [...watchlist].sort((a, b) => (a.sort_index ?? 0) - (b.sort_index ?? 0));
   }, [watchlist]);
@@ -7568,13 +7664,52 @@ export default function App() {
     setScreen(legal);
   }, [screen]);
 
-  async function toggleWatchlist(movie) {
+  function clearCircleRecentStripLongPressTimer() {
+    if (circleRecentStripLongPressTimerRef.current != null) {
+      window.clearTimeout(circleRecentStripLongPressTimerRef.current);
+      circleRecentStripLongPressTimerRef.current = null;
+    }
+  }
+
+  async function unpublishTitleFromCircleStrip(movieId) {
+    if (!selectedCircleId || !user) return;
+    setCircleStripUnpublishBusy(true);
+    try {
+      const ids = await fetchRatingCircleShareIds(movieId);
+      const next = ids.filter((id) => id !== selectedCircleId);
+      await syncRatingCircleShares(movieId, next);
+      setCircleRecentStripMenuRowKey(null);
+      setCircleRatedRefreshKey((k) => k + 1);
+    } catch (e) {
+      setInviteToast({
+        tone: "warn",
+        text: e?.message || "Could not remove from this circle.",
+      });
+    } finally {
+      setCircleStripUnpublishBusy(false);
+    }
+  }
+
+  async function toggleWatchlist(movie, opts = {}) {
+    const skipGoBack = opts.skipGoBack === true;
+    const circleIdForSource =
+      opts.circleIdForSource != null ? opts.circleIdForSource : null;
     const alreadySaved = watchlist.find(m => m.id === movie.id);
     const fromCircleContext =
-      detailReturnScreenRef.current === "circle-detail" && selectedCircleId;
-    const sourceCircleId = fromCircleContext ? selectedCircleId : null;
+      circleIdForSource != null
+        ? Boolean(circleIdForSource)
+        : detailReturnScreenRef.current === "circle-detail" && selectedCircleId;
+    const sourceCircleId =
+      circleIdForSource != null ? circleIdForSource : (fromCircleContext ? selectedCircleId : null);
 
     if (user && !alreadySaved) {
+      if (watchlist.length >= WATCHLIST_MAX) {
+        setInviteToast({
+          tone: "warn",
+          text: `Watchlist is full (${WATCHLIST_MAX} titles). Remove one to add more.`,
+        });
+        return;
+      }
       const [type, tmdbId] = movie.id.split("-");
       const tid = parseInt(tmdbId, 10);
       const { data: rows } = await supabase
@@ -7593,6 +7728,14 @@ export default function App() {
         sort_index: nextSort,
       };
       if (sourceCircleId) row.source_circle_id = sourceCircleId;
+      const { error: insertErr } = await supabase.from("watchlist").insert(row);
+      if (insertErr) {
+        setInviteToast({
+          tone: "warn",
+          text: insertErr.message || "Could not add to watchlist.",
+        });
+        return;
+      }
       setWatchlist((w) => [
         ...w,
         {
@@ -7602,8 +7745,7 @@ export default function App() {
           sort_index: nextSort,
         },
       ]);
-      await supabase.from("watchlist").insert(row);
-      setTimeout(() => goBack(), 1000);
+      if (!skipGoBack) setTimeout(() => goBack(), 1000);
       return;
     }
 
@@ -7611,6 +7753,14 @@ export default function App() {
       const [type, tmdbId] = movie.id.split("-");
       setWatchlist((w) => w.filter((m) => m.id !== movie.id));
       await supabase.from("watchlist").delete().eq("user_id", user.id).eq("tmdb_id", parseInt(tmdbId, 10)).eq("media_type", type);
+      return;
+    }
+
+    if (!alreadySaved && watchlist.length >= WATCHLIST_MAX) {
+      setInviteToast({
+        tone: "warn",
+        text: `Watchlist is full (${WATCHLIST_MAX} titles). Remove one to add more.`,
+      });
       return;
     }
 
@@ -7627,7 +7777,7 @@ export default function App() {
             },
           ],
     );
-    if (!alreadySaved) {
+    if (!alreadySaved && !skipGoBack) {
       setTimeout(() => goBack(), 1000);
     }
   }
@@ -8059,9 +8209,17 @@ export default function App() {
   }
 
   function selectToWatch(movieId) {
-    setSelectedToWatch(prev => ({ ...prev, [movieId]: !prev[movieId] }));
-    const movie = catalogue.find(m => m.id === movieId) || moodResults.find(r => r.movie.id === movieId)?.movie;
-    if (movie && !watchlist.find(m => m.id === movieId)) toggleWatchlist(movie);
+    const movie = catalogue.find(m => m.id === movieId) || moodResults.find((r) => r.movie.id === movieId)?.movie;
+    const inWl = watchlist.some((m) => m.id === movieId);
+    if (movie && !inWl && watchlist.length >= WATCHLIST_MAX) {
+      setInviteToast({
+        tone: "warn",
+        text: `Watchlist is full (${WATCHLIST_MAX} titles). Remove one to add more.`,
+      });
+      return;
+    }
+    setSelectedToWatch((prev) => ({ ...prev, [movieId]: !prev[movieId] }));
+    if (movie && !inWl) void toggleWatchlist(movie);
   }
 
   const inWatchlist = (id) => watchlist.some(m => m.id === id);
@@ -8703,14 +8861,62 @@ export default function App() {
                         </div>
                       );
                     }
+                    const inWatchlist = Boolean(watchlist.find((m) => m.id === movie.id));
+                    const hasUserRating = userRatings[movie.id] != null;
+                    const userPublishedHere =
+                      row.viewer_score != null && Number.isFinite(Number(row.viewer_score));
+                    const onStripCardPointerDown = (e) => {
+                      if (e.button !== 0) return;
+                      const el = e.target;
+                      if (el.closest?.(".strip-card__menu-btn")) return;
+                      if (el.closest?.(".circle-recent-strip-menu")) return;
+                      circleRecentStripLongPressStartRef.current = { x: e.clientX, y: e.clientY };
+                      clearCircleRecentStripLongPressTimer();
+                      circleRecentStripLongPressTimerRef.current = window.setTimeout(() => {
+                        circleRecentStripLongPressTimerRef.current = null;
+                        circleRecentStripSuppressClickRef.current = true;
+                        setCircleRecentStripMenuRowKey(rowKey);
+                      }, 520);
+                    };
+                    const onStripCardPointerMove = (e) => {
+                      if (circleRecentStripLongPressTimerRef.current == null) return;
+                      const { x, y } = circleRecentStripLongPressStartRef.current;
+                      const dx = e.clientX - x;
+                      const dy = e.clientY - y;
+                      if (dx * dx + dy * dy > 100) {
+                        clearCircleRecentStripLongPressTimer();
+                      }
+                    };
+                    const onStripCardPointerEnd = () => {
+                      clearCircleRecentStripLongPressTimer();
+                    };
+                    const openStripMenu = (e) => {
+                      e.stopPropagation();
+                      setCircleRecentStripMenuRowKey((k) => (k === rowKey ? null : rowKey));
+                    };
+                    const closeStripMenu = () => setCircleRecentStripMenuRowKey(null);
                     return (
                       <div
-                        className="strip-card"
+                        className="strip-card strip-card--circle-recent"
                         key={rowKey}
                         ref={isNewest ? circleRecentNewestRef : null}
                         role="button"
                         tabIndex={0}
-                        onClick={() => openDetail(movie, predDetail)}
+                        onPointerDown={onStripCardPointerDown}
+                        onPointerMove={onStripCardPointerMove}
+                        onPointerUp={onStripCardPointerEnd}
+                        onPointerLeave={onStripCardPointerEnd}
+                        onPointerCancel={onStripCardPointerEnd}
+                        onClick={(e) => {
+                          const el = e.target;
+                          if (el.closest?.(".strip-card__menu-btn")) return;
+                          if (el.closest?.(".circle-recent-strip-menu")) return;
+                          if (circleRecentStripSuppressClickRef.current) {
+                            circleRecentStripSuppressClickRef.current = false;
+                            return;
+                          }
+                          openDetail(movie, predDetail);
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
@@ -8718,6 +8924,92 @@ export default function App() {
                           }
                         }}
                       >
+                        <button
+                          type="button"
+                          className="strip-card__menu-btn"
+                          aria-label="Title actions"
+                          aria-haspopup="true"
+                          aria-expanded={circleRecentStripMenuRowKey === rowKey}
+                          onClick={openStripMenu}
+                        >
+                          ⋯
+                        </button>
+                        {circleRecentStripMenuRowKey === rowKey ? (
+                          <div
+                            className="circle-recent-strip-menu"
+                            role="menu"
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              className="circle-recent-strip-menu__item"
+                              role="menuitem"
+                              onClick={() => {
+                                closeStripMenu();
+                                openDetail(movie, predDetail);
+                              }}
+                            >
+                              Details
+                            </button>
+                            <button
+                              type="button"
+                              className="circle-recent-strip-menu__item"
+                              role="menuitem"
+                              onClick={() => {
+                                closeStripMenu();
+                                if (hasUserRating) {
+                                  openDetail(movie, predDetail, { startEditing: true });
+                                } else {
+                                  openDetail(movie, predDetail);
+                                }
+                              }}
+                            >
+                              {hasUserRating ? "Rerate" : "Rate"}
+                            </button>
+                            <button
+                              type="button"
+                              className="circle-recent-strip-menu__item"
+                              role="menuitem"
+                              disabled={!inWatchlist && watchlist.length >= WATCHLIST_MAX}
+                              onClick={() => {
+                                closeStripMenu();
+                                void toggleWatchlist(movie, {
+                                  skipGoBack: true,
+                                  circleIdForSource: selectedCircleId,
+                                });
+                              }}
+                            >
+                              {inWatchlist ? "Delete from watchlist" : "Add to watchlist"}
+                            </button>
+                            {hasUserRating ? (
+                              <button
+                                type="button"
+                                className="circle-recent-strip-menu__item"
+                                role="menuitem"
+                                onClick={() => {
+                                  closeStripMenu();
+                                  setPublishRatingModal({ movieId: movie.id, mode: "manage" });
+                                }}
+                              >
+                                Forward
+                              </button>
+                            ) : null}
+                            {userPublishedHere ? (
+                              <button
+                                type="button"
+                                className="circle-recent-strip-menu__item circle-recent-strip-menu__item--danger"
+                                role="menuitem"
+                                disabled={circleStripUnpublishBusy}
+                                onClick={() => {
+                                  void unpublishTitleFromCircleStrip(movie.id);
+                                }}
+                              >
+                                {circleStripUnpublishBusy ? "Removing…" : "Remove from circle"}
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="strip-poster">
                           {movie.poster ? (
                             <img src={movie.poster} alt="" />
@@ -10182,7 +10474,14 @@ export default function App() {
                     <div className="mood-result-synopsis">{(rec.movie.synopsis || "").slice(0, 100)}…</div>
                     <div className="mood-result-actions">
                       <button
+                        type="button"
                         className={`btn-select-watch ${(inWatchlist(rec.movie.id) || selectedToWatch[rec.movie.id]) ? "selected" : ""}`}
+                        disabled={!inWatchlist(rec.movie.id) && watchlist.length >= WATCHLIST_MAX}
+                        title={
+                          !inWatchlist(rec.movie.id) && watchlist.length >= WATCHLIST_MAX
+                            ? `Watchlist full (${WATCHLIST_MAX}). Remove a title first.`
+                            : undefined
+                        }
                         onClick={() => selectToWatch(rec.movie.id)}
                       >
                         {(inWatchlist(rec.movie.id) || selectedToWatch[rec.movie.id]) ? "✓ In Watchlist" : "🎬 Select to Watch"}
@@ -10302,7 +10601,9 @@ export default function App() {
           <div className="section profile-watchlist-section">
             <div className="section-header">
               <div className="section-title">📌 Watchlist</div>
-              <div className="section-meta">{watchlist.length} {watchlist.length === 1 ? "title" : "titles"}</div>
+              <div className="section-meta">
+                {watchlist.length} / {WATCHLIST_MAX} {watchlist.length === 1 ? "title" : "titles"}
+              </div>
             </div>
             {watchlist.length === 0 ? (
               <div className="empty-box"><div className="empty-text">Save titles from detail to watch later</div></div>
@@ -10418,7 +10719,7 @@ export default function App() {
           <div className="watchlist-page-intro">
             <div className="discover-title">Watchlist</div>
             <div className="section-meta">
-              {watchlist.length} {watchlist.length === 1 ? "title" : "titles"}
+              {watchlist.length} / {WATCHLIST_MAX} {watchlist.length === 1 ? "title" : "titles"}
             </div>
           </div>
           <div className="section profile-watchlist-section">
@@ -10835,8 +11136,17 @@ export default function App() {
                           onClick={() => { void addRating(movie.id, detailRating, { pendingNavigate: "back", navigateDelayMs: 800 }); }}>
                           Submit Rating
                         </button>
-                        <button className={`btn-full btn-full-dark ${inWatchlist(movie.id) ? "saved-style" : ""}`}
-                          onClick={() => toggleWatchlist(movie)}>
+                        <button
+                          type="button"
+                          className={`btn-full btn-full-dark ${inWatchlist(movie.id) ? "saved-style" : ""}`}
+                          disabled={!inWatchlist(movie.id) && watchlist.length >= WATCHLIST_MAX}
+                          title={
+                            !inWatchlist(movie.id) && watchlist.length >= WATCHLIST_MAX
+                              ? `Watchlist full (${WATCHLIST_MAX}). Remove a title first.`
+                              : undefined
+                          }
+                          onClick={() => toggleWatchlist(movie)}
+                        >
                           {inWatchlist(movie.id) ? "✓ Saved" : "+ Watchlist"}
                         </button>
                       </div>

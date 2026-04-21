@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.6.12
+
+- **Watchlist:** **30 titles max** per user (`WATCHLIST_MAX` in `App.jsx`). Adds are blocked with a toast when full; **+ Watchlist** (detail), **Select to Watch** (mood), and **Add to watchlist** (circle Recent menu) are disabled at cap. **Profile** and **Watchlist** screens show **count / 30**. Migration **`20260525120000_watchlist_max_30.sql`**: trims users over 30 (pre-launch), **`BEFORE INSERT`** trigger enforces the cap.
+
+## 5.6.11
+
+- **Circles — Recent strip:** **Long-press** (~520ms) or **⋯** opens a menu: **Details**, **Rate** / **Rerate**, **Add to watchlist** / **Delete from watchlist** (no navigate-away), **Forward** (opens **Circles for this title** when you’ve rated — publish to other circles), **Remove from circle** (only when **you** published here; unpublishes your share). Horizontal drag cancels long-press.
+
 ## 5.6.10
 
 - **Circles — All / Top:** After the **Circle** score, show **(n)** when the circle has **more than two members** and **n** members rated that title (`distinct_circle_raters`), matching the **Recent** strip’s rater-count rule.
