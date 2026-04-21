@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-20
+**Last updated:** 2026-04-22
 
 ---
 
@@ -41,12 +41,18 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Repo version & git
 
-- **`package.json`:** **5.5.15** — **`CHANGELOG.md`** through **5.5.15**. Profile shows **Cinemastro v…** via **`APP_VERSION`** (from `package.json` in `src/App.jsx`).
-- Confirm **`main` tip** with `git log -3 --oneline` after local commits. Recent **`main`** includes **v5.5.8–v5.5.15**: circle **Ratings** tabs — **Recent** (horizontal strip), **All** / **Top** (3-col grids, **More** pagination; Top cap **25**); migration **`20260522120000_circles_rated_all_top_grid.sql`** + redeploy **`get-circle-rated-titles`**. Older: **`20260506120000_circles_strip_recent_activity.sql`**, **`20260505120000_...`**, optional **`20260504120000_...`**.
+- **`package.json`:** **5.5.20** — **`CHANGELOG.md`** through **5.5.20**. Profile shows **Cinemastro v…** via **`APP_VERSION`** (from `package.json` in `src/App.jsx`).
+- Confirm **`main` tip** with `git log -3 --oneline` after local commits. **Watchlist (v5.5.17–5.5.20):** **Profile** drops duplicate **`page-topbar`**; **bottom nav** uses **circle highlight** (no text labels); **Watchlist** screen = **list + ⋯** (Details / Move up / Remove); **primary nav** menu includes **Watchlist**; **`sort_index`** on **`public.watchlist`** (migration **`20260523120000_watchlist_sort_index.sql`**) for cross-device order — **apply on Supabase**. Strip/list meta: **one line** (`Movie · year · TMDB · genre` when catalogue has data). Older: **v5.5.16** bottom nav Watchlist tab; **v5.5.15** Circles Ratings tabs + **`20260522120000_circles_rated_all_top_grid.sql`** + redeploy **`get-circle-rated-titles`**.
 
 ## Recent work (client — `src/App.jsx`)
 
-**Primary file:** `src/App.jsx` (inline `<style>{styles}</style>` for nav, detail, circles, etc.).
+**Primary file:** `src/App.jsx` (inline `<style>{styles}</style>` for nav, detail, circles, bottom nav, etc.).
+
+### Bottom navigation
+
+- **`BottomNav`:** **Mood** · **Watchlist** (center, list icon) · **Profile** (overflow: Profile / Sign out); **active** = **faded circle** behind icon (no labels). **No** community or ratings counts in the bottom bar.
+- **Screen `watchlist`:** **list rows** (not strip); **⋯** menu **Details / Move up / Remove**; order from **`sort_index`** (DB). **Profile** strip: horizontal **`wl-card`** + **Group** hint; meta from catalogue when available. **`primaryNavScreens`** + **`SPA_DEEPLINK_READY_SCREENS`** include **`watchlist`**.
+- **Detail:** **`BottomNav`** rendered inside **`.detail`** so Watchlist is reachable from title detail; **`clearDetailForBottomNav`** prop = **`clearDetailOverlayToNavigate`** for Mood, Watchlist, and Profile (menu → Profile).
 
 ### Title detail
 
@@ -64,10 +70,11 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 - **Invite:** **+ Invite more** lives in the **Circle info** modal (creator, active); **`openInviteSheet`** closes the info sheet first.
 - **Circle info modal:** **`get_circle_member_names`** RPC + `profiles` fallback when **`showCircleInfoSheet`** opens (`circleInfoNamesById`).
 
-### Circles — strip + “Rate a title”
+### Circles — Ratings tabs + “Rate a title”
 
 - **Ratings block:** Header **Ratings** with tabs **Recent** | **All** | **Top**. **Recent:** horizontal strip (skeleton + loaded). **All / Top:** 3-column grid (2 cols if viewport **≤360px**), Discover-style cards, **More** loads **10** more; **Top** max **25** titles. **Empty** copy unchanged for all tabs. **&lt;2 members** placeholder still **Rated in this circle** (gate copy).
 - **Cards:** **Recent** strip sorted by **most recent circle rating** (`last_at`). **Circle** avg for **every** title; **N rated** if circle **&gt;2 members**. **Solo** rows: **Cinemastro** under meta. Grids reuse the same score lines.
+- **Client fetch:** **`fetchCircleRatedTitles`** in **`src/circles.js`** — **`view`**: `recent` | `all` | `top`; **`CIRCLE_GRID_PAGE`**, **`CIRCLE_TOP_MAX`**.
 - **Rate a title:** Centered pill below the body (**`circle-rate-title-pill`**, active circles only). **`openDiscoverFromCircleForRating`** sets **`rateTitleReturnCircleIdRef`**; from **Discover**, **`openDetail`** forces **`detailReturnScreenRef`** → **`circle-detail`** so **Submit rating** / back returns to the same circle. **`useEffect` on `screen`** clears the ref when not on **discover** / **detail**. Cap-hint **Open Discover** uses the same handler.
 - **Create circle names:** **`validateCircleName`** in **`src/circles.js`** — 2–32 chars, letter-led charset (see Supabase migrations below).
 
@@ -78,14 +85,20 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 ### Detail / nav glue (stable)
 
 - **`"detail"`** in **`primaryNavScreens`**; **`clearDetailOverlayToNavigate()`** in **`navigatePrimarySection`** / **`onDiscover`**. **`AppPrimaryNav`**: **`onDetailBack={screen === "detail" ? goBack : undefined}`**.
+- **`goBack`:** when **`navTab === "watchlist"`**, restores **`screen`** to **`watchlist`** (not only mood / home / raw **`navTab`** for discover).
+
+## Recent work (`src/circles.js`)
+
+- **`fetchCircleRatedTitles({ circleId, limit, offset, view })`** — Edge **`get-circle-rated-titles`** + RPC fallback via **`get_circle_rated_strip`** / **`get_circle_rated_all_grid`** / **`get_circle_rated_top_grid`**.
 
 ## Recent work (Supabase / Circles / profiles)
 
+- **`20260523120000_watchlist_sort_index.sql`** — **`watchlist.sort_index`** (user list order). Apply on hosted DB for cross-device **Move up** / ordering.
 - **`20260503120000_get_circle_member_names.sql`** — **`get_circle_member_names(p_circle_id)`** — apply on hosted DB if missing.
-- **`20260522120000_circles_rated_all_top_grid.sql`** — **`get_circle_rated_all_grid`**, **`get_circle_rated_top_grid`** (Edge **`view`**).
+- **`20260522120000_circles_rated_all_top_grid.sql`** — **`get_circle_rated_all_grid`**, **`get_circle_rated_top_grid`** — apply on hosted DB; **redeploy** **`get-circle-rated-titles`** after changes.
 - **`20260506120000_circles_strip_recent_activity.sql`** — **`get_circle_rated_strip`** recent-activity ordering + **`group_rating`** for single rater + **`trg_ratings_bump_rated_at`** on **`ratings`** score updates.
-- **`20260505120000_circles_name_length_2_32.sql`** — **`circles.name`** length **2–32** (replaces legacy 1–40 check). Apply on hosted DB if not applied (existing rows must satisfy length before it succeeds).
-- **`20260504120000_profiles_name_not_null.sql`** — backfill + **`NOT NULL`** on **`profiles.name`** — optional; run when product is ready.
+- **`20260505120000_circles_name_length_2_32.sql`** — **`circles.name`** length **2–32**. Apply on hosted DB if not applied.
+- **`20260504120000_profiles_name_not_null.sql`** — optional **`profiles.name` NOT NULL** when product is ready.
 
 ## Neighbor CF + cron (unchanged thread)
 
@@ -116,7 +129,8 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Open / follow-ups
 
-- **Circles (full backlog):** **`HANDOFF.md`** “What’s next” — **edit name & info**, **watchlist on Circles main page** (layout TBD), **circle name on watchlist rows** (`source_circle_id`), **invite email for non-users**, **phone verification at signup**, **Bayesian rating normalization**. *Quick-rate from inside a circle* is partially covered by **Rate a title** (Discover + return); a slimmer **in-place** pill without leaving the circle is still backlog if desired.
+- **Circles (full backlog):** **`HANDOFF.md`** “What’s next” — **edit name & info**, **watchlist on Circles main page** (embedded list / layout still TBD; global **Watchlist** via bottom bar is done in **5.5.16**), **circle name on watchlist rows** (`source_circle_id`), **invite email for non-users**, **phone verification at signup**, **Bayesian rating normalization**. *Quick-rate from inside a circle* is partially covered by **Rate a title** (Discover + return); a slimmer **in-place** pill without leaving the circle is still backlog if desired.
+- **Marketing stats:** community / ratings counts can return in **top bar**, **About**, or onboarding — not currently in **bottom nav**.
 - **Cron:** audit **`jobs × limit`** vs eligible users; **`COMPUTE-NEIGHBORS-CRON.md`**.
 - **Nav (optional):** **`126px`** header / scrim offsets — **`App.jsx`**.
 - **Lint:** possible **`react-hooks/set-state-in-effect`** on **`AppPrimaryNav`** — pre-existing.

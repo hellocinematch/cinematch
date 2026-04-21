@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.5.20
+
+- **Watchlist strip / list meta.** Type, year, TMDB score, and genre are combined into **one line** under the title (e.g. `Movie · 2024 · TMDB 7.2 · Drama`); narrow strip cards still ellipsis when needed.
+
+## 5.5.19
+
+- **Watchlist order (database).** New column **`sort_index`** on **`public.watchlist`** (migration **`20260523120000_watchlist_sort_index.sql`**). List order syncs across devices; **Move up** updates **`sort_index`** in Supabase. Removed local-only ordering via localStorage.
+- **Profile watchlist strip + list rows.** Under each title: line 1 = **type · year**; line 2 = **TMDB score** and **first known genre** (from TMDB genre ids when the title is in the catalogue). If metadata is missing, lines may show **—** or omit the second line.
+
+## 5.5.18
+
+- **Watchlist ⋯ menu.** Row menu now has **Details** (opens title detail), **Move up** (swap with the row above; disabled on the first row), and **Remove**. Order is stored per account in **localStorage** so it survives refresh on this device (Profile strip and list stay in sync).
+
+## 5.5.17
+
+- **Profile — header.** Removed the duplicate **page top bar** (wordmark + small avatar) under the primary nav; the **name / stats** band stays as the profile hero.
+- **Bottom nav.** Active tab uses a **subtle circular highlight** behind the icon for **Mood**, **Watchlist**, and **Profile** (no text labels), keeping the bar a consistent height.
+- **Watchlist screen.** **List layout**: poster thumbnail, title, **Movie/TV · year**, optional **Group** hint, row divider, **⋯** menu with **Remove from watchlist**. **Primary nav** (desktop links + hamburger drawer) includes **Watchlist**.
+- **Watchlist data.** Rows and Profile strip show **type · year**; **detail** shows **Watchlist · from …** with the **circle name** when the item was saved from a circle (or “from a circle” if the name is not available).
+
 ## 5.5.16
 
 - **Navigation — Watchlist in bottom bar.** The bottom nav **center** slot is now **Watchlist** (list icon + label when active). Community / ratings counts are removed from the bottom bar (can be restored elsewhere later). New **`watchlist`** screen shows the same list as Profile’s watchlist. **Title detail** includes the bottom bar so Watchlist is reachable from detail; switching tab clears the detail overlay when needed.

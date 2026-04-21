@@ -370,14 +370,60 @@ function normalizeWatchlistPosterUrl(poster) {
 
 function buildWatchlistFromRows(watchlistData, catalogue) {
   if (!watchlistData?.length) return [];
+  const sorted = [...watchlistData].sort(
+    (a, b) => (Number(a.sort_index) || 0) - (Number(b.sort_index) || 0),
+  );
   const movieMap = Object.fromEntries(catalogue.map(m => [m.id, m]));
-  return watchlistData.map(w => {
+  return sorted.map((w) => {
     const id = `${w.media_type}-${w.tmdb_id}`;
     const base = movieMap[id] || { id, tmdbId: w.tmdb_id, type: w.media_type, title: w.title, poster: w.poster };
     const poster = normalizeWatchlistPosterUrl(base.poster);
     const fromGroup = w.source_circle_id != null;
-    return { ...base, poster: poster ?? base.poster, fromGroup };
+    const si = Number(w.sort_index);
+    return {
+      ...base,
+      poster: poster ?? base.poster,
+      fromGroup,
+      source_circle_id: w.source_circle_id ?? null,
+      sort_index: Number.isFinite(si) ? si : 0,
+    };
   }).filter(Boolean);
+}
+
+/** TMDB genre id → short label (movie + TV). Used for watchlist meta line. */
+const TMDB_GENRE_NAME_BY_ID = new Map([
+  [28, "Action"], [12, "Adventure"], [16, "Animation"], [35, "Comedy"], [80, "Crime"],
+  [99, "Documentary"], [18, "Drama"], [10751, "Family"], [14, "Fantasy"], [36, "History"],
+  [27, "Horror"], [10402, "Music"], [9648, "Mystery"], [10749, "Romance"], [878, "Sci-Fi"],
+  [10770, "TV Movie"], [53, "Thriller"], [10752, "War"], [37, "Western"],
+  [10759, "Action & Adventure"], [10762, "Kids"], [10763, "News"], [10764, "Reality"],
+  [10765, "Sci-Fi & Fantasy"], [10766, "Soap"], [10767, "Talk"], [10768, "War & Politics"],
+]);
+
+function firstWatchlistGenreName(movie) {
+  const ids = movie?.genreIds;
+  if (!Array.isArray(ids) || ids.length === 0) return null;
+  for (const raw of ids) {
+    const id = Number(raw);
+    if (!Number.isFinite(id)) continue;
+    const label = TMDB_GENRE_NAME_BY_ID.get(id);
+    if (label) return label;
+  }
+  return null;
+}
+
+/** One line under the title: type · year · TMDB score · genre (omits missing pieces except type/year placeholders). */
+function formatWatchlistMetaLine(movie) {
+  const parts = [];
+  const t = movie?.type === "tv" ? "TV" : movie?.type === "movie" ? "Movie" : "—";
+  parts.push(t);
+  const y = movie?.year != null && String(movie.year).trim() !== "" ? String(movie.year) : null;
+  parts.push(y ?? "—");
+  const tr = movie?.tmdbRating;
+  if (tr != null && Number.isFinite(Number(tr))) parts.push(`TMDB ${Number(tr).toFixed(1)}`);
+  const g = firstWatchlistGenreName(movie);
+  if (g) parts.push(g);
+  return parts.join(" · ");
 }
 
 /** YYYY-MM-DD from TMDB when present (movies: release_date; TV: first_air_date). */
@@ -1298,8 +1344,9 @@ function BottomNav({
           setScreen("mood-picker");
         }}
       >
-        <div className="nav-icon">🎭</div>
-        {navTab === "mood" && <div className="nav-label">Mood</div>}
+        <div className={`nav-item__icon-wrap ${navTab === "mood" ? "nav-item__icon-wrap--active" : ""}`}>
+          <div className="nav-icon">🎭</div>
+        </div>
       </div>
       <div
         className={`nav-item ${navTab === "watchlist" ? "active" : ""}`}
@@ -1322,10 +1369,11 @@ function BottomNav({
           }
         }}
       >
-        <div className="nav-icon nav-icon--svg">
-          <BottomNavListIcon />
+        <div className={`nav-item__icon-wrap ${navTab === "watchlist" ? "nav-item__icon-wrap--active" : ""}`}>
+          <div className="nav-icon nav-icon--svg">
+            <BottomNavListIcon />
+          </div>
         </div>
-        {navTab === "watchlist" ? <div className="nav-label">Watchlist</div> : null}
       </div>
       <div
         ref={profileNavRef}
@@ -1335,8 +1383,9 @@ function BottomNav({
           setProfileMenuOpen((v) => !v);
         }}
       >
-        <div className="nav-icon">👤</div>
-        {navTab === "profile" && !profileMenuOpen ? <div className="nav-label">Profile</div> : null}
+        <div className={`nav-item__icon-wrap ${navTab === "profile" || profileMenuOpen ? "nav-item__icon-wrap--active" : ""}`}>
+          <div className="nav-icon">👤</div>
+        </div>
         {profileMenuOpen ? (
           <div className="bottom-nav__profile-menu" onClick={(ev) => ev.stopPropagation()}>
             <button
@@ -2137,15 +2186,16 @@ const styles = `
   .empty-box { margin:0 24px; padding:24px; border:1px dashed #222; border-radius:10px; text-align:center; }
   .empty-text { font-size:13px; color:#444; }
 
-  .bottom-nav { position:fixed; bottom:0; left:0; right:0; margin-left:auto; margin-right:auto; width:100%; max-width:var(--shell); box-sizing:border-box; background:rgba(10,10,10,0.95); border-top:1px solid #1a1a1a; display:flex; align-items:flex-end; justify-content:space-between; gap:6px; padding:10px 8px calc(18px + env(safe-area-inset-bottom,0px)); padding-left:max(8px, env(safe-area-inset-left,0px)); padding-right:max(8px, env(safe-area-inset-right,0px)); backdrop-filter:blur(20px); z-index:100; }
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; margin-left:auto; margin-right:auto; width:100%; max-width:var(--shell); box-sizing:border-box; background:rgba(10,10,10,0.95); border-top:1px solid #1a1a1a; display:flex; align-items:center; justify-content:space-between; gap:6px; padding:10px 8px calc(14px + env(safe-area-inset-bottom,0px)); padding-left:max(8px, env(safe-area-inset-left,0px)); padding-right:max(8px, env(safe-area-inset-right,0px)); backdrop-filter:blur(20px); z-index:100; }
+  .nav-item__icon-wrap { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:background 0.2s; }
+  .nav-item__icon-wrap--active { background:rgba(232, 201, 106, 0.14); }
   .nav-icon--svg { display:flex; align-items:center; justify-content:center; color:#c9c9c9; }
-  .nav-item.active .nav-icon--svg { color:#e8c96a; }
+  .nav-item.active .nav-item__icon-wrap .nav-icon--svg { color:#e8c96a; }
   .bottom-nav-list-svg { display:block; }
-  .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; opacity:0.4; transition:opacity 0.2s; min-width:0; }
+  .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; cursor:pointer; opacity:0.4; transition:opacity 0.2s; min-width:0; min-height:48px; }
   .nav-item--profile { position:relative; }
   .nav-item.active { opacity:1; }
   .nav-icon { font-size:20px; }
-  .nav-label { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#e8c96a; }
   .bottom-nav__profile-menu { position:absolute; right:0; bottom:calc(100% + 10px); min-width:150px; background:#141414; border:1px solid #2a2a2a; border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,0.45); padding:6px; z-index:130; }
 
   .app-footer { padding:20px 24px 28px; border-top:1px solid #1a1a1a; margin-top:8px; }
@@ -2568,7 +2618,7 @@ const styles = `
 
   .profile { height:100%; min-height:0; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
   .profile-top { display:flex; gap:16px; align-items:flex-start; padding:52px 24px 20px; }
-  .profile .profile-top { padding:8px 24px 20px; }
+  .profile .profile-top { padding:14px 24px 20px; }
   .profile-top-text { min-width:0; }
   .profile-avatar { width:64px; height:64px; border-radius:50%; background:#e8c96a; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:700; color:#0a0a0a; font-family:'DM Sans',sans-serif; flex-shrink:0; }
   .profile-top-text { flex:1; min-width:0; }
@@ -2595,7 +2645,27 @@ const styles = `
   .watchlist-page-intro { padding:8px 24px 4px; }
   .watchlist-page-intro .discover-title { margin:0; }
   .watchlist-page-intro .section-meta { margin-top:6px; color:#666; font-size:12px; }
-  .wl-from-group { font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#6a6a6a; margin-top:4px; font-weight:600; }
+  .wl-from-group { font-size:9px; letter-spacing:0.06em; text-transform:uppercase; color:#6a6a6a; margin-top:4px; font-weight:600; }
+  .wl-card-meta { font-size:10px; color:#777; margin-top:4px; line-height:1.3; font-family:'DM Sans',sans-serif; max-width:100px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .wl-list { padding:0 0 8px; width:100%; max-width:100%; box-sizing:border-box; }
+  .wl-list-row { display:flex; align-items:stretch; gap:0; border-bottom:1px solid #1a1a1a; min-width:0; }
+  .wl-list-row:last-child { border-bottom:none; }
+  .wl-list-row__main { flex:1; min-width:0; display:flex; align-items:center; gap:12px; padding:12px 24px; background:none; border:none; cursor:pointer; text-align:left; color:inherit; font:inherit; }
+  .wl-list-row__main:hover { background:rgba(255,255,255,0.03); }
+  .wl-list-thumb { width:48px; height:72px; border-radius:8px; overflow:hidden; background:#1a1a1a; flex-shrink:0; border:1px solid #1e1e1e; }
+  .wl-list-thumb img { width:100%; height:100%; object-fit:cover; }
+  .wl-list-text { flex:1; min-width:0; }
+  .wl-list-title { font-size:14px; color:#ccc; line-height:1.3; font-weight:500; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .wl-list-meta { font-size:11px; color:#666; margin-top:4px; line-height:1.4; font-family:'DM Sans',sans-serif; }
+  .wl-list-row__more { position:relative; flex-shrink:0; display:flex; align-items:stretch; }
+  .wl-list-row__more-btn { width:44px; border:none; background:transparent; color:#666; font-size:18px; line-height:1; cursor:pointer; padding:0; align-self:stretch; }
+  .wl-list-row__more-btn:hover { color:#ccc; background:rgba(255,255,255,0.04); }
+  .wl-list-row__menu { position:absolute; right:8px; bottom:calc(100% + 6px); min-width:180px; background:#141414; border:1px solid #2a2a2a; border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,0.45); padding:4px; z-index:130; }
+  .wl-list-row__menu-item { display:block; width:100%; text-align:left; background:none; border:none; color:#e8c96a; font-size:13px; font-family:'DM Sans',sans-serif; padding:10px 12px; border-radius:6px; cursor:pointer; }
+  .wl-list-row__menu-item:hover:not(:disabled) { background:rgba(232, 201, 106, 0.08); }
+  .wl-list-row__menu-item:disabled { opacity:0.4; cursor:default; color:#666; }
+  .wl-list-row__menu-item + .wl-list-row__menu-item { border-top:1px solid #222; }
+  .detail-watchlist-source { font-size:12px; color:#777; margin-top:14px; line-height:1.4; font-family:'DM Sans',sans-serif; }
   .stat-box { background:#141414; border:1px solid #1e1e1e; border-radius:12px; padding:16px; text-align:center; }
   .stat-box-clickable { cursor:pointer; transition:border-color 0.2s, background 0.2s; }
   .stat-box-clickable:hover { border-color:#333; background:#181818; }
@@ -2759,6 +2829,8 @@ const styles = `
     .profile-top,
     .profile-settings,
     .profile-section,
+    .watchlist-page-intro,
+    .wl-list-row__main,
     .rated-search-wrap,
     .mood-results-header { padding-left:32px; padding-right:32px; }
     /* Desktop Mood: denser two-column cards to reduce vertical scrolling without changing mobile UX. */
@@ -3616,6 +3688,8 @@ export default function App() {
   const [sliderTouched, setSliderTouched] = useState(false);
   const [userRatings, setUserRatings] = useState({});
   const [watchlist, setWatchlist] = useState([]);
+  /** Open ⋯ menu row id on Watchlist screen (single flyout). */
+  const [watchlistRowMenuId, setWatchlistRowMenuId] = useState(null);
   const [selectedToWatch, setSelectedToWatch] = useState({});
   const [selectedMovie, setSelected] = useState(null);
   const [detailRating, setDetailRating] = useState(5);
@@ -4703,7 +4777,11 @@ export default function App() {
     if (!user || catalogue.length === 0) return;
     let cancelled = false;
     (async () => {
-      const { data: watchlistData } = await supabase.from("watchlist").select("*").eq("user_id", user.id);
+      const { data: watchlistData } = await supabase
+        .from("watchlist")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("sort_index", { ascending: true });
       if (cancelled || !watchlistData?.length) return;
       setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
     })();
@@ -4833,7 +4911,7 @@ export default function App() {
     if (!user) return { ratingCount: 0 };
     const [{ data: ratingsData }, { data: watchlistData }] = await Promise.all([
       supabase.from("ratings").select("*").eq("user_id", user.id),
-      supabase.from("watchlist").select("*").eq("user_id", user.id),
+      supabase.from("watchlist").select("*").eq("user_id", user.id).order("sort_index", { ascending: true }),
     ]);
     if (ratingsData) {
       const ratingsMap = {};
@@ -6341,6 +6419,14 @@ export default function App() {
   const activeCirclesCount = circlesList.length;
   const atCircleCap = activeCirclesCount >= CIRCLE_CAP;
 
+  const circleNameById = useMemo(() => {
+    const map = new Map();
+    for (const c of circlesList) {
+      if (c?.id) map.set(c.id, c.name);
+    }
+    return map;
+  }, [circlesList]);
+
   function openCreateCircleSheet() {
     if (atCircleCap) return;
     setCreateCircleName("");
@@ -6967,6 +7053,7 @@ export default function App() {
     { id: "in-theaters", label: "In Theaters" },
     { id: "streaming-page", label: "Streaming" },
     { id: "your-picks", label: "Your Picks" },
+    { id: "watchlist", label: "Watchlist" },
     ...(shouldShowSecondaryRegionPage
       ? [{ id: "secondary-region", label: V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region" }]
       : []),
@@ -7002,6 +7089,11 @@ export default function App() {
       setScreen("pulse");
       return;
     }
+    if (nextScreen === "watchlist") {
+      setNavTab("watchlist");
+      setScreen("watchlist");
+      return;
+    }
     setScreen(nextScreen);
   }
 
@@ -7013,6 +7105,24 @@ export default function App() {
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [showAvatarMenu]);
+
+  useEffect(() => {
+    if (screen !== "watchlist") setWatchlistRowMenuId(null);
+  }, [screen]);
+
+  useEffect(() => {
+    if (!watchlistRowMenuId) return;
+    const close = () => setWatchlistRowMenuId(null);
+    const t = window.setTimeout(() => window.addEventListener("click", close), 0);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("click", close);
+    };
+  }, [watchlistRowMenuId]);
+
+  const watchlistDisplay = useMemo(() => {
+    return [...watchlist].sort((a, b) => (a.sort_index ?? 0) - (b.sort_index ?? 0));
+  }, [watchlist]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -7067,30 +7177,111 @@ export default function App() {
     const fromCircleContext =
       detailReturnScreenRef.current === "circle-detail" && selectedCircleId;
     const sourceCircleId = fromCircleContext ? selectedCircleId : null;
+
+    if (user && !alreadySaved) {
+      const [type, tmdbId] = movie.id.split("-");
+      const tid = parseInt(tmdbId, 10);
+      const { data: rows } = await supabase
+        .from("watchlist")
+        .select("sort_index")
+        .eq("user_id", user.id)
+        .order("sort_index", { ascending: false })
+        .limit(1);
+      const nextSort = (rows?.[0]?.sort_index != null ? Number(rows[0].sort_index) : -1) + 1;
+      const row = {
+        user_id: user.id,
+        tmdb_id: tid,
+        media_type: type,
+        title: movie.title,
+        poster: movie.poster,
+        sort_index: nextSort,
+      };
+      if (sourceCircleId) row.source_circle_id = sourceCircleId;
+      setWatchlist((w) => [
+        ...w,
+        {
+          ...movie,
+          fromGroup: Boolean(sourceCircleId),
+          source_circle_id: sourceCircleId ?? null,
+          sort_index: nextSort,
+        },
+      ]);
+      await supabase.from("watchlist").insert(row);
+      setTimeout(() => goBack(), 1000);
+      return;
+    }
+
+    if (user && alreadySaved) {
+      const [type, tmdbId] = movie.id.split("-");
+      setWatchlist((w) => w.filter((m) => m.id !== movie.id));
+      await supabase.from("watchlist").delete().eq("user_id", user.id).eq("tmdb_id", parseInt(tmdbId, 10)).eq("media_type", type);
+      return;
+    }
+
     setWatchlist((w) =>
       alreadySaved
         ? w.filter((m) => m.id !== movie.id)
-        : [...w, { ...movie, fromGroup: Boolean(sourceCircleId) }],
+        : [
+            ...w,
+            {
+              ...movie,
+              fromGroup: Boolean(sourceCircleId),
+              source_circle_id: sourceCircleId ?? null,
+              sort_index: w.reduce((m, x) => Math.max(m, x.sort_index ?? -1), -1) + 1,
+            },
+          ],
     );
-    if (user) {
-      const [type, tmdbId] = movie.id.split("-");
-      if (alreadySaved) {
-        await supabase.from("watchlist").delete().eq("user_id", user.id).eq("tmdb_id", parseInt(tmdbId)).eq("media_type", type);
-      } else {
-        const row = {
-          user_id: user.id,
-          tmdb_id: parseInt(tmdbId),
-          media_type: type,
-          title: movie.title,
-          poster: movie.poster,
-        };
-        if (sourceCircleId) row.source_circle_id = sourceCircleId;
-        await supabase.from("watchlist").insert(row);
-        setTimeout(() => goBack(), 1000);
-      }
-    } else if (!alreadySaved) {
+    if (!alreadySaved) {
       setTimeout(() => goBack(), 1000);
     }
+  }
+
+  async function moveWatchlistItemUp(movieId) {
+    if (!user) return;
+    const list = [...watchlist].sort((a, b) => (a.sort_index ?? 0) - (b.sort_index ?? 0));
+    const i = list.findIndex((m) => m.id === movieId);
+    if (i <= 0) return;
+    const cur = list[i];
+    const prev = list[i - 1];
+    const a = cur.sort_index ?? i;
+    const b = prev.sort_index ?? i - 1;
+    const uid = user.id;
+    const TEMP = 2147483646;
+    try {
+      const { error: e1 } = await supabase
+        .from("watchlist")
+        .update({ sort_index: TEMP })
+        .eq("user_id", uid)
+        .eq("tmdb_id", cur.tmdbId)
+        .eq("media_type", cur.type);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase
+        .from("watchlist")
+        .update({ sort_index: a })
+        .eq("user_id", uid)
+        .eq("tmdb_id", prev.tmdbId)
+        .eq("media_type", prev.type);
+      if (e2) throw e2;
+      const { error: e3 } = await supabase
+        .from("watchlist")
+        .update({ sort_index: b })
+        .eq("user_id", uid)
+        .eq("tmdb_id", cur.tmdbId)
+        .eq("media_type", cur.type);
+      if (e3) throw e3;
+    } catch (e) {
+      console.warn("Watchlist reorder failed:", e);
+      return;
+    }
+    setWatchlist((w) => {
+      const byId = new Map(w.map((m) => [m.id, { ...m }]));
+      const c = byId.get(cur.id);
+      const p = byId.get(prev.id);
+      if (c) c.sort_index = b;
+      if (p) p.sort_index = a;
+      return w.map((m) => byId.get(m.id) ?? m);
+    });
+    setWatchlistRowMenuId(null);
   }
 
   function toggleMoodOption(cardId, optionId) {
@@ -9554,11 +9745,6 @@ export default function App() {
       {/* PROFILE */}
       {screen === "profile" && (
         <div className="profile">
-          <div className="page-topbar">
-            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-            <div />
-            <AccountAvatarMenu />
-          </div>
           <div className="profile-top">
             <div className="profile-avatar">{userInitial}</div>
             <div className="profile-top-text">
@@ -9587,12 +9773,13 @@ export default function App() {
               <div className="empty-box"><div className="empty-text">Save titles from detail to watch later</div></div>
             ) : (
               <div className="strip">
-                {watchlist.map(m => (
+                {watchlistDisplay.map((m) => (
                   <div className="wl-card" key={m.id} onClick={() => openDetail(m, recMap[m.id])}>
                     <div className="wl-poster">
                       {m.poster ? <img src={m.poster} alt={m.title} /> : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 36 }}>🎬</div>}
                     </div>
                     <div className="strip-title">{m.title}</div>
+                    <div className="wl-card-meta">{formatWatchlistMetaLine(m)}</div>
                     {m.fromGroup ? <div className="wl-from-group">Group</div> : null}
                   </div>
                 ))}
@@ -9692,12 +9879,7 @@ export default function App() {
       )}
 
       {screen === "watchlist" && (
-        <div className="profile">
-          <div className="page-topbar">
-            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-            <div />
-            <AccountAvatarMenu />
-          </div>
+        <div className="profile watchlist-screen">
           <div className="watchlist-page-intro">
             <div className="discover-title">Watchlist</div>
             <div className="section-meta">
@@ -9710,22 +9892,80 @@ export default function App() {
                 <div className="empty-text">Save titles from detail to watch later</div>
               </div>
             ) : (
-              <div className="strip">
-                {watchlist.map((m) => (
-                  <div className="wl-card" key={m.id} onClick={() => openDetail(m, recMap[m.id])}>
-                    <div className="wl-poster">
-                      {m.poster ? (
-                        <img src={m.poster} alt={m.title} />
-                      ) : (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 36 }}>
-                          🎬
+              <div className="wl-list">
+                {watchlistDisplay.map((m, rowIndex) => {
+                  const canMoveUp = rowIndex > 0;
+                  return (
+                  <div className="wl-list-row" key={m.id}>
+                    <button
+                      type="button"
+                      className="wl-list-row__main"
+                      onClick={() => openDetail(m, recMap[m.id])}
+                    >
+                      <div className="wl-list-thumb">
+                        {m.poster ? (
+                          <img src={m.poster} alt="" />
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 22 }}>🎬</div>
+                        )}
+                      </div>
+                      <div className="wl-list-text">
+                        <div className="wl-list-title">{m.title}</div>
+                        <div className="wl-list-meta">{formatWatchlistMetaLine(m)}</div>
+                        {m.fromGroup ? <div className="wl-from-group" style={{ marginTop: 6 }}>Group</div> : null}
+                      </div>
+                    </button>
+                    <div className="wl-list-row__more">
+                      <button
+                        type="button"
+                        className="wl-list-row__more-btn"
+                        aria-label="Watchlist actions"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setWatchlistRowMenuId((id) => (id === m.id ? null : m.id));
+                        }}
+                      >
+                        <span aria-hidden="true">⋯</span>
+                      </button>
+                      {watchlistRowMenuId === m.id ? (
+                        <div className="wl-list-row__menu" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="wl-list-row__menu-item"
+                            onClick={() => {
+                              setWatchlistRowMenuId(null);
+                              openDetail(m, recMap[m.id]);
+                            }}
+                          >
+                            Details
+                          </button>
+                          <button
+                            type="button"
+                            className="wl-list-row__menu-item"
+                            disabled={!canMoveUp}
+                            onClick={() => {
+                              if (!canMoveUp) return;
+                              void moveWatchlistItemUp(m.id);
+                            }}
+                          >
+                            Move up
+                          </button>
+                          <button
+                            type="button"
+                            className="wl-list-row__menu-item"
+                            onClick={() => {
+                              setWatchlistRowMenuId(null);
+                              void toggleWatchlist(m);
+                            }}
+                          >
+                            Remove
+                          </button>
                         </div>
-                      )}
+                      ) : null}
                     </div>
-                    <div className="strip-title">{m.title}</div>
-                    {m.fromGroup ? <div className="wl-from-group">Group</div> : null}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -9882,6 +10122,18 @@ export default function App() {
                     </div>
                   </div>
                 )}
+                {inWatchlist(movie.id)
+                  ? (() => {
+                      const wl = watchlist.find((w) => w.id === movie.id);
+                      if (!wl?.fromGroup && !wl?.source_circle_id) return null;
+                      const circleLabel = wl.source_circle_id ? circleNameById.get(wl.source_circle_id) : null;
+                      return (
+                        <div className="detail-watchlist-source">
+                          {circleLabel ? `Watchlist · from ${circleLabel}` : "Watchlist · from a circle"}
+                        </div>
+                      );
+                    })()
+                  : null}
                 {showRatePill ? (
                   <div className="detail-rate-pill-wrap">
                     <button
