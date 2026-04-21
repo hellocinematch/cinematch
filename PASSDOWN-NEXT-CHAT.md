@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-21
+**Last updated:** 2026-04-20
 
 ---
 
@@ -41,8 +41,8 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Repo version & git
 
-- **`package.json`:** **5.5.13** — **`CHANGELOG.md`** through **5.5.13**. Profile shows **Cinemastro v…** via **`APP_VERSION`** (from `package.json` in `src/App.jsx`).
-- Confirm **`main` tip** with `git log -3 --oneline` after local commits. Recent **`main`** includes **v5.5.8–v5.5.13**: circle-detail **chat-style hero**, **circle name** rules (**`validateCircleName`** / **`circleAvatarInitials`** in **`src/circles.js`**), DB migration **`20260505120000_circles_name_length_2_32.sql`** (apply on hosted DB if not yet), **Recent activity** strip + **circle score** above title, **Rate a title** pill (Discover + return to circle). Optional **`profiles` name NOT NULL`** — **`20260504120000_profiles_name_not_null.sql`**.
+- **`package.json`:** **5.5.15** — **`CHANGELOG.md`** through **5.5.15**. Profile shows **Cinemastro v…** via **`APP_VERSION`** (from `package.json` in `src/App.jsx`).
+- Confirm **`main` tip** with `git log -3 --oneline` after local commits. Recent **`main`** includes **v5.5.8–v5.5.15**: circle **Ratings** tabs — **Recent** (horizontal strip), **All** / **Top** (3-col grids, **More** pagination; Top cap **25**); migration **`20260522120000_circles_rated_all_top_grid.sql`** + redeploy **`get-circle-rated-titles`**. Older: **`20260506120000_circles_strip_recent_activity.sql`**, **`20260505120000_...`**, optional **`20260504120000_...`**.
 
 ## Recent work (client — `src/App.jsx`)
 
@@ -66,8 +66,8 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ### Circles — strip + “Rate a title”
 
-- **Section title:** **Recent activity** (loading skeleton + loaded strip). **Empty strip** copy unchanged: *No shared ratings in this circle yet.* **&lt;2 members** placeholder title still **Rated in this circle** (gate copy).
-- **Cards:** **Together:** muted **Circle** + gold **number** centered **above** the title (**`circle-strip-circle-score`**); no duplicate Circle line below. **Solo:** **Cinemastro** line only under meta.
+- **Ratings block:** Header **Ratings** with tabs **Recent** | **All** | **Top**. **Recent:** horizontal strip (skeleton + loaded). **All / Top:** 3-column grid (2 cols if viewport **≤360px**), Discover-style cards, **More** loads **10** more; **Top** max **25** titles. **Empty** copy unchanged for all tabs. **&lt;2 members** placeholder still **Rated in this circle** (gate copy).
+- **Cards:** **Recent** strip sorted by **most recent circle rating** (`last_at`). **Circle** avg for **every** title; **N rated** if circle **&gt;2 members**. **Solo** rows: **Cinemastro** under meta. Grids reuse the same score lines.
 - **Rate a title:** Centered pill below the body (**`circle-rate-title-pill`**, active circles only). **`openDiscoverFromCircleForRating`** sets **`rateTitleReturnCircleIdRef`**; from **Discover**, **`openDetail`** forces **`detailReturnScreenRef`** → **`circle-detail`** so **Submit rating** / back returns to the same circle. **`useEffect` on `screen`** clears the ref when not on **discover** / **detail**. Cap-hint **Open Discover** uses the same handler.
 - **Create circle names:** **`validateCircleName`** in **`src/circles.js`** — 2–32 chars, letter-led charset (see Supabase migrations below).
 
@@ -82,6 +82,8 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 ## Recent work (Supabase / Circles / profiles)
 
 - **`20260503120000_get_circle_member_names.sql`** — **`get_circle_member_names(p_circle_id)`** — apply on hosted DB if missing.
+- **`20260522120000_circles_rated_all_top_grid.sql`** — **`get_circle_rated_all_grid`**, **`get_circle_rated_top_grid`** (Edge **`view`**).
+- **`20260506120000_circles_strip_recent_activity.sql`** — **`get_circle_rated_strip`** recent-activity ordering + **`group_rating`** for single rater + **`trg_ratings_bump_rated_at`** on **`ratings`** score updates.
 - **`20260505120000_circles_name_length_2_32.sql`** — **`circles.name`** length **2–32** (replaces legacy 1–40 check). Apply on hosted DB if not applied (existing rows must satisfy length before it succeeds).
 - **`20260504120000_profiles_name_not_null.sql`** — backfill + **`NOT NULL`** on **`profiles.name`** — optional; run when product is ready.
 
@@ -114,7 +116,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Open / follow-ups
 
-- **Circles (full backlog):** **`HANDOFF.md`** “What’s next” — includes **edit name & info**, **watchlist on Circles main page** (layout TBD), **circle name on watchlist rows** (`source_circle_id`), **invite email for non-users**, **phone verification at signup**, **Bayesian rating normalization**. *Quick-rate from inside a circle* is partially covered by **Rate a title** (Discover + return); a slimmer **in-place** pill without leaving the circle is still backlog if desired.
+- **Circles (full backlog):** **`HANDOFF.md`** “What’s next” — **edit name & info**, **watchlist on Circles main page** (layout TBD), **circle name on watchlist rows** (`source_circle_id`), **invite email for non-users**, **phone verification at signup**, **Bayesian rating normalization**. *Quick-rate from inside a circle* is partially covered by **Rate a title** (Discover + return); a slimmer **in-place** pill without leaving the circle is still backlog if desired.
 - **Cron:** audit **`jobs × limit`** vs eligible users; **`COMPUTE-NEIGHBORS-CRON.md`**.
 - **Nav (optional):** **`126px`** header / scrim offsets — **`App.jsx`**.
 - **Lint:** possible **`react-hooks/set-state-in-effect`** on **`AppPrimaryNav`** — pre-existing.

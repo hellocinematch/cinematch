@@ -9,15 +9,15 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 1. **Read this file first** — `HANDOFF.md` at the repository root:  
    `/Users/tlmahesh/Library/Mobile Documents/com~apple~CloudDocs/Cinematch/HANDOFF.md`
 2. In Cursor chat, attach it: type **`@HANDOFF.md`** and select the file, or paste: *“Follow `HANDOFF.md`.”*
-3. **Version bump rule for the next vertical slice:** current release in repo is **5.5.0** (unchanged for docs-only or handoff-only commits). When **Phase D**, **Phase E**, or the **next real feature** ships, bump to **`5.6.0`** and add a matching **`CHANGELOG.md`** section in the **same release commit** as the first shipping change—not in a handoff-only or docs-only commit.
+3. **Version bump rule for the next vertical slice:** current release in repo is **5.5.15** (bump **`package.json`** + **`CHANGELOG.md`** whenever you ship product code). When **Phase D**, **Phase E**, or a **major circles / match vertical** ships, consider **`5.6.0`** and add a matching **`CHANGELOG.md`** section in the **same release commit** as the first shipping change—not in a handoff-only or docs-only commit.
 
 ---
 
 ## Current state (as of last update)
 
 - **`main` is pushed** to `origin` (includes Circles Phase A + RLS hotfix + Phase B + Phase C strip backend + Phase C strip UI).
-- **`package.json` version:** `5.5.0` — **`watchlist.source_circle_id`** + Profile watchlist **Group** label when saved from a circle flow.
-- **Prod DB:** Phase A circles schema + RLS recursion hotfix + Phase B SQL helpers + Phase C strip RPCs (**`20260429120000`**, **`20260430120000`**) + **`20260501120000_watchlist_source_circle_id.sql`** (`watchlist.source_circle_id`).
+- **`package.json` version:** `5.5.15` — Circles **Ratings** tabs (**Recent** / **All** / **Top** grids); see **`CHANGELOG.md`**.
+- **Prod DB:** Phase A circles schema + RLS recursion hotfix + Phase B SQL helpers + Phase C strip RPCs (**`20260429120000`**, **`20260430120000`**) + **`20260501120000_watchlist_source_circle_id.sql`** (`watchlist.source_circle_id`). Apply **`20260506120000_circles_strip_recent_activity.sql`** when ready (strip ordering + **`rated_at`** on score change). Apply **`20260522120000_circles_rated_all_top_grid.sql`** for **All** / **Top** grids.
 - **Edge functions:** `send-circle-invite`, `accept-circle-invite`, and **`get-circle-rated-titles`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`).
 
 ---
@@ -71,6 +71,8 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 
 10. **Circle — quick rate pill** — Inside a circle, a **pill** (or entry point) for the user to **add a rating** for a movie/show; once added, it **propagates** to **all their groups** (shared rating graph behavior — align with existing rating flows).
 
+11. ~~**Circles — strip tabs on circle detail**~~ **Done in 5.5.15:** **Recent** / **All** / **Top** (see `CHANGELOG.md`). Possible follow-up: rename **Top** copy, combine **Most rated** (by count) if product wants both.
+
 ---
 
 ## Ops reminders
@@ -90,6 +92,6 @@ git status && git log -5 --oneline
 grep '"version"' package.json
 ```
 
-Expected version line: **`"version": "5.5.0"`** until the next release bump (→ **`5.6.0`** for Phase D / next feature).
+Expected version line: match **`package.json`** / **`CHANGELOG.md`** (e.g. **`5.5.15`**); next minor feature wave may target **`5.6.0`**.
 
 If this file overwrote older notes, recover the previous text with: `git show HEAD~1:HANDOFF.md` (adjust `HEAD~1` if needed).

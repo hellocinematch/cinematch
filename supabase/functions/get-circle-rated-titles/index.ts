@@ -5,10 +5,10 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 // Circles Phase C — get-circle-rated-titles
 // ------------------------------------------------------------------------------------------------
 //
-// Body: { circle_id: string, p_limit?: number, p_offset?: number }
+// Body: { circle_id: string, p_limit?: number, p_offset?: number, view?: "recent" | "all" | "top" }
 // Auth: JWT — caller must be a member of the circle.
 //
-// 1) Calls public.get_circle_rated_strip(...) with the caller's JWT.
+// 1) Calls public.get_circle_rated_strip | get_circle_rated_all_grid | get_circle_rated_top_grid (JWT).
 // 2) Fills per-title CF predictions from user_title_predictions only (batched by media_type).
 //    Cold cache → prediction null (same as detail-page predict_cached; avoids N× match_predict RPCs).
 //
@@ -166,7 +166,19 @@ Deno.serve(async (req: Request) => {
       ? Math.max(0, Math.floor(rawOffset))
       : 0;
 
-    const { data: stripData, error: stripErr } = await authed.rpc("get_circle_rated_strip", {
+    const rawView = body.view;
+    const view =
+      rawView === "all" || rawView === "top"
+        ? rawView
+        : "recent";
+    const rpcName =
+      view === "all"
+        ? "get_circle_rated_all_grid"
+        : view === "top"
+          ? "get_circle_rated_top_grid"
+          : "get_circle_rated_strip";
+
+    const { data: stripData, error: stripErr } = await authed.rpc(rpcName, {
       p_circle_id: circleId,
       p_limit: pLimit,
       p_offset: pOffset,
@@ -183,7 +195,7 @@ Deno.serve(async (req: Request) => {
       const detail = [stripErr.message, (stripErr as { details?: string }).details, (stripErr as { hint?: string }).hint]
         .filter((x): x is string => typeof x === "string" && x.length > 0)
         .join(" — ");
-      console.error("get-circle-rated-titles: get_circle_rated_strip failed", stripErr);
+      console.error(`get-circle-rated-titles: ${rpcName} failed`, stripErr);
       const errOut = detail.length > 0 ? detail.slice(0, 900) : "Could not load circle titles.";
       return jsonResponse({ error: errOut }, 500);
     }

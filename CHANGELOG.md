@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.5.15
+
+- **Circles — Ratings tabs on circle detail.** **Ratings** row with **Recent** (horizontal strip, unchanged cap/behavior), **All** (Discover-style **3-column** grid, **10** titles per page + **More**), and **Top** (same grid, sorted by **highest circle average** with ties by rater count then recency, **max 25** titles + **More**). Edge **`get-circle-rated-titles`** accepts **`view`**: `recent` | `all` | `top`. New RPCs: **`get_circle_rated_all_grid`**, **`get_circle_rated_top_grid`**. Migration: **`supabase/migrations/20260522120000_circles_rated_all_top_grid.sql`** (apply on Supabase). Redeploy Edge **`get-circle-rated-titles`**.
+
+## 5.5.14
+
+- **Circles — Recent activity strip.** `get_circle_rated_strip` orders titles by **latest circle rating** (`last_at` only), not “together before solo.” **Circle** score shows for **every** title (including a single rater; the average is that member’s score). When the circle has **more than two members**, each card shows **how many members rated** (e.g. `2 rated`) without naming them. **Re-rating** a title updates **`rated_at`** (trigger on `ratings` score change) so the strip reflects edits. Migration: `supabase/migrations/20260506120000_circles_strip_recent_activity.sql` (apply on Supabase).
+
 ## 5.5.13
 
 - **Circles — Rate a title.** On **circle detail** (active circles), a centered **Rate a title** pill below the strip opens **Discover** unchanged. Opening a title from Discover and submitting a rating (or back) returns to **this circle** via `detailReturnScreenRef` + `rateTitleReturnCircleIdRef`. **Open Discover** in the post–20-cap hint uses the same return behavior.

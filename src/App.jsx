@@ -23,6 +23,8 @@ import {
   CIRCLE_STRIP_INITIAL,
   CIRCLE_STRIP_PAGE,
   CIRCLE_STRIP_MAX,
+  CIRCLE_GRID_PAGE,
+  CIRCLE_TOP_MAX,
 } from "./circles";
 
 const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
@@ -3028,6 +3030,67 @@ const styles = `
   .circle-detail-strip-wrap { display:flex; flex-direction:column; gap:18px; }
   .circle-detail-strip-section { margin:0; }
   .circle-detail-strip-header { padding-left:0 !important; padding-right:0 !important; }
+  .circle-detail-strip-header--tabs { flex-direction:column; align-items:stretch !important; gap:12px; padding-bottom:4px !important; }
+  .circle-detail-ratings-tabs { display:flex; gap:8px; flex-wrap:wrap; width:100%; }
+  .circle-detail-ratings-tab {
+    flex:1;
+    min-width:72px;
+    padding:8px 12px;
+    border-radius:20px;
+    font-size:12px;
+    font-family:'DM Sans',sans-serif;
+    cursor:pointer;
+    border:1px solid #2a2a2a;
+    background:transparent;
+    color:#888;
+    transition:all 0.2s;
+  }
+  .circle-detail-ratings-tab:hover { border-color:#555; color:#ccc; }
+  .circle-detail-ratings-tab--active {
+    background:#e8c96a;
+    color:#0a0a0a;
+    border-color:#e8c96a;
+    font-weight:500;
+  }
+  .circle-rated-grid {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:12px;
+    width:100%;
+    box-sizing:border-box;
+  }
+  @media (max-width: 360px) {
+    .circle-rated-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  }
+  .circle-rated-grid-score { margin-top:4px; }
+  .circle-rated-grid-more {
+    width:100%;
+    box-sizing:border-box;
+    margin-top:8px;
+    padding:12px 16px;
+    border-radius:20px;
+    border:1px solid #2a2a2a;
+    background:transparent;
+    color:#e8c96a;
+    font-family:'DM Sans',sans-serif;
+    font-size:14px;
+    font-weight:500;
+    cursor:pointer;
+    transition:border-color 0.2s, background 0.2s;
+  }
+  .circle-rated-grid-more:hover:not(:disabled) { border-color:#e8c96a; background:rgba(232,201,106,0.06); }
+  .circle-rated-grid-more:disabled { opacity:0.5; cursor:default; }
+  @keyframes circleRatedGridSkel {
+    0%, 100% { opacity:0.5; }
+    50% { opacity:0.85; }
+  }
+  .circle-rated-grid-skel {
+    border-radius:12px;
+    background:#1a1a1a;
+    border:1px solid #1e1e1e;
+    aspect-ratio:2/3;
+    animation:circleRatedGridSkel 1.2s ease-in-out infinite;
+  }
   .circle-detail-strip-block { margin-top:4px; }
   .circle-strip-circle-score {
     text-align:center;
@@ -3040,6 +3103,7 @@ const styles = `
   }
   .circle-strip-circle-score__label { color:#888; margin-right:5px; }
   .circle-strip-circle-score__num { color:#e8c96a; font-weight:600; }
+  .circle-strip-rater-count { font-size:11px; color:#666; margin-top:2px; letter-spacing:0.2px; text-align:center; }
   .circle-strip-comm-line { font-size:11px; color:#888; margin-top:4px; letter-spacing:0.2px; }
   .circle-strip-comm-line--muted { color:#555; }
   .circle-detail-strip-empty { margin:0 !important; }
@@ -3581,6 +3645,16 @@ export default function App() {
   const [circleStripLoadingMore, setCircleStripLoadingMore] = useState(false);
   const [circleStripError, setCircleStripError] = useState("");
   const [circleStripExtraMovies, setCircleStripExtraMovies] = useState(() => new Map());
+  /** Circle detail rated block: recent (horizontal strip) | all | top (grids). */
+  const [circleRatingsView, setCircleRatingsView] = useState("recent");
+  const [circleGridAllPayload, setCircleGridAllPayload] = useState(null);
+  const [circleGridAllLoading, setCircleGridAllLoading] = useState(false);
+  const [circleGridAllLoadingMore, setCircleGridAllLoadingMore] = useState(false);
+  const [circleGridAllError, setCircleGridAllError] = useState("");
+  const [circleGridTopPayload, setCircleGridTopPayload] = useState(null);
+  const [circleGridTopLoading, setCircleGridTopLoading] = useState(false);
+  const [circleGridTopLoadingMore, setCircleGridTopLoadingMore] = useState(false);
+  const [circleGridTopError, setCircleGridTopError] = useState("");
   const [leaveCircleBusy, setLeaveCircleBusy] = useState(false);
   const [leaveCircleError, setLeaveCircleError] = useState("");
   const [leaveConfirmCircle, setLeaveConfirmCircle] = useState(null);
@@ -4245,25 +4319,41 @@ export default function App() {
     return map;
   }, [catalogue, watchlist, catalogueForRecs, inTheatersForRecs, streamingMoviesForRecs, streamingTVForRecs, secondaryStripCatalogRows, whatsHotForRecs, pulseTrendingForRecs, pulsePopularForRecs, inTheatersPagePopularForRecs]);
 
-  const circleStripIdsNeedingFetch = useMemo(() => {
-    if (!circleStripPayload?.titles?.length) return [];
+  const circleDetailHydrateIds = useMemo(() => {
+    if (screen !== "circle-detail") return [];
+    let titles = [];
+    if (circleRatingsView === "recent" && Array.isArray(circleStripPayload?.titles)) {
+      titles = circleStripPayload.titles;
+    } else if (circleRatingsView === "all" && Array.isArray(circleGridAllPayload?.titles)) {
+      titles = circleGridAllPayload.titles;
+    } else if (circleRatingsView === "top" && Array.isArray(circleGridTopPayload?.titles)) {
+      titles = circleGridTopPayload.titles;
+    }
     const out = [];
-    for (const t of circleStripPayload.titles) {
+    for (const t of titles) {
       const id = `${String(t.media_type)}-${Number(t.tmdb_id)}`;
       if (movieLookupById.has(id)) continue;
       if (circleStripExtraMovies.has(id)) continue;
       out.push({ id, media_type: t.media_type, tmdb_id: t.tmdb_id });
     }
     return out;
-  }, [circleStripPayload, movieLookupById, circleStripExtraMovies]);
+  }, [
+    screen,
+    circleRatingsView,
+    circleStripPayload,
+    circleGridAllPayload,
+    circleGridTopPayload,
+    movieLookupById,
+    circleStripExtraMovies,
+  ]);
 
   useEffect(() => {
-    if (screen !== "circle-detail" || circleStripIdsNeedingFetch.length === 0) return;
+    if (screen !== "circle-detail" || circleDetailHydrateIds.length === 0) return;
     let cancelled = false;
     (async () => {
       const fetched = new Map();
-      for (let i = 0; i < circleStripIdsNeedingFetch.length; i += 8) {
-        const chunk = circleStripIdsNeedingFetch.slice(i, i + 8);
+      for (let i = 0; i < circleDetailHydrateIds.length; i += 8) {
+        const chunk = circleDetailHydrateIds.slice(i, i + 8);
         await Promise.all(
           chunk.map(async (item) => {
             const raw = await fetchTMDB(`/${item.media_type}/${item.tmdb_id}?language=en-US`);
@@ -4279,7 +4369,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [screen, circleStripIdsNeedingFetch]);
+  }, [screen, circleDetailHydrateIds]);
 
   /** Secondary region strip: TMDB fallback until `matchData.secondaryRecs` fills from `predict_cached`. */
   const secondaryStripRecsResolved = useMemo(() => {
@@ -6322,6 +6412,18 @@ export default function App() {
     setCircleStripExtraMovies(new Map());
   }, [selectedCircleId]);
 
+  useEffect(() => {
+    setCircleRatingsView("recent");
+    setCircleGridAllPayload(null);
+    setCircleGridAllLoading(false);
+    setCircleGridAllLoadingMore(false);
+    setCircleGridAllError("");
+    setCircleGridTopPayload(null);
+    setCircleGridTopLoading(false);
+    setCircleGridTopLoadingMore(false);
+    setCircleGridTopError("");
+  }, [selectedCircleId]);
+
   // Phase C: circle rated strip (Edge + RPC) — first page only; see loadCircleStripMore.
   useEffect(() => {
     if (screen !== "circle-detail" || !selectedCircleId || !user) {
@@ -6338,6 +6440,7 @@ export default function App() {
           circleId: selectedCircleId,
           limit: CIRCLE_STRIP_INITIAL,
           offset: 0,
+          view: "recent",
         });
         if (cancelled) return;
         setCircleStripPayload(data);
@@ -6355,6 +6458,68 @@ export default function App() {
     };
   }, [screen, selectedCircleId, user]);
 
+  useEffect(() => {
+    if (screen !== "circle-detail" || !selectedCircleId || !user) return;
+    if (circleRatingsView !== "all") return;
+    if (circleGridAllPayload != null) return;
+    let cancelled = false;
+    setCircleGridAllLoading(true);
+    setCircleGridAllError("");
+    (async () => {
+      try {
+        const data = await fetchCircleRatedTitles({
+          circleId: selectedCircleId,
+          limit: CIRCLE_GRID_PAGE,
+          offset: 0,
+          view: "all",
+        });
+        if (cancelled) return;
+        setCircleGridAllPayload(data);
+      } catch (e) {
+        if (cancelled) return;
+        console.error("Circles: fetchCircleRatedTitles (all) failed", e);
+        setCircleGridAllError(e?.message || "Could not load titles.");
+        setCircleGridAllPayload(null);
+      } finally {
+        if (!cancelled) setCircleGridAllLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, selectedCircleId, user, circleRatingsView, circleGridAllPayload]);
+
+  useEffect(() => {
+    if (screen !== "circle-detail" || !selectedCircleId || !user) return;
+    if (circleRatingsView !== "top") return;
+    if (circleGridTopPayload != null) return;
+    let cancelled = false;
+    setCircleGridTopLoading(true);
+    setCircleGridTopError("");
+    (async () => {
+      try {
+        const data = await fetchCircleRatedTitles({
+          circleId: selectedCircleId,
+          limit: CIRCLE_GRID_PAGE,
+          offset: 0,
+          view: "top",
+        });
+        if (cancelled) return;
+        setCircleGridTopPayload(data);
+      } catch (e) {
+        if (cancelled) return;
+        console.error("Circles: fetchCircleRatedTitles (top) failed", e);
+        setCircleGridTopError(e?.message || "Could not load titles.");
+        setCircleGridTopPayload(null);
+      } finally {
+        if (!cancelled) setCircleGridTopLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, selectedCircleId, user, circleRatingsView, circleGridTopPayload]);
+
   async function loadCircleStripMore() {
     if (!selectedCircleId || !user || circleStripLoadingMore || circleStripLoading) return;
     const prev = circleStripPayload;
@@ -6370,6 +6535,7 @@ export default function App() {
         circleId: selectedCircleId,
         limit: CIRCLE_STRIP_PAGE,
         offset,
+        view: "recent",
       });
       setCircleStripPayload((p) => {
         const base = p || {};
@@ -6389,6 +6555,79 @@ export default function App() {
       setCircleStripError(e?.message || "Could not load more titles.");
     } finally {
       setCircleStripLoadingMore(false);
+    }
+  }
+
+  async function loadCircleGridAllMore() {
+    if (!selectedCircleId || !user || circleGridAllLoadingMore || circleGridAllLoading) return;
+    const prev = circleGridAllPayload;
+    if (!prev || prev.gated) return;
+    const cur = Array.isArray(prev.titles) ? prev.titles : [];
+    const offset = cur.length;
+    if (!prev.has_more) return;
+    setCircleGridAllLoadingMore(true);
+    setCircleGridAllError("");
+    try {
+      const data = await fetchCircleRatedTitles({
+        circleId: selectedCircleId,
+        limit: CIRCLE_GRID_PAGE,
+        offset,
+        view: "all",
+      });
+      setCircleGridAllPayload((p) => {
+        const base = p || {};
+        const merged = [
+          ...(Array.isArray(base.titles) ? base.titles : []),
+          ...(Array.isArray(data.titles) ? data.titles : []),
+        ];
+        return {
+          ...data,
+          titles: merged,
+          total_eligible: data.total_eligible ?? base.total_eligible,
+          has_more: Boolean(data.has_more),
+        };
+      });
+    } catch (e) {
+      console.error("Circles: loadCircleGridAllMore failed", e);
+      setCircleGridAllError(e?.message || "Could not load more titles.");
+    } finally {
+      setCircleGridAllLoadingMore(false);
+    }
+  }
+
+  async function loadCircleGridTopMore() {
+    if (!selectedCircleId || !user || circleGridTopLoadingMore || circleGridTopLoading) return;
+    const prev = circleGridTopPayload;
+    if (!prev || prev.gated) return;
+    const cur = Array.isArray(prev.titles) ? prev.titles : [];
+    const offset = cur.length;
+    if (offset >= CIRCLE_TOP_MAX || !prev.has_more) return;
+    setCircleGridTopLoadingMore(true);
+    setCircleGridTopError("");
+    try {
+      const data = await fetchCircleRatedTitles({
+        circleId: selectedCircleId,
+        limit: CIRCLE_GRID_PAGE,
+        offset,
+        view: "top",
+      });
+      setCircleGridTopPayload((p) => {
+        const base = p || {};
+        const prevTitles = Array.isArray(base.titles) ? base.titles : [];
+        const nextChunk = Array.isArray(data.titles) ? data.titles : [];
+        const merged = prevTitles.concat(nextChunk).slice(0, CIRCLE_TOP_MAX);
+        return {
+          ...data,
+          titles: merged,
+          total_eligible: data.total_eligible ?? base.total_eligible,
+          has_more: Boolean(data.has_more) && merged.length < CIRCLE_TOP_MAX,
+        };
+      });
+    } catch (e) {
+      console.error("Circles: loadCircleGridTopMore failed", e);
+      setCircleGridTopError(e?.message || "Could not load more titles.");
+    } finally {
+      setCircleGridTopLoadingMore(false);
     }
   }
 
@@ -7712,28 +7951,47 @@ export default function App() {
                       </div>
                     );
                   }
-                  if (circleStripError) {
-                    return (
-                      <div className="circles-error-banner" role="alert">
-                        {circleStripError}
+                  const showStripRaterCounts = mc > 2;
+                  const ratingsTabs = (
+                    <div className="section-header circle-detail-strip-header circle-detail-strip-header--tabs">
+                      <div className="section-title">Ratings</div>
+                      <div className="circle-detail-ratings-tabs" role="tablist" aria-label="Circle ratings views">
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={circleRatingsView === "recent"}
+                          className={`circle-detail-ratings-tab${circleRatingsView === "recent" ? " circle-detail-ratings-tab--active" : ""}`}
+                          onClick={() => setCircleRatingsView("recent")}
+                        >
+                          Recent
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={circleRatingsView === "all"}
+                          className={`circle-detail-ratings-tab${circleRatingsView === "all" ? " circle-detail-ratings-tab--active" : ""}`}
+                          onClick={() => setCircleRatingsView("all")}
+                        >
+                          All
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={circleRatingsView === "top"}
+                          className={`circle-detail-ratings-tab${circleRatingsView === "top" ? " circle-detail-ratings-tab--active" : ""}`}
+                          onClick={() => setCircleRatingsView("top")}
+                        >
+                          Top
+                        </button>
                       </div>
-                    );
-                  }
-                  if (circleStripLoading && !circleStripPayload) {
-                    return (
-                      <div className="circle-detail-strip-block">
-                        <div className="section-header circle-detail-strip-header">
-                          <div className="section-title">Recent activity</div>
-                        </div>
-                        <SkeletonStrip count={6} />
-                      </div>
-                    );
-                  }
+                    </div>
+                  );
                   const titles = Array.isArray(circleStripPayload?.titles) ? circleStripPayload.titles : [];
                   const renderStripRow = (row) => {
                     const movie = circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies);
                     const rowKey = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
                     const predDetail = circleStripPredictionForDetail(row);
+                    const distinctRaters = Number(row.distinct_circle_raters ?? 0);
                     const predictedForBadge =
                       row.viewer_score != null && Number.isFinite(Number(row.viewer_score))
                         ? null
@@ -7781,17 +8039,116 @@ export default function App() {
                             predictedNeighborCount={predictedForBadge != null ? predictedNeighborCount : 0}
                           />
                         </div>
-                        {row.section === "together" && row.group_rating != null && (
+                        {row.group_rating != null && (
                           <div
                             className="circle-strip-circle-score"
-                            aria-label={`Circle score ${formatScore(row.group_rating)}`}
+                            aria-label={
+                              showStripRaterCounts && distinctRaters > 0
+                                ? `Circle score ${formatScore(row.group_rating)}, ${distinctRaters} rated in this circle`
+                                : `Circle score ${formatScore(row.group_rating)}`
+                            }
                           >
                             <span className="circle-strip-circle-score__label">Circle</span>
                             <span className="circle-strip-circle-score__num">{formatScore(row.group_rating)}</span>
                           </div>
                         )}
+                        {showStripRaterCounts && distinctRaters > 0 ? (
+                          <div className="circle-strip-rater-count">
+                            {distinctRaters === 1 ? "1 rated" : `${distinctRaters} rated`}
+                          </div>
+                        ) : null}
                         <div className="strip-title">{movie.title}</div>
                         <div className="strip-genre">{formatStripMediaMeta(movie, tvStripMetaByTmdbId)}</div>
+                        {row.section === "solo" && (
+                          <div className="circle-strip-comm-line">
+                            {row.site_rating != null ? (
+                              <span>Cinemastro {formatScore(row.site_rating)}</span>
+                            ) : (
+                              <span className="circle-strip-comm-line--muted">Cinemastro —</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  };
+                  const renderGridCard = (row) => {
+                    const movie = circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies);
+                    const rowKey = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
+                    const predDetail = circleStripPredictionForDetail(row);
+                    const distinctRaters = Number(row.distinct_circle_raters ?? 0);
+                    const predictedForBadge =
+                      row.viewer_score != null && Number.isFinite(Number(row.viewer_score))
+                        ? null
+                        : row.prediction != null && typeof row.prediction.predicted === "number"
+                          ? row.prediction.predicted
+                          : null;
+                    const predictedNeighborCount =
+                      row.prediction != null
+                        ? Number(row.prediction.neighborCount ?? row.prediction.neighbor_count ?? 0)
+                        : 0;
+                    if (!movie) {
+                      return (
+                        <div className="disc-card circle-rated-grid-card" key={rowKey}>
+                          <div className="disc-poster">
+                            <div className="disc-poster-fallback">🎬</div>
+                            <StripPosterBadge
+                              movie={{ id: rowKey, title: "…", type: row.media_type === "tv" ? "tv" : "movie" }}
+                              predicted={null}
+                              predictedNeighborCount={0}
+                            />
+                          </div>
+                          <div className="disc-title">Loading…</div>
+                          <div className="disc-meta">—</div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        className="disc-card circle-rated-grid-card"
+                        key={rowKey}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openDetail(movie, predDetail)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDetail(movie, predDetail);
+                          }
+                        }}
+                      >
+                        <div className="disc-poster">
+                          {movie.poster ? (
+                            <img src={movie.poster} alt="" />
+                          ) : (
+                            <div className="disc-poster-fallback">🎬</div>
+                          )}
+                          <div className="disc-type">{row.media_type === "movie" ? "Movie" : "TV"}</div>
+                          <StripPosterBadge
+                            movie={movie}
+                            predicted={predictedForBadge}
+                            predictedNeighborCount={predictedForBadge != null ? predictedNeighborCount : 0}
+                          />
+                        </div>
+                        {row.group_rating != null && (
+                          <div
+                            className="circle-strip-circle-score circle-rated-grid-score"
+                            aria-label={
+                              showStripRaterCounts && distinctRaters > 0
+                                ? `Circle score ${formatScore(row.group_rating)}, ${distinctRaters} rated in this circle`
+                                : `Circle score ${formatScore(row.group_rating)}`
+                            }
+                          >
+                            <span className="circle-strip-circle-score__label">Circle</span>
+                            <span className="circle-strip-circle-score__num">{formatScore(row.group_rating)}</span>
+                          </div>
+                        )}
+                        {showStripRaterCounts && distinctRaters > 0 ? (
+                          <div className="circle-strip-rater-count">
+                            {distinctRaters === 1 ? "1 rated" : `${distinctRaters} rated`}
+                          </div>
+                        ) : null}
+                        <div className="disc-title">{movie.title}</div>
+                        <div className="disc-meta">{formatStripMediaMeta(movie, tvStripMetaByTmdbId)}</div>
                         {row.section === "solo" && (
                           <div className="circle-strip-comm-line">
                             {row.site_rating != null ? (
@@ -7815,45 +8172,118 @@ export default function App() {
                     && (circleStripPayload.total_eligible ?? 0) > CIRCLE_STRIP_MAX
                     && titles.length >= CIRCLE_STRIP_MAX
                     && !circleStripPayload.has_more;
+                  const allTitles = Array.isArray(circleGridAllPayload?.titles) ? circleGridAllPayload.titles : [];
+                  const topTitles = Array.isArray(circleGridTopPayload?.titles) ? circleGridTopPayload.titles : [];
+                  const showAllMore =
+                    circleGridAllPayload
+                    && !circleGridAllPayload.gated
+                    && circleGridAllPayload.has_more;
+                  const showTopMore =
+                    circleGridTopPayload
+                    && !circleGridTopPayload.gated
+                    && circleGridTopPayload.has_more
+                    && topTitles.length < CIRCLE_TOP_MAX;
+                  const gridSkel = (
+                    <div className="circle-rated-grid" aria-hidden="true">
+                      {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <div key={i} className="circle-rated-grid-skel" />
+                      ))}
+                    </div>
+                  );
+                  const emptyRated = (
+                    <div className="empty-box circle-detail-strip-empty">
+                      <div className="empty-text">No shared ratings in this circle yet.</div>
+                      <div className="empty-sub">Rate titles on your shelf — they&apos;ll show here when circle members have rated too.</div>
+                    </div>
+                  );
                   return (
                     <>
                       <div className="circle-detail-strip-wrap">
-                        {titles.length === 0 ? (
-                          <div className="empty-box circle-detail-strip-empty">
-                            <div className="empty-text">No shared ratings in this circle yet.</div>
-                            <div className="empty-sub">Rate titles on your shelf — they&apos;ll show here when circle members have rated too.</div>
-                          </div>
-                        ) : (
-                          <div className="section circle-detail-strip-section">
-                            <div className="section-header circle-detail-strip-header">
-                              <div className="section-title">Recent activity</div>
-                            </div>
-                            <div className="strip">
-                              {titles.map(renderStripRow)}
-                              {showLoadMore && (
-                                <button
-                                  type="button"
-                                  className="strip-card strip-card--circle-more"
-                                  onClick={() => void loadCircleStripMore()}
-                                  disabled={circleStripLoadingMore}
-                                  aria-label={circleStripLoadingMore ? "Loading more titles" : "Load more titles"}
-                                >
-                                  <div className="strip-poster circle-strip-more-poster">
-                                    {circleStripLoadingMore ? (
-                                      <span className="circle-strip-more-spinner">Loading…</span>
-                                    ) : (
-                                      <span className="circle-strip-more-arrow" aria-hidden>→</span>
-                                    )}
-                                  </div>
-                                  <div className="strip-title">More</div>
-                                  <div className="strip-genre">&nbsp;</div>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
+                        <div className="section circle-detail-strip-section">
+                          {ratingsTabs}
+                          {circleRatingsView === "recent" && circleStripError ? (
+                            <div className="circles-error-banner" role="alert">{circleStripError}</div>
+                          ) : null}
+                          {circleRatingsView === "all" && circleGridAllError ? (
+                            <div className="circles-error-banner" role="alert">{circleGridAllError}</div>
+                          ) : null}
+                          {circleRatingsView === "top" && circleGridTopError ? (
+                            <div className="circles-error-banner" role="alert">{circleGridTopError}</div>
+                          ) : null}
+                          {circleRatingsView === "recent" && circleStripLoading && !circleStripPayload ? (
+                            <SkeletonStrip count={6} />
+                          ) : null}
+                          {circleRatingsView === "all" && circleGridAllLoading && circleGridAllPayload == null ? gridSkel : null}
+                          {circleRatingsView === "top" && circleGridTopLoading && circleGridTopPayload == null ? gridSkel : null}
+                          {circleRatingsView === "recent" && circleStripPayload && !circleStripLoading ? (
+                            titles.length === 0 ? (
+                              emptyRated
+                            ) : (
+                              <div className="strip">
+                                {titles.map(renderStripRow)}
+                                {showLoadMore && (
+                                  <button
+                                    type="button"
+                                    className="strip-card strip-card--circle-more"
+                                    onClick={() => void loadCircleStripMore()}
+                                    disabled={circleStripLoadingMore}
+                                    aria-label={circleStripLoadingMore ? "Loading more titles" : "Load more titles"}
+                                  >
+                                    <div className="strip-poster circle-strip-more-poster">
+                                      {circleStripLoadingMore ? (
+                                        <span className="circle-strip-more-spinner">Loading…</span>
+                                      ) : (
+                                        <span className="circle-strip-more-arrow" aria-hidden>→</span>
+                                      )}
+                                    </div>
+                                    <div className="strip-title">More</div>
+                                    <div className="strip-genre">&nbsp;</div>
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          ) : null}
+                          {circleRatingsView === "all" && circleGridAllPayload && !circleGridAllLoading ? (
+                            allTitles.length === 0 ? (
+                              emptyRated
+                            ) : (
+                              <>
+                                <div className="circle-rated-grid">{allTitles.map(renderGridCard)}</div>
+                                {showAllMore ? (
+                                  <button
+                                    type="button"
+                                    className="circle-rated-grid-more"
+                                    onClick={() => void loadCircleGridAllMore()}
+                                    disabled={circleGridAllLoadingMore}
+                                  >
+                                    {circleGridAllLoadingMore ? "Loading…" : "More"}
+                                  </button>
+                                ) : null}
+                              </>
+                            )
+                          ) : null}
+                          {circleRatingsView === "top" && circleGridTopPayload && !circleGridTopLoading ? (
+                            topTitles.length === 0 ? (
+                              emptyRated
+                            ) : (
+                              <>
+                                <div className="circle-rated-grid">{topTitles.map(renderGridCard)}</div>
+                                {showTopMore ? (
+                                  <button
+                                    type="button"
+                                    className="circle-rated-grid-more"
+                                    onClick={() => void loadCircleGridTopMore()}
+                                    disabled={circleGridTopLoadingMore}
+                                  >
+                                    {circleGridTopLoadingMore ? "Loading…" : "More"}
+                                  </button>
+                                ) : null}
+                              </>
+                            )
+                          ) : null}
+                        </div>
                       </div>
-                      {showSearchHint && (
+                      {showSearchHint && circleRatingsView === "recent" ? (
                         <div className="circle-strip-cap-hint">
                           Showing {CIRCLE_STRIP_MAX} recent titles in this circle. For anything else, search by title in Discover.
                           <div>
@@ -7862,7 +8292,7 @@ export default function App() {
                             </button>
                           </div>
                         </div>
-                      )}
+                      ) : null}
                     </>
                   );
                 })()}
