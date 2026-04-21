@@ -9,7 +9,7 @@
 | Item | State |
 |------|--------|
 | **App version** | **5.5.21** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** includes **5.5.21** (watchlist **⋯** Top / Up / Down / Bottom + **`PASSDOWN-NEXT-CHAT.md`**); should track **`origin`**. |
+| **Git** | **`main`** **5.5.21** (watchlist **⋯** reorder + passdown) pushed to **`origin`**. |
 | **Supabase — apply if not already** | **`20260523120000_watchlist_sort_index.sql`** adds **`watchlist.sort_index`** (required for **⋯ reorder** + ordered selects). Run on hosted DB when ready. |
 | **Edge** | Git push does **not** deploy functions. After RPC changes to Circles, redeploy **`get-circle-rated-titles`** (see migrations below). |
 
