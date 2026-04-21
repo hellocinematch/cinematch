@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-21
+**Last updated:** 2026-04-22
 
 ---
 
@@ -8,8 +8,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.1** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** **5.6.1** (Recent strip order + in-strip **Rate a title** + publish copy); push to **`origin`** when you ship. |
+| **App version** | **5.6.4** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main`** **5.6.4**; push to **`origin`** when you ship. |
 | **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`** — **`rating_circle_shares`** + RPC updates (circle feeds use **published** titles only). **`20260523120000_watchlist_sort_index.sql`** for watchlist **⋯** order. |
 | **Edge** | **`get-circle-rated-titles`** unchanged (still RPC-only); redeploy **optional** after this release. |
 
@@ -64,7 +64,10 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
-- **5.6.1** — Recent: **oldest → newest** (L→R), **Earlier** on the **left**, **Rate a title** add tile to the right of newest; **center-on-land** scroll; empty / leave / grid copy = **publish**; removed bottom **Rate a title** pill.
+- **5.6.4** — Recent add column **76px** wide (half a strip poster), smaller **+**.
+- **5.6.3** — Recent **+** in **poster** band, not vertically centered in full row.
+- **5.6.2** — Recent: **+** in a **round** (muted) for add (replaces large add tile); **`aria-label`** for accessibility.
+- **5.6.1** — Recent: **oldest → newest** (L→R), **Earlier** on the **left**, add tile to the right of newest; **center-on-land** scroll; empty / leave / grid copy = **publish**; removed bottom **Rate a title** pill.
 - **5.6.0** — **`rating_circle_shares`**; circle strip/grids only show **published** titles; publish modal after first rating; **Publish to circles…** on detail; leave circle drops shares for that group.
 - **5.5.21** — Watchlist **⋯**: **⇈ Top**, **↑ Up**, **↓ Down**, **⇊ Bottom** (+ Details, Remove); **`swapWatchlistOrder`**, **`moveWatchlistItemToTop`**, **`moveWatchlistItemToBottom`** in **`App.jsx`**.
 - **5.5.20** — Single-line watchlist meta (type · year · TMDB · genre); strip ellipsis when narrow.
@@ -91,7 +94,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 - **Circle detail:** Ratings **Recent / All / Top**; feeds = **`ratings` ∩ `rating_circle_shares`** for that circle. **`fetchCircleRatedTitles`** + Edge **`get-circle-rated-titles`**. Migrations: **`20260524120000_rating_circle_shares.sql`**, **`20260522120000_...`**, strip **`20260506120000_...`**, etc.
 - **Publish:** first-time rating from detail → modal (skip OK); from circle flow, defaults include that circle. **Publish to circles…** on detail when already rated.
-- **Rate a title** in-strip (right of newest) or empty state → Discover → return to circle via refs.
+- **+** in-strip (right of newest) or empty state → Discover → return to circle via refs.
 
 ### Title detail (basics)
 

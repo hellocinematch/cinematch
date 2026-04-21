@@ -3233,16 +3233,24 @@ const styles = `
   .circle-strip-cap-hint { font-size:12px; color:#777; line-height:1.5; margin-top:8px; text-align:center; max-width:36em; margin-left:auto; margin-right:auto; }
   .circle-strip-cap-hint button { margin-top:8px; background:transparent; border:none; color:#e8c96a; text-decoration:underline; cursor:pointer; font-size:inherit; padding:0; font-family:inherit; }
   .strip--circle-recent--solo-cta { justify-content:center; }
-  .strip-card--circle-add-rate {
-    border:none; background:transparent; padding:0; font:inherit; text-align:center; align-self:flex-start; cursor:pointer;
+  /* Add control: half-width “poster” column (76 = 152/2), + centered in 212px poster row. */
+  .strip-card.strip-card--circle-add-rate {
+    width:76px; max-width:76px; flex-shrink:0; border:none; background:transparent; padding:0; font:inherit; cursor:pointer; text-align:left;
+    align-self:flex-start; box-sizing:border-box;
   }
+  .strip-poster.strip-poster--circle-add-rate-slot { width:76px; min-width:76px; max-width:76px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
   .strip-card--circle-add-rate:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:12px; }
-  .strip-card--circle-add-rate:hover .strip-poster--circle-add-rate { border-color:#555; background:#1e1e1e; }
-  .strip-poster--circle-add-rate {
-    width:152px; min-height:212px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:12px 8px; box-sizing:border-box;
-    border:1px dashed #4a3f25; background:rgba(232,201,106,0.04); color:#d4b96a; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; letter-spacing:0.3px; line-height:1.2;
+  .strip-card--circle-add-rate .strip-title,
+  .strip-card--circle-add-rate .strip-genre { visibility:hidden; }
+  .circle-add-rate-bubble {
+    width:36px; height:36px; border-radius:50%; box-sizing:border-box; display:flex; align-items:center; justify-content:center;
+    border:1px solid rgba(232,201,106,0.32); background:rgba(232,201,106,0.07); color:rgba(201, 175, 120, 0.72);
+    font-family:'DM Sans',sans-serif; font-size:22px; font-weight:300; line-height:1; user-select:none; transition:background 0.15s, border-color 0.15s, color 0.15s; flex-shrink:0;
   }
-  .strip-poster--circle-add-rate__line { display:block; }
+  .strip-card--circle-add-rate:hover .circle-add-rate-bubble {
+    border-color:rgba(232,201,106,0.5); background:rgba(232,201,106,0.12); color:rgba(232, 210, 160, 0.92);
+  }
+  .strip-card--circle-add-rate:active .circle-add-rate-bubble { opacity:0.92; }
   .strip-card--circle-more { border:none; background:transparent; padding:0; font:inherit; text-align:left; align-self:flex-start; }
   .strip-card--circle-more:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:12px; }
   .strip-card--circle-more:disabled { opacity:0.55; cursor:default; }
@@ -8700,12 +8708,13 @@ export default function App() {
                                       className="strip-card strip-card--circle-add-rate"
                                       ref={circleRecentAddCtaRef}
                                       onClick={openDiscoverFromCircleForRating}
-                                      aria-label="Open Discover to rate a title for this circle"
+                                      aria-label="Add a title for this circle. Opens Discover."
                                     >
-                                      <div className="strip-poster strip-poster--circle-add-rate">
-                                        <span className="strip-poster--circle-add-rate__line">Rate</span>
-                                        <span className="strip-poster--circle-add-rate__line">a title</span>
+                                      <div className="strip-poster strip-poster--circle-add-rate-slot" aria-hidden="true">
+                                        <span className="circle-add-rate-bubble">+</span>
                                       </div>
+                                      <div className="strip-title">&nbsp;</div>
+                                      <div className="strip-genre">&nbsp;</div>
                                     </button>
                                   )}
                                 </div>

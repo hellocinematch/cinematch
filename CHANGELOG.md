@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.6.4
+
+- **Circles — Recent add width.** The add column is **half the width** of a title strip card (**76px** vs **152** poster), with a **smaller** round **+**; still **212px** tall poster row for alignment with neighbors.
+
+## 5.6.3
+
+- **Circles — Recent add alignment.** The **+** sits in the same **152×212 poster** band as other strip cards, with `strip-title` / `strip-genre` placeholders (hidden) so the column matches neighbors; `align-self: flex-start` with title cards (no vertical centering in the full row).
+
+## 5.6.2
+
+- **Circles — Recent add control.** The in-strip add action is a **round +** (muted gold, ~48px) instead of a full poster-size “Rate a title” tile, with a clear **`aria-label`**.
+
 ## 5.6.1
 
 - **Circles — Recent strip UX.** Titles are shown **oldest → newest (left → right)** with **load earlier** on the **left** and a **Rate a title** add tile to the **right** of the newest pick (replaces the separate bottom **Rate a title** pill). On load, the strip **scrolls** so the **newest** title is about **centered** in view; re-centering is skipped when loading more **earlier** titles. **All / Top** and placeholder **empty** copy is aligned with the **publish** model; creator **leave** confirmation copy updated.
