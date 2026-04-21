@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.6.7
+
+- **Circles** — Title and type/year/Cinemastro subline are **center**-aligned. Site score segment uses **`⭐ 5.0`** (space after star) for clearer separation from the middle dot.
+
+## 5.6.6
+
+- **Circles — title rows (Recent / All / Top).** Titles are **one line** with **ellipsis**; the line under is **`Movie`/`TV` · year · `⭐`Cinemastro** (e.g. `TV · 2026 · ⭐5.0`), with **—** when there is no site average. **Circle** row (group score + rater count) is unchanged. The extra **Cinemastro**-only line under `solo` is removed; site score is in the combined line.
+
 ## 5.6.5
 
 - **Circles — Recent scroll hint.** When the strip is horizontally scrollable and not at the **left** edge (e.g. after centering on the newest title), a **faded ← in a round** appears on the **left** over the poster row; **pointer-events: none** so it does not block dragging. Shown when `scrollLeft > 4` and `scrollWidth > clientWidth`.

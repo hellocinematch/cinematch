@@ -2160,7 +2160,9 @@ const styles = `
   .strip-kind-icon--pop { color:#888; }
   .strip-hot-theater-pill { position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.78); color:#c9b87c; font-size:10px; font-weight:500; padding:3px 7px; border-radius:8px; z-index:2; font-family:'DM Sans',sans-serif; letter-spacing:0.02em; }
   .strip-title { font-size:14px; color:#ccc; margin-top:9px; line-height:1.35; }
+  .strip-title.strip-title--circle-single { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; max-width:100%; text-align:center; }
   .strip-genre { font-size:11px; color:#555; margin-top:2px; }
+  .strip-genre.strip-genre--circle-cine { font-size:11px; color:#666; margin-top:4px; line-height:1.35; letter-spacing:0.1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
   .strip-card-skeleton { flex-shrink:0; width:152px; }
   .skel-poster { width:152px; height:212px; border-radius:12px; border:1px solid #1e1e1e; position:relative; overflow:hidden; background:#141414; }
   /* Placeholder pill where Pick/Popular icon will appear (Your picks skeleton). */
@@ -2261,7 +2263,9 @@ const styles = `
   .cinemastro-vote-meter--disc { max-width:56px; }
   .disc-unseen-badge { color:#555; font-size:10px; font-family:'DM Sans',sans-serif; }
   .disc-title { font-size:13px; color:#ccc; margin-top:8px; line-height:1.3; font-weight:500; overflow-wrap:anywhere; word-break:break-word; }
+  .disc-title.disc-title--circle-single { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; overflow-wrap:normal; word-break:normal; min-width:0; max-width:100%; text-align:center; }
   .disc-meta { font-size:11px; color:#555; margin-top:2px; overflow-wrap:anywhere; word-break:break-word; }
+  .disc-meta.disc-meta--circle-cine { color:#666; line-height:1.35; letter-spacing:0.1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
   .disc-empty { padding:48px 24px; text-align:center; }
   .disc-empty-text { font-size:14px; color:#444; }
 
@@ -3181,6 +3185,7 @@ const styles = `
     width:100%;
     box-sizing:border-box;
   }
+  .circle-rated-grid .disc-card { min-width:0; }
   @media (max-width: 360px) {
     .circle-rated-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
   }
@@ -3630,6 +3635,29 @@ function formatStripMediaMeta(movie, tvMetaByTmdbId) {
     return `TV · ${latestYear} · S${Number(meta.seasonCount)}`;
   }
   return `TV · ${latestYear}`;
+}
+
+/** Circle strip/grid: one line e.g. `TV · 2026 · ⭐5.0` (Cinemastro site average when available). */
+function formatCircleSublineTypeYearCine(movie, tvMetaByTmdbId, siteRating) {
+  const type = movie?.type === "tv" ? "TV" : "Movie";
+  let year = "—";
+  if (movie?.type === "tv") {
+    const meta = movie?.tmdbId != null ? tvMetaByTmdbId?.[movie.tmdbId] : null;
+    const y = meta?.latestYear ?? movie?.year;
+    if (y != null && String(y).trim() !== "") year = String(y);
+  } else {
+    if (movie?.year != null && String(movie.year).trim() !== "") {
+      year = String(movie.year);
+    } else {
+      const rd = movie?.releaseDate;
+      if (rd && /^\d{4}/.test(String(rd))) year = String(rd).slice(0, 4);
+    }
+  }
+  const cine =
+    siteRating != null && Number.isFinite(Number(siteRating))
+      ? `⭐ ${formatScore(siteRating)}`
+      : "—";
+  return `${type} · ${year} · ${cine}`;
 }
 
 function pickMoodMix(results, movieTarget = 7, tvTarget = 3) {
@@ -8510,8 +8538,8 @@ export default function App() {
                           <div className="strip-poster">
                             <div className="strip-poster-fallback">🎬</div>
                           </div>
-                          <div className="strip-title">Loading…</div>
-                          <div className="strip-genre">—</div>
+                          <div className="strip-title strip-title--circle-single">Loading…</div>
+                          <div className="strip-genre strip-genre--circle-cine">—</div>
                         </div>
                       );
                     }
@@ -8560,17 +8588,12 @@ export default function App() {
                             {distinctRaters === 1 ? "1 rated" : `${distinctRaters} rated`}
                           </div>
                         ) : null}
-                        <div className="strip-title">{movie.title}</div>
-                        <div className="strip-genre">{formatStripMediaMeta(movie, tvStripMetaByTmdbId)}</div>
-                        {row.section === "solo" && (
-                          <div className="circle-strip-comm-line">
-                            {row.site_rating != null ? (
-                              <span>Cinemastro {formatScore(row.site_rating)}</span>
-                            ) : (
-                              <span className="circle-strip-comm-line--muted">Cinemastro —</span>
-                            )}
-                          </div>
-                        )}
+                        <div className="strip-title strip-title--circle-single" title={movie.title}>
+                          {movie.title}
+                        </div>
+                        <div className="strip-genre strip-genre--circle-cine" aria-label="Type, year, and Cinemastro community average">
+                          {formatCircleSublineTypeYearCine(movie, tvStripMetaByTmdbId, row.site_rating ?? null)}
+                        </div>
                       </div>
                     );
                   };
@@ -8600,8 +8623,8 @@ export default function App() {
                               predictedNeighborCount={0}
                             />
                           </div>
-                          <div className="disc-title">Loading…</div>
-                          <div className="disc-meta">—</div>
+                          <div className="disc-title disc-title--circle-single">Loading…</div>
+                          <div className="disc-meta disc-meta--circle-cine">—</div>
                         </div>
                       );
                     }
@@ -8650,17 +8673,12 @@ export default function App() {
                             {distinctRaters === 1 ? "1 rated" : `${distinctRaters} rated`}
                           </div>
                         ) : null}
-                        <div className="disc-title">{movie.title}</div>
-                        <div className="disc-meta">{formatStripMediaMeta(movie, tvStripMetaByTmdbId)}</div>
-                        {row.section === "solo" && (
-                          <div className="circle-strip-comm-line">
-                            {row.site_rating != null ? (
-                              <span>Cinemastro {formatScore(row.site_rating)}</span>
-                            ) : (
-                              <span className="circle-strip-comm-line--muted">Cinemastro —</span>
-                            )}
-                          </div>
-                        )}
+                        <div className="disc-title disc-title--circle-single" title={movie.title}>
+                          {movie.title}
+                        </div>
+                        <div className="disc-meta disc-meta--circle-cine" aria-label="Type, year, and Cinemastro community average">
+                          {formatCircleSublineTypeYearCine(movie, tvStripMetaByTmdbId, row.site_rating ?? null)}
+                        </div>
                       </div>
                     );
                   };
