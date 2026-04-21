@@ -6,8 +6,8 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.9** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message).  
-> **Context:** **Circles** use **`rating_circle_shares`** (prod migration applied); **Recent** strip is oldest→newest L→R, **Earlier** loads older titles on the **left**, **+** (half-width) adds from Discover; **faded ←** on the left when you can pan for more; title + one line `Movie|TV · year · ⭐ n.n` centered; **All / Top** = watchlist-style **list** (title · year, then Circle / You / Cinemastro ratings); **5.6.8** fixed **bottom bar** so **top nav** → Circles/Streaming/… sets **`navTab` to `home`** (Watchlist no longer stuck active). **Edge** `get-circle-rated-titles` = RPC still; redeploy only if the function file changes. **Cron** neighbor coverage: **`COMPUTE-NEIGHBORS-CRON.md`**.
+> Cinematch is on **`main` at 5.6.10** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message).  
+> **Context:** **Circles** use **`rating_circle_shares`** (prod migration applied); **Recent** strip is oldest→newest L→R, **Earlier** loads older titles on the **left**, **+** (half-width) adds from Discover; **faded ←** on the left when you can pan for more; title + one line `Movie|TV · year · ⭐ n.n` centered; **All / Top** = watchlist-style **list** (title · year, then Circle `(n)` when **memberCount > 2** + distinct raters, You, Cinemastro); **5.6.8** fixed **bottom bar** so **top nav** → Circles/Streaming/… sets **`navTab` to `home`** (Watchlist no longer stuck active). **Edge** `get-circle-rated-titles` = RPC still; redeploy only if the function file changes. **Cron** neighbor coverage: **`COMPUTE-NEIGHBORS-CRON.md`**.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,8 +17,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.9** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main` pushed**; last ship **5.6.9** (Circles All/Top list); push **`origin`** when you ship. |
+| **App version** | **5.6.10** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main` pushed**; last ship **5.6.10** (All/Top Circle `(n)`); push **`origin`** when you ship. |
 | **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`** — **`rating_circle_shares`** + RPC updates (circle feeds use **published** titles only). **`20260523120000_watchlist_sort_index.sql`** for watchlist **⋯** order. |
 | **Edge** | **`get-circle-rated-titles`** unchanged (still RPC-only); redeploy **optional** after this release. |
 
@@ -73,6 +73,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.10** — **Circles All / Top:** **(n)** after **Circle** score when **memberCount > 2** and **n** raters (`distinct_circle_raters`).
 - **5.6.9** — **Circles All / Top:** watchlist-style **list**; line 1 **title · year**; line 2 **Circle** → **You** → **Cinemastro** (⭐), omit missing; row opens **detail**.
 - **5.6.8** — **Primary nav** → Circles/… clears **bottom** watchlist tab highlight (`navTab` `home`).
 - **5.6.7** — Circle title lines **centered**; `⭐` score spacing.
@@ -109,7 +110,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 - **Circle detail:** Ratings **Recent / All / Top**; feeds = **`ratings` ∩ `rating_circle_shares`** for that circle. **`fetchCircleRatedTitles`** + Edge **`get-circle-rated-titles`**. Migrations: **`20260524120000_rating_circle_shares.sql`**, **`20260522120000_...`**, strip **`20260506120000_...`**, etc.
 - **Publish:** first-time rating from detail → modal (skip OK); from circle flow, defaults include that circle. **Publish to circles…** on detail when already rated.
 - **Recent strip:** Titles **oldest → newest** (L→R); **Earlier** (paginate) on the **left**; **+** in a **76px**-wide poster band (right of newest); **center-on-land** scroll for newest; **faded ←** (non-interactive) when `scrollLeft > 0` and the row overflows.
-- **All / Top:** **List** (like Watchlist): **title · year** on line 1; line 2 **Circle** / **You** / **Cinemastro** with **⭐** (omit if missing); **`CircleAllTopRatingsLine`**, **`formatCircleListYear`** in **`App.jsx`**. **Recent** strip cards still use **`formatCircleSublineTypeYearCine`** (centered poster row).
+- **All / Top:** **List** (like Watchlist): **title · year** on line 1; line 2 **Circle** / **You** / **Cinemastro** with **⭐** (omit if missing); **Circle** may show **(n)** after the score when **`memberCount > 2`** and **`distinct_circle_raters`**. **`CircleAllTopRatingsLine`**, **`formatCircleListYear`** in **`App.jsx`**. **Recent** strip cards still use **`formatCircleSublineTypeYearCine`** (centered poster row).
 - **+** or empty state → **Discover**; **`rateTitleReturnCircleIdRef`** / **`detailReturnScreenRef`** for return to circle.
 
 ### Title detail (basics)

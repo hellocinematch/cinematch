@@ -3264,6 +3264,7 @@ const styles = `
   .circle-list-rating__num { font-weight:600; font-family:'DM Sans',sans-serif; }
   .circle-list-rating--circle .circle-list-rating__lbl { color:#888; }
   .circle-list-rating--circle .circle-list-rating__num { color:#d4a84a; }
+  .circle-list-rating__paren { color:#888; font-weight:600; margin-left:2px; font-size:11px; }
   .circle-list-rating--you .circle-list-rating__lbl { color:#6ab4e8; }
   .circle-list-rating--you .circle-list-rating__num { color:#6aaa6a; }
   .circle-list-rating--cine .circle-list-rating__lbl { color:#888; }
@@ -3750,20 +3751,35 @@ function formatCircleListYear(movie, tvMetaByTmdbId) {
 }
 
 /** Circle All/Top list row: Circle → You → Cinemastro (only when present). */
-function CircleAllTopRatingsLine({ row }) {
+function CircleAllTopRatingsLine({ row, showRaterParen }) {
   const gr = row.group_rating;
   const vs = row.viewer_score;
   const sr = row.site_rating;
+  const distinctRaters = Number(row.distinct_circle_raters ?? 0);
   const hasCircle = gr != null && Number.isFinite(Number(gr));
   const hasYou = vs != null && Number.isFinite(Number(vs));
   const hasCine = sr != null && Number.isFinite(Number(sr));
+  const showParen = Boolean(showRaterParen) && hasCircle && distinctRaters > 0;
   const nodes = [];
   if (hasCircle) {
     nodes.push(
-      <span key="c" className="circle-list-rating circle-list-rating--circle">
+      <span
+        key="c"
+        className="circle-list-rating circle-list-rating--circle"
+        aria-label={
+          showParen
+            ? `Circle score ${formatScore(Number(gr))}, ${distinctRaters} rated in this circle`
+            : `Circle score ${formatScore(Number(gr))}`
+        }
+      >
         <span className="circle-list-rating__lbl">Circle</span>
         <span className="circle-list-rating__star" aria-hidden="true">⭐</span>
         <span className="circle-list-rating__num">{formatScore(Number(gr))}</span>
+        {showParen ? (
+          <span className="circle-list-rating__paren" aria-hidden="true">
+            ({distinctRaters})
+          </span>
+        ) : null}
       </span>,
     );
   }
@@ -8798,7 +8814,7 @@ export default function App() {
                           <div className="wl-list-title" title={movie.title}>
                             {titleLine}
                           </div>
-                          <CircleAllTopRatingsLine row={row} />
+                          <CircleAllTopRatingsLine row={row} showRaterParen={showStripRaterCounts} />
                         </div>
                       </button>
                     );

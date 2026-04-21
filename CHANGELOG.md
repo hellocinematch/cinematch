@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.10
+
+- **Circles — All / Top:** After the **Circle** score, show **(n)** when the circle has **more than two members** and **n** members rated that title (`distinct_circle_raters`), matching the **Recent** strip’s rater-count rule.
+
 ## 5.6.9
 
 - **Circles — All / Top:** Replaced the poster **grid** with a **watchlist-style list** (thumb + text). First line is **title · year**; second line shows **Circle**, **You**, and **Cinemastro** ratings in that order (each with **⭐**), omitting scores that are not available. **Circle** uses amber numerals, **You** uses a blue label and green score, **Cinemastro** uses gold. Rows open **title detail** on tap.
