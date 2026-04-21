@@ -7330,6 +7330,8 @@ export default function App() {
       setScreen("watchlist");
       return;
     }
+    /* Primary nav → Circles / Pulse / etc. is not a bottom-tab screen; clear watchlist/mood/profile highlight. */
+    setNavTab("home");
     setScreen(nextScreen);
   }
 

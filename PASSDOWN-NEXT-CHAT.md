@@ -8,8 +8,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.7** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** **5.6.7**; push to **`origin`** when you ship. |
+| **App version** | **5.6.8** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main`** **5.6.8**; push to **`origin`** when you ship. |
 | **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`** — **`rating_circle_shares`** + RPC updates (circle feeds use **published** titles only). **`20260523120000_watchlist_sort_index.sql`** for watchlist **⋯** order. |
 | **Edge** | **`get-circle-rated-titles`** unchanged (still RPC-only); redeploy **optional** after this release. |
 
@@ -64,6 +64,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.8** — **Primary nav** → Circles/… clears **bottom** watchlist tab highlight (`navTab` `home`).
 - **5.6.7** — Circle title lines **centered**; `⭐` score spacing.
 - **5.6.6** — Circle strip/grid: one-line **title** + type · year · Cine; Circle score row unchanged.
 - **5.6.5** — Recent: faded **←** in circle on **left** when you can pan left (more titles off-screen).

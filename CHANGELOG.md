@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.8
+
+- **Navigation:** Opening **Circles** (or other primary sections) from the **top nav** after being on **Watchlist** now sets **`navTab` to `home`**, so the bottom bar no longer keeps the **Watchlist** ring.
+
 ## 5.6.7
 
 - **Circles** — Title and type/year/Cinemastro subline are **center**-aligned. Site score segment uses **`⭐ 5.0`** (space after star) for clearer separation from the middle dot.
