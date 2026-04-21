@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.1
+
+- **Circles — Recent strip UX.** Titles are shown **oldest → newest (left → right)** with **load earlier** on the **left** and a **Rate a title** add tile to the **right** of the newest pick (replaces the separate bottom **Rate a title** pill). On load, the strip **scrolls** so the **newest** title is about **centered** in view; re-centering is skipped when loading more **earlier** titles. **All / Top** and placeholder **empty** copy is aligned with the **publish** model; creator **leave** confirmation copy updated.
+
 ## 5.6.0
 
 - **Circles — publish ratings per group.** New table **`rating_circle_shares`** (`user_id`, `tmdb_id`, `media_type`, `circle_id`): a title appears in a circle’s Recent / All / Top feeds only if the member **published** it there. **No backfill** — existing circles start empty until users publish. **Leave circle** (trigger on `circle_members` delete) removes that member’s shares for that circle only; global **`ratings`** rows unchanged.

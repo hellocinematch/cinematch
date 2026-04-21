@@ -9,14 +9,14 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 1. **Read this file first** — `HANDOFF.md` at the repository root:  
    `/Users/tlmahesh/Library/Mobile Documents/com~apple~CloudDocs/Cinematch/HANDOFF.md`
 2. In Cursor chat, attach it: type **`@HANDOFF.md`** and select the file, or paste: *“Follow `HANDOFF.md`.”*
-3. **Version bump rule:** trust **`package.json`** / **`CHANGELOG.md`** for the current release (now **5.6.0** — circle **rating publish**). Bump both whenever you ship product code; add **`CHANGELOG.md`** in the **same release commit** as the first shipping change—not in a handoff-only or docs-only commit.
+3. **Version bump rule:** trust **`package.json`** / **`CHANGELOG.md`** for the current release (now **5.6.1**). Bump both whenever you ship product code; add **`CHANGELOG.md`** in the **same release commit** as the first shipping change—not in a handoff-only or docs-only commit.
 
 ---
 
 ## Current state (as of last update)
 
 - **`main` is pushed** to `origin` (includes Circles Phase A + RLS hotfix + Phase B + Phase C strip backend + Phase C strip UI).
-- **`package.json` version:** **`5.6.0`** — circle feeds use **`rating_circle_shares`** (published titles only); see **`CHANGELOG.md`** and **`PASSDOWN-NEXT-CHAT.md`**.
+- **`package.json` version:** **`5.6.1`** — see **`CHANGELOG.md`**; circle feeds use **`rating_circle_shares`**; Recent strip layout + copy in **5.6.1**.
 - **Prod DB:** Circles schema through strip/grids + watchlist + **rating publish** — ensure **`20260524120000_rating_circle_shares.sql`** is applied (feeds join through shares; leave-circle trigger clears shares for that member+circle). Earlier migrations as in repo / **`PASSDOWN-NEXT-CHAT.md`** checklist.
 - **Edge functions:** `send-circle-invite`, `accept-circle-invite`, and **`get-circle-rated-titles`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`).
 
@@ -113,6 +113,6 @@ git status && git log -5 --oneline
 grep '"version"' package.json
 ```
 
-Expected version line: match **`package.json`** / **`CHANGELOG.md`** (currently **`5.6.0`**).
+Expected version line: match **`package.json`** / **`CHANGELOG.md`** (currently **`5.6.1`**).
 
 If this file overwrote older notes, recover the previous text with: `git show HEAD~1:HANDOFF.md` (adjust `HEAD~1` if needed).

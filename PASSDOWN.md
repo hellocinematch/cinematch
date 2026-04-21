@@ -8,7 +8,7 @@ Attach **`@PASSDOWN.md`** only if you rely on the narrative below. Use **`@HANDO
 
 ## Repo version
 
-- **`package.json`:** **5.6.0** — circle **rating publish** (`rating_circle_shares`); see **`CHANGELOG.md`** and **`PASSDOWN-NEXT-CHAT.md`**.
+- **`package.json`:** **5.6.1** — circle **rating publish** + Recent strip / copy updates; see **`CHANGELOG.md`** and **`PASSDOWN-NEXT-CHAT.md`**.
 - **Next bump:** follow repo convention — bump **`package.json`** + **`CHANGELOG.md`** together when the next feature ships.
 
 ---
@@ -102,6 +102,6 @@ grep '"version"' package.json
 git status && git log -3 --oneline
 ```
 
-Expected: **`"version": "5.6.0"`** (always match **`package.json`**).
+Expected: match **`package.json`** (e.g. **`"version": "5.6.1"`**).
 
 If this file overwrote older notes: `git show HEAD~1:PASSDOWN.md` (adjust `HEAD~n` as needed).

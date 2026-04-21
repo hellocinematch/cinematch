@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from "react";
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from "react";
 import packageJson from "../package.json";
 import { AppFooter } from "./appFooter.jsx";
 import { supabase } from "./supabase";
@@ -3232,30 +3232,17 @@ const styles = `
   .circle-detail-strip-empty .empty-sub { margin-top:8px; font-size:12px; color:#777; line-height:1.45; }
   .circle-strip-cap-hint { font-size:12px; color:#777; line-height:1.5; margin-top:8px; text-align:center; max-width:36em; margin-left:auto; margin-right:auto; }
   .circle-strip-cap-hint button { margin-top:8px; background:transparent; border:none; color:#e8c96a; text-decoration:underline; cursor:pointer; font-size:inherit; padding:0; font-family:inherit; }
-  .circle-rate-title-pill-wrap {
-    display:flex;
-    justify-content:center;
-    margin-top:18px;
-    padding-bottom:4px;
-    width:100%;
-    box-sizing:border-box;
+  .strip--circle-recent--solo-cta { justify-content:center; }
+  .strip-card--circle-add-rate {
+    border:none; background:transparent; padding:0; font:inherit; text-align:center; align-self:flex-start; cursor:pointer;
   }
-  .circle-rate-title-pill {
-    appearance:none;
-    background:transparent;
-    border:1px solid #e8c96a;
-    color:#e8c96a;
-    padding:10px 22px;
-    border-radius:999px;
-    font-family:'DM Sans',sans-serif;
-    font-size:13px;
-    font-weight:600;
-    letter-spacing:0.2px;
-    cursor:pointer;
-    transition:border-color 0.15s, background 0.15s, color 0.15s;
+  .strip-card--circle-add-rate:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:12px; }
+  .strip-card--circle-add-rate:hover .strip-poster--circle-add-rate { border-color:#555; background:#1e1e1e; }
+  .strip-poster--circle-add-rate {
+    width:152px; min-height:212px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:12px 8px; box-sizing:border-box;
+    border:1px dashed #4a3f25; background:rgba(232,201,106,0.04); color:#d4b96a; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; letter-spacing:0.3px; line-height:1.2;
   }
-  .circle-rate-title-pill:hover { background:rgba(232,201,106,0.08); border-color:#f0dc9a; color:#f0dc9a; }
-  .circle-rate-title-pill:active { opacity:0.92; }
+  .strip-poster--circle-add-rate__line { display:block; }
   .strip-card--circle-more { border:none; background:transparent; padding:0; font:inherit; text-align:left; align-self:flex-start; }
   .strip-card--circle-more:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:12px; }
   .strip-card--circle-more:disabled { opacity:0.55; cursor:default; }
@@ -3837,6 +3824,11 @@ export default function App() {
 
   /** When set, opening title detail from Discover returns to `circle-detail` after rating/back (see `openDetail`). */
   const rateTitleReturnCircleIdRef = useRef(null);
+  /** Recent strip: horizontal scroller, newest title ref (for “center on land”), add CTA when empty, skip re-center after “load more”. */
+  const circleRecentStripRef = useRef(null);
+  const circleRecentNewestRef = useRef(null);
+  const circleRecentAddCtaRef = useRef(null);
+  const circleRecentSkipScrollAfterLoadMoreRef = useRef(false);
   /** Browser Back should return to the in-app screen that opened detail, not leave the site (SPA history). */
   const detailReturnScreenRef = useRef(null);
   const detailHistoryPushedRef = useRef(false);
@@ -6777,6 +6769,7 @@ export default function App() {
     const offset = cur.length;
     if (offset >= CIRCLE_STRIP_MAX || !prev.has_more) return;
 
+    circleRecentSkipScrollAfterLoadMoreRef.current = true;
     setCircleStripLoadingMore(true);
     setCircleStripError("");
     try {
@@ -6806,6 +6799,30 @@ export default function App() {
       setCircleStripLoadingMore(false);
     }
   }
+
+  // Circle Recent: on first load / circle change, scroll so newest title is ~centered; skip re-center after “Load earlier”.
+  useLayoutEffect(() => {
+    if (screen !== "circle-detail" || circleRatingsView !== "recent" || !circleStripPayload) return;
+    if (circleStripLoading) return;
+    if (circleStripLoadingMore) return;
+    if (circleRecentSkipScrollAfterLoadMoreRef.current) {
+      circleRecentSkipScrollAfterLoadMoreRef.current = false;
+      return;
+    }
+    const scroller = circleRecentStripRef.current;
+    if (!scroller) return;
+    const t = Array.isArray(circleStripPayload.titles) ? circleStripPayload.titles : [];
+    const center = (el) => {
+      if (!el) return;
+      const left = el.offsetLeft + el.offsetWidth / 2 - scroller.clientWidth / 2;
+      scroller.scrollLeft = Math.max(0, Math.min(left, scroller.scrollWidth - scroller.clientWidth));
+    };
+    if (t.length === 0) {
+      center(circleRecentAddCtaRef.current);
+      return;
+    }
+    center(circleRecentNewestRef.current);
+  }, [screen, circleRatingsView, selectedCircleId, circleStripPayload, circleStripLoading, circleStripLoadingMore, circleRatedRefreshKey]);
 
   async function loadCircleGridAllMore() {
     if (!selectedCircleId || !user || circleGridAllLoadingMore || circleGridAllLoading) return;
@@ -8353,10 +8370,11 @@ export default function App() {
                   if (mc < 2) {
                     return (
                       <div className="circle-detail-placeholder">
-                        <div className="circle-detail-placeholder__title">Rated in this circle</div>
+                        <div className="circle-detail-placeholder__title">Ratings in this circle</div>
                         <div className="circle-detail-placeholder__text">
-                          Once your circle has at least two members, the titles you&apos;ve all rated will
-                          show up here with a group score and your personal prediction.
+                          Once you have at least two members, you can publish titles here. Each pick appears
+                          when a member has shared that rating to this circle — with a group score and
+                          your personal prediction.
                         </div>
                       </div>
                     );
@@ -8397,7 +8415,8 @@ export default function App() {
                     </div>
                   );
                   const titles = Array.isArray(circleStripPayload?.titles) ? circleStripPayload.titles : [];
-                  const renderStripRow = (row) => {
+                  const stripTitlesOrdered = titles.length > 0 ? [...titles].reverse() : [];
+                  const renderStripRow = (row, isNewest) => {
                     const movie = circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies);
                     const rowKey = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
                     const predDetail = circleStripPredictionForDetail(row);
@@ -8414,7 +8433,11 @@ export default function App() {
                         : 0;
                     if (!movie) {
                       return (
-                        <div className="strip-card strip-card--circle-pending" key={rowKey}>
+                        <div
+                          className="strip-card strip-card--circle-pending"
+                          key={rowKey}
+                          ref={isNewest ? circleRecentNewestRef : null}
+                        >
                           <div className="strip-poster">
                             <div className="strip-poster-fallback">🎬</div>
                           </div>
@@ -8427,6 +8450,7 @@ export default function App() {
                       <div
                         className="strip-card"
                         key={rowKey}
+                        ref={isNewest ? circleRecentNewestRef : null}
                         role="button"
                         tabIndex={0}
                         onClick={() => openDetail(movie, predDetail)}
@@ -8602,10 +8626,17 @@ export default function App() {
                   );
                   const emptyRated = (
                     <div className="empty-box circle-detail-strip-empty">
-                      <div className="empty-text">No shared ratings in this circle yet.</div>
-                      <div className="empty-sub">Rate titles on your shelf — they&apos;ll show here when circle members have rated too.</div>
+                      <div className="empty-text">Nothing published in this circle yet.</div>
+                      <div className="empty-sub">When members rate and choose to share here, those picks appear in these views.</div>
                     </div>
                   );
+                  const recentStripActiveEmptyCopy =
+                    titles.length === 0 && circleDetailData.status === "active" ? (
+                      <div className="empty-box circle-detail-strip-empty circle-detail-recent-empty-copy">
+                        <div className="empty-text">Nothing published here yet.</div>
+                        <div className="empty-sub">Rate a title, then use Publish to circles to show it here (there&apos;s no backfill).</div>
+                      </div>
+                    ) : null;
                   return (
                     <>
                       <div className="circle-detail-strip-wrap">
@@ -8626,31 +8657,59 @@ export default function App() {
                           {circleRatingsView === "all" && circleGridAllLoading && circleGridAllPayload == null ? gridSkel : null}
                           {circleRatingsView === "top" && circleGridTopLoading && circleGridTopPayload == null ? gridSkel : null}
                           {circleRatingsView === "recent" && circleStripPayload && !circleStripLoading ? (
-                            titles.length === 0 ? (
+                            titles.length === 0 && circleDetailData.status !== "active" ? (
                               emptyRated
                             ) : (
-                              <div className="strip">
-                                {titles.map(renderStripRow)}
-                                {showLoadMore && (
-                                  <button
-                                    type="button"
-                                    className="strip-card strip-card--circle-more"
-                                    onClick={() => void loadCircleStripMore()}
-                                    disabled={circleStripLoadingMore}
-                                    aria-label={circleStripLoadingMore ? "Loading more titles" : "Load more titles"}
-                                  >
-                                    <div className="strip-poster circle-strip-more-poster">
-                                      {circleStripLoadingMore ? (
-                                        <span className="circle-strip-more-spinner">Loading…</span>
-                                      ) : (
-                                        <span className="circle-strip-more-arrow" aria-hidden>→</span>
-                                      )}
-                                    </div>
-                                    <div className="strip-title">More</div>
-                                    <div className="strip-genre">&nbsp;</div>
-                                  </button>
-                                )}
-                              </div>
+                              <>
+                                {recentStripActiveEmptyCopy}
+                                <div
+                                  ref={circleRecentStripRef}
+                                  className={`strip strip--circle-recent${
+                                    titles.length === 0
+                                      ? " strip--circle-recent--solo-cta"
+                                      : ""
+                                  }`}
+                                >
+                                  {showLoadMore && (
+                                    <button
+                                      type="button"
+                                      className="strip-card strip-card--circle-more"
+                                      onClick={() => void loadCircleStripMore()}
+                                      disabled={circleStripLoadingMore}
+                                      aria-label={
+                                        circleStripLoadingMore ? "Loading earlier titles" : "Load earlier titles"
+                                      }
+                                    >
+                                      <div className="strip-poster circle-strip-more-poster">
+                                        {circleStripLoadingMore ? (
+                                          <span className="circle-strip-more-spinner">Loading…</span>
+                                        ) : (
+                                          <span className="circle-strip-more-arrow" aria-hidden>←</span>
+                                        )}
+                                      </div>
+                                      <div className="strip-title">Earlier</div>
+                                      <div className="strip-genre">&nbsp;</div>
+                                    </button>
+                                  )}
+                                  {stripTitlesOrdered.map((row, i) =>
+                                    renderStripRow(row, i === stripTitlesOrdered.length - 1)
+                                  )}
+                                  {circleDetailData.status === "active" && (
+                                    <button
+                                      type="button"
+                                      className="strip-card strip-card--circle-add-rate"
+                                      ref={circleRecentAddCtaRef}
+                                      onClick={openDiscoverFromCircleForRating}
+                                      aria-label="Open Discover to rate a title for this circle"
+                                    >
+                                      <div className="strip-poster strip-poster--circle-add-rate">
+                                        <span className="strip-poster--circle-add-rate__line">Rate</span>
+                                        <span className="strip-poster--circle-add-rate__line">a title</span>
+                                      </div>
+                                    </button>
+                                  )}
+                                </div>
+                              </>
                             )
                           ) : null}
                           {circleRatingsView === "all" && circleGridAllPayload && !circleGridAllLoading ? (
@@ -8706,17 +8765,6 @@ export default function App() {
                     </>
                   );
                 })()}
-                {circleDetailData.status === "active" && (
-                  <div className="circle-rate-title-pill-wrap">
-                    <button
-                      type="button"
-                      className="circle-rate-title-pill"
-                      onClick={openDiscoverFromCircleForRating}
-                    >
-                      Rate a title
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -9059,8 +9107,8 @@ export default function App() {
             <div className="circles-confirm-title">Leave this circle?</div>
             <div className="circles-confirm-text">
               {currentUserRole(leaveConfirmCircle, user?.id) === "creator"
-                ? "You're the creator. Leaving will archive the circle — members can still view it, but no new invites or ratings will flow through."
-                : "Titles you published here will be removed from this circle. Your personal ratings stay on your account."}
+                ? "You're the creator. Leaving will archive the circle. No new invites. Picks published in this group stop showing in its feeds; members can still view the archived circle."
+                : "Picks you published in this group will be removed from this circle. Your personal ratings on your account stay the same."}
             </div>
             {leaveCircleError && <div className="circles-error-banner">{leaveCircleError}</div>}
             <div className="circles-sheet-actions">
