@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.9
+
+- **Circles — All / Top:** Replaced the poster **grid** with a **watchlist-style list** (thumb + text). First line is **title · year**; second line shows **Circle**, **You**, and **Cinemastro** ratings in that order (each with **⭐**), omitting scores that are not available. **Circle** uses amber numerals, **You** uses a blue label and green score, **Cinemastro** uses gold. Rows open **title detail** on tap.
+
 ## 5.6.8
 
 - **Navigation:** Opening **Circles** (or other primary sections) from the **top nav** after being on **Watchlist** now sets **`navTab` to `home`**, so the bottom bar no longer keeps the **Watchlist** ring.

@@ -3218,6 +3218,80 @@ const styles = `
     aspect-ratio:2/3;
     animation:circleRatedGridSkel 1.2s ease-in-out infinite;
   }
+  .circle-rated-list {
+    padding:0;
+    width:100%;
+    max-width:100%;
+    box-sizing:border-box;
+  }
+  .circle-rated-list--skel { padding:0 0 8px; }
+  .circle-rated-list-row {
+    display:flex;
+    align-items:center;
+    gap:12px;
+    width:100%;
+    min-width:0;
+    box-sizing:border-box;
+    padding:12px 24px;
+    border-bottom:1px solid #1a1a1a;
+    background:none;
+    border-left:none;
+    border-right:none;
+    border-top:none;
+    cursor:pointer;
+    text-align:left;
+    color:inherit;
+    font:inherit;
+  }
+  .circle-rated-list-row:hover { background:rgba(255,255,255,0.03); }
+  .circle-rated-list-row:last-child { border-bottom:none; }
+  .circle-rated-list-row--pending { opacity:0.85; pointer-events:none; }
+  .circle-rated-list-ratings {
+    margin-top:4px;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:6px 8px;
+    font-family:'DM Sans',sans-serif;
+    font-size:11px;
+    line-height:1.45;
+  }
+  .circle-rated-list-ratings--empty { color:#555; }
+  .circle-rated-list-ratings-sep { color:#444; opacity:0.85; user-select:none; }
+  .circle-list-rating { display:inline-flex; align-items:baseline; flex-wrap:wrap; gap:0 2px; }
+  .circle-list-rating__lbl { font-size:10px; letter-spacing:0.04em; text-transform:uppercase; margin-right:4px; }
+  .circle-list-rating__star { font-size:10px; line-height:1; margin-right:1px; }
+  .circle-list-rating__num { font-weight:600; font-family:'DM Sans',sans-serif; }
+  .circle-list-rating--circle .circle-list-rating__lbl { color:#888; }
+  .circle-list-rating--circle .circle-list-rating__num { color:#d4a84a; }
+  .circle-list-rating--you .circle-list-rating__lbl { color:#6ab4e8; }
+  .circle-list-rating--you .circle-list-rating__num { color:#6aaa6a; }
+  .circle-list-rating--cine .circle-list-rating__lbl { color:#888; }
+  .circle-list-rating--cine .circle-list-rating__num { color:#e8c96a; }
+  .circle-rated-list-skel-row {
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 24px;
+    border-bottom:1px solid #1a1a1a;
+  }
+  .circle-rated-list-skel-thumb {
+    width:48px;
+    height:72px;
+    border-radius:8px;
+    background:#1a1a1a;
+    border:1px solid #1e1e1e;
+    flex-shrink:0;
+    animation:circleRatedGridSkel 1.2s ease-in-out infinite;
+  }
+  .circle-rated-list-skel-lines { flex:1; min-width:0; display:flex; flex-direction:column; gap:8px; }
+  .circle-rated-list-skel-line {
+    border-radius:4px;
+    background:#1a1a1a;
+    animation:circleRatedGridSkel 1.2s ease-in-out infinite;
+  }
+  .circle-rated-list-skel-line--title { height:14px; width:min(100%, 220px); }
+  .circle-rated-list-skel-line--meta { height:11px; width:min(100%, 180px); }
   .circle-detail-strip-block { margin-top:4px; }
   .circle-strip-circle-score {
     text-align:center;
@@ -3658,6 +3732,74 @@ function formatCircleSublineTypeYearCine(movie, tvMetaByTmdbId, siteRating) {
       ? `⭐ ${formatScore(siteRating)}`
       : "—";
   return `${type} · ${year} · ${cine}`;
+}
+
+/** Circle All/Top list: year segment for `Title · YYYY` (matches strip year rules). */
+function formatCircleListYear(movie, tvMetaByTmdbId) {
+  if (!movie) return "—";
+  if (movie.type === "tv") {
+    const meta = movie.tmdbId != null ? tvMetaByTmdbId?.[movie.tmdbId] : null;
+    const y = meta?.latestYear ?? movie.year;
+    if (y != null && String(y).trim() !== "") return String(y);
+    return "—";
+  }
+  if (movie.year != null && String(movie.year).trim() !== "") return String(movie.year);
+  const rd = movie.releaseDate;
+  if (rd && /^\d{4}/.test(String(rd))) return String(rd).slice(0, 4);
+  return "—";
+}
+
+/** Circle All/Top list row: Circle → You → Cinemastro (only when present). */
+function CircleAllTopRatingsLine({ row }) {
+  const gr = row.group_rating;
+  const vs = row.viewer_score;
+  const sr = row.site_rating;
+  const hasCircle = gr != null && Number.isFinite(Number(gr));
+  const hasYou = vs != null && Number.isFinite(Number(vs));
+  const hasCine = sr != null && Number.isFinite(Number(sr));
+  const nodes = [];
+  if (hasCircle) {
+    nodes.push(
+      <span key="c" className="circle-list-rating circle-list-rating--circle">
+        <span className="circle-list-rating__lbl">Circle</span>
+        <span className="circle-list-rating__star" aria-hidden="true">⭐</span>
+        <span className="circle-list-rating__num">{formatScore(Number(gr))}</span>
+      </span>,
+    );
+  }
+  if (hasYou) {
+    nodes.push(
+      <span key="y" className="circle-list-rating circle-list-rating--you">
+        <span className="circle-list-rating__lbl">You</span>
+        <span className="circle-list-rating__star" aria-hidden="true">⭐</span>
+        <span className="circle-list-rating__num">{formatScore(Number(vs))}</span>
+      </span>,
+    );
+  }
+  if (hasCine) {
+    nodes.push(
+      <span key="s" className="circle-list-rating circle-list-rating--cine">
+        <span className="circle-list-rating__lbl">Cinemastro</span>
+        <span className="circle-list-rating__star" aria-hidden="true">⭐</span>
+        <span className="circle-list-rating__num">{formatScore(Number(sr))}</span>
+      </span>,
+    );
+  }
+  if (nodes.length === 0) {
+    return <div className="circle-rated-list-ratings circle-rated-list-ratings--empty">—</div>;
+  }
+  const out = [];
+  for (let i = 0; i < nodes.length; i += 1) {
+    if (i > 0) {
+      out.push(
+        <span key={`sep-${i}`} className="circle-rated-list-ratings-sep" aria-hidden="true">
+          ·
+        </span>,
+      );
+    }
+    out.push(nodes[i]);
+  }
+  return <div className="circle-rated-list-ratings">{out}</div>;
 }
 
 function pickMoodMix(results, movieTarget = 7, tvTarget = 3) {
@@ -8599,89 +8741,66 @@ export default function App() {
                       </div>
                     );
                   };
-                  const renderGridCard = (row) => {
+                  const renderCircleAllTopListRow = (row) => {
                     const movie = circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies);
                     const rowKey = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
                     const predDetail = circleStripPredictionForDetail(row);
-                    const distinctRaters = Number(row.distinct_circle_raters ?? 0);
-                    const predictedForBadge =
-                      row.viewer_score != null && Number.isFinite(Number(row.viewer_score))
-                        ? null
-                        : row.prediction != null && typeof row.prediction.predicted === "number"
-                          ? row.prediction.predicted
-                          : null;
-                    const predictedNeighborCount =
-                      row.prediction != null
-                        ? Number(row.prediction.neighborCount ?? row.prediction.neighbor_count ?? 0)
-                        : 0;
                     if (!movie) {
                       return (
-                        <div className="disc-card circle-rated-grid-card" key={rowKey}>
-                          <div className="disc-poster">
-                            <div className="disc-poster-fallback">🎬</div>
-                            <StripPosterBadge
-                              movie={{ id: rowKey, title: "…", type: row.media_type === "tv" ? "tv" : "movie" }}
-                              predicted={null}
-                              predictedNeighborCount={0}
-                            />
+                        <div key={rowKey} className="circle-rated-list-row circle-rated-list-row--pending">
+                          <div className="wl-list-thumb">
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                height: "100%",
+                                fontSize: 22,
+                              }}
+                            >
+                              🎬
+                            </div>
                           </div>
-                          <div className="disc-title disc-title--circle-single">Loading…</div>
-                          <div className="disc-meta disc-meta--circle-cine">—</div>
+                          <div className="wl-list-text">
+                            <div className="wl-list-title">Loading…</div>
+                            <div className="circle-rated-list-ratings circle-rated-list-ratings--empty">—</div>
+                          </div>
                         </div>
                       );
                     }
+                    const year = formatCircleListYear(movie, tvStripMetaByTmdbId);
+                    const titleLine = `${movie.title} · ${year}`;
                     return (
-                      <div
-                        className="disc-card circle-rated-grid-card"
+                      <button
                         key={rowKey}
-                        role="button"
-                        tabIndex={0}
+                        type="button"
+                        className="circle-rated-list-row"
                         onClick={() => openDetail(movie, predDetail)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            openDetail(movie, predDetail);
-                          }
-                        }}
                       >
-                        <div className="disc-poster">
+                        <div className="wl-list-thumb">
                           {movie.poster ? (
                             <img src={movie.poster} alt="" />
                           ) : (
-                            <div className="disc-poster-fallback">🎬</div>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                height: "100%",
+                                fontSize: 22,
+                              }}
+                            >
+                              🎬
+                            </div>
                           )}
-                          <div className="disc-type">{row.media_type === "movie" ? "Movie" : "TV"}</div>
-                          <StripPosterBadge
-                            movie={movie}
-                            predicted={predictedForBadge}
-                            predictedNeighborCount={predictedForBadge != null ? predictedNeighborCount : 0}
-                          />
                         </div>
-                        {row.group_rating != null && (
-                          <div
-                            className="circle-strip-circle-score circle-rated-grid-score"
-                            aria-label={
-                              showStripRaterCounts && distinctRaters > 0
-                                ? `Circle score ${formatScore(row.group_rating)}, ${distinctRaters} rated in this circle`
-                                : `Circle score ${formatScore(row.group_rating)}`
-                            }
-                          >
-                            <span className="circle-strip-circle-score__label">Circle</span>
-                            <span className="circle-strip-circle-score__num">{formatScore(row.group_rating)}</span>
+                        <div className="wl-list-text">
+                          <div className="wl-list-title" title={movie.title}>
+                            {titleLine}
                           </div>
-                        )}
-                        {showStripRaterCounts && distinctRaters > 0 ? (
-                          <div className="circle-strip-rater-count">
-                            {distinctRaters === 1 ? "1 rated" : `${distinctRaters} rated`}
-                          </div>
-                        ) : null}
-                        <div className="disc-title disc-title--circle-single" title={movie.title}>
-                          {movie.title}
+                          <CircleAllTopRatingsLine row={row} />
                         </div>
-                        <div className="disc-meta disc-meta--circle-cine" aria-label="Type, year, and Cinemastro community average">
-                          {formatCircleSublineTypeYearCine(movie, tvStripMetaByTmdbId, row.site_rating ?? null)}
-                        </div>
-                      </div>
+                      </button>
                     );
                   };
                   const showLoadMore =
@@ -8707,9 +8826,15 @@ export default function App() {
                     && circleGridTopPayload.has_more
                     && topTitles.length < CIRCLE_TOP_MAX;
                   const gridSkel = (
-                    <div className="circle-rated-grid" aria-hidden="true">
+                    <div className="circle-rated-list circle-rated-list--skel" aria-hidden="true">
                       {[1, 2, 3, 4, 5, 6].map((i) => (
-                        <div key={i} className="circle-rated-grid-skel" />
+                        <div key={i} className="circle-rated-list-skel-row">
+                          <div className="circle-rated-list-skel-thumb" />
+                          <div className="circle-rated-list-skel-lines">
+                            <div className="circle-rated-list-skel-line circle-rated-list-skel-line--title" />
+                            <div className="circle-rated-list-skel-line circle-rated-list-skel-line--meta" />
+                          </div>
+                        </div>
                       ))}
                     </div>
                   );
@@ -8818,7 +8943,7 @@ export default function App() {
                               emptyRated
                             ) : (
                               <>
-                                <div className="circle-rated-grid">{allTitles.map(renderGridCard)}</div>
+                                <div className="circle-rated-list">{allTitles.map(renderCircleAllTopListRow)}</div>
                                 {showAllMore ? (
                                   <button
                                     type="button"
@@ -8837,7 +8962,7 @@ export default function App() {
                               emptyRated
                             ) : (
                               <>
-                                <div className="circle-rated-grid">{topTitles.map(renderGridCard)}</div>
+                                <div className="circle-rated-list">{topTitles.map(renderCircleAllTopListRow)}</div>
                                 {showTopMore ? (
                                   <button
                                     type="button"
