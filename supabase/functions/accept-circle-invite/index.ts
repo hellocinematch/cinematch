@@ -13,9 +13,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 //   * Circle still exists and is 'active' — if archived, decline the invite
 //     (status='declined', responded_at=now()) and return an error. Stale cleanup.
 //   * Caller is not already a member (idempotent defensive check; leave invite pending).
-//   * Caller is below the active-circle cap. If at cap, error and LEAVE pending
+//   * Caller is below the 10-active-circle cap. If at cap, error and LEAVE pending
 //     (spec §3.3 + Phase A confirmation — accept-time cap race does not auto-decline).
-//   * Circle is below the member cap. If full, error and LEAVE pending (sender can retry).
+//   * Circle is below the 25-member cap. If full, error and LEAVE pending (sender can retry).
 //
 // On success, insert the member row first (as service role to bypass RLS), then flip the invite
 // to 'accepted'. Order matters: if the member insert fails we never mark the invite accepted.
@@ -28,8 +28,8 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const CIRCLE_MEMBER_CAP = 4;
-const CIRCLE_USER_ACTIVE_CAP = 3;
+const CIRCLE_MEMBER_CAP = 25;
+const CIRCLE_USER_ACTIVE_CAP = 10;
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

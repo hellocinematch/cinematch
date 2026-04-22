@@ -15,8 +15,8 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 //      - No match -> 404 "no account found for that email".
 //      - Match == caller -> 400 "you're already the creator".
 //   4. Reject if recipient is already a member of the circle.
-//   5. Reject if member cap would be breached.
-//   6. If recipient is at the active-circle cap, write the invite with status='auto_declined'
+//   5. Reject if member cap would be breached (25/25).
+//   6. If recipient is at the 10-active-circle cap, write the invite with status='auto_declined'
 //      + responded_at=now() (spec §3.2).
 //   7. Otherwise write with status='pending'.
 //   8. Handles the circle_invites_unique_pending constraint by UPDATE-on-conflict: a prior row
@@ -32,8 +32,8 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const CIRCLE_MEMBER_CAP = 4;
-const CIRCLE_USER_ACTIVE_CAP = 3;
+const CIRCLE_MEMBER_CAP = 25;
+const CIRCLE_USER_ACTIVE_CAP = 10;
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -163,7 +163,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "That person is already in this circle." }, 409);
     }
 
-    // --- 4. Member cap. -------------------------------------------------------------------------
+    // --- 4. Member cap (25). --------------------------------------------------------------------
     const { count: memberCount, error: memberCountErr } = await admin
       .from("circle_members")
       .select("user_id", { count: "exact", head: true })

@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.26
+
+- **Circles — limits:** Restore **10** active circles per user and **25** members per circle in **`circles.js`** and **`send-circle-invite`** / **`accept-circle-invite`**. (Testing caps 3/4 are reverted.) **Redeploy** both Edge functions to Supabase for prod to match the client.
+
 ## 5.6.25
 
 - **Circles — limits (testing):** **3** active circles per user and **4** members per circle (`CIRCLE_CAP` / `CIRCLE_MEMBER_CAP` in `circles.js`, matching **`send-circle-invite`** and **`accept-circle-invite`** Edge). UI copy and invite gating use **`CIRCLE_MEMBER_CAP`** (no hardcoded 25s). **Redeploy** both Edge functions on the Supabase project when shipping.

@@ -10,10 +10,10 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 /** Maximum active circles per user. Archived circles don't count. */
-export const CIRCLE_CAP = 3;
+export const CIRCLE_CAP = 10;
 
 /** Maximum members per circle. Enforced in send/accept Edge (Phase B). */
-export const CIRCLE_MEMBER_CAP = 4;
+export const CIRCLE_MEMBER_CAP = 25;
 
 /** Vibe catalog — values match the `check` constraint on circles.vibe. Accent + tint match the
  *  design tokens from Architechture/cinemastro-circles-requirements.md §8. */
