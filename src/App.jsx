@@ -379,13 +379,17 @@ function buildWatchlistFromRows(watchlistData, catalogue) {
   );
   const movieMap = Object.fromEntries(catalogue.map(m => [m.id, m]));
   return sorted.map((w) => {
-    const id = `${w.media_type}-${w.tmdb_id}`;
-    const base = movieMap[id] || { id, tmdbId: w.tmdb_id, type: w.media_type, title: w.title, poster: w.poster };
+    const ty = String(w.media_type ?? "movie").toLowerCase() === "tv" ? "tv" : "movie";
+    const id = `${ty}-${w.tmdb_id}`;
+    const base = movieMap[id] || { id, tmdbId: w.tmdb_id, type: ty, title: w.title, poster: w.poster };
     const poster = normalizeWatchlistPosterUrl(base.poster);
     const fromGroup = w.source_circle_id != null;
     const si = Number(w.sort_index);
+    const tidNum = Number(w.tmdb_id);
     return {
       ...base,
+      type: ty,
+      tmdbId: Number.isFinite(Number(base.tmdbId)) ? Number(base.tmdbId) : tidNum,
       poster: poster ?? base.poster,
       fromGroup,
       source_circle_id: w.source_circle_id ?? null,
@@ -5284,7 +5288,7 @@ export default function App() {
       });
       setUserRatings(ratingsMap);
     }
-    if (watchlistData && catalogue.length > 0) {
+    if (watchlistData?.length) {
       setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
     }
 
@@ -7855,6 +7859,21 @@ export default function App() {
     }
   }
 
+  function watchlistRowKeys(m) {
+    let tid = Number(m?.tmdbId ?? m?.tmdb_id);
+    let rawType = String(m?.type || "movie").toLowerCase();
+    if (rawType !== "tv") rawType = "movie";
+    if (!Number.isFinite(tid) && m?.id != null) {
+      const p = parseMediaKey(m.id);
+      if (p) {
+        tid = p.tmdbId;
+        rawType = p.type;
+      }
+    }
+    if (!Number.isFinite(tid)) return null;
+    return { tid, mt: rawType === "tv" ? "tv" : "movie" };
+  }
+
   async function swapWatchlistOrder(movieId, direction) {
     if (!user) return;
     const list = [...watchlist].sort((a, b) => (a.sort_index ?? 0) - (b.sort_index ?? 0));
@@ -7864,31 +7883,38 @@ export default function App() {
     if (j < 0 || j >= list.length) return;
     const cur = list[i];
     const other = list[j];
+    const curK = watchlistRowKeys(cur);
+    const othK = watchlistRowKeys(other);
+    if (!curK || !othK) {
+      console.warn("Watchlist swap: bad row keys", { cur, other });
+      return;
+    }
     const a = cur.sort_index ?? i;
     const b = other.sort_index ?? j;
     const uid = user.id;
     const TEMP = 2147483646;
     try {
+      // Do not require `.select()` / RETURNING: some RLS setups omit returned rows even when the row updated.
       const { error: e1 } = await supabase
         .from("watchlist")
         .update({ sort_index: TEMP })
         .eq("user_id", uid)
-        .eq("tmdb_id", cur.tmdbId)
-        .eq("media_type", cur.type);
+        .eq("tmdb_id", curK.tid)
+        .eq("media_type", curK.mt);
       if (e1) throw e1;
       const { error: e2 } = await supabase
         .from("watchlist")
         .update({ sort_index: a })
         .eq("user_id", uid)
-        .eq("tmdb_id", other.tmdbId)
-        .eq("media_type", other.type);
+        .eq("tmdb_id", othK.tid)
+        .eq("media_type", othK.mt);
       if (e2) throw e2;
       const { error: e3 } = await supabase
         .from("watchlist")
         .update({ sort_index: b })
         .eq("user_id", uid)
-        .eq("tmdb_id", cur.tmdbId)
-        .eq("media_type", cur.type);
+        .eq("tmdb_id", curK.tid)
+        .eq("media_type", curK.mt);
       if (e3) throw e3;
     } catch (e) {
       console.warn("Watchlist reorder failed:", e);
@@ -7912,6 +7938,11 @@ export default function App() {
     if (i <= 0) return;
     const cur = list[i];
     const top = list[0];
+    const k = watchlistRowKeys(cur);
+    if (!k) {
+      console.warn("Watchlist to-top: bad row keys", cur);
+      return;
+    }
     const newSort = (Number(top.sort_index) || 0) - 1;
     const uid = user.id;
     try {
@@ -7919,8 +7950,8 @@ export default function App() {
         .from("watchlist")
         .update({ sort_index: newSort })
         .eq("user_id", uid)
-        .eq("tmdb_id", cur.tmdbId)
-        .eq("media_type", cur.type);
+        .eq("tmdb_id", k.tid)
+        .eq("media_type", k.mt);
       if (error) throw error;
     } catch (e) {
       console.warn("Watchlist reorder failed:", e);
@@ -7939,6 +7970,11 @@ export default function App() {
     if (i < 0 || i >= list.length - 1) return;
     const cur = list[i];
     const bot = list[list.length - 1];
+    const k = watchlistRowKeys(cur);
+    if (!k) {
+      console.warn("Watchlist to-bottom: bad row keys", cur);
+      return;
+    }
     const newSort = (Number(bot.sort_index) || 0) + 1;
     const uid = user.id;
     try {
@@ -7946,8 +7982,8 @@ export default function App() {
         .from("watchlist")
         .update({ sort_index: newSort })
         .eq("user_id", uid)
-        .eq("tmdb_id", cur.tmdbId)
-        .eq("media_type", cur.type);
+        .eq("tmdb_id", k.tid)
+        .eq("media_type", k.mt);
       if (error) throw error;
     } catch (e) {
       console.warn("Watchlist reorder failed:", e);

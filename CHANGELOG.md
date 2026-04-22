@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.6.24
+
+- **Watchlist — ⋯ menu moves:** Reorder no longer **blocks the UI** on empty **`UPDATE` RETURNING** rows (some RLS / PostgREST setups omit the returned row even when the update applies). We only **fail** on a non-null **`error`**. New migration adds **`watchlist update own`** (authenticated users may update their own rows) for projects where UPDATE was not allowed.
+
+## 5.6.23
+
+- **Watchlist reorder:** **Move up/down/top/bottom work again** — row keys for Supabase `tmdb_id` / `media_type` now fall back to **`tmdb_id`**, then **`parseMediaKey(id)`** when `tmdbId` is missing, and `buildWatchlistFromRows` always sets **`tmdbId`** from the DB when needed. **Post-update `.select()`** results are treated as **either a single object or an array** so we do not treat a successful one-row update as “0 rows”.
+
+## 5.6.22
+
+- **Watchlist order:** **Persist reorder after sign-out** — `loadUserData` now always rebuilds the list from `watchlist` when rows exist, even if **catalogue** is not ready yet (stubs for TMDB). **Media type** is normalized to `movie` / `tv` for list keys and **Supabase** updates so `.eq("media_type", …)` and `.eq("tmdb_id", …)` match stored rows. **Swap / Top / Bottom** use **number** `tmdb_id`, normalized `media_type`, and **`.select()`** after updates so a **0-row** update no longer only updates React state (which looked fine until the next full reload).
+
 ## 5.6.21
 
 - **Circles — All / Top:** The **You** label uses the same **green** as your score (was blue).
