@@ -41,8 +41,52 @@ const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2J
 const TMDB_BASE = "https://api.themoviedb.org/3";
 /** Direct TMDB CDN URLs work on Vercel; `/tmdb-images` only works via Vite dev proxy. */
 const TMDB_IMG_HOST = "https://image.tmdb.org";
+/** Full-size poster in data / DB / detail — strips and lists rewrite at render via `posterSrcThumb`. */
 const TMDB_IMG = `${TMDB_IMG_HOST}/t/p/w500`;
 const TMDB_IMG_BACKDROP = `${TMDB_IMG_HOST}/t/p/w780`;
+/** TMDB `w*` token for small posters (strips, list thumbs, grids) — ~2× typical strip width on phone. */
+const TMDB_POSTER_THUMB = "w342";
+/** Detail float, large cards, hero poster fallback — matches `TMDB_IMG`. */
+const TMDB_POSTER_DETAIL = "w500";
+
+const TMDB_IMAGE_PROFILE_RE = /^(https:\/\/image\.tmdb\.org\/t\/p\/)(w\d+|original)(\/.*)$/i;
+
+/**
+ * Rewrite TMDB CDN profile segment (`w500` → `w342`, etc.). Non-TMDB absolute URLs unchanged.
+ * Bare `poster_path` values (e.g. `/abc.jpg`) become `https://image.tmdb.org/t/p/{sizeToken}/abc.jpg`.
+ */
+function tmdbImageProfileUrl(urlOrPath, sizeToken) {
+  if (urlOrPath == null || urlOrPath === "") return null;
+  const s = String(urlOrPath).trim();
+  if (!s) return null;
+  if (TMDB_IMAGE_PROFILE_RE.test(s)) {
+    return s.replace(TMDB_IMAGE_PROFILE_RE, (_, prefix, _old, path) => `${prefix}${sizeToken}${path}`);
+  }
+  if (s.startsWith("/tmdb-images")) {
+    const tail = s.slice("/tmdb-images".length);
+    const m = tail.match(/^\/t\/p\/(w\d+|original)(\/.*)$/i);
+    if (m) return `${TMDB_IMG_HOST}/t/p/${sizeToken}${m[2]}`;
+    return `${TMDB_IMG_HOST}${tail}`;
+  }
+  if (/^https?:\/\//i.test(s)) return s;
+  const path = s.startsWith("/") ? s : `/${s}`;
+  return `${TMDB_IMG_HOST}/t/p/${sizeToken}${path}`;
+}
+
+function posterSrcThumb(urlOrPath) {
+  return tmdbImageProfileUrl(urlOrPath, TMDB_POSTER_THUMB);
+}
+
+function posterSrcDetail(urlOrPath) {
+  return tmdbImageProfileUrl(urlOrPath, TMDB_POSTER_DETAIL);
+}
+
+/** Mood cards: full-width visual — keep backdrop; poster-only uses detail profile. */
+function moodCardBackdropOrPosterSrc(rec) {
+  const b = rec?.movie?.backdrop;
+  if (b) return b;
+  return posterSrcDetail(rec?.movie?.poster);
+}
 const DEFAULT_EXCLUDED_GENRE_IDS = [16]; // Animation
 
 const TMDB_HEADERS = {
@@ -8605,7 +8649,7 @@ export default function App() {
             <div className="movie-card" key={obStep}>
               <div className="card-poster">
                 {obMovie.poster ? (
-                  <img src={obMovie.poster} alt={obMovie.title} loading="eager" decoding="async" />
+                  <img src={posterSrcDetail(obMovie.poster)} alt={obMovie.title} loading="eager" decoding="async" />
                 ) : (
                   <div className="card-poster-fallback">🎬</div>
                 )}
@@ -9133,7 +9177,7 @@ export default function App() {
                         ) : null}
                         <div className="strip-poster strip-poster--circle-recent">
                           {movie.poster ? (
-                            <img src={movie.poster} alt="" loading="lazy" decoding="async" />
+                            <img src={posterSrcThumb(movie.poster)} alt="" loading="lazy" decoding="async" />
                           ) : (
                             <div className="strip-poster-fallback">🎬</div>
                           )}
@@ -9200,7 +9244,7 @@ export default function App() {
                       >
                         <div className="wl-list-thumb">
                           {movie.poster ? (
-                            <img src={movie.poster} alt="" loading="lazy" decoding="async" />
+                            <img src={posterSrcThumb(movie.poster)} alt="" loading="lazy" decoding="async" />
                           ) : (
                             <div
                               style={{
@@ -9887,7 +9931,7 @@ export default function App() {
                       {pulseTrendingRecsResolved.map((rec) => (
                         <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                           <div className="strip-poster">
-                            {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                            {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
                             <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                           </div>
                           <div className="strip-title">{rec.movie.title}</div>
@@ -9911,7 +9955,7 @@ export default function App() {
                       {pulsePopularRecsResolved.map((rec) => (
                         <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                           <div className="strip-poster">
-                            {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                            {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
                             <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                           </div>
                           <div className="strip-title">{rec.movie.title}</div>
@@ -9963,7 +10007,7 @@ export default function App() {
                   {theaterRecs.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
-                        {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                        {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
                       <div className="strip-title">{rec.movie.title}</div>
@@ -9991,7 +10035,7 @@ export default function App() {
                   {inTheatersPagePopularRecsResolved.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
-                        {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                        {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
                       <div className="strip-title">{rec.movie.title}</div>
@@ -10051,7 +10095,7 @@ export default function App() {
                   {streamingNowRecs.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
-                        {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                        {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
                       <div className="strip-title">{rec.movie.title}</div>
@@ -10079,7 +10123,7 @@ export default function App() {
                   {streamingPopularRecs.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
-                        {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                        {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
                       <div className="strip-title">{rec.movie.title}</div>
@@ -10141,7 +10185,7 @@ export default function App() {
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
                       >
                         <div className="strip-poster">
-                          {row.rec.movie.poster ? <img src={row.rec.movie.poster} alt="" loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                          {row.rec.movie.poster ? <img src={posterSrcThumb(row.rec.movie.poster)} alt="" loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
                           <span
                             className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
                             aria-hidden
@@ -10313,7 +10357,7 @@ export default function App() {
                       {secondaryStripRecsVisible.map((rec) => (
                         <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                           <div className="strip-poster">
-                            {rec.movie.poster ? <img src={rec.movie.poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                            {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
                             <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                           </div>
                           <div className="strip-title">{rec.movie.title}</div>
@@ -10362,7 +10406,7 @@ export default function App() {
             <div className="movie-card" key={obStep}>
               <div className="card-poster">
                 {rateMoreMovie.poster ? (
-                  <img src={rateMoreMovie.poster} alt={rateMoreMovie.title} loading="eager" decoding="async" />
+                  <img src={posterSrcDetail(rateMoreMovie.poster)} alt={rateMoreMovie.title} loading="eager" decoding="async" />
                 ) : (
                   <div className="card-poster-fallback">🎬</div>
                 )}
@@ -10460,7 +10504,7 @@ export default function App() {
                 return (
                   <div className="disc-card" key={m.id} onClick={() => openDetail(m, rec)}>
                     <div className="disc-poster">
-                      {m.poster ? <img src={m.poster} alt={m.title} loading="lazy" decoding="async" /> : <div className="disc-poster-fallback">🎬</div>}
+                      {m.poster ? <img src={posterSrcThumb(m.poster)} alt={m.title} loading="lazy" decoding="async" /> : <div className="disc-poster-fallback">🎬</div>}
                       <div className="disc-type">{m.type === "movie" ? "Movie" : "TV"}</div>
                       <div className="disc-badge">
                         {myRating ? <span className="disc-rated-badge">★ {myRating}</span>
@@ -10563,7 +10607,7 @@ export default function App() {
                 <div className="mood-result-card" key={rec.movie.id}>
                   <div className="mood-result-poster">
                     {rec.movie.backdrop || rec.movie.poster
-                      ? <img src={rec.movie.backdrop || rec.movie.poster} alt={rec.movie.title} loading="lazy" decoding="async" />
+                      ? <img src={moodCardBackdropOrPosterSrc(rec)} alt={rec.movie.title} loading="lazy" decoding="async" />
                       : <div className="mood-result-poster-fallback">🎬</div>}
                     <div className="mood-result-overlay" />
                     <div className="mood-result-type">{rec.movie.type === "movie" ? "Movie" : "TV"}</div>
@@ -10664,7 +10708,7 @@ export default function App() {
                   {filteredRatedMovies.map(({ movie, score }) => (
                     <div className="rated-list-item" key={movie.id} onClick={() => openDetail(movie, recMap[movie.id])}>
                       <div className="rated-thumb">
-                        {movie.poster ? <img src={movie.poster} alt={movie.title} loading="lazy" decoding="async" /> : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 20 }}>🎬</div>}
+                        {movie.poster ? <img src={posterSrcThumb(movie.poster)} alt={movie.title} loading="lazy" decoding="async" /> : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 20 }}>🎬</div>}
                       </div>
                       <div className="rated-info">
                         <div className="rated-info-title">{movie.title}</div>
@@ -10733,7 +10777,7 @@ export default function App() {
                 {watchlistDisplay.map((m) => (
                   <div className="wl-card" key={m.id} onClick={() => openDetail(m, recMap[m.id])}>
                     <div className="wl-poster">
-                      {m.poster ? <img src={m.poster} alt={m.title} loading="lazy" decoding="async" /> : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 36 }}>🎬</div>}
+                      {m.poster ? <img src={posterSrcThumb(m.poster)} alt={m.title} loading="lazy" decoding="async" /> : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 36 }}>🎬</div>}
                     </div>
                     <div className="strip-title">{m.title}</div>
                     <div className="wl-card-meta">{formatWatchlistMetaLine(m)}</div>
@@ -10862,7 +10906,7 @@ export default function App() {
                     >
                       <div className="wl-list-thumb">
                         {m.poster ? (
-                          <img src={m.poster} alt="" loading="lazy" decoding="async" />
+                          <img src={posterSrcThumb(m.poster)} alt="" loading="lazy" decoding="async" />
                         ) : (
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 22 }}>🎬</div>
                         )}
@@ -11035,7 +11079,7 @@ export default function App() {
                 <div className="d-overlay" />
                 {movie.poster ? (
                   <div className="detail-hero-poster--float">
-                    <img src={movie.poster} alt="" loading="eager" decoding="async" />
+                    <img src={posterSrcDetail(movie.poster)} alt="" loading="eager" decoding="async" />
                   </div>
                 ) : null}
               </div>

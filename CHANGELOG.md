@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.32
+
+- **TMDB posters — right-size at render:** Strips, list thumbs, discover grid, watchlist, rated list, circle rows, etc. use **`w342`** via **`posterSrcThumb()`** (rewrites `/t/p/w500/…` → **`w342`**). **Detail** floating poster, **onboarding** / **rate-more** cards, and **mood** poster-only fallback use **`w500`** via **`posterSrcDetail()`**. **Mood** cards keep **`backdrop`** URLs as-is (**`w780`**). Catalogue / watchlist **stored** URLs stay **`w500`**; only **`<img src>`** changes. Helpers: **`tmdbImageProfileUrl`**, **`posterSrcThumb`**, **`posterSrcDetail`**, **`moodCardBackdropOrPosterSrc`**.
+
 ## 5.6.31
 
 - **Images:** **`loading="lazy"`** + **`decoding="async"`** on poster thumbnails, strips, lists, discover/mood grids, watchlist, circle rows, and **Where to Watch** provider logos. **Title detail** hero **backdrop** uses **`loading="eager"`** + **`fetchPriority="high"`**; **floating poster** **`eager`**; **onboarding** and **Rate more** single-card posters **`eager`** so LCP is not deferred.
