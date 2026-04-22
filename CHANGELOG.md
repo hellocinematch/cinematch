@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.29
+
+- **PWA icon:** Larger **cinemastro** wordmark on **`cinemastro-pwa-icon.svg`** (~**88px** type, wider canvas), **−27°** tilt so it uses the square; tagline omitted on the icon asset only (unreadable at 180×180). Regenerated **`apple-touch-icon.png`** / **`pwa-icon-192.png`** (`npm run icons:pwa`).
+
 ## 5.6.28
 
 - **PWA / iOS home screen:** **`apple-touch-icon`** now **`/apple-touch-icon.png`** (180×180 raster) so Add to Home Screen shows the **wordmark** on iPhone (Safari often skips nested `<image href>` inside SVG touch icons). **`cinemastro-pwa-icon.svg`** is **self-contained** (inlined wordmark, no external asset). **`site.webmanifest`** lists **`/pwa-icon-192.png`** first for install surfaces that prefer PNG. Dev: **`npm run icons:pwa`** regenerates PNGs from the SVG via **`scripts/generate-pwa-touch-icons.mjs`** (**`@resvg/resvg-js`**).

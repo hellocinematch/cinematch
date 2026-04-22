@@ -1,13 +1,13 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-22 (5.6.28 PWA iOS icon)
+**Last updated:** 2026-04-22 (5.6.29 PWA icon larger + diagonal)
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.28** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
-> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **Primary nav:** **`profiles.name`** pill. **PWA:** **`/site.webmanifest`**; **`apple-touch-icon`** = **`/apple-touch-icon.png`** (180×180); manifest also **`/pwa-icon-192.png`**; **`/cinemastro-pwa-icon.svg`** = self-contained **wordmark** (no nested `<image>`). **Tab** still **`/favicon.svg`**. Regenerate PNGs: **`npm run icons:pwa`**. **Client:** **git push** → Vercel. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Backlog:** **Open / follow-ups** (numbered 1–6) + **Roadmap** in this file.
+> Cinematch is on **`main` at 5.6.29** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
+> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **Primary nav:** **`profiles.name`** pill. **PWA:** **`/site.webmanifest`**; **`apple-touch-icon`** = **`/apple-touch-icon.png`** (180×180); manifest **`/pwa-icon-192.png`**; **`/cinemastro-pwa-icon.svg`** = larger **wordmark**, slight **diagonal** (no tagline on icon; in-app logo unchanged). **Tab** **`/favicon.svg`**. **`npm run icons:pwa`** after SVG edits. **Client:** **git push** → Vercel. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Backlog:** **Open / follow-ups** (numbered 1–6) + **Roadmap** in this file.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,16 +17,16 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.28** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** — ship **5.6.28** for **iOS** home-screen icon (**PNG** `apple-touch-icon` + self-contained PWA SVG); prior **5.6.27** = PWA manifest + SVG icon (nested image broke on iPhone); **5.6.26** = Circles **10/25** caps. |
+| **App version** | **5.6.29** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main`** — **5.6.29** = larger diagonal **PWA** wordmark + regenerated PNGs; **5.6.28** = **iOS** `apple-touch-icon` PNG + self-contained SVG; **5.6.26** = Circles **10/25** caps. |
 | **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`** (watchlist row **UPDATE** for reorder under RLS). |
 | **Edge** | **`get-circle-rated-titles`** — RPC-only; **redeploy** only if function source changes. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
 
-**PWA / install (5.6.28)**
+**PWA / install (5.6.29)**
 
 - **`/site.webmanifest`:** `name` / `short_name` **Cinemastro**, **`display: standalone`**, **theme/background** `#0a0a0a`, **`icons`:** **`/pwa-icon-192.png`** then **`/cinemastro-pwa-icon.svg`** (maskable **any**).  
-- **`/cinemastro-pwa-icon.svg`:** 512×512, **`#0a0a0a`** background, **inlined** wordmark (same copy as **`cinemastro-logo.svg`** — no external **`<image href>`**; iOS rasterization was blank without this).  
+- **`/cinemastro-pwa-icon.svg`:** 512×512, **`#0a0a0a`** background, **inlined** wordmark — **larger** type, **~−27°** diagonal (home-screen legibility); **no** “YOUR PERSONAL…” tagline on this asset (still on **`cinemastro-logo.svg`** in-app).  
 - **`index.html`:** `link rel="manifest"`, `theme-color`, `application-name`, **`apple-touch-icon`** → **`/apple-touch-icon.png`** (180×180).  
 - **Regenerate PNGs** after editing the master SVG: **`npm run icons:pwa`** (`scripts/generate-pwa-touch-icons.mjs`, **`@resvg/resvg-js`**).  
 - **Favicon** for tabs/bookmarks: unchanged **`/favicon.svg`**.
@@ -93,6 +93,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.29** — **PWA icon:** Bigger wordmark, diagonal tilt; regenerated PNGs.  
 - **5.6.28** — **PWA / iOS:** **`apple-touch-icon.png`** (180×180), **`pwa-icon-192.png`** in manifest; **`cinemastro-pwa-icon.svg`** self-contained; **`npm run icons:pwa`** + **`@resvg/resvg-js`**.  
 - **5.6.27** — **PWA:** `site.webmanifest` + square **`cinemastro-pwa-icon.svg`** (embeds **`cinemastro-logo.svg`**) for **Install** / home screen; `index.html` manifest + `theme-color` + `apple-touch-icon`. (Commit on **`main`**, e.g. **`876a484`**.)  
 - **5.6.26** — Circles: **10** / **25** caps restored (client + invite Edge; redeployed by user).  
@@ -146,7 +147,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 - Backdrop **`object-position: 30% top`**; mobile **`.d-title`** DM Sans; **`BottomNav`** inside **`.detail`**.
 
-### PWA (5.6.28)
+### PWA (5.6.29)
 
 - **Files:** `index.html` (manifest + metas + **`apple-touch-icon.png`**), `public/site.webmanifest`, `public/cinemastro-pwa-icon.svg` (inlined wordmark), `public/apple-touch-icon.png`, `public/pwa-icon-192.png`, `scripts/generate-pwa-touch-icons.mjs`.
 
@@ -199,6 +200,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Shipped 2026-04-22**
 
+- **5.6.29 — PWA readability:** User asked for **larger** home-screen wordmark; shipped bigger type + **−27°** diagonal; tagline only on in-app **`cinemastro-logo.svg`**. Re-run **`npm run icons:pwa`** after SVG edits; redeploy, re-add icon if cached.  
 - **5.6.28 — PWA / iOS home screen:** User saw **blank** tile on iPhone after Add to Home Screen (**SVG** touch icon with nested **`cinemastro-logo.svg`** not rasterized). Shipped **PNG** **`apple-touch-icon`** + **192** manifest icon; **self-contained** **`cinemastro-pwa-icon.svg`**; **`npm run icons:pwa`** to refresh PNGs from SVG. Push **`main`** → Vercel; user may need to **remove** old home-screen shortcut and **re-add** after deploy (Safari caches icons).
 - **5.6.27 — PWA / beta install:** `site.webmanifest` + `cinemastro-pwa-icon.svg` (wordmark via embed; superseded for iOS by **5.6.28**).
 
