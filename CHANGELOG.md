@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.27
+
+- **PWA / install icon:** `site.webmanifest` + **`/cinemastro-pwa-icon.svg`** (square, **`#0a0a0a`**, embeds the full **`/cinemastro-logo.svg`**) so “Install” / Add to Home Screen uses the **Cinemastro wordmark**, not the small abstract **`favicon.svg`**. `index.html`: manifest link, `theme-color`, `application-name`, `apple-touch-icon`. Tab shortcut still uses **`favicon.svg`**. *Note:* some older iOS versions prefer a **raster** `apple-touch-icon` (e.g. 180×180 PNG); if the home-screen tile is wrong on a device, export PNGs from the same comp and add them to `public/` + manifest.
+
 ## 5.6.26
 
 - **Circles — limits:** Restore **10** active circles per user and **25** members per circle in **`circles.js`** and **`send-circle-invite`** / **`accept-circle-invite`**. (Testing caps 3/4 are reverted.) **Redeploy** both Edge functions to Supabase for prod to match the client.

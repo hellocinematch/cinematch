@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Cinemastro">
+  <!-- PWA / Add to Home Screen: same wordmark as /cinemastro-logo.svg, centered on app shell. -->
+  <rect width="512" height="512" fill="#0a0a0a" />
+  <image
+    href="cinemastro-logo.svg"
+    x="56"
+    y="196"
+    width="400"
+    height="120"
+    preserveAspectRatio="xMidYMid meet"
+  />
+</svg>
