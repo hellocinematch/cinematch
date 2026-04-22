@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-21
+**Last updated:** 2026-04-22
 
 ---
 
@@ -33,6 +33,15 @@
 - **Reordering (5.6.22–5.6.24):** **`loadUserData`** always rebuilds from **`watchlist`** rows when present (stubs in **`buildWatchlistFromRows`** if catalogue is empty). Keys for Supabase filters: **`watchlistRowKeys`**, **`tmdbId` / `tmdb_id` / `parseMediaKey(id)`**, **`media_type`** → **`movie` \| `tv`**. **Swap** / **Top** / **Bottom** do **not** require non-empty **`UPDATE … RETURNING`**; only a non-null **`error`** from the client is treated as failure. Hosted DB: apply **`20260526120000_watchlist_rls_update_own.sql`** so **`authenticated`** users can **`update`** their own **`watchlist`** rows if RLS was blocking **`sort_index`** updates.
 - **Primary nav** (desktop + hamburger): includes **Watchlist**; **`navigatePrimarySection`**: **Watchlist** → `navTab` **watchlist**; **Pulse** → `navTab` **home**; **any other section** (Circles, Streaming, etc.) → **`setNavTab("home")`** + **`setScreen(…)`** so the bottom **Watchlist** ring does not stay on after you leave Watchlist via the top bar (**5.6.8**).
 - **Detail:** optional line **Watchlist · from …** (circle name when resolvable) when saved from a circle (`source_circle_id` + **`circleNameById`** from **`circlesList`**).
+
+**Circles — production caps (revert from testing)**
+
+- If you **lower** caps locally (e.g. **3** active circles, **4** members per circle), **restore production** to these values everywhere they appear:
+  - **10** active circles per user — `CIRCLE_CAP` in **`src/circles.js`**, and **`CIRCLE_USER_ACTIVE_CAP`** in Edge **`supabase/functions/send-circle-invite/index.ts`** and **`supabase/functions/accept-circle-invite/index.ts`**.
+  - **25** members per circle — `CIRCLE_MEMBER_CAP` in those same **three** files.
+- In **`src/App.jsx`**, avoid hard-coded “10-circle” copy; use **`CIRCLE_CAP`** (or match it when reverting) so UI strings stay correct.
+- **Redeploy** both invite Edge functions after any cap change so the client and server stay aligned.
+- **No Supabase SQL migration** is required to switch these numbers (enforcement is app + Edge; the circles schema comment documents intent only).
 
 ---
 

@@ -29,7 +29,7 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 - **Each page owns its RPC path** — no cross-page borrowing.
 - **Circle membership for anyone other than creator seed** → **Edge** + service role; RLS allows creator-seed-self only.
 - **Creator leave:** `circles.status = 'archived'`, `archived_at = now()` **before** deleting creator’s `circle_members` row (update policy gates on `status = 'active'`).
-- **Invite caps:** send-time 10-circle cap → `auto_declined`; accept-time cap → **error**, invite stays `pending` (spec in migration header).
+- **Invite caps:** send-time 10-circle cap → `auto_declined`; accept-time cap → **error**, invite stays `pending` (spec in migration header). **Production numbers** (10 active circles / user, 25 members / circle) and **where to revert** after test-only lower caps: **`PASSDOWN-NEXT-CHAT.md`** section **“Circles — production caps (revert from testing)”.**
 
 ---
 

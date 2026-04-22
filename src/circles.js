@@ -2,7 +2,7 @@
 // All calls hit supabase directly (no Edge functions yet). RLS policies live in
 // supabase/migrations/20260422120000_circles_schema.sql.
 //
-// The 10-active-circle user cap and 25-member-per-circle cap are enforced here / in the
+// Active-circle user cap and member-per-circle cap are enforced here / in the
 // server-side policies (cap math is UI-level in phase A; Phase B's send-circle-invite
 // Edge function re-validates before minting new memberships).
 
@@ -10,10 +10,10 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 /** Maximum active circles per user. Archived circles don't count. */
-export const CIRCLE_CAP = 10;
+export const CIRCLE_CAP = 3;
 
 /** Maximum members per circle. Enforced in send/accept Edge (Phase B). */
-export const CIRCLE_MEMBER_CAP = 25;
+export const CIRCLE_MEMBER_CAP = 4;
 
 /** Vibe catalog — values match the `check` constraint on circles.vibe. Accent + tint match the
  *  design tokens from Architechture/cinemastro-circles-requirements.md §8. */
@@ -341,7 +341,7 @@ async function invokeCirclesEdge(fnName, body) {
 }
 
 /** Sends (or resurrects) an invite for `invitedEmail` to `circleId`. If the recipient is at the
- *  10-active-circle cap the Edge function auto-declines (spec §3.2) — we surface that as a
+ *  Active-circle user cap: the Edge function auto-declines (spec §3.2) — we surface that as a
  *  dedicated status on the returned object so the UI can show the right toast. */
 export async function sendCircleInvite({ circleId, invitedEmail }) {
   const email = (invitedEmail || "").trim();

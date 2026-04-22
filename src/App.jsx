@@ -4,6 +4,7 @@ import { AppFooter } from "./appFooter.jsx";
 import { supabase } from "./supabase";
 import {
   CIRCLE_CAP,
+  CIRCLE_MEMBER_CAP,
   CIRCLE_NAME_MAX,
   validateCircleName,
   circleAvatarInitials,
@@ -28,6 +29,17 @@ import {
   CIRCLE_GRID_PAGE,
   CIRCLE_TOP_MAX,
 } from "./circles";
+
+/** `profiles.name` in primary nav: at most this many characters; longer values show a trailing ellipsis. */
+const HEADER_NAME_PILL_MAX = 5;
+
+function formatHeaderNamePill(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (s.length === 0) return null;
+  if (s.length <= HEADER_NAME_PILL_MAX) return s;
+  return `${s.slice(0, HEADER_NAME_PILL_MAX - 1)}…`;
+}
 
 const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
@@ -1434,6 +1446,8 @@ function AppPrimaryNav({
   onHome,
   discoverActive,
   onDetailBack,
+  headerNamePillText,
+  headerNamePillTitle,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -1496,6 +1510,14 @@ function AppPrimaryNav({
         <div className="app-primary-nav__brand">
           <AppBrand onPress={onHome} />
         </div>
+        {headerNamePillText ? (
+          <div
+            className="app-primary-nav__name-pill"
+            title={headerNamePillTitle || undefined}
+          >
+            {headerNamePillText}
+          </div>
+        ) : null}
         <nav className="app-primary-nav__links" aria-label="Sections">
           {menuItems.map((item) => (
             <button
@@ -1984,6 +2006,23 @@ const styles = `
   .app-primary-nav__detail-back--mobile { display:none; }
   .app-primary-nav__detail-back--desktop { display:inline-flex; }
   .app-primary-nav__brand { flex-shrink:0; }
+  .app-primary-nav__name-pill {
+    flex-shrink:0;
+    max-width:5.5ch;
+    min-width:0;
+    padding:2px 8px;
+    border-radius:9999px;
+    background:transparent;
+    border:none;
+    font-family:'DM Sans',sans-serif;
+    font-size:12px;
+    font-weight:500;
+    color:#9a968c;
+    line-height:1.2;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
   .app-primary-nav__brand .brand-logo--header {
     height:40px;
     width:auto;
@@ -4013,6 +4052,8 @@ export default function App() {
   const [screen, setScreen] = useState("splash");
   const [navTab, setNavTab] = useState("home");
   const [user, setUser] = useState(null);
+  /** `profiles.name` for primary nav pill (raw). */
+  const [headerProfileName, setHeaderProfileName] = useState(null);
   const [authMode, setAuthMode] = useState("signup");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -5294,9 +5335,10 @@ export default function App() {
 
     const { data: profileRow } = await supabase
       .from("profiles")
-      .select("streaming_provider_ids, show_genre_ids, show_region_keys, secondary_region_key")
+      .select("name, streaming_provider_ids, show_genre_ids, show_region_keys, secondary_region_key")
       .eq("id", user.id)
       .maybeSingle();
+    setHeaderProfileName(typeof profileRow?.name === "string" ? profileRow.name : null);
     const allowedRegions = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
     setSelectedStreamingProviderIds(
       Array.isArray(profileRow?.streaming_provider_ids)
@@ -5517,7 +5559,9 @@ export default function App() {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
-    setUser(null); setUserRatings({}); setWatchlist([]);
+    setUser(null);
+    setHeaderProfileName(null);
+    setUserRatings({}); setWatchlist([]);
     setMatchData(null);
     setSelectedStreamingProviderIds([]);
     setShowGenreIds([]);
@@ -8421,6 +8465,12 @@ export default function App() {
             onHome={goHome}
             discoverActive={screen === "discover"}
             onDetailBack={screen === "detail" ? goBack : undefined}
+            headerNamePillText={formatHeaderNamePill(headerProfileName)}
+            headerNamePillTitle={
+              headerProfileName && String(headerProfileName).trim()
+                ? String(headerProfileName).trim()
+                : undefined
+            }
           />
         )}
 
@@ -9468,12 +9518,12 @@ export default function App() {
                   type="button"
                   className="circle-invite-btn circle-invite-btn--modal"
                   onClick={openInviteSheet}
-                  disabled={circleDetailData.memberCount >= 25}
+                  disabled={circleDetailData.memberCount >= CIRCLE_MEMBER_CAP}
                 >
                   + Invite more
                 </button>
-                {circleDetailData.memberCount >= 25 && (
-                  <p className="circle-info-invite-cap">This circle is full (25/25).</p>
+                {circleDetailData.memberCount >= CIRCLE_MEMBER_CAP && (
+                  <p className="circle-info-invite-cap">This circle is full ({CIRCLE_MEMBER_CAP}/{CIRCLE_MEMBER_CAP}).</p>
                 )}
               </div>
             )}
@@ -9501,7 +9551,7 @@ export default function App() {
           <div className="circles-sheet">
             <div className="circles-sheet-handle" aria-hidden="true" />
             <div className="circles-sheet-title">New circle</div>
-            <div className="circles-sheet-sub">Private by default. You can invite up to 25 members.</div>
+            <div className="circles-sheet-sub">Private by default. You can invite up to {CIRCLE_MEMBER_CAP} members.</div>
 
             <div className="circles-field">
               <label className="circles-field-label">

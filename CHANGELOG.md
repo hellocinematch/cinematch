@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.6.25
+
+- **Circles — limits (testing):** **3** active circles per user and **4** members per circle (`CIRCLE_CAP` / `CIRCLE_MEMBER_CAP` in `circles.js`, matching **`send-circle-invite`** and **`accept-circle-invite`** Edge). UI copy and invite gating use **`CIRCLE_MEMBER_CAP`** (no hardcoded 25s). **Redeploy** both Edge functions on the Supabase project when shipping.
+- **Primary nav — display name:** Shows **`profiles.name`** in a small **no-fill** pill between the logo and the **Discover (lens)** control; names longer than **5** characters are truncated with an **ellipsis** (full name on hover via `title`).
+
 ## 5.6.24
 
 - **Watchlist — ⋯ menu moves:** Reorder no longer **blocks the UI** on empty **`UPDATE` RETURNING** rows (some RLS / PostgREST setups omit the returned row even when the update applies). We only **fail** on a non-null **`error`**. New migration adds **`watchlist update own`** (authenticated users may update their own rows) for projects where UPDATE was not allowed.
