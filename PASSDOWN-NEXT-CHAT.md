@@ -6,8 +6,8 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.24** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message).  
-> **Context:** **Circles** use **`rating_circle_shares`**. **Recent** strip: long-press or **⋯** → Details / Rate·Rerate / watchlist / Forward (manage) / Remove from circle; **Movie/TV · year** on-poster (muted chip) + `StripPosterBadge` + under-title **circle · Cinemastro** pill; **All / Top** = **3 lines** (title; **type · year**; ring **Circle** / **Cinemastro** / green **You**; **(n)** if **memberCount > 2**). **Strips** type/year lines use a muted chip (`.strip-genre`). **Watchlist:** max **30**; reorder (⋯ Top / Up / Down / Bottom) uses **`sort_index`**; **apply** **`20260523120000`** + **`20260525120000`** + **`20260526120000_watchlist_rls_update_own.sql`** on hosted DB (migrations are not Vercel); client treats **`UPDATE` `error` only** (no gating on empty RETURNING; some RLS setups omit returned rows). **Client:** **git push** → Vercel. **5.6.8** **navTab** from primary nav. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**.
+> Cinematch is on **`main` at 5.6.27** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
+> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **Primary nav:** **`profiles.name`** pill. **PWA (5.6.27):** **`/site.webmanifest`**, install icon **`/cinemastro-pwa-icon.svg`** = full **wordmark** (embeds **`cinemastro-logo.svg`**); **tab** still **`/favicon.svg`**. **Client:** **git push** → Vercel. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Backlog:** **Open / follow-ups** (numbered 1–6) + **Roadmap** in this file.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,11 +17,18 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.24** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main` pushed**; last ship **5.6.24** (watchlist reorder + **RLS UPDATE** migration + passdown). |
+| **App version** | **5.6.27** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main` pushed**; latest prod ship **5.6.27** — PWA **manifest** + full **wordmark** install icon; prior **5.6.26** = Circles **10/25** caps; **5.6.25** = header name pill. |
 | **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`** (watchlist row **UPDATE** for reorder under RLS). |
 | **Edge** | **`get-circle-rated-titles`** — RPC-only; **redeploy** only if function source changes. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
+
+**PWA / install (5.6.27)**
+
+- **`/site.webmanifest`:** `name` / `short_name` **Cinemastro**, **`display: standalone`**, **theme/background** `#0a0a0a`, icons → **`/cinemastro-pwa-icon.svg`**.  
+- **`/cinemastro-pwa-icon.svg`:** 512×512, **`#0a0a0a`** background, **`<image href="cinemastro-logo.svg">`** so the **install / home-screen** icon tracks the in-app **wordmark** file.  
+- **`index.html`:** `link rel="manifest"`, `theme-color`, `application-name`, `apple-touch-icon` → PWA icon (SVG; **CHANGELOG** notes optional **180×180 PNG** for some **iOS** if the tile is wrong).  
+- **Favicon** for tabs/bookmarks: unchanged **`/favicon.svg`**.
 
 **Watchlist (current behavior)**
 
@@ -72,6 +79,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 2. **Recurring ops:** as MAU grows, **`pg_cron`** **`compute-neighbors`** chunk coverage must grow — **`(# jobs) × (limit per job)`** must cover eligible non-seed users. **`COMPUTE-NEIGHBORS-CRON.md`**. Audit:  
    `select jobname, schedule from cron.job where jobname like 'compute-neighbors-w%';`
 3. When the user asks to **“update passdown”** or after a milestone: **edit this file** (date, version, migrations, open items).
+4. **When you write or update this handoff for the next chat** (including when the user says **“write a handoff”** / **“handoff for next chat”**), always include the session’s *last note* — the final thing the user asked for, decided, or left open in that thread (e.g. *“don’t implement X yet”*, a product call, a bug repro, or a **pending backlog** list). **Do not** only bump version: merge that **last note** into **Open / follow-ups** (or a short **Last session** bullet under it) so the next assistant sees it. After long threads, a **bulleted pending list** (Circles, watchlist, ops) is **required**; see **Open / follow-ups** in this file.
 
 ---
 
@@ -84,6 +92,9 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.27** — **PWA:** `site.webmanifest` + square **`cinemastro-pwa-icon.svg`** (embeds **`cinemastro-logo.svg`**) for **Install** / home screen; `index.html` manifest + `theme-color` + `apple-touch-icon`. (Commit on **`main`**, e.g. **`876a484`**.)  
+- **5.6.26** — Circles: **10** / **25** caps restored (client + invite Edge; redeployed by user).  
+- **5.6.25** — **Header** `profiles.name` pill; testing caps 3/4 (superseded by 5.6.26 for prod).  
 - **5.6.24** — Watchlist ⋯ **moves:** don’t require **`UPDATE` RETURNING**; migration **`20260526120000_watchlist_rls_update_own`**. (Git **`770278e`** to **`main`**.)
 - **5.6.23** — **Watchlist:** **`watchlistRowKeys`** fallbacks + stable **`tmdbId`** in **`buildWatchlistFromRows`**; RETURNING object/array fix (superseded by 5.6.24).
 - **5.6.22** — **Watchlist** persist: **`loadUserData`** when rows exist; normalized **`media_type`**; numeric **`tmdb_id`** in Supabase filters.
@@ -133,6 +144,10 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 - Backdrop **`object-position: 30% top`**; mobile **`.d-title`** DM Sans; **`BottomNav`** inside **`.detail`**.
 
+### PWA (5.6.27)
+
+- **Files:** `index.html` (manifest + metas + apple-touch), `public/site.webmanifest`, `public/cinemastro-pwa-icon.svg` (wordmark = embed **`cinemastro-logo.svg`**).
+
 ---
 
 ## Recent work (`src/circles.js`)
@@ -178,12 +193,35 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 ## Open / follow-ups
 
-- **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** applied (SQL editor or **`db push`**) if watchlist RLS is enabled.
-- **`ACCOUNT-SECURITY.md`** — Tightening user accounts: **Apple/Google OAuth** + **CAPTCHA** (preferred); optional **phone**; layers vs duplicate-account rating abuse.
-- **`HANDOFF.md`** — Phase D (handle), **edit circle name/info**, watchlist on **Circles** landing (layout TBD; global Watchlist done), **`source_circle_id`** labels on rows, invites to non-users, Bayesian ratings, in-circle quick rate, etc.
-- **Marketing stats:** can return in top bar / About — not in bottom nav.
-- **Cron:** audit coverage vs eligible users.
-- **Lint:** possible **`react-hooks/set-state-in-effect`** on **`AppPrimaryNav`** — pre-existing.
+**Handoff rule:** the **last user note** from the prior session (see **§ For the assistant** item 4) must be reflected here or under **Last session** when you update this file.
+
+**Shipped 2026-04-22**
+
+- **5.6.27 — PWA / beta install:** `site.webmanifest` + `cinemastro-pwa-icon.svg` (full **Cinemastro** wordmark for **Install** / Add to Home Screen, distinct from **favicon**). See **Snapshot** and **Changelog**; deploy via **Vercel** on **`main`**.
+
+**Last session backlog (2026-04-21) — not implemented unless user says *code now* / *implement* / *fix* for that item**
+
+1. **Circle feeds — live / multi-user:** no auto-refresh when another member **publishes**; only refetch/refresh/leave-then-re-enter. *Later:* Realtime, polling, and/or refetch on tab visibility.
+2. **Circles list — “unseen” activity:** after login, show that some groups have **activity not yet seen**; needs **last-seen** (likely DB) + **UI**; can ship without (1).
+3. **Invites at max circles:** today **`auto_declined`**; recipient **never sees** invite; creator gets auto-decline. *Idea:* **muted** row for recipient (“at cap”) + **open/pending** for creator until resolved.
+4. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if watchlist RLS is enabled and reorder must work.
+5. **Docs:** keep **`package.json` / `CHANGELOG` / this file** in sync; **`HANDOFF.md`** roadmap **version** line lags if not refreshed — trust **`package.json`**.
+6. **Creator leave → new owner, keep circle:** *Desired behavior:* when the **creator** leaves, **do not** archive/remove the circle; **transfer ownership** to the **next** member (define order: e.g. `joined_at`, member list) and keep the group **active**. *Current behavior (as of 5.6.x):* creator leave still follows **archive-then-leave** / dissolve-style flow in app + `HANDOFF.md` — changing this needs **client**, **RLS/Edge**, and **edge cases** (e.g. **creator is the only member** — archive vs delete vs require transfer — **TBD**).
+
+**Roadmap (see also `HANDOFF.md`)**
+
+- **Phase D — `profiles.handle`:** search/invite by handle (blocked on schema).
+- **Edit circle** name/description/(maybe vibe) from Circle info; archived read-only.
+- **Phase E polish:** animations, cover, `icon_emoji`, per-circle color, archived section.
+- **Watchlist on Circles** landing; **`source_circle_id`** / circle name on list rows; **invites to non-user emails**; **in-circle quick rate**; **Bayesian** ratings; **`ACCOUNT-SECURITY.md`** (OAuth, CAPTCHA, optional phone); **split `App.jsx`**.
+
+**Ongoing / ops**
+
+- **Marketing stats** may return in top bar / About — not in bottom nav. **Cron:** audit **`compute-neighbors`** coverage vs MAU (`COMPUTE-NEIGHBORS-CRON.md`). **Lint:** pre-existing **`react-hooks/set-state-in-effect`** in **`AppPrimaryNav`**.
+
+---
+
+*Legacy pointer:* Previous ask to **list all pending** for the project is **folded** into **Open / follow-ups** and **Last session** above; future passdowns should not drop that class of “last note.”
 
 ---
 
