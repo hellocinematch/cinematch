@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.31
+
+- **Images:** **`loading="lazy"`** + **`decoding="async"`** on poster thumbnails, strips, lists, discover/mood grids, watchlist, circle rows, and **Where to Watch** provider logos. **Title detail** hero **backdrop** uses **`loading="eager"`** + **`fetchPriority="high"`**; **floating poster** **`eager`**; **onboarding** and **Rate more** single-card posters **`eager`** so LCP is not deferred.
+
 ## 5.6.30
 
 - **Primary nav:** Removed **`profiles.name`** pill beside the header logo (it crowded narrow viewports and overlapped section titles like **Circles**). Name still appears on **Profile** as before.
