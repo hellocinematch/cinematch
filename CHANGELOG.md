@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.30
+
+- **Primary nav:** Removed **`profiles.name`** pill beside the header logo (it crowded narrow viewports and overlapped section titles like **Circles**). Name still appears on **Profile** as before.
+
 ## 5.6.29
 
 - **PWA icon:** Larger **cinemastro** wordmark on **`cinemastro-pwa-icon.svg`** (~**88px** type, wider canvas), **−27°** tilt so it uses the square; tagline omitted on the icon asset only (unreadable at 180×180). Regenerated **`apple-touch-icon.png`** / **`pwa-icon-192.png`** (`npm run icons:pwa`).
