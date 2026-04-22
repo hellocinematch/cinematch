@@ -1,13 +1,13 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-21
+**Last updated:** 2026-04-22
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.12** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message).  
-> **Context:** **Circles** use **`rating_circle_shares`** (prod migration applied); **Recent** strip: long-press or **⋯** → Details / Rate·Rerate / watchlist / Forward (manage publish) / Remove from circle; oldest→newest L→R, **Earlier**, **+**; **faded ←** when pannable; **All / Top** = watchlist **list** with Circle `(n)` when **memberCount > 2** + raters; **5.6.8** **navTab** fix for primary nav. **Edge** `get-circle-rated-titles` = RPC still. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**.
+> Cinematch is on **`main` at 5.6.21** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message).  
+> **Context:** **Circles** use **`rating_circle_shares`**. **Recent** strip: long-press or **⋯** → Details / Rate·Rerate / watchlist / Forward (manage) / Remove from circle; **Movie/TV · year** on-poster (muted chip) + `StripPosterBadge` + under-title **circle · Cinemastro** pill; **All / Top** = **3 lines** (title; **type · year**; ring **Circle** / **Cinemastro** / green **You**; **(n)** if **memberCount > 2**). **Strips** type/year lines use a muted chip (`.strip-genre`). **Watchlist:** max **30**; **`20260525120000_watchlist_max_30.sql`**. **Client:** **git push** → Vercel. **5.6.8** **navTab** from primary nav. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,15 +17,16 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.12** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main` pushed**; last ship **5.6.12** (watchlist max 30); push **`origin`** when you ship. |
-| **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`** — **`rating_circle_shares`** + RPC updates (circle feeds use **published** titles only). **`20260523120000_watchlist_sort_index.sql`** for watchlist **⋯** order. |
-| **Edge** | **`get-circle-rated-titles`** unchanged (still RPC-only); redeploy **optional** after this release. |
+| **App version** | **5.6.21** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main` pushed**; last ship **5.6.21** (Circles UI + passdown); push **`origin`** when you ship. |
+| **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`** (watchlist cap). |
+| **Edge** | **`get-circle-rated-titles`** — RPC-only; **redeploy** only if function source changes. |
+| **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
 
 **Watchlist (current behavior)**
 
-- **DB:** `watchlist` stores **`user_id`**, **`tmdb_id`**, **`media_type`**, **`title`**, **`poster`**, **`sort_index`**, optional **`source_circle_id`** — not full TMDB year/genre/rating on the row. **Max 30** rows per user (migration **`20260525120000_watchlist_max_30.sql`**).
-- **UI meta** (strip + list): **one line** under the title — **`Movie · YYYY · TMDB x.x · Genre`** (pieces omitted when missing). Enrichment comes from **`catalogue`** merge in **`buildWatchlistFromRows`**; thin stubs show **`—`** for year until the title exists in `catalogue`. **Detail** remains the full-fidelity surface.
+- **DB:** `watchlist` stores **`user_id`**, **`tmdb_id`**, **`media_type`**, **`title`**, **`poster`**, **`sort_index`**, optional **`source_circle_id`**. **Max 30** rows per user — **`WATCHLIST_MAX`** + migration **`20260525120000_watchlist_max_30.sql`** (trim over-cap + insert trigger). At cap: toast; **+ Watchlist** (detail), **Select to Watch** (mood), **Add to watchlist** (circle menu) **disabled**; **Profile** / watchlist screen show **n / 30**. **`toggleWatchlist(movie, { skipGoBack, circleIdForSource })`** for strip/circle.
+- **UI meta** (strip + list): **one line** under the title — **`Movie · YYYY · TMDB x.x · Genre`**. Enrichment via **`buildWatchlistFromRows`** + **`catalogue`**. **Detail** = full-fidelity.
 - **Profile:** no duplicate **`page-topbar`** under primary nav; hero is **`profile-top`** only.
 - **Bottom nav:** **Mood · Watchlist · Profile** — active tab = **faded circle** behind icon (no text labels).
 - **Watchlist screen:** vertical **list**, **⋯** = **Details / ⇈ Top / ↑ Up / ↓ Down / ⇊ Bottom / Remove**. **Up** and **Down** swap **`sort_index`** with the adjacent row; **Top** / **Bottom** set **`sort_index`** below the current minimum / above the current maximum for that user (one update each).

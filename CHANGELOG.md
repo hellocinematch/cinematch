@@ -1,5 +1,43 @@
 # Changelog
 
+## 5.6.21
+
+- **Circles — All / Top:** The **You** label uses the same **green** as your score (was blue).
+
+## 5.6.20
+
+- **Circles — All / Top:** Personal score label is **You** in sentence case (not uppercase), matching “you” vs the prior **Your** / **YOUR** styling.
+
+## 5.6.19
+
+- **Strips — type & year:** A **muted chip** (dark translucid background + light border) behind **Movie · … / TV · …** on home/strip cards (`.strip-genre`).
+- **Circles — Recent:** The **on-poster** type/year (bottom-left) uses a matching **muted background** (`.circle-strip-poster-meta`). **Spacer** strip rows (Earlier / + / More / etc.) use `.strip-genre--spacer` so empty slot lines stay invisible.
+
+## 5.6.18
+
+- **Circles — All / Top list:** **Three lines** — **title** (line 1); **Movie/TV · year** on its own line (line 2, muted); **Circle · Cinemastro · Your** scores (line 3).
+
+## 5.6.17
+
+- **Circles — All / Top list:** **Movie/TV** and **year** sit **immediately after** the title (inline) instead of being pushed to the right — **`.circle-list-title-line__name`** no longer uses `flex-grow`.
+
+## 5.6.16
+
+- **Circles — Recent:** Restores the **pill** (subtle background + gold-edge border) around the **circle + Cinemastro** line under the title.
+
+## 5.6.15
+
+- **Circles — Recent:** Circle + Cinemastro line **below the title** is **plain text** (no background/border “pill”).
+
+## 5.6.14
+
+- **Circles — Recent strip (fix):** Restores **`StripPosterBadge`** on the **poster (bottom-right)** — your rating, personal prediction, or community/TMDB as before. **Circle** (gold ring) and **Cinemastro** (smaller ⭐) live on a **line under the title**, not on the art.
+
+## 5.6.13
+
+- **Circles — Recent strip:** **Movie/TV** and **year** on the poster (**bottom-left**, muted) so the row under the art is just **title** + optional rater line. **Circle** and **Cinemastro** scores sit together in one **bottom-right** pill: **hollow gold ring** + circle average, **·** , slightly smaller **⭐** + site average (no separate per-title badge).
+- **Circles — All / Top** list: **one line** for scores — **ring** + circle (and **(n)** when used) **·** **⭐** + Cinemastro **·** **Your** + number (no extra stars on “Your”). **Title** is **one line** with **· TV|Movie · year** in **smaller, muted** type after the name.
+
 ## 5.6.12
 
 - **Watchlist:** **30 titles max** per user (`WATCHLIST_MAX` in `App.jsx`). Adds are blocked with a toast when full; **+ Watchlist** (detail), **Select to Watch** (mood), and **Add to watchlist** (circle Recent menu) are disabled at cap. **Profile** and **Watchlist** screens show **count / 30**. Migration **`20260525120000_watchlist_max_30.sql`**: trims users over 30 (pre-launch), **`BEFORE INSERT`** trigger enforces the cap.

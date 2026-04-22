@@ -2216,8 +2216,15 @@ const styles = `
   .strip-hot-theater-pill { position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.78); color:#c9b87c; font-size:10px; font-weight:500; padding:3px 7px; border-radius:8px; z-index:2; font-family:'DM Sans',sans-serif; letter-spacing:0.02em; }
   .strip-title { font-size:14px; color:#ccc; margin-top:9px; line-height:1.35; }
   .strip-title.strip-title--circle-single { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; max-width:100%; text-align:center; }
-  .strip-genre { font-size:11px; color:#555; margin-top:2px; }
-  .strip-genre.strip-genre--circle-cine { font-size:11px; color:#666; margin-top:4px; line-height:1.35; letter-spacing:0.1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
+  .strip-genre {
+    display:inline-block; box-sizing:border-box; max-width:100%;
+    font-size:11px; color:#8a8a8a; margin-top:2px; line-height:1.3;
+    padding:2px 6px 3px; border-radius:5px;
+    background:rgba(12,12,12,0.65); border:1px solid rgba(255,255,255,0.05);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:top;
+  }
+  .strip-genre.strip-genre--spacer { background:transparent; border-color:transparent; padding:0; min-height:0; color:transparent; }
+  .strip-genre.strip-genre--circle-cine { font-size:11px; color:#7a7a7a; margin-top:4px; line-height:1.35; letter-spacing:0.1px; text-align:center; }
   .strip-card-skeleton { flex-shrink:0; width:152px; }
   .skel-poster { width:152px; height:212px; border-radius:12px; border:1px solid #1e1e1e; position:relative; overflow:hidden; background:#141414; }
   /* Placeholder pill where Pick/Popular icon will appear (Your picks skeleton). */
@@ -3311,21 +3318,32 @@ const styles = `
     gap:6px 8px;
     font-family:'DM Sans',sans-serif;
     font-size:11px;
-    line-height:1.45;
+    line-height:1;
   }
   .circle-rated-list-ratings--empty { color:#555; }
-  .circle-rated-list-ratings-sep { color:#444; opacity:0.85; user-select:none; }
-  .circle-list-rating { display:inline-flex; align-items:baseline; flex-wrap:wrap; gap:0 2px; }
-  .circle-list-rating__lbl { font-size:10px; letter-spacing:0.04em; text-transform:uppercase; margin-right:4px; }
+  .circle-rated-list-ratings-sep { color:#444; opacity:0.85; user-select:none; line-height:1; align-self:center; }
+  .circle-list-rating { display:inline-flex; align-items:center; flex-wrap:wrap; gap:0 2px; }
+  .circle-list-rating__lbl { font-size:10px; letter-spacing:0.04em; text-transform:uppercase; margin-right:3px; }
   .circle-list-rating__star { font-size:10px; line-height:1; margin-right:1px; }
-  .circle-list-rating__num { font-weight:600; font-family:'DM Sans',sans-serif; }
-  .circle-list-rating--circle .circle-list-rating__lbl { color:#888; }
+  .circle-list-rating--cine .circle-list-rating__star { font-size:8.5px; line-height:1; margin-right:1px; opacity:0.95; }
+  .circle-list-rating__num { font-weight:600; font-family:'DM Sans',sans-serif; line-height:1; }
+  .circle-list-rating--circle .circle-gold-ring-mark { width:8px; height:8px; border-width:1.5px; }
   .circle-list-rating--circle .circle-list-rating__num { color:#d4a84a; }
   .circle-list-rating__paren { color:#888; font-weight:600; margin-left:2px; font-size:11px; }
-  .circle-list-rating--you .circle-list-rating__lbl { color:#6ab4e8; }
+  .circle-list-rating--you .circle-list-rating__lbl { color:#6aaa6a; text-transform:none; font-size:11px; letter-spacing:0.03em; }
   .circle-list-rating--you .circle-list-rating__num { color:#6aaa6a; }
-  .circle-list-rating--cine .circle-list-rating__lbl { color:#888; }
+  .circle-list-rating--cine { align-items:center; gap:1px; }
   .circle-list-rating--cine .circle-list-rating__num { color:#e8c96a; }
+  /* All / Top: 3 lines — title; type·year; scores */
+  .wl-list-title.circle-list-all-top__title {
+    display:block !important; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    -webkit-line-clamp:unset !important; -webkit-box-orient:unset !important;
+    max-width:100%;
+  }
+  .circle-list-all-top__type-year {
+    font-size:12px; color:#777; font-weight:400; line-height:1.35; margin-top:3px; letter-spacing:0.02em;
+    font-family:'DM Sans',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
   .circle-rated-list-skel-row {
     display:flex;
     align-items:center;
@@ -3342,26 +3360,63 @@ const styles = `
     flex-shrink:0;
     animation:circleRatedGridSkel 1.2s ease-in-out infinite;
   }
-  .circle-rated-list-skel-lines { flex:1; min-width:0; display:flex; flex-direction:column; gap:8px; }
+  .circle-rated-list-skel-lines { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
   .circle-rated-list-skel-line {
     border-radius:4px;
     background:#1a1a1a;
     animation:circleRatedGridSkel 1.2s ease-in-out infinite;
   }
   .circle-rated-list-skel-line--title { height:14px; width:min(100%, 220px); }
+  .circle-rated-list-skel-line--ty { height:10px; width:min(100%, 120px); }
   .circle-rated-list-skel-line--meta { height:11px; width:min(100%, 180px); }
   .circle-detail-strip-block { margin-top:4px; }
-  .circle-strip-circle-score {
-    text-align:center;
-    font-size:11px;
-    line-height:1.3;
-    margin-top:6px;
-    margin-bottom:2px;
-    font-family:'DM Sans',sans-serif;
-    letter-spacing:0.2px;
+  /* Gold hollow ring (circle score) — matches Cinemastro gold accent */
+  .circle-gold-ring-mark {
+    display:block;
+    width:10px; height:10px;
+    box-sizing:border-box;
+    flex-shrink:0;
+    border:1.65px solid rgba(201,162,39,0.88);
+    border-radius:50%;
+    box-shadow:0 0 0 0.5px rgba(232,201,106,0.2), inset 0 0 0 0.5px rgba(255,220,150,0.12);
+    background:transparent;
+    /* align to numerals: flex parents use align-items:center; no inline-block baseline drift */
   }
-  .circle-strip-circle-score__label { color:#888; margin-right:5px; }
-  .circle-strip-circle-score__num { color:#e8c96a; font-weight:600; }
+  .circle-list-rating--circle { display:inline-flex; align-items:center; gap:4px; }
+  .strip-poster--circle-recent { position:relative; }
+  .circle-strip-poster-meta {
+    position:absolute; left:5px; bottom:5px; z-index:2;
+    max-width:56%;
+    font-size:10px; line-height:1.3; letter-spacing:0.02em;
+    color:rgba(200, 197, 188, 0.92);
+    text-shadow:0 1px 2px rgba(0,0,0,0.75);
+    font-family:'DM Sans',sans-serif;
+    pointer-events:none;
+    padding:3px 6px; border-radius:5px;
+    background:rgba(8,8,8,0.55); border:1px solid rgba(255,255,255,0.06);
+    box-sizing:border-box;
+  }
+  /* Under strip title: circle (gold ring) + · + Cinemastro — pill groups with poster badge. */
+  .circle-strip-below-title-scores {
+    display:flex; align-items:center; justify-content:center; flex-wrap:wrap;
+    margin-top:5px; gap:3px; row-gap:2px;
+    max-width:100%;
+    padding:3px 6px 4px;
+    border-radius:10px;
+    background:rgba(0,0,0,0.35);
+    border:1px solid rgba(201,162,39,0.3);
+    font-family:'DM Sans',sans-serif;
+    font-size:11px;
+    font-weight:600;
+    line-height:1;
+  }
+  .circle-strip-below-title-scores__seg { display:inline-flex; align-items:center; gap:3px; color:#e8c96a; line-height:1; }
+  .circle-strip-below-title-scores__seg--cine .cinematch-cine-star {
+    font-size:0.68em; line-height:1; margin-right:0.5px; display:block;
+    color:#e0c26a; text-shadow:none;
+  }
+  .circle-strip-below-title-scores__dot { color:#666; font-weight:500; user-select:none; line-height:1; }
+  .circle-strip-below-title-scores__num { font-weight:600; line-height:1; }
   .circle-strip-rater-count { font-size:11px; color:#666; margin-top:2px; letter-spacing:0.2px; text-align:center; }
   .circle-strip-comm-line { font-size:11px; color:#888; margin-top:4px; letter-spacing:0.2px; }
   .circle-strip-comm-line--muted { color:#555; }
@@ -3769,29 +3824,6 @@ function formatStripMediaMeta(movie, tvMetaByTmdbId) {
   return `TV · ${latestYear}`;
 }
 
-/** Circle strip/grid: one line e.g. `TV · 2026 · ⭐5.0` (Cinemastro site average when available). */
-function formatCircleSublineTypeYearCine(movie, tvMetaByTmdbId, siteRating) {
-  const type = movie?.type === "tv" ? "TV" : "Movie";
-  let year = "—";
-  if (movie?.type === "tv") {
-    const meta = movie?.tmdbId != null ? tvMetaByTmdbId?.[movie.tmdbId] : null;
-    const y = meta?.latestYear ?? movie?.year;
-    if (y != null && String(y).trim() !== "") year = String(y);
-  } else {
-    if (movie?.year != null && String(movie.year).trim() !== "") {
-      year = String(movie.year);
-    } else {
-      const rd = movie?.releaseDate;
-      if (rd && /^\d{4}/.test(String(rd))) year = String(rd).slice(0, 4);
-    }
-  }
-  const cine =
-    siteRating != null && Number.isFinite(Number(siteRating))
-      ? `⭐ ${formatScore(siteRating)}`
-      : "—";
-  return `${type} · ${year} · ${cine}`;
-}
-
 /** Circle All/Top list: year segment for `Title · YYYY` (matches strip year rules). */
 function formatCircleListYear(movie, tvMetaByTmdbId) {
   if (!movie) return "—";
@@ -3807,7 +3839,51 @@ function formatCircleListYear(movie, tvMetaByTmdbId) {
   return "—";
 }
 
-/** Circle All/Top list row: Circle → You → Cinemastro (only when present). */
+/** Inline `Movie · YYYY` / `TV · YYYY` for circle title rows (same year rules as list year). */
+function formatCircleTypeYearShort(movie, tvMetaByTmdbId) {
+  if (!movie) return "· —";
+  const kind = movie.type === "tv" ? "TV" : "Movie";
+  return `${kind} · ${formatCircleListYear(movie, tvMetaByTmdbId)}`;
+}
+
+/**
+ * Circles — Recent strip: under the title — gold ring + circle score · smaller ⭐ + Cinemastro (row fields).
+ * Omits if both scores are missing.
+ */
+function CircleStripRingCineBelowTitle({ groupRating, siteRating }) {
+  const hasGr = groupRating != null && Number.isFinite(Number(groupRating));
+  const hasSr = siteRating != null && Number.isFinite(Number(siteRating));
+  if (!hasGr && !hasSr) return null;
+  const a11y = [
+    hasGr ? `Circle ${formatScore(Number(groupRating))}` : null,
+    hasSr ? `Cinemastro ${formatScore(Number(siteRating))}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return (
+    <div className="circle-strip-below-title-scores" title={a11y} aria-label={a11y}>
+      {hasGr ? (
+        <span className="circle-strip-below-title-scores__seg circle-strip-below-title-scores__seg--circle">
+          <span className="circle-gold-ring-mark" aria-hidden="true" />
+          <span className="circle-strip-below-title-scores__num">{formatScore(Number(groupRating))}</span>
+        </span>
+      ) : null}
+      {hasGr && hasSr ? (
+        <span className="circle-strip-below-title-scores__dot" aria-hidden="true">
+          ·
+        </span>
+      ) : null}
+      {hasSr ? (
+        <span className="circle-strip-below-title-scores__seg circle-strip-below-title-scores__seg--cine">
+          <span className="cinematch-cine-star" aria-hidden="true">⭐</span>
+          <span className="circle-strip-below-title-scores__num">{formatScore(Number(siteRating))}</span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** Circle All/Top list row: ring+Circle score · smaller ★+Cinemastro · “You”+score (order; omit when missing). */
 function CircleAllTopRatingsLine({ row, showRaterParen }) {
   const gr = row.group_rating;
   const vs = row.viewer_score;
@@ -3829,8 +3905,7 @@ function CircleAllTopRatingsLine({ row, showRaterParen }) {
             : `Circle score ${formatScore(Number(gr))}`
         }
       >
-        <span className="circle-list-rating__lbl">Circle</span>
-        <span className="circle-list-rating__star" aria-hidden="true">⭐</span>
+        <span className="circle-gold-ring-mark" aria-hidden="true" />
         <span className="circle-list-rating__num">{formatScore(Number(gr))}</span>
         {showParen ? (
           <span className="circle-list-rating__paren" aria-hidden="true">
@@ -3840,21 +3915,19 @@ function CircleAllTopRatingsLine({ row, showRaterParen }) {
       </span>,
     );
   }
+  if (hasCine) {
+    nodes.push(
+      <span key="s" className="circle-list-rating circle-list-rating--cine">
+        <span className="circle-list-rating__star" aria-hidden="true">⭐</span>
+        <span className="circle-list-rating__num">{formatScore(Number(sr))}</span>
+      </span>,
+    );
+  }
   if (hasYou) {
     nodes.push(
       <span key="y" className="circle-list-rating circle-list-rating--you">
         <span className="circle-list-rating__lbl">You</span>
-        <span className="circle-list-rating__star" aria-hidden="true">⭐</span>
         <span className="circle-list-rating__num">{formatScore(Number(vs))}</span>
-      </span>,
-    );
-  }
-  if (hasCine) {
-    nodes.push(
-      <span key="s" className="circle-list-rating circle-list-rating--cine">
-        <span className="circle-list-rating__lbl">Cinemastro</span>
-        <span className="circle-list-rating__star" aria-hidden="true">⭐</span>
-        <span className="circle-list-rating__num">{formatScore(Number(sr))}</span>
       </span>,
     );
   }
@@ -8853,11 +8926,10 @@ export default function App() {
                           key={rowKey}
                           ref={isNewest ? circleRecentNewestRef : null}
                         >
-                          <div className="strip-poster">
+                          <div className="strip-poster strip-poster--circle-recent">
                             <div className="strip-poster-fallback">🎬</div>
                           </div>
                           <div className="strip-title strip-title--circle-single">Loading…</div>
-                          <div className="strip-genre strip-genre--circle-cine">—</div>
                         </div>
                       );
                     }
@@ -9010,31 +9082,21 @@ export default function App() {
                             ) : null}
                           </div>
                         ) : null}
-                        <div className="strip-poster">
+                        <div className="strip-poster strip-poster--circle-recent">
                           {movie.poster ? (
                             <img src={movie.poster} alt="" />
                           ) : (
                             <div className="strip-poster-fallback">🎬</div>
                           )}
+                          <div className="circle-strip-poster-meta" aria-hidden="true">
+                            {formatCircleTypeYearShort(movie, tvStripMetaByTmdbId)}
+                          </div>
                           <StripPosterBadge
                             movie={movie}
                             predicted={predictedForBadge}
                             predictedNeighborCount={predictedForBadge != null ? predictedNeighborCount : 0}
                           />
                         </div>
-                        {row.group_rating != null && (
-                          <div
-                            className="circle-strip-circle-score"
-                            aria-label={
-                              showStripRaterCounts && distinctRaters > 0
-                                ? `Circle score ${formatScore(row.group_rating)}, ${distinctRaters} rated in this circle`
-                                : `Circle score ${formatScore(row.group_rating)}`
-                            }
-                          >
-                            <span className="circle-strip-circle-score__label">Circle</span>
-                            <span className="circle-strip-circle-score__num">{formatScore(row.group_rating)}</span>
-                          </div>
-                        )}
                         {showStripRaterCounts && distinctRaters > 0 ? (
                           <div className="circle-strip-rater-count">
                             {distinctRaters === 1 ? "1 rated" : `${distinctRaters} rated`}
@@ -9043,9 +9105,10 @@ export default function App() {
                         <div className="strip-title strip-title--circle-single" title={movie.title}>
                           {movie.title}
                         </div>
-                        <div className="strip-genre strip-genre--circle-cine" aria-label="Type, year, and Cinemastro community average">
-                          {formatCircleSublineTypeYearCine(movie, tvStripMetaByTmdbId, row.site_rating ?? null)}
-                        </div>
+                        <CircleStripRingCineBelowTitle
+                          groupRating={row.group_rating}
+                          siteRating={row.site_rating}
+                        />
                       </div>
                     );
                   };
@@ -9077,7 +9140,8 @@ export default function App() {
                       );
                     }
                     const year = formatCircleListYear(movie, tvStripMetaByTmdbId);
-                    const titleLine = `${movie.title} · ${year}`;
+                    const kind = movie.type === "tv" ? "TV" : "Movie";
+                    const titleLineFull = `${movie.title} · ${kind} · ${year}`;
                     return (
                       <button
                         key={rowKey}
@@ -9103,8 +9167,11 @@ export default function App() {
                           )}
                         </div>
                         <div className="wl-list-text">
-                          <div className="wl-list-title" title={movie.title}>
-                            {titleLine}
+                          <div className="wl-list-title circle-list-all-top__title" title={titleLineFull}>
+                            {movie.title}
+                          </div>
+                          <div className="circle-list-all-top__type-year" aria-label="Type and year">
+                            {kind} · {year}
                           </div>
                           <CircleAllTopRatingsLine row={row} showRaterParen={showStripRaterCounts} />
                         </div>
@@ -9140,6 +9207,7 @@ export default function App() {
                           <div className="circle-rated-list-skel-thumb" />
                           <div className="circle-rated-list-skel-lines">
                             <div className="circle-rated-list-skel-line circle-rated-list-skel-line--title" />
+                            <div className="circle-rated-list-skel-line circle-rated-list-skel-line--ty" />
                             <div className="circle-rated-list-skel-line circle-rated-list-skel-line--meta" />
                           </div>
                         </div>
@@ -9220,7 +9288,7 @@ export default function App() {
                                         )}
                                       </div>
                                       <div className="strip-title">Earlier</div>
-                                      <div className="strip-genre">&nbsp;</div>
+                                      <div className="strip-genre strip-genre--spacer" aria-hidden>&nbsp;</div>
                                     </button>
                                   )}
                                   {stripTitlesOrdered.map((row, i) =>
@@ -9238,7 +9306,7 @@ export default function App() {
                                         <span className="circle-add-rate-bubble">+</span>
                                       </div>
                                       <div className="strip-title">&nbsp;</div>
-                                      <div className="strip-genre">&nbsp;</div>
+                                      <div className="strip-genre strip-genre--spacer" aria-hidden>&nbsp;</div>
                                     </button>
                                   )}
                                 </div>
@@ -10059,7 +10127,7 @@ export default function App() {
                           <span className="circle-strip-more-arrow" aria-hidden>→</span>
                         </div>
                         <div className="strip-title">More</div>
-                        <div className="strip-genre">&nbsp;</div>
+                        <div className="strip-genre strip-genre--spacer" aria-hidden>&nbsp;</div>
                       </button>
                     )}
                     {hasYourPicksStripSource &&
@@ -10090,7 +10158,7 @@ export default function App() {
                           </div>
                         </div>
                         <div className="strip-title">&nbsp;</div>
-                        <div className="strip-genre">&nbsp;</div>
+                        <div className="strip-genre strip-genre--spacer" aria-hidden>&nbsp;</div>
                       </div>
                     )}
                   </div>
