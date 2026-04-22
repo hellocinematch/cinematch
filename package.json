@@ -1,7 +1,7 @@
 {
   "name": "cinematch",
   "private": true,
-  "version": "5.6.27",
+  "version": "5.6.28",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,7 +16,8 @@
     "seed:merge-weekly-into-prev": "node scripts/merge-weekly-ratings-into-prev-loaded.mjs",
     "titles:enrich-export": "node scripts/enrich-ratings-export-with-tmdb-titles.mjs",
     "titles:join-csv": "node scripts/join-csv-with-tmdb-titles.mjs",
-    "titles:streaming-year": "node scripts/tmdb-streaming-releases-this-year.mjs"
+    "titles:streaming-year": "node scripts/tmdb-streaming-releases-this-year.mjs",
+    "icons:pwa": "node scripts/generate-pwa-touch-icons.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@resvg/resvg-js": "^2.6.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

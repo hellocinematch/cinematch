@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.28
+
+- **PWA / iOS home screen:** **`apple-touch-icon`** now **`/apple-touch-icon.png`** (180×180 raster) so Add to Home Screen shows the **wordmark** on iPhone (Safari often skips nested `<image href>` inside SVG touch icons). **`cinemastro-pwa-icon.svg`** is **self-contained** (inlined wordmark, no external asset). **`site.webmanifest`** lists **`/pwa-icon-192.png`** first for install surfaces that prefer PNG. Dev: **`npm run icons:pwa`** regenerates PNGs from the SVG via **`scripts/generate-pwa-touch-icons.mjs`** (**`@resvg/resvg-js`**).
+
 ## 5.6.27
 
 - **PWA / install icon:** `site.webmanifest` + **`/cinemastro-pwa-icon.svg`** (square, **`#0a0a0a`**, embeds the full **`/cinemastro-logo.svg`**) so “Install” / Add to Home Screen uses the **Cinemastro wordmark**, not the small abstract **`favicon.svg`**. `index.html`: manifest link, `theme-color`, `application-name`, `apple-touch-icon`. Tab shortcut still uses **`favicon.svg`**. *Note:* some older iOS versions prefer a **raster** `apple-touch-icon` (e.g. 180×180 PNG); if the home-screen tile is wrong on a device, export PNGs from the same comp and add them to `public/` + manifest.
