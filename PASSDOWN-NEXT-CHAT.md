@@ -1,13 +1,13 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-22
+**Last updated:** 2026-04-21
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.21** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message).  
-> **Context:** **Circles** use **`rating_circle_shares`**. **Recent** strip: long-press or **⋯** → Details / Rate·Rerate / watchlist / Forward (manage) / Remove from circle; **Movie/TV · year** on-poster (muted chip) + `StripPosterBadge` + under-title **circle · Cinemastro** pill; **All / Top** = **3 lines** (title; **type · year**; ring **Circle** / **Cinemastro** / green **You**; **(n)** if **memberCount > 2**). **Strips** type/year lines use a muted chip (`.strip-genre`). **Watchlist:** max **30**; **`20260525120000_watchlist_max_30.sql`**. **Client:** **git push** → Vercel. **5.6.8** **navTab** from primary nav. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**.
+> Cinematch is on **`main` at 5.6.24** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message).  
+> **Context:** **Circles** use **`rating_circle_shares`**. **Recent** strip: long-press or **⋯** → Details / Rate·Rerate / watchlist / Forward (manage) / Remove from circle; **Movie/TV · year** on-poster (muted chip) + `StripPosterBadge` + under-title **circle · Cinemastro** pill; **All / Top** = **3 lines** (title; **type · year**; ring **Circle** / **Cinemastro** / green **You**; **(n)** if **memberCount > 2**). **Strips** type/year lines use a muted chip (`.strip-genre`). **Watchlist:** max **30**; reorder (⋯ Top / Up / Down / Bottom) uses **`sort_index`**; **apply** **`20260523120000`** + **`20260525120000`** + **`20260526120000_watchlist_rls_update_own.sql`** on hosted DB (migrations are not Vercel); client treats **`UPDATE` `error` only** (no gating on empty RETURNING; some RLS setups omit returned rows). **Client:** **git push** → Vercel. **5.6.8** **navTab** from primary nav. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,9 +17,9 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.21** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main` pushed**; last ship **5.6.21** (Circles UI + passdown); push **`origin`** when you ship. |
-| **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`** (watchlist cap). |
+| **App version** | **5.6.24** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main` pushed**; last ship **5.6.24** (watchlist reorder + **RLS UPDATE** migration + passdown). |
+| **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`** (watchlist row **UPDATE** for reorder under RLS). |
 | **Edge** | **`get-circle-rated-titles`** — RPC-only; **redeploy** only if function source changes. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
 
@@ -30,6 +30,7 @@
 - **Profile:** no duplicate **`page-topbar`** under primary nav; hero is **`profile-top`** only.
 - **Bottom nav:** **Mood · Watchlist · Profile** — active tab = **faded circle** behind icon (no text labels).
 - **Watchlist screen:** vertical **list**, **⋯** = **Details / ⇈ Top / ↑ Up / ↓ Down / ⇊ Bottom / Remove**. **Up** and **Down** swap **`sort_index`** with the adjacent row; **Top** / **Bottom** set **`sort_index`** below the current minimum / above the current maximum for that user (one update each).
+- **Reordering (5.6.22–5.6.24):** **`loadUserData`** always rebuilds from **`watchlist`** rows when present (stubs in **`buildWatchlistFromRows`** if catalogue is empty). Keys for Supabase filters: **`watchlistRowKeys`**, **`tmdbId` / `tmdb_id` / `parseMediaKey(id)`**, **`media_type`** → **`movie` \| `tv`**. **Swap** / **Top** / **Bottom** do **not** require non-empty **`UPDATE … RETURNING`**; only a non-null **`error`** from the client is treated as failure. Hosted DB: apply **`20260526120000_watchlist_rls_update_own.sql`** so **`authenticated`** users can **`update`** their own **`watchlist`** rows if RLS was blocking **`sort_index`** updates.
 - **Primary nav** (desktop + hamburger): includes **Watchlist**; **`navigatePrimarySection`**: **Watchlist** → `navTab` **watchlist**; **Pulse** → `navTab` **home**; **any other section** (Circles, Streaming, etc.) → **`setNavTab("home")`** + **`setScreen(…)`** so the bottom **Watchlist** ring does not stay on after you leave Watchlist via the top bar (**5.6.8**).
 - **Detail:** optional line **Watchlist · from …** (circle name when resolvable) when saved from a circle (`source_circle_id` + **`circleNameById`** from **`circlesList`**).
 
@@ -74,6 +75,9 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.24** — Watchlist ⋯ **moves:** don’t require **`UPDATE` RETURNING**; migration **`20260526120000_watchlist_rls_update_own`**. (Git **`770278e`** to **`main`**.)
+- **5.6.23** — **Watchlist:** **`watchlistRowKeys`** fallbacks + stable **`tmdbId`** in **`buildWatchlistFromRows`**; RETURNING object/array fix (superseded by 5.6.24).
+- **5.6.22** — **Watchlist** persist: **`loadUserData`** when rows exist; normalized **`media_type`**; numeric **`tmdb_id`** in Supabase filters.
 - **5.6.12** — **Watchlist max 30** (client + migration trim + trigger).
 - **5.6.11** — **Circles Recent:** long-press / **⋯** menu (Details, Rate·Rerate, watchlist, Forward, Remove from circle).
 - **5.6.10** — **Circles All / Top:** **(n)** after **Circle** score when **memberCount > 2** and **n** raters (`distinct_circle_raters`).
@@ -106,7 +110,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 - **`navigatePrimarySection`:** handles **`watchlist`** (sets **`navTab`** + **`screen`**).
 - **`goBack`:** if **`navTab === "watchlist"`**, restores **`screen`** to **`watchlist`**.
 - **`clearDetailOverlayToNavigate`** before leaving detail via Mood / Watchlist / Profile.
-- **Watchlist reorder:** **`swapWatchlistOrder(id, "up" | "down")`** (TEMP swap, same pattern as prior **Move up**); **`moveWatchlistItemToTop`** / **`moveWatchlistItemToBottom`** (single **`sort_index`** update).
+- **Watchlist reorder:** **`swapWatchlistOrder(id, "up" | "down")`** (TEMP swap); **`moveWatchlistItemToTop`** / **`moveWatchlistItemToBottom`**; **`buildWatchlistFromRows`**, **`watchlistRowKeys`**; **`setInviteToast`** is not used for reorder errors (see **`console.warn`**). **5.6.24:** no `.select()` gating on success.
 
 ### Circles
 
@@ -137,6 +141,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 | **`20260524120000_rating_circle_shares.sql`** | **`rating_circle_shares`** + strip/all/top RPCs — **required** for circle rated feeds (publish model). |
 | **`20260523120000_watchlist_sort_index.sql`** | **`watchlist.sort_index`** — **required** for watchlist ordering / **⋯** Top·Up·Down·Bottom. |
 | **`20260525120000_watchlist_max_30.sql`** | **30** watchlist rows per user (trim + trigger); client **`WATCHLIST_MAX`**. |
+| **`20260526120000_watchlist_rls_update_own.sql`** | RLS: **`update`** on own **`watchlist`** rows (`auth.uid() = user_id`) — for ⋯ **Top/Up/Down/Bottom** when RLS is on. |
 | **`20260522120000_circles_rated_all_top_grid.sql`** | All/Top grid RPCs; then **redeploy** **`get-circle-rated-titles`**. |
 | **`20260506120000_circles_strip_recent_activity.sql`** | Strip ordering + `rated_at` bump. |
 | **`20260505120000_circles_name_length_2_32.sql`** | Circle name 2–32. |
@@ -164,6 +169,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 ## Open / follow-ups
 
+- **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** applied (SQL editor or **`db push`**) if watchlist RLS is enabled.
 - **`ACCOUNT-SECURITY.md`** — Tightening user accounts: **Apple/Google OAuth** + **CAPTCHA** (preferred); optional **phone**; layers vs duplicate-account rating abuse.
 - **`HANDOFF.md`** — Phase D (handle), **edit circle name/info**, watchlist on **Circles** landing (layout TBD; global Watchlist done), **`source_circle_id`** labels on rows, invites to non-users, Bayesian ratings, in-circle quick rate, etc.
 - **Marketing stats:** can return in top bar / About — not in bottom nav.
