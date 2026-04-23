@@ -183,10 +183,18 @@ function genresLineFromTmdbDetail(raw) {
  * Returns strings for the shaded facts bar + tagline.
  */
 function detailMetaFromTmdbDetail(raw, mediaType) {
-  const empty = { tagline: null, genresLine: null, certification: null, runtimeLabel: null, releaseLabel: null };
+  const empty = {
+    tagline: null,
+    genresLine: null,
+    certification: null,
+    runtimeLabel: null,
+    releaseLabel: null,
+    languageLabel: null,
+  };
   if (!raw || isTmdbApiErrorPayload(raw)) return empty;
   const tag = typeof raw.tagline === "string" ? raw.tagline.trim() : "";
   const genresLine = genresLineFromTmdbDetail(raw);
+  const languageLabel = formatOriginalLanguageDisplay(raw?.original_language) || null;
   if (mediaType === "tv") {
     let certification = null;
     const cr = raw.content_ratings?.results;
@@ -207,6 +215,7 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
       certification,
       runtimeLabel,
       releaseLabel,
+      languageLabel,
     };
   }
   const certification = usMovieCertificationFromReleaseDatesPayload(raw.release_dates);
@@ -218,6 +227,7 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
     certification,
     runtimeLabel,
     releaseLabel,
+    languageLabel,
   };
 }
 
@@ -2055,6 +2065,33 @@ function formatStripMediaMeta(movie, tvMetaByTmdbId) {
   return `TV · ${latestYear}`;
 }
 
+/** TMDB `original_language` (ISO 639-1) → human-readable for strip meta (e.g. secondary Region). */
+function formatOriginalLanguageDisplay(iso639_1) {
+  const raw = String(iso639_1 || "")
+    .trim()
+    .toLowerCase();
+  if (raw.length < 2 || raw === "und" || raw === "xx") return "";
+  if (typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function") {
+    try {
+      for (const loc of [undefined, "en"]) {
+        const dn = new Intl.DisplayNames(loc, { type: "language" });
+        const name = dn.of(raw);
+        if (typeof name === "string" && name.length > 0) return name;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return raw;
+}
+
+/** Secondary Region page: same as {@link formatStripMediaMeta} plus original-language label. */
+function formatSecondaryRegionStripMeta(movie, tvMetaByTmdbId) {
+  const base = formatStripMediaMeta(movie, tvMetaByTmdbId);
+  const lang = formatOriginalLanguageDisplay(movie?.language);
+  return lang ? `${base} · ${lang}` : base;
+}
+
 /** Circle All/Top list: year segment for `Title · YYYY` (matches strip year rules). */
 function formatCircleListYear(movie, tvMetaByTmdbId) {
   if (!movie) return "—";
@@ -2539,6 +2576,7 @@ export default function App() {
     certification: null,
     runtimeLabel: null,
     releaseLabel: null,
+    languageLabel: null,
   });
   useEffect(() => {
     if (screen !== "detail" || !selectedMovie?.movie) {
@@ -2548,6 +2586,7 @@ export default function App() {
         certification: null,
         runtimeLabel: null,
         releaseLabel: null,
+        languageLabel: null,
       });
       return;
     }
@@ -2558,6 +2597,7 @@ export default function App() {
       certification: null,
       runtimeLabel: null,
       releaseLabel: null,
+      languageLabel: null,
     });
     let cancelled = false;
     const type = m.type === "tv" ? "tv" : "movie";
@@ -9003,7 +9043,7 @@ export default function App() {
                             <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                           </div>
                           <div className="strip-title">{rec.movie.title}</div>
-                          <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
+                          <div className="strip-genre">{formatSecondaryRegionStripMeta(rec.movie, tvStripMetaByTmdbId)}</div>
                         </div>
                       ))}
                     </div>
@@ -9688,7 +9728,8 @@ export default function App() {
           detailMeta.certification ||
             detailMeta.releaseLabel ||
             detailMeta.runtimeLabel ||
-            detailMeta.genresLine,
+            detailMeta.genresLine ||
+            detailMeta.languageLabel,
         );
         const sliderBubbleLeftPct = (v) => {
           const x = Number(v);
@@ -9830,17 +9871,32 @@ export default function App() {
                 ) : null}
                 {hasFactsBar ? (
                   <div className="detail-facts-bar">
-                    {detailMeta.certification || detailMeta.releaseLabel || detailMeta.runtimeLabel ? (
+                    {detailMeta.certification ||
+                    detailMeta.releaseLabel ||
+                    detailMeta.runtimeLabel ||
+                    detailMeta.languageLabel ? (
                       <div className="detail-facts-row">
                         {detailMeta.certification ? (
                           <span className="detail-facts-cert">{detailMeta.certification}</span>
                         ) : null}
-                        {detailMeta.certification && (detailMeta.releaseLabel || detailMeta.runtimeLabel) ? (
+                        {detailMeta.certification &&
+                        (detailMeta.releaseLabel || detailMeta.runtimeLabel || detailMeta.languageLabel) ? (
                           <span className="detail-facts-sep">·</span>
                         ) : null}
                         {detailMeta.releaseLabel ? <span>{detailMeta.releaseLabel}</span> : null}
-                        {detailMeta.releaseLabel && detailMeta.runtimeLabel ? <span className="detail-facts-sep">·</span> : null}
+                        {detailMeta.releaseLabel && (detailMeta.runtimeLabel || detailMeta.languageLabel) ? (
+                          <span className="detail-facts-sep">·</span>
+                        ) : null}
                         {detailMeta.runtimeLabel ? <span>{detailMeta.runtimeLabel}</span> : null}
+                        {detailMeta.runtimeLabel && detailMeta.languageLabel ? (
+                          <span className="detail-facts-sep">·</span>
+                        ) : null}
+                        {!detailMeta.runtimeLabel &&
+                        detailMeta.languageLabel &&
+                        (detailMeta.certification || detailMeta.releaseLabel) ? (
+                          <span className="detail-facts-sep">·</span>
+                        ) : null}
+                        {detailMeta.languageLabel ? <span>{detailMeta.languageLabel}</span> : null}
                       </div>
                     ) : null}
                     {detailMeta.genresLine ? <div className="detail-facts-genres">{detailMeta.genresLine}</div> : null}

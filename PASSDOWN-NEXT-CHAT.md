@@ -6,8 +6,8 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 6.0.0** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
-> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **5.6.33+ — activity:** **`circle_member_last_seen`** + RPCs (apply prod migration if missing). **5.6.38+ — Edge:** each function has **`EDGE_FUNCTION_VERSION`**; JSON includes **`edge: { name, version }`** — **bump + redeploy** on change. **5.6.50–5.6.52 — Circles:** **Forward** add-only; **Recent** strip order uses **share** time; **creator leave** **transfers** when **≥2** members (RPC); **edit circle** (name, description, vibe) for **creator** from list + circle info. **5.6.49** — shared **SVG** stars (orange / gold). **Strip vs detail** predictions: **`user_title_predictions`**; cold strip → **deferred** scroll-stop prefetch. **`fetchMyCircles`** includes **`joined_at`** on members. **Git:** e.g. **6.0.0** on **`main`**. **Deploy:** **Vercel** on push; **migrations** not auto (apply **§ Supabase migrations checklist** for prod). **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next:** **§ Master backlog** (moderation, **4e** grace, etc.); beta feedback.
+> Cinematch is on **`main` at 6.0.1** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
+> **Context:** **6.0.0** — global CSS in **`src/App.css`**. **6.0.1** — secondary **Region** page: reliable TMDB load (fast **`secondary_region_key`** + **try/catch/finally** on fetch). **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **5.6.33+ — activity:** **`circle_member_last_seen`** + RPCs. **5.6.38+ — Edge:** **`EDGE_FUNCTION_VERSION`** + **`edge.version`**; bump + redeploy on change. **5.6.50–5.6.52 — Circles:** **Forward**; strip **`last_at`** with shares; **creator leave** RPC; **edit circle**. **5.6.49** — shared **SVG** stars. **Strip vs detail** predictions: **`user_title_predictions`**; scroll-stop **deferred**. **`fetchMyCircles`** includes **`joined_at`**. **Prod SQL:** manual runs do **not** appear in **`supabase_migrations.schema_migrations`** — verify with **`pg_get_functiondef`** / **`pg_proc`** (see passdown / session note). **Deploy:** **Vercel** on push; **migrations** not auto. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next:** **§ Master backlog**; optional **secondary region** strip: show **language** from TMDB **`original_language`** (`movie.language`) for Indian (discussed, not implemented). **Beta** feedback.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -141,7 +141,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Recent work (client — `src/App.jsx`)
 
-**Primary file:** `src/App.jsx` + global **`src/App.css`** (nav, detail, circles, bottom nav, watchlist list CSS, etc.).
+**Primary file:** `src/App.jsx` + global **`src/App.css`** (nav, detail, circles, bottom nav, watchlist list CSS, etc.). **6.0.1** — secondary **Region** screen (`screen === "secondary-region"`): **reliable** strip data (profile key hydration + error handling on TMDB `Promise.all`). **Optional (not shipped):** show **original language** on that strip for Indian multi-language clarity — data exists as **`movie.language`** from **`normalizeTMDBItem`**.
 
 ### Bottom navigation & Watchlist
 
@@ -336,15 +336,19 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Handoff rule:** the **last user note** from the prior session (see **§ For the assistant** item 4) must be reflected here or under **Last session** when you update this file.
 
-**Last session (2026-04-22) — for the next chat**
+**Last session (2026-04-23) — for the next chat**
 
-- **2026-04-23 — passdown structure:** **§ Master backlog** circle moderation **4a–4e** are **first-class numbered items 4–8** (not only nested under a single **4**); former **5–29** renumbered **9–33** (e.g. **Edit circle** = **item 10**).
-- **5.6.52 — shipped to `main` (commit e.g. `7ae12ad`):** **Creator** can **edit** circle **name**, **description**, and **vibe** — **Circles** list **Edit** pill + **Circle info** “Edit name & description” (bottom sheet). **`updateCircle`** in **`src/circles.js`**; in-memory updates to **`circlesList`** and **`circleDetailData`**. **No** new Supabase migration (RLS **creator can update**).
-- **5.6.51 — shipped** (prior): **`creator_leave_circle`** — creator leave with **≥2** members **transfers** **`creator_id`**; **solo** → archive. **Prod:** run **`20260529120000_creator_leave_transfer_ownership.sql`** if not applied.
-- **5.6.50 — shipped (prior):** **Forward** add-only, strip **`greatest(rated_at, share.created_at)`**; migration **`20260528120000…`** on prod.
-- **Passdown** updated this thread for the **next** assistant (versions, **§ Tell the next chat**, **changelog** trail, backlog **item 10** edit circle = shipped).
-- **Open:** **§ Master backlog 4a–4c, 4e** (moderation, request unpublish, solo-after-exodus **~7d** grace). **4d** **partial** (transfer **done**; last-member **delete** / disintegrate **TBD**). **Deferred product:** **scroll-stop `predict_cached`**; **stale** strip when others **unpublish** — accepted for beta. **5.6.38** Edge **bump + redeploy** rule unchanged.
-- **Next work:** same as **§ Master backlog** + beta feedback; **native** / **Realtime** when prioritized.
+- **Shipped to `main`:** **6.0.0** — **`App.css`** split from inline **`styles`** in **`App.jsx`**; **`import "./App.css"`**; no intended UI change. **6.0.1** — secondary **Region** strip: dedicated **`secondary_region_key`** read after catalogue bootstrap; **try/catch/finally** on secondary TMDB **`Promise.all`** (fixes empty / stuck loading until hard refresh). **Pushed** to **GitHub** → **Vercel** deploy.
+- **Prod Supabase (session note):** **`supabase_migrations.schema_migrations`** is **empty** for hand-pasted SQL — use **`pg_get_functiondef`**, **`pg_proc`**, or Dashboard to confirm **`get_circle_rated_strip`** / **`creator_leave_circle`** if migrations **`20260528` / `20260529`** were applied manually.
+- **Passdown structure (earlier 2026-04-23):** **§ Master backlog** — moderation **4a–4e** = numbered items **4–8**; list continues **9–33**.
+- **Product (discussion only, not implemented):** On **secondary Region** screen, show **language** (TMDB **`original_language`** → already on rows as **`movie.language`**) on the strip for **Indian** (and similar) — **feasible**; single code per title; use **`formatStripMediaMeta`** or a branch; map ISO → name (**`Intl.DisplayNames`** or static map). Await **code now** / **implement** if user wants it shipped.
+- **Open (unchanged):** **§ Master backlog 4a–4c, 4e**; **4d** last-member **delete group** TBD. **Deferred:** scroll-stop **`predict_cached`**. **Next:** same backlog + **beta** feedback; **native** / **Realtime** when prioritized.
+- **Carry from 2026-04-22 / earlier:** **5.6.52** edit circle, **5.6.51** `creator_leave_circle`, **5.6.50** forward + strip order — all on **`main`**; see **Changelog** / **Snapshot**.
+
+**Earlier — Last session (2026-04-22)**
+
+- **5.6.52 — shipped to `main` (commit e.g. `7ae12ad`):** **Creator** can **edit** circle **name**, **description**, and **vibe** — **Circles** list **Edit** + **Circle info**; **`updateCircle`** in **`src/circles.js`**. **No** new migration.
+- **5.6.51 / 5.6.50** — see **Changelog**; prod migrations **`20260529120000`**, **`20260528120000`** if using creator leave + strip share ordering.
 
 **Shipped 2026-04-22**
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.0.3
+
+- **Title detail — facts bar:** The shaded row under the scores (US rating / air date, runtime, etc.) now also shows **original language** (from TMDB detail `original_language`, same display names as the secondary Region strip).
+
+## 6.0.2
+
+- **Region (secondary) strip:** Each tile’s meta line now includes **original language** (TMDB `original_language`, shown as a readable name, e.g. Hindi, English) after type · year / season, so one market can still show many languages clearly.
+
 ## 6.0.1
 
 - **Region (secondary) strip reliability:** `secondary_region_key` is now read from the profile in a **dedicated, fast** Supabase call once session + catalogue bootstrap are ready, instead of only at the end of the heavier `loadUserData()` (ratings + watchlist + full profile). That removes a race where the secondary TMDB fetches could run with a **null** key and leave theaters/streaming **empty** until a full page refresh. The secondary **TMDB** `useEffect` now uses **try / catch / finally** so a thrown error or unhandled edge case cannot leave the strip **stuck in the loading** state (`secondaryStripReady` false).
