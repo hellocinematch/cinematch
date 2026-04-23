@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-22 (5.6.32 TMDB poster w342 thumbs)
+**Last updated:** 2026-04-22 (5.6.32; **§ Speed / performance** backlog added)
 
 ---
 
@@ -225,6 +225,18 @@ Apply any that are missing on prod (user often uses SQL editor):
 - **Edit circle** name/description/(maybe vibe) from Circle info; archived read-only.
 - **Phase E polish:** animations, cover, `icon_emoji`, per-circle color, archived section.
 - **Watchlist on Circles** landing; **`source_circle_id`** / circle name on list rows; **invites to non-user emails**; **in-circle quick rate**; **Bayesian** ratings; **`ACCOUNT-SECURITY.md`** (OAuth, CAPTCHA, optional phone); **split `App.jsx`**.
+
+**Speed / performance (to do — beyond 5.6.31 lazy + 5.6.32 `w342`/`w500`)**
+
+- **Code-split:** route/screen-level **`lazy()` + `Suspense`** for heavy UI (shrink parse/compile on first load).
+- **Fetch waterfall:** keep shell + skeletons; avoid awaiting non-critical TMDB/secondary fetches before first meaningful paint after auth.
+- **Caching:** lean on Vercel CDN for hashed assets; optional short TTL for stable owned API responses.
+- **Vercel Image Optimization** (optional): `/_vercel/image` or framework integration — WebP/AVIF + resize vs raw TMDB URLs.
+- **Smaller thumbs (optional):** e.g. **`w185`** for tiny list rows only if quality OK; keep strips/detail larger.
+- **Prefetch (careful on cellular):** low-priority hints for likely next screen/data after login.
+- **Supabase hot paths:** fewer columns, indexes, avoid N+1; watch RLS cost on hot queries.
+- **Fonts:** subset / **`font-display`** if text ever blocks paint.
+- **PWA SW (repeat visits):** optional cache for app shell/assets; respect TMDB hotlinking; cold first load unchanged.
 
 **Ongoing / ops**
 
