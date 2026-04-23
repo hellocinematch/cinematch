@@ -1,13 +1,13 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-22 — **`main` at 5.6.52** (see `package.json` / **CHANGELOG**). **Recent Circles:** **5.6.50** **Forward** (add-only) + **strip** `last_at` = **`greatest(rated_at, share.created_at)`** (migration `20260528120000…`); **5.6.51** **creator leave** = **transfer** to earliest other member via RPC **`creator_leave_circle`** (migration `20260529120000…`); **5.6.52** **creator** can **edit** name / description / **vibe** (list **Edit** + **Circle info**, **`updateCircle`** in `circles.js`, **no** new SQL). **To do (moderation):** **§ Master backlog 4a–4c, 4e**; **4d** open: last-member **disintegrate** / **delete group**. **Deferred:** scroll-stop **`predict_cached`**. See **§ Last session** below.
+**Last updated:** 2026-04-23 — **`main` at 6.0.0** (see `package.json` / **CHANGELOG**). **6.0.0** — global styles in **`src/App.css`** (imported from **`App.jsx`**); no product change. **Recent Circles:** **5.6.50** **Forward** (add-only) + **strip** `last_at` = **`greatest(rated_at, share.created_at)`** (migration `20260528120000…`); **5.6.51** **creator leave** = **transfer** to earliest other member via RPC **`creator_leave_circle`** (migration `20260529120000…`); **5.6.52** **creator** can **edit** name / description / **vibe** (list **Edit** + **Circle info**, **`updateCircle`** in `circles.js`, **no** new SQL). **To do (moderation):** **§ Master backlog 4a–4c, 4e**; **4d** open: last-member **disintegrate** / **delete group**. **Deferred:** scroll-stop **`predict_cached`**. See **§ Last session** below.
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.52** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
-> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **5.6.33+ — activity:** **`circle_member_last_seen`** + RPCs (apply prod migration if missing). **5.6.38+ — Edge:** each function has **`EDGE_FUNCTION_VERSION`**; JSON includes **`edge: { name, version }`** — **bump + redeploy** on change. **5.6.50–5.6.52 — Circles:** **Forward** add-only; **Recent** strip order uses **share** time; **creator leave** **transfers** when **≥2** members (RPC); **edit circle** (name, description, vibe) for **creator** from list + circle info. **5.6.49** — shared **SVG** stars (orange / gold). **Strip vs detail** predictions: **`user_title_predictions`**; cold strip → **deferred** scroll-stop prefetch. **`fetchMyCircles`** includes **`joined_at`** on members. **Git:** e.g. **5.6.52** on **`main`**. **Deploy:** **Vercel** on push; **migrations** not auto (apply **§ Supabase migrations checklist** for prod). **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next:** **§ Master backlog** (moderation, **4e** grace, etc.); beta feedback.
+> Cinematch is on **`main` at 6.0.0** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
+> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **5.6.33+ — activity:** **`circle_member_last_seen`** + RPCs (apply prod migration if missing). **5.6.38+ — Edge:** each function has **`EDGE_FUNCTION_VERSION`**; JSON includes **`edge: { name, version }`** — **bump + redeploy** on change. **5.6.50–5.6.52 — Circles:** **Forward** add-only; **Recent** strip order uses **share** time; **creator leave** **transfers** when **≥2** members (RPC); **edit circle** (name, description, vibe) for **creator** from list + circle info. **5.6.49** — shared **SVG** stars (orange / gold). **Strip vs detail** predictions: **`user_title_predictions`**; cold strip → **deferred** scroll-stop prefetch. **`fetchMyCircles`** includes **`joined_at`** on members. **Git:** e.g. **6.0.0** on **`main`**. **Deploy:** **Vercel** on push; **migrations** not auto (apply **§ Supabase migrations checklist** for prod). **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next:** **§ Master backlog** (moderation, **4e** grace, etc.); beta feedback.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,8 +17,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.52** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** (pushed) — **5.6.52** = **Edit circle** (`updateCircle`); **5.6.51** = **`creator_leave_circle`**; **5.6.50** = **Forward** + strip **share** ordering; **5.6.38** = Edge **`edge.version`**; **5.6.33+** = Circles activity. |
+| **App version** | **6.0.0** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. **6.0.0** — global CSS in **`src/App.css`**. |
+| **Git** | **`main`** (pushed) — **6.0.0** = **App.css** split (no product change); **5.6.52** = **Edit circle** (`updateCircle`); **5.6.51** = **`creator_leave_circle`**; **5.6.50** = **Forward** + strip **share** ordering; **5.6.38** = Edge **`edge.version`**; **5.6.33+** = Circles activity. |
 | **Supabase — apply if not already** | **`20260529120000_creator_leave_transfer_ownership.sql`** — **creator** leave **transfers** `creator_id` when **≥2** members. Plus prior: **`20260528120000_circle_strip_share_activity_order.sql`**, **`20260527120000_circle_member_last_seen.sql`**, **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`**. |
 | **Edge** | Each of **`get-circle-rated-titles`**, **`send-circle-invite`**, **`accept-circle-invite`**, **`compute-neighbors`**, **`match`**: `index.ts` has **`EDGE_FUNCTION_VERSION`**; JSON bodies include **`edge: { name, version }`**. On any code change: **bump** that constant (semver) in the **same** commit, **redeploy** that function, confirm **`edge.version`** in a test response. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
@@ -81,7 +81,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
    `select jobname, schedule from cron.job where jobname like 'compute-neighbors-w%';`
 3. When the user asks to **“update passdown”** or after a milestone: **edit this file** (date, version, migrations, open items).
 4. **When you write or update this handoff for the next chat** (including when the user says **“write a handoff”** / **“handoff for next chat”**), always include the session’s *last note* — the final thing the user asked for, decided, or left open in that thread (e.g. *“don’t implement X yet”*, a product call, a bug repro, or a **pending backlog** list). **Do not** only bump version: merge that **last note** into **Open / follow-ups** (or a short **Last session** bullet under it) so the next assistant sees it. After long threads, a **bulleted pending list** (Circles, watchlist, ops) is **required**; see **Open / follow-ups** in this file.
-5. **Circles moderation backlog (not implemented):** scannable **checkbox** list under **§ Master backlog** — **“Circles moderation & lifecycle — things to do”** (items **4a–4e**). Update checkboxes when features ship; full spec remains in **item 4** bullets.
+5. **Circles moderation backlog (not implemented):** scannable **checkbox** list under **§ Master backlog** — **“Circles moderation & lifecycle — things to do”** (items **4a–4e**, main list **4–8**). Update checkboxes when features ship; full spec is in those **items 4–8** (not only a nested sub-list).
 
 ---
 
@@ -94,6 +94,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **6.0.0** — **Refactor:** global stylesheet in **`src/App.css`** (imported from **`App.jsx`**); no intended UI or product change. **Major** = structural milestone.  
 - **5.6.52** — **Circles — edit info:** **Creator** updates **name**, **description**, **vibe** for **active** circles; **Edit** on **Circles list** + **“Edit name & description”** in **Circle info**; **`updateCircle`** in **`src/circles.js`**. **No** migration.  
 - **5.6.51** — **Creator leave** — if **other members** remain, **`creator_id`** **transfers** to **earliest** `joined_at` (RPC **`creator_leave_circle`**); **solo** creator → **archive** + leave. Migration **`20260529120000_creator_leave_transfer_ownership.sql`**.  
 - **5.6.50** — **Forward** add-only + **`addRatingCircleShares`**; **strip** **`greatest(rated_at, share.created_at)`** (migration **`20260528120000_circle_strip_share_activity_order.sql`**).  
@@ -139,7 +140,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Recent work (client — `src/App.jsx`)
 
-**Primary file:** `src/App.jsx` (inline `<style>{styles}</style>` for nav, detail, circles, bottom nav, watchlist list CSS, etc.).
+**Primary file:** `src/App.jsx` + global **`src/App.css`** (nav, detail, circles, bottom nav, watchlist list CSS, etc.).
 
 ### Bottom navigation & Watchlist
 
@@ -269,78 +270,78 @@ Apply any that are missing on prod (user often uses SQL editor):
 1b. **Recent strip — personal prediction (blue) hydration (deferred post-beta):** optional **scroll-stop** / idle **`predict_cached`** for **1–2** visible **unrated** titles to show **blue** without opening **detail**; **not** implemented as of 5.6.49 — user chose **beta first**, **detail** already fetches; **revisit** after feedback. *See* **§ Circles — ratings & strip predictions**.
 2. **“Unseen” activity (polish):** optional: dismiss rules, animation, or tuning count rules; core badges shipped in 5.6.33.
 3. **Invites at max circles:** today **`auto_declined`** — recipient never sees invite; creator gets auto-decline. *Idea:* muted row for recipient (“at cap”) + open/pending for creator until resolved.
-4. **Circles — moderation, succession, and end-of-life (partially shipped; see sub-bullets).**
-   - **4a. Admin line:** **Creator** = primary mod. **Auto-designate** up to two **sub-admins** as the **2nd and 3rd members to join** (by `joined_at` / join order) so **successor order** is always known without manual picks.
-   - **4b. Remove member:** **Creator/admins** can **remove a user** from the circle (new RLS / RPC or Edge; today `circle_members` DELETE is **self-only** — see passdown / schema). Aligns with familiar chat **admin** behavior.
-   - **4c. Request unpublish title:** **Request** flow — ask the **publisher** to **unpublish** a title from the group (notification + deep link to unpublish) for **wrong fit** without ejecting the member. Complements **show who published** (when implemented).
-   - **4d. Creator leave + group survival:** If **>1 member** remains, **do not** kill the circle: **transfer ownership** to the **next in line** (e.g. **2nd joiner** admin, else **3rd joiner**). If **0–1 members** and the **last person** leaves or **deletes the group**, **disintegrate** (archive/delete — exact rule **TBD**). **Shipped (5.6.51):** creator leave with **≥2 members** → **`creator_leave_circle`** RPC transfers **`creator_id`** to **earliest `joined_at`** among **other** members, then removes the leaver (no archive). **Solo** creator leave → **archive** + leave (unchanged). *Still TBD:* explicit **“delete group”** for last member, **2nd/3rd** as named **admin** roles beyond `creator_id` / one `role='creator'` row.
-   - **4e. Solo only after others left (anti–shadow-watchlist):** If the circle **used to have 2+ members** and the **last other member(s) leave**, the **one remaining** user is not in the same boat as a **fresh** solo create + invite. Product intent: **~7 day grace** (default; **TBD** at build) to **invite** someone or **close** the circle — avoids using an empty social shell as a **second watchlist**; after grace, **nudge** or **force** **Close** (or require invite) — enforcement **TBD**. *Implementation needs* a **transition timestamp** (e.g. when `member_count` first drops to **1** from **≥2**) or equivalent.
+4. **(4a) Circles — admin line / successor order:** **Creator** = primary mod. **Auto-designate** up to two **sub-admins** as the **2nd and 3rd members to join** (by `joined_at` / join order) so **successor order** is always known without manual picks.
+5. **(4b) Circles — remove member:** **Creator/admins** can **remove a user** from the circle (new RLS / RPC or Edge; today `circle_members` DELETE is **self-only** — see passdown / schema). Aligns with familiar chat **admin** behavior.
+6. **(4c) Circles — request unpublish title:** **Request** flow — ask the **publisher** to **unpublish** a title from the group (notification + deep link to unpublish) for **wrong fit** without ejecting the member. Complements **show who published** (when implemented).
+7. **(4d) Circles — creator leave + group survival (partially shipped):** If **>1 member** remains, **do not** kill the circle: **transfer ownership** to the **next in line** (e.g. **2nd joiner** admin, else **3rd joiner**). If **0–1 members** and the **last person** leaves or **deletes the group**, **disintegrate** (archive/delete — exact rule **TBD**). **Shipped (5.6.51):** creator leave with **≥2 members** → **`creator_leave_circle`** RPC transfers **`creator_id`** to **earliest `joined_at`** among **other** members, then removes the leaver (no archive). **Solo** creator leave → **archive** + leave (unchanged). *Still TBD:* explicit **“delete group”** for last member, **2nd/3rd** as named **admin** roles beyond `creator_id` / one `role='creator'` row.
+8. **(4e) Circles — solo only after others left (anti–shadow-watchlist):** If the circle **used to have 2+ members** and the **last other member(s) leave**, the **one remaining** user is not in the same boat as a **fresh** solo create + invite. Product intent: **~7 day grace** (default; **TBD** at build) to **invite** someone or **close** the circle — avoids using an empty social shell as a **second watchlist**; after grace, **nudge** or **force** **Close** (or require invite) — enforcement **TBD**. *Implementation needs* a **transition timestamp** (e.g. when `member_count` first drops to **1** from **≥2**) or equivalent.
 
-**Circles moderation & lifecycle — things to do** (same as **item 4**; use this as a scan list; check off when shipped.)
+**Circles moderation & lifecycle — things to do** (same as **items 4–8**; use this as a scan list; check off when shipped.)
 
-- [ ] **4a** — Auto **2nd / 3rd joiner** admins / **successor** order (`joined_at`).
-- [ ] **4b** — **Remove member** (creator/admins; RLS / RPC or Edge).
-- [ ] **4c** — **Request unpublish** title + **show who published** (if not already).
-- [x] **4d** — **Creator leave** → **transfer** if **>1** member (**5.6.51** `creator_leave_circle`). *Open:* last-member **delete group** / full **disintegrate** rules.
-- [ ] **4e** — **Solo after exodus** — **~7 day grace**, then **invite** or **close**; track **≥2 → 1** transition time in DB.
+- [ ] **4a** — Auto **2nd / 3rd joiner** admins / **successor** order (`joined_at`) — *main list **4***.
+- [ ] **4b** — **Remove member** (creator/admins; RLS / RPC or Edge) — *main list **5***.
+- [ ] **4c** — **Request unpublish** title + **show who published** (if not already) — *main list **6***.
+- [x] **4d** — **Creator leave** → **transfer** if **>1** member (**5.6.51** `creator_leave_circle`). *Open:* last-member **delete group** / full **disintegrate** rules — *main list **7***.
+- [ ] **4e** — **Solo after exodus** — **~7 day grace**, then **invite** or **close**; track **≥2 → 1** transition time in DB — *main list **8***.
 
 ### Product — discovery & polish
 
-5. **Phase D — `profiles.handle`:** search/invite by handle — **blocked on schema**.
-6. **Edit circle** — **shipped 5.6.52:** name / description / vibe; **active** + **creator** only; **`updateCircle`**. *Polish (optional):* **archived** read-only is already the case (list only **active**); no extra work unless showing archived later.
-7. **Phase E polish:** animations, cover upload, **`icon_emoji`**, per-circle color, **archived** section.
+9. **Phase D — `profiles.handle`:** search/invite by handle — **blocked on schema**.
+10. **Edit circle** — **shipped 5.6.52:** name / description / vibe; **active** + **creator** only; **`updateCircle`**. *Polish (optional):* **archived** read-only is already the case (list only **active**); no extra work unless showing archived later.
+11. **Phase E polish:** animations, cover upload, **`icon_emoji`**, per-circle color, **archived** section.
 
 ### Watchlist, invites, ratings
 
-8. **Watchlist on Circles landing:** surface watchlist on main Circles — **layout TBD** (`HANDOFF.md`).
-9. **Watchlist rows — circle name:** when saved from a circle, show name via **`source_circle_id`** (partially in roadmap today).
-10. **Invite → non-user email:** deliver path to **join** + accept circle invite — product detail **TBD**.
-11. **In-circle quick rate pill:** rate from circle context → same **publish to circles** flow (`rating_circle_shares`).
-12. **Bayesian (or similar) normalization** for ratings — formula + pipeline **TBD**.
+12. **Watchlist on Circles landing:** surface watchlist on main Circles — **layout TBD** (`HANDOFF.md`).
+13. **Watchlist rows — circle name:** when saved from a circle, show name via **`source_circle_id`** (partially in roadmap today).
+14. **Invite → non-user email:** deliver path to **join** + accept circle invite — product detail **TBD**.
+15. **In-circle quick rate pill:** rate from circle context → same **publish to circles** flow (`rating_circle_shares`).
+16. **Bayesian (or similar) normalization** for ratings — formula + pipeline **TBD**.
 
 ### Security & trust
 
-13. **`ACCOUNT-SECURITY.md`:** OAuth (e.g. Apple / Google), **CAPTCHA** on signup, optional **phone** verification — see file.
+17. **`ACCOUNT-SECURITY.md`:** OAuth (e.g. Apple / Google), **CAPTCHA** on signup, optional **phone** verification — see file.
 
 ### Engineering — performance & platform
 
-14. **Code-splitting:** route/screen **`lazy()` + `Suspense`** to cut first-load JS parse/compile.
-15. **Fetch waterfalls:** shell + skeletons first; don’t await non-critical TMDB/secondary fetches before meaningful paint after auth.
-16. **Split `App.jsx`:** move to **`pages/*`** (pure refactor, large file — `HANDOFF.md`).
-17. **Caching:** Vercel CDN for hashed assets; optional short TTL for stable owned API responses.
-18. **Vercel Image Optimization (optional):** `/_vercel/image` or framework integration — WebP/AVIF + resize vs raw TMDB.
-19. **Smaller thumbs (optional):** e.g. **`w185`** for tiny list rows only if quality OK.
-20. **Prefetch (optional):** low-priority hints for likely next screen — **careful on cellular**.
-21. **Supabase hot paths:** fewer columns, indexes, avoid N+1; watch **RLS** cost on hot queries.
-22. **Fonts:** subset / **`font-display`** if text blocks paint.
-23. **PWA service worker (optional):** repeat-visit cache for shell/assets; respect **TMDB** hotlinking; cold first load unchanged.
+18. **Code-splitting:** route/screen **`lazy()` + `Suspense`** to cut first-load JS parse/compile.
+19. **Fetch waterfalls:** shell + skeletons first; don’t await non-critical TMDB/secondary fetches before meaningful paint after auth.
+20. **Split `App.jsx`:** move to **`pages/*`** (pure refactor, large file — `HANDOFF.md`).
+21. **Caching:** Vercel CDN for hashed assets; optional short TTL for stable owned API responses.
+22. **Vercel Image Optimization (optional):** `/_vercel/image` or framework integration — WebP/AVIF + resize vs raw TMDB.
+23. **Smaller thumbs (optional):** e.g. **`w185`** for tiny list rows only if quality OK.
+24. **Prefetch (optional):** low-priority hints for likely next screen — **careful on cellular**.
+25. **Supabase hot paths:** fewer columns, indexes, avoid N+1; watch **RLS** cost on hot queries.
+26. **Fonts:** subset / **`font-display`** if text blocks paint.
+27. **PWA service worker (optional):** repeat-visit cache for shell/assets; respect **TMDB** hotlinking; cold first load unchanged.
 
 ### Ops, quality, docs
 
-24. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if **RLS** on **`watchlist`** and **⋯ reorder** must work.
-25. **Docs sync:** **`package.json`**, **`CHANGELOG.md`**, this file, **`HANDOFF.md`** version/callouts — don’t let **`HANDOFF`** version drift vs **`package.json`**.
-26. **Marketing stats:** may return in top bar / About (not bottom nav).
-27. **Cron:** **`compute-neighbors`** wave coverage vs MAU — **`COMPUTE-NEIGHBORS-CRON.md`**.
-28. **Lint:** pre-existing **`react-hooks/set-state-in-effect`** in **`AppPrimaryNav`**.
+28. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if **RLS** on **`watchlist`** and **⋯ reorder** must work.
+29. **Docs sync:** **`package.json`**, **`CHANGELOG.md`**, this file, **`HANDOFF.md`** version/callouts — don’t let **`HANDOFF`** version drift vs **`package.json`**.
+30. **Marketing stats:** may return in top bar / About (not bottom nav).
+31. **Cron:** **`compute-neighbors`** wave coverage vs MAU — **`COMPUTE-NEIGHBORS-CRON.md`**.
+32. **Lint:** pre-existing **`react-hooks/set-state-in-effect`** in **`AppPrimaryNav`**.
 
 ### Small follow-ups (nice-to-have)
 
-29. **Circle strip tabs:** **Top** copy vs **Most rated** by count — combine or rename if product wants both (`HANDOFF.md` item 11).
+33. **Circle strip tabs:** **Top** copy vs **Most rated** by count — combine or rename if product wants both (`HANDOFF.md` item 11).
 
 ---
 
 ## Open / follow-ups
 
-**Master checklist:** **§ Master backlog (consolidated checklist)** above — this section keeps **narrative**, **shipped** history, and **numbered 1–6** shorthand aligned with that list.
+**Master checklist:** **§ Master backlog (consolidated checklist)** above — this section keeps **narrative**, **shipped** history, and **numbered 1–33** shorthand aligned with that list (Circles **1–1b, 2, 3,** moderation **4–8** = **4a–4e**, then Product **9–11**, etc.).
 
 **Handoff rule:** the **last user note** from the prior session (see **§ For the assistant** item 4) must be reflected here or under **Last session** when you update this file.
 
 **Last session (2026-04-22) — for the next chat**
 
+- **2026-04-23 — passdown structure:** **§ Master backlog** circle moderation **4a–4e** are **first-class numbered items 4–8** (not only nested under a single **4**); former **5–29** renumbered **9–33** (e.g. **Edit circle** = **item 10**).
 - **5.6.52 — shipped to `main` (commit e.g. `7ae12ad`):** **Creator** can **edit** circle **name**, **description**, and **vibe** — **Circles** list **Edit** pill + **Circle info** “Edit name & description” (bottom sheet). **`updateCircle`** in **`src/circles.js`**; in-memory updates to **`circlesList`** and **`circleDetailData`**. **No** new Supabase migration (RLS **creator can update**).
 - **5.6.51 — shipped** (prior): **`creator_leave_circle`** — creator leave with **≥2** members **transfers** **`creator_id`**; **solo** → archive. **Prod:** run **`20260529120000_creator_leave_transfer_ownership.sql`** if not applied.
 - **5.6.50 — shipped (prior):** **Forward** add-only, strip **`greatest(rated_at, share.created_at)`**; migration **`20260528120000…`** on prod.
-- **Passdown** updated this thread for the **next** assistant (versions, **§ Tell the next chat**, **changelog** trail, backlog **item 6** edit circle = shipped).
+- **Passdown** updated this thread for the **next** assistant (versions, **§ Tell the next chat**, **changelog** trail, backlog **item 10** edit circle = shipped).
 - **Open:** **§ Master backlog 4a–4c, 4e** (moderation, request unpublish, solo-after-exodus **~7d** grace). **4d** **partial** (transfer **done**; last-member **delete** / disintegrate **TBD**). **Deferred product:** **scroll-stop `predict_cached`**; **stale** strip when others **unpublish** — accepted for beta. **5.6.38** Edge **bump + redeploy** rule unchanged.
 - **Next work:** same as **§ Master backlog** + beta feedback; **native** / **Realtime** when prioritized.
 
@@ -365,7 +366,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 3. **Invites at max circles:** today **`auto_declined`**; recipient **never sees** invite; creator gets auto-decline. *Idea:* **muted** row for recipient (“at cap”) + **open/pending** for creator until resolved.
 4. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if watchlist RLS is enabled and reorder must work.
 5. **Docs:** keep **`package.json` / `CHANGELOG` / this file** in sync; **`HANDOFF.md`** roadmap **version** line lags if not refreshed — trust **`package.json`**.
-6. **Creator leave / moderation stack:** *Full spec:* **§ Master backlog** item **4 (4a–4e)**. **5.6.51:** creator leave **transfers** when others remain; **solo** still archives. *Still not in app:* **remove member** (4b), **request unpublish** (4c), **4e** grace clock, last-member **delete group** (4d).
+6. **Creator leave / moderation stack:** *Full spec:* **§ Master backlog** **items 4–8 (4a–4e)**. **5.6.51:** creator leave **transfers** when others remain; **solo** still archives. *Still not in app:* **remove member** (4b), **request unpublish** (4c), **4e** grace clock, last-member **delete group** (4d).
 
 **Roadmap (see also `HANDOFF.md`)**
 

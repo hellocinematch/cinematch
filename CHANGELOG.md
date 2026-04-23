@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.0.0
+
+- **Refactor:** Moved the global app stylesheet from an inline **`styles`** template literal in **`App.jsx`** to **`src/App.css`**, imported from **`App.jsx`**. **No** intended visual or behavior change; same class names and rules. Bumps **major** version to reflect the structural milestone.
+
 ## 5.6.52
 
 - **Circles — edit info:** The **creator** can update **name**, **description**, and **vibe** for an **active** circle. **Edit** on the **Circles list** (pill next to the card) and **“Edit name & description”** in **Circle info** open the same bottom sheet. **`updateCircle`** in **`src/circles.js`** (RLS: existing creator update policy). **No** new migration.
