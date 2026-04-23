@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.0.1
+
+- **Region (secondary) strip reliability:** `secondary_region_key` is now read from the profile in a **dedicated, fast** Supabase call once session + catalogue bootstrap are ready, instead of only at the end of the heavier `loadUserData()` (ratings + watchlist + full profile). That removes a race where the secondary TMDB fetches could run with a **null** key and leave theaters/streaming **empty** until a full page refresh. The secondary **TMDB** `useEffect` now uses **try / catch / finally** so a thrown error or unhandled edge case cannot leave the strip **stuck in the loading** state (`secondaryStripReady` false).
+
 ## 6.0.0
 
 - **Refactor:** Moved the global app stylesheet from an inline **`styles`** template literal in **`App.jsx`** to **`src/App.css`**, imported from **`App.jsx`**. **No** intended visual or behavior change; same class names and rules. Bumps **major** version to reflect the structural milestone.

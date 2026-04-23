@@ -2899,6 +2899,35 @@ export default function App() {
     };
   }, [user, screen]);
 
+  /**
+   * V1.3.0: Hydrate `secondary_region_key` as soon as session + bootstrap allow — it was only set at
+   * the end of `loadUserData()` (after ratings/watchlist + full profile), so the secondary strip effect
+   * often started with `null` and raced slow networks. Single-field read keeps TMDB fetches in sync.
+   */
+  useEffect(() => {
+    if (!user || !catalogueBootstrapDone) return;
+    let cancelled = false;
+    (async () => {
+      const { data: row, error } = await supabase
+        .from("profiles")
+        .select("secondary_region_key")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) {
+        console.warn("Could not read secondary_region_key:", error.message);
+        return;
+      }
+      const sk = row?.secondary_region_key;
+      setSecondaryRegionKey(
+        typeof sk === "string" && V130_SECONDARY_REGION_IDS.includes(sk) ? sk : null,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, catalogueBootstrapDone]);
+
   /** V1.3.0: Fetch secondary-market theaters + streaming (parallel); V1.3.2: keep pools separate for tabs. */
   useEffect(() => {
     if (!user || !secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
@@ -2914,26 +2943,36 @@ export default function App() {
     setSecondaryStripReady(false);
     const defer = setTimeout(() => {
       (async () => {
-        const tmdbReg = secondaryMarketTmdbRegion(secondaryRegionKey);
-        const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
-        const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
-        const [theaters, sm, st] = await Promise.all([
-          fetchInTheatersForMarket(tmdbReg, langCodes),
-          fetchStreamingMoviesForMarket(tmdbReg, langQuery),
-          fetchStreamingTVForMarket(tmdbReg, langQuery),
-        ]);
-        if (cancelled) return;
-        const mergedCatalog = dedupeMediaRowsById([...theaters, ...sm, ...st]);
-        setSecondaryTheaterRows(theaters);
-        setSecondaryStreamingMovieRows(sm);
-        setSecondaryStreamingTvRows(st);
-        setCatalogue((prev) => {
-          const seen = new Set(prev.map((m) => m.id));
-          const added = mergedCatalog.filter((m) => !seen.has(m.id));
-          if (added.length === 0) return prev;
-          return [...prev, ...added];
-        });
-        setSecondaryStripReady(true);
+        try {
+          const tmdbReg = secondaryMarketTmdbRegion(secondaryRegionKey);
+          const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
+          const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+          const [theaters, sm, st] = await Promise.all([
+            fetchInTheatersForMarket(tmdbReg, langCodes),
+            fetchStreamingMoviesForMarket(tmdbReg, langQuery),
+            fetchStreamingTVForMarket(tmdbReg, langQuery),
+          ]);
+          if (cancelled) return;
+          const mergedCatalog = dedupeMediaRowsById([...theaters, ...sm, ...st]);
+          setSecondaryTheaterRows(theaters);
+          setSecondaryStreamingMovieRows(sm);
+          setSecondaryStreamingTvRows(st);
+          setCatalogue((prev) => {
+            const seen = new Set(prev.map((m) => m.id));
+            const added = mergedCatalog.filter((m) => !seen.has(m.id));
+            if (added.length === 0) return prev;
+            return [...prev, ...added];
+          });
+        } catch (e) {
+          if (!cancelled) {
+            console.warn("Secondary region strip fetch failed:", e);
+            setSecondaryTheaterRows([]);
+            setSecondaryStreamingMovieRows([]);
+            setSecondaryStreamingTvRows([]);
+          }
+        } finally {
+          if (!cancelled) setSecondaryStripReady(true);
+        }
       })();
     }, SECONDARY_STRIP_FETCH_DEFER_MS);
     return () => {

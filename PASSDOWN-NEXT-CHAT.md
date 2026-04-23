@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-23 — **`main` at 6.0.0** (see `package.json` / **CHANGELOG**). **6.0.0** — global styles in **`src/App.css`** (imported from **`App.jsx`**); no product change. **Recent Circles:** **5.6.50** **Forward** (add-only) + **strip** `last_at` = **`greatest(rated_at, share.created_at)`** (migration `20260528120000…`); **5.6.51** **creator leave** = **transfer** to earliest other member via RPC **`creator_leave_circle`** (migration `20260529120000…`); **5.6.52** **creator** can **edit** name / description / **vibe** (list **Edit** + **Circle info**, **`updateCircle`** in `circles.js`, **no** new SQL). **To do (moderation):** **§ Master backlog 4a–4c, 4e**; **4d** open: last-member **disintegrate** / **delete group**. **Deferred:** scroll-stop **`predict_cached`**. See **§ Last session** below.
+**Last updated:** 2026-04-23 — **`main` at 6.0.1** (see `package.json` / **CHANGELOG**). **6.0.1** — secondary **Region** strip: fast **`secondary_region_key`** read + **try/catch/finally** on TMDB fetch (reliability). **6.0.0** — global styles in **`src/App.css`**. **Recent Circles:** **5.6.50** **Forward** (add-only) + **strip** `last_at` = **`greatest(rated_at, share.created_at)`** (migration `20260528120000…`); **5.6.51** **creator leave** = **transfer** to earliest other member via RPC **`creator_leave_circle`** (migration `20260529120000…`); **5.6.52** **creator** can **edit** name / description / **vibe** (list **Edit** + **Circle info**, **`updateCircle`** in `circles.js`, **no** new SQL). **To do (moderation):** **§ Master backlog 4a–4c, 4e**; **4d** open: last-member **disintegrate** / **delete group**. **Deferred:** scroll-stop **`predict_cached`**. See **§ Last session** below.
 
 ---
 
@@ -17,8 +17,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **6.0.0** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. **6.0.0** — global CSS in **`src/App.css`**. |
-| **Git** | **`main`** (pushed) — **6.0.0** = **App.css** split (no product change); **5.6.52** = **Edit circle** (`updateCircle`); **5.6.51** = **`creator_leave_circle`**; **5.6.50** = **Forward** + strip **share** ordering; **5.6.38** = Edge **`edge.version`**; **5.6.33+** = Circles activity. |
+| **App version** | **6.0.1** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`**. **6.0.0+** — global CSS **`src/App.css`**. **6.0.1** — secondary region strip load fixes. |
+| **Git** | **`main`** — **6.0.1** = secondary region reliability; **6.0.0** = **App.css** split; **5.6.52** = **Edit circle**; **5.6.51** = **`creator_leave_circle`**; **5.6.50** = **Forward** + strip order; **5.6.38** = Edge **`edge.version`**; **5.6.33+** = Circles activity. |
 | **Supabase — apply if not already** | **`20260529120000_creator_leave_transfer_ownership.sql`** — **creator** leave **transfers** `creator_id` when **≥2** members. Plus prior: **`20260528120000_circle_strip_share_activity_order.sql`**, **`20260527120000_circle_member_last_seen.sql`**, **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`**. |
 | **Edge** | Each of **`get-circle-rated-titles`**, **`send-circle-invite`**, **`accept-circle-invite`**, **`compute-neighbors`**, **`match`**: `index.ts` has **`EDGE_FUNCTION_VERSION`**; JSON bodies include **`edge: { name, version }`**. On any code change: **bump** that constant (semver) in the **same** commit, **redeploy** that function, confirm **`edge.version`** in a test response. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
@@ -94,6 +94,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **6.0.1** — **Region (secondary) strip:** Fast **`secondary_region_key`** from Supabase after bootstrap; **try/catch/finally** for TMDB **Promise.all** so the strip is not left loading or empty until refresh.  
 - **6.0.0** — **Refactor:** global stylesheet in **`src/App.css`** (imported from **`App.jsx`**); no intended UI or product change. **Major** = structural milestone.  
 - **5.6.52** — **Circles — edit info:** **Creator** updates **name**, **description**, **vibe** for **active** circles; **Edit** on **Circles list** + **“Edit name & description”** in **Circle info**; **`updateCircle`** in **`src/circles.js`**. **No** migration.  
 - **5.6.51** — **Creator leave** — if **other members** remain, **`creator_id`** **transfers** to **earliest** `joined_at` (RPC **`creator_leave_circle`**); **solo** creator → **archive** + leave. Migration **`20260529120000_creator_leave_transfer_ownership.sql`**.  
