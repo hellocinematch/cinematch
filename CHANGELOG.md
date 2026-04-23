@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.52
+
+- **Circles — edit info:** The **creator** can update **name**, **description**, and **vibe** for an **active** circle. **Edit** on the **Circles list** (pill next to the card) and **“Edit name & description”** in **Circle info** open the same bottom sheet. **`updateCircle`** in **`src/circles.js`** (RLS: existing creator update policy). **No** new migration.
+
 ## 5.6.51
 
 - **Circles — creator leave:** If the **creator** leaves but **other members** remain, the circle **stays active**: **`creator_id` transfers** to the **earliest-joined** remaining member (`circle_members.joined_at`), their membership role becomes **creator**, then the leaver is removed. **Solo** creator (only member) — behavior **unchanged** (**archive** + remove membership). **Client:** `leaveCircle` calls new RPC `creator_leave_circle`; leave confirmation **copy** reflects transfer vs solo-archive. **DB:** apply **`20260529120000_creator_leave_transfer_ownership.sql`**. **`fetchMyCircles`** now selects **`joined_at`** on members (for any UI that needs join order later).

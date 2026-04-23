@@ -14,6 +14,7 @@ import {
   fetchMyCircles,
   fetchCircleDetail,
   createCircle,
+  updateCircle,
   leaveCircle,
   currentUserRole,
   fetchPendingInvites,
@@ -3036,9 +3037,15 @@ const styles = `
   .circles-empty-slot { aspect-ratio:1; border-radius:10px; border:1px dashed #222; background:#111; }
 
   .circles-list { padding:16px 24px 24px; display:flex; flex-direction:column; gap:12px; animation:fadeIn 0.3s ease; }
-  .circle-card { position:relative; display:block; width:100%; text-align:left; background:#111; border:1px solid #1e1e1e; border-radius:14px; padding:16px 18px; cursor:pointer; overflow:hidden; transition:transform 0.15s, border-color 0.15s; animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1); --vibe-accent:#e8c96a; --vibe-tint:#3a2a0a; font-family:'DM Sans',sans-serif; color:inherit; }
+  .circle-card { position:relative; display:block; width:100%; text-align:left; background:#111; border:1px solid #1e1e1e; border-radius:14px; padding:16px 18px; overflow:hidden; transition:transform 0.15s, border-color 0.15s; animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1); --vibe-accent:#e8c96a; --vibe-tint:#3a2a0a; font-family:'DM Sans',sans-serif; color:inherit; }
   .circle-card:hover { transform:translateY(-2px); border-color:var(--vibe-accent); }
-  .circle-card:focus-visible { outline:2px solid var(--vibe-accent); outline-offset:2px; }
+  .circle-card:focus-within { outline:2px solid var(--vibe-accent); outline-offset:2px; }
+  .circle-card__row { position:relative; z-index:1; display:flex; align-items:flex-start; gap:10px; min-width:0; }
+  .circle-card__open { flex:1; min-width:0; margin:0; padding:0; border:none; background:transparent; cursor:pointer; text-align:left; color:inherit; font:inherit; }
+  .circle-card__open:focus-visible { outline:2px solid var(--vibe-accent); outline-offset:3px; border-radius:8px; }
+  .circle-card__edit-pill { flex-shrink:0; margin-top:2px; padding:6px 12px; border-radius:999px; border:1px solid #3a3020; background:#1a1814; color:#e8d4b0; font-size:12px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; }
+  .circle-card__edit-pill:hover { border-color:var(--vibe-accent); color:var(--vibe-accent); }
+  .circle-card__edit-pill:disabled { opacity:0.5; cursor:not-allowed; }
   .circle-card__tint { position:absolute; inset:0; background:radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--vibe-tint) 75%, transparent) 0%, transparent 65%); pointer-events:none; opacity:0.85; }
   .circle-card__body { position:relative; z-index:1; display:flex; flex-direction:column; gap:6px; }
   .circle-card__top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
@@ -4175,6 +4182,13 @@ export default function App() {
   const [createCircleVibe, setCreateCircleVibe] = useState("Mixed Bag");
   const [createCircleSubmitting, setCreateCircleSubmitting] = useState(false);
   const [createCircleError, setCreateCircleError] = useState("");
+  const [showEditCircleSheet, setShowEditCircleSheet] = useState(false);
+  const [editCircleId, setEditCircleId] = useState(null);
+  const [editCircleName, setEditCircleName] = useState("");
+  const [editCircleDescription, setEditCircleDescription] = useState("");
+  const [editCircleVibe, setEditCircleVibe] = useState("Mixed Bag");
+  const [editCircleSubmitting, setEditCircleSubmitting] = useState(false);
+  const [editCircleError, setEditCircleError] = useState("");
   const [selectedCircleId, setSelectedCircleId] = useState(null);
   const [circleDetailData, setCircleDetailData] = useState(null);
   const [circleDetailLoading, setCircleDetailLoading] = useState(false);
@@ -7133,6 +7147,69 @@ export default function App() {
     }
   }
 
+  function openEditCircleSheet(circle, { closeInfo = false } = {}) {
+    if (!circle?.id) return;
+    if (currentUserRole(circle, user?.id) !== "creator" || circle.status !== "active") return;
+    if (closeInfo) setShowCircleInfoSheet(false);
+    setEditCircleId(circle.id);
+    setEditCircleName(circle.name || "");
+    setEditCircleDescription(circle.description || "");
+    setEditCircleVibe(circle.vibe && VIBES.some((v) => v.id === circle.vibe) ? circle.vibe : "Mixed Bag");
+    setEditCircleError("");
+    setShowEditCircleSheet(true);
+  }
+
+  function closeEditCircleSheet() {
+    if (editCircleSubmitting) return;
+    setShowEditCircleSheet(false);
+    setEditCircleId(null);
+    setEditCircleError("");
+  }
+
+  async function submitEditCircle() {
+    if (!user || !editCircleId || editCircleSubmitting) return;
+    const nameCheck = validateCircleName(editCircleName);
+    if (!nameCheck.ok) {
+      setEditCircleError(nameCheck.error);
+      return;
+    }
+    if (editCircleDescription.length > CIRCLE_DESCRIPTION_MAX) {
+      setEditCircleError(`Description must be ${CIRCLE_DESCRIPTION_MAX} characters or fewer.`);
+      return;
+    }
+    setEditCircleSubmitting(true);
+    setEditCircleError("");
+    try {
+      await updateCircle({
+        circleId: editCircleId,
+        name: nameCheck.name,
+        description: editCircleDescription,
+        vibe: editCircleVibe,
+      });
+      const nextName = nameCheck.name;
+      const nextDesc = editCircleDescription.trim() || "";
+      setCirclesList((prev) =>
+        prev.map((c) =>
+          c.id === editCircleId
+            ? { ...c, name: nextName, description: nextDesc, vibe: editCircleVibe }
+            : c
+        )
+      );
+      setCircleDetailData((d) =>
+        d && d.id === editCircleId
+          ? { ...d, name: nextName, description: nextDesc, vibe: editCircleVibe }
+          : d
+      );
+      setShowEditCircleSheet(false);
+      setEditCircleId(null);
+    } catch (e) {
+      console.error("Circles: updateCircle failed", e);
+      setEditCircleError(e?.message || "Could not save changes. Please try again.");
+    } finally {
+      setEditCircleSubmitting(false);
+    }
+  }
+
   function openCircleDetail(circleId) {
     if (!circleId) return;
     setSelectedCircleId(circleId);
@@ -8964,49 +9041,65 @@ export default function App() {
                       ? `${circle.name}, ${unseenN === 1 ? "1 new" : `${unseenN} new`} from your circle`
                       : undefined;
                   return (
-                    <button
-                      type="button"
+                    <div
                       key={circle.id}
                       className="circle-card"
-                      aria-label={cardAria}
-                      onClick={() => openCircleDetail(circle.id)}
                       style={{
                         "--vibe-accent": meta.accent,
                         "--vibe-tint": meta.tint,
                       }}
                     >
                       <div className="circle-card__tint" aria-hidden="true" />
-                      <div className="circle-card__body">
-                        <div className="circle-card__top">
-                          <div className="circle-card__name">{circle.name}</div>
-                          <div className="circle-card__top-badges">
-                            {isCreator && (
-                              <div className="circle-card__crown" title="You're the creator">👑</div>
-                            )}
-                            {unseenN > 0 ? (
-                              <div
-                                className="circle-card__activity"
-                                title="New from other members"
-                              >
-                                <span className="circle-card__activity-ico" aria-hidden="true">🔔</span>
-                                <span className="circle-card__activity-count">
-                                  {unseenN > 99 ? "99+" : unseenN}
-                                </span>
+                      <div className="circle-card__row">
+                        <button
+                          type="button"
+                          className="circle-card__open"
+                          aria-label={cardAria || `Open ${circle.name}`}
+                          onClick={() => openCircleDetail(circle.id)}
+                        >
+                          <div className="circle-card__body">
+                            <div className="circle-card__top">
+                              <div className="circle-card__name">{circle.name}</div>
+                              <div className="circle-card__top-badges">
+                                {isCreator && (
+                                  <div className="circle-card__crown" title="You're the creator">👑</div>
+                                )}
+                                {unseenN > 0 ? (
+                                  <div
+                                    className="circle-card__activity"
+                                    title="New from other members"
+                                  >
+                                    <span className="circle-card__activity-ico" aria-hidden="true">🔔</span>
+                                    <span className="circle-card__activity-count">
+                                      {unseenN > 99 ? "99+" : unseenN}
+                                    </span>
+                                  </div>
+                                ) : null}
                               </div>
-                            ) : null}
+                            </div>
+                            {circle.description && (
+                              <div className="circle-card__desc">{circle.description}</div>
+                            )}
+                            <div className="circle-card__meta-row">
+                              <span className="circle-card__vibe-badge">{meta.id}</span>
+                              <span className="circle-card__members">
+                                {circle.memberCount} {circle.memberCount === 1 ? "member" : "members"}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                        {circle.description && (
-                          <div className="circle-card__desc">{circle.description}</div>
-                        )}
-                        <div className="circle-card__meta-row">
-                          <span className="circle-card__vibe-badge">{meta.id}</span>
-                          <span className="circle-card__members">
-                            {circle.memberCount} {circle.memberCount === 1 ? "member" : "members"}
-                          </span>
-                        </div>
+                        </button>
+                        {isCreator ? (
+                          <button
+                            type="button"
+                            className="circle-card__edit-pill"
+                            onClick={() => openEditCircleSheet(circle)}
+                            aria-label={`Edit ${circle.name}`}
+                          >
+                            Edit
+                          </button>
+                        ) : null}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -9766,6 +9859,13 @@ export default function App() {
                 <button
                   type="button"
                   className="circle-invite-btn circle-invite-btn--modal"
+                  onClick={() => openEditCircleSheet(circleDetailData, { closeInfo: true })}
+                >
+                  Edit name & description
+                </button>
+                <button
+                  type="button"
+                  className="circle-invite-btn circle-invite-btn--modal"
                   onClick={openInviteSheet}
                   disabled={circleDetailData.memberCount >= CIRCLE_MEMBER_CAP}
                 >
@@ -9869,6 +9969,92 @@ export default function App() {
                 disabled={createCircleSubmitting || !createCircleName.trim()}
               >
                 {createCircleSubmitting ? "Creating…" : "Create circle"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditCircleSheet && (
+        <div className="circles-sheet-root" role="dialog" aria-modal="true" aria-label="Edit circle">
+          <button
+            type="button"
+            className="circles-sheet-backdrop"
+            aria-label="Close"
+            onClick={closeEditCircleSheet}
+          />
+          <div className="circles-sheet">
+            <div className="circles-sheet-handle" aria-hidden="true" />
+            <div className="circles-sheet-title">Edit circle</div>
+            <div className="circles-sheet-sub">Name, description, and vibe. Other members will see the updates.</div>
+
+            <div className="circles-field">
+              <label className="circles-field-label">
+                Name <span className="circles-field-required">*</span>
+              </label>
+              <input
+                className="circles-input"
+                type="text"
+                maxLength={CIRCLE_NAME_MAX}
+                placeholder="e.g. Friday movie night"
+                value={editCircleName}
+                onChange={(e) => setEditCircleName(e.target.value)}
+                disabled={editCircleSubmitting}
+                autoFocus
+              />
+              <div className="circles-field-count">
+                {editCircleName.length}/{CIRCLE_NAME_MAX}
+              </div>
+            </div>
+
+            <div className="circles-field">
+              <label className="circles-field-label">Description</label>
+              <textarea
+                className="circles-textarea"
+                maxLength={CIRCLE_DESCRIPTION_MAX}
+                placeholder="What's this circle about? (optional)"
+                value={editCircleDescription}
+                onChange={(e) => setEditCircleDescription(e.target.value)}
+                disabled={editCircleSubmitting}
+                rows={2}
+              />
+              <div className="circles-field-count">
+                {editCircleDescription.length}/{CIRCLE_DESCRIPTION_MAX}
+              </div>
+            </div>
+
+            <div className="circles-field">
+              <label className="circles-field-label">Vibe</label>
+              <select
+                className="circles-input"
+                value={editCircleVibe}
+                onChange={(e) => setEditCircleVibe(e.target.value)}
+                disabled={editCircleSubmitting}
+              >
+                {VIBES.map((v) => (
+                  <option key={v.id} value={v.id}>{v.id}</option>
+                ))}
+              </select>
+            </div>
+
+            {editCircleError && <div className="circles-error-banner">{editCircleError}</div>}
+
+            <div className="circles-sheet-actions">
+              <button
+                type="button"
+                className="circles-btn-ghost"
+                onClick={closeEditCircleSheet}
+                disabled={editCircleSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="circles-btn-primary"
+                onClick={() => void submitEditCircle()}
+                disabled={editCircleSubmitting || !editCircleName.trim()}
+              >
+                {editCircleSubmitting ? "Saving…" : "Save changes"}
               </button>
             </div>
           </div>

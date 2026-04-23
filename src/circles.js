@@ -192,6 +192,31 @@ export async function createCircle({ name, description, vibe, creatorId }) {
   });
 }
 
+/** Active circle only; RLS: current creator (`is_circle_creator`). */
+export async function updateCircle({ circleId, name, description, vibe }) {
+  const validation = validateCircleName(name);
+  if (!validation.ok) throw new Error(validation.error);
+  const trimmedName = validation.name;
+  const trimmedDescription = (description || "").trim();
+  if (trimmedDescription.length > CIRCLE_DESCRIPTION_MAX) {
+    throw new Error(`Description must be ${CIRCLE_DESCRIPTION_MAX} characters or fewer.`);
+  }
+  const vibeId = vibe && VIBE_BY_ID.has(vibe) ? vibe : "Mixed Bag";
+  const { data, error } = await supabase
+    .from("circles")
+    .update({
+      name: trimmedName,
+      description: trimmedDescription || null,
+      vibe: vibeId,
+    })
+    .eq("id", circleId)
+    .select("id, name, description, vibe, status, archived_at, created_at, creator_id")
+    .maybeSingle();
+  if (error) throw new Error(error.message || "Could not update circle.");
+  if (!data) throw new Error("Could not update circle.");
+  return data;
+}
+
 /** Leave flow.
  *  - Member (non-creator): delete the membership row.
  *  - Creator: RPC `creator_leave_circle` — if other members exist, **transfer** `circles.creator_id`
