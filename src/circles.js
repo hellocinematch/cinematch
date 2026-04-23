@@ -105,7 +105,7 @@ export async function fetchMyCircles() {
       archived_at,
       created_at,
       creator_id,
-      circle_members ( user_id, role )
+      circle_members ( user_id, role, joined_at )
     `)
     .eq("status", "active")
     .order("created_at", { ascending: false });
@@ -193,18 +193,16 @@ export async function createCircle({ name, description, vibe, creatorId }) {
 }
 
 /** Leave flow.
- *  - Member (non-creator): just delete the membership row.
- *  - Creator: flip status to archived first (RLS gates the UPDATE on status = 'active'), then
- *    delete the creator's own membership row. The circle row itself stays around as an archived
- *    read-only artefact; Phase B's Edge function will hard-delete once the last member leaves.
+ *  - Member (non-creator): delete the membership row.
+ *  - Creator: RPC `creator_leave_circle` — if other members exist, **transfer** `circles.creator_id`
+ *    to the **earliest** `joined_at` among remaining members, promote their role, then remove the
+ *    leaver; if the creator is **solo**, **archive** the circle and delete membership (unchanged).
  */
 export async function leaveCircle({ circleId, userId, isCreator }) {
   if (isCreator) {
-    const { error: updateErr } = await supabase
-      .from("circles")
-      .update({ status: "archived", archived_at: new Date().toISOString() })
-      .eq("id", circleId);
-    if (updateErr) throw updateErr;
+    const { data, error: rpcErr } = await supabase.rpc("creator_leave_circle", { p_circle_id: circleId });
+    if (rpcErr) throw new Error(rpcErr.message || "Could not leave circle.");
+    return data;
   }
   const { error: deleteErr } = await supabase
     .from("circle_members")
@@ -212,6 +210,7 @@ export async function leaveCircle({ circleId, userId, isCreator }) {
     .eq("circle_id", circleId)
     .eq("user_id", userId);
   if (deleteErr) throw deleteErr;
+  return { outcome: "left" };
 }
 
 function parseMovieIdForShare(movieId) {

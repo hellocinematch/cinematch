@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.51
+
+- **Circles — creator leave:** If the **creator** leaves but **other members** remain, the circle **stays active**: **`creator_id` transfers** to the **earliest-joined** remaining member (`circle_members.joined_at`), their membership role becomes **creator**, then the leaver is removed. **Solo** creator (only member) — behavior **unchanged** (**archive** + remove membership). **Client:** `leaveCircle` calls new RPC `creator_leave_circle`; leave confirmation **copy** reflects transfer vs solo-archive. **DB:** apply **`20260529120000_creator_leave_transfer_ownership.sql`**. **`fetchMyCircles`** now selects **`joined_at`** on members (for any UI that needs join order later).
+
 ## 5.6.50
 
 - **Circles — Forward:** Uses a dedicated **Forward to circles** step: only **other** groups (not the circle you’re in) with **add-only** saves — the source circle is never un-published. (Detail still uses **Circles for this title** for full add/remove.) **DB:** `get_circle_rated_strip` now orders Recent by `max(greatest(ratings.rated_at, rating_circle_shares.created_at))` per title so a forward surfaces as **recent** in destination circles, not only when someone re-rates. Apply migration **`20260528120000_circle_strip_share_activity_order.sql`**.

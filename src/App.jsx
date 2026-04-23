@@ -10044,7 +10044,9 @@ export default function App() {
             <div className="circles-confirm-title">Leave this circle?</div>
             <div className="circles-confirm-text">
               {currentUserRole(leaveConfirmCircle, user?.id) === "creator"
-                ? "You're the creator. Leaving will archive the circle. No new invites. Picks published in this group stop showing in its feeds; members can still view the archived circle."
+                ? (leaveConfirmCircle.memberCount ?? 0) > 1
+                  ? "You're the creator. Another member will become the owner and the circle stays active. You'll leave; picks you published only in this group are removed here. Your ratings on your account stay the same."
+                  : "You're the only member. Leaving will archive the circle. No new invites. Picks published in this group stop showing in its feeds; members can still view the archived circle."
                 : "Picks you published in this group will be removed from this circle. Your personal ratings on your account stay the same."}
             </div>
             {leaveCircleError && <div className="circles-error-banner">{leaveCircleError}</div>}
