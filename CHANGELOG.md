@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.33
+
+- **Circles — activity (Phase A, web):** **Circles** list (logged in): each circle can show a **bell + count** for **new publishes from other members** since your last open (`rating_circle_shares` with `user_id` ≠ you and `created_at` > per-circle **last seen**). **Inside a circle** (2+ members): after you load the feed, we compare a server **watermark** (latest other member share time) to what you had when the feed was last refreshed; on **tab focus** / **visibility** / bfcache **pageshow** we may show **“New activity”** with **Refresh**; pull **down** on the circle body (from scroll top) also bumps refresh. **No** automatic silent refetch of the strip. **DB:** `circle_member_last_seen` + RPCs **`get_my_circle_unseen_counts`**, **`mark_circle_last_seen`**, **`get_circle_others_activity_watermark`** — apply migration **`20260527120000_circle_member_last_seen.sql`** on Supabase. Badges also refresh on **login** and when returning to the **Circles** list.
+
 ## 5.6.32
 
 - **TMDB posters — right-size at render:** Strips, list thumbs, discover grid, watchlist, rated list, circle rows, etc. use **`w342`** via **`posterSrcThumb()`** (rewrites `/t/p/w500/…` → **`w342`**). **Detail** floating poster, **onboarding** / **rate-more** cards, and **mood** poster-only fallback use **`w500`** via **`posterSrcDetail()`**. **Mood** cards keep **`backdrop`** URLs as-is (**`w780`**). Catalogue / watchlist **stored** URLs stay **`w500`**; only **`<img src>`** changes. Helpers: **`tmdbImageProfileUrl`**, **`posterSrcThumb`**, **`posterSrcDetail`**, **`moodCardBackdropOrPosterSrc`**.

@@ -389,6 +389,57 @@ function normalizeCircleRatedRpcPayload(data, fallbackMsg) {
 }
 
 /** Circle rated titles: `view` recent (horizontal strip RPC), all (grid), or top (grid, cap 25). Edge + RPC fallback. */
+// -------------------------------------------------------------------------------------------------
+// Circle activity badges (5.6.33): per-user last_seen in DB; counts = others' rating_circle_shares
+// with created_at > last_seen. See supabase/migrations/20260527120000_circle_member_last_seen.sql
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * @returns {Promise<Array<{ circle_id: string, unseen_others: number, latest_others_share_at: string | null }>>}
+ */
+export async function fetchMyCircleUnseenActivity() {
+  const { data, error } = await supabase.rpc("get_my_circle_unseen_counts");
+  if (error) throw new Error(error.message || "Could not load circle activity.");
+  const root = data && typeof data === "object" ? data : null;
+  const rows = root?.rows;
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((r) => ({
+      circleId: r?.circle_id,
+      unseenOthers: Number(r?.unseen_others) || 0,
+      latestOthersShareAt:
+        r?.latest_others_share_at == null
+          ? null
+          : typeof r.latest_others_share_at === "string"
+            ? r.latest_others_share_at
+            : String(r.latest_others_share_at),
+    }))
+    .filter((r) => r.circleId);
+}
+
+/** Call when the user opens a circle (list badge clears; server stores last_seen). */
+export async function markCircleLastSeen(circleId) {
+  const id = (circleId || "").trim();
+  if (!id) return;
+  const { error } = await supabase.rpc("mark_circle_last_seen", { p_circle_id: id });
+  if (error) throw new Error(error.message || "Could not mark circle as seen.");
+}
+
+/**
+ * @returns {Promise<string | null>} ISO time of the newest other member’s share in the circle, or null.
+ */
+export async function getCircleOthersActivityWatermark(circleId) {
+  const id = (circleId || "").trim();
+  if (!id) return null;
+  const { data, error } = await supabase.rpc("get_circle_others_activity_watermark", {
+    p_circle_id: id,
+  });
+  if (error) throw new Error(error.message || "Could not read activity time.");
+  if (data == null) return null;
+  if (data instanceof Date) return data.toISOString();
+  return String(data);
+}
+
 export async function fetchCircleRatedTitles({ circleId, limit, offset, view = "recent" }) {
   const id = (circleId || "").trim();
   if (!id) throw new Error("Missing circle.");

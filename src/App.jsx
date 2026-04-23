@@ -28,6 +28,9 @@ import {
   CIRCLE_STRIP_MAX,
   CIRCLE_GRID_PAGE,
   CIRCLE_TOP_MAX,
+  fetchMyCircleUnseenActivity,
+  markCircleLastSeen,
+  getCircleOthersActivityWatermark,
 } from "./circles";
 
 const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
@@ -3037,9 +3040,18 @@ const styles = `
   .circle-card:focus-visible { outline:2px solid var(--vibe-accent); outline-offset:2px; }
   .circle-card__tint { position:absolute; inset:0; background:radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--vibe-tint) 75%, transparent) 0%, transparent 65%); pointer-events:none; opacity:0.85; }
   .circle-card__body { position:relative; z-index:1; display:flex; flex-direction:column; gap:6px; }
-  .circle-card__top { display:flex; align-items:center; gap:8px; }
+  .circle-card__top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
   .circle-card__name { font-family:'DM Serif Display',serif; font-size:22px; color:#f0ebe0; line-height:1.1; flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+  .circle-card__top-badges { display:flex; align-items:center; gap:6px; flex-shrink:0; padding-top:2px; }
   .circle-card__crown { font-size:16px; flex-shrink:0; }
+  .circle-card__activity { position:relative; display:inline-flex; align-items:center; gap:3px; padding:4px 8px 4px 6px; border-radius:999px; border:1px solid #3a3020; background:#1a1510; font-size:13px; line-height:1; }
+  .circle-card__activity-ico { font-size:14px; line-height:1; }
+  .circle-card__activity-count { font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; color:#e8c96a; min-width:1.1em; text-align:center; }
+  .circle-new-activity-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; padding:10px 14px; border-radius:12px; border:1px solid #3a3020; background:linear-gradient(90deg, color-mix(in srgb, #e8c96a 12%, #141208) 0%, #12100a 100%); font-family:'DM Sans',sans-serif; }
+  .circle-new-activity-bar__text { font-size:14px; color:#e8e0d0; font-weight:600; }
+  .circle-new-activity-bar__btn { flex-shrink:0; padding:8px 14px; border-radius:999px; border:1px solid #e8c96a; background:#e8c96a; color:#0a0a0a; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .circle-new-activity-bar__btn:hover { filter:brightness(1.05); }
+  .circle-new-activity-bar__btn:focus-visible { outline:2px solid #e8c96a; outline-offset:2px; }
   .circle-card__desc { font-size:13px; color:#aaa; line-height:1.4; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .circle-card__meta-row { display:flex; align-items:center; gap:10px; margin-top:4px; flex-wrap:wrap; }
   .circle-card__vibe-badge { display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; border:1px solid var(--vibe-accent); color:var(--vibe-accent); background:color-mix(in srgb, var(--vibe-accent) 12%, transparent); font-size:11px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; }
@@ -4170,6 +4182,11 @@ export default function App() {
   const [publishModalError, setPublishModalError] = useState("");
   const [publishModalSelection, setPublishModalSelection] = useState(() => new Set());
   const [circleRatedRefreshKey, setCircleRatedRefreshKey] = useState(0);
+  /** Per circle: others' unpublishes since last mark_circle_last_seen; powers list card badge (5.6.33). */
+  const [circleUnseenById, setCircleUnseenById] = useState(() => ({}));
+  const circleDetailActivityWatermarkRef = useRef(null);
+  const [circleDetailShowNewActivityBar, setCircleDetailShowNewActivityBar] = useState(false);
+  const circleDetailPullRef = useRef({ y0: 0, fired: false });
   /** Recent strip: which row key has the ⋯ / long-press menu open. */
   const [circleRecentStripMenuRowKey, setCircleRecentStripMenuRowKey] = useState(null);
   const circleRecentStripLongPressTimerRef = useRef(null);
@@ -6858,6 +6875,123 @@ export default function App() {
   // Circles (Phase A) — data loaders + actions. Uses the supabase client directly (no Edge yet).
   // ============================================================================================
 
+  const refreshCircleUnseenBadges = useCallback(async () => {
+    if (!user) {
+      setCircleUnseenById({});
+      return;
+    }
+    try {
+      const rows = await fetchMyCircleUnseenActivity();
+      const next = {};
+      for (const r of rows) {
+        next[r.circleId] = { unseenOthers: r.unseenOthers, latest: r.latestOthersShareAt };
+      }
+      setCircleUnseenById(next);
+    } catch (e) {
+      console.warn("Circles: fetchMyCircleUnseenActivity failed", e);
+    }
+  }, [user]);
+
+  const checkRemoteCircleNewActivity = useCallback(async () => {
+    if (screen !== "circle-detail" || !selectedCircleId) return;
+    if (circleDetailData && circleDetailData.memberCount < 2) return;
+    if (circleStripLoading) return;
+    const baseline = circleDetailActivityWatermarkRef.current;
+    try {
+      const remote = await getCircleOthersActivityWatermark(selectedCircleId);
+      if (remote == null) return;
+      if (baseline == null) {
+        setCircleDetailShowNewActivityBar(true);
+        return;
+      }
+      if (new Date(remote) > new Date(baseline)) {
+        setCircleDetailShowNewActivityBar(true);
+      }
+    } catch (e) {
+      console.warn("Circles: activity watermark check failed", e);
+    }
+  }, [screen, selectedCircleId, circleDetailData, circleStripLoading]);
+
+  const onCircleDetailBodyTouchStart = (e) => {
+    if (e.touches.length !== 1) return;
+    circleDetailPullRef.current = { y0: e.touches[0].clientY, fired: false };
+  };
+
+  const onCircleDetailBodyTouchMove = (e) => {
+    if (e.touches.length !== 1) return;
+    if (screen !== "circle-detail" || !circleDetailData || circleDetailData.memberCount < 2) return;
+    if (window.scrollY > 4) return;
+    const t = e.touches[0];
+    const st = circleDetailPullRef.current;
+    if (st == null || st.fired) return;
+    const dy = t.clientY - st.y0;
+    if (dy > 68) {
+      st.fired = true;
+      setCircleRatedRefreshKey((k) => k + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) {
+      setCircleUnseenById({});
+      return;
+    }
+    void refreshCircleUnseenBadges();
+  }, [user, refreshCircleUnseenBadges]);
+
+  useEffect(() => {
+    if (!user) return;
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      void refreshCircleUnseenBadges();
+      void checkRemoteCircleNewActivity();
+    };
+    const onFoc = () => {
+      void refreshCircleUnseenBadges();
+      void checkRemoteCircleNewActivity();
+    };
+    const onPageShow = (ev) => {
+      if (ev.persisted) {
+        void refreshCircleUnseenBadges();
+        void checkRemoteCircleNewActivity();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onFoc);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onFoc);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [user, refreshCircleUnseenBadges, checkRemoteCircleNewActivity]);
+
+  useEffect(() => {
+    if (screen !== "circle-detail" || !selectedCircleId || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await markCircleLastSeen(selectedCircleId);
+        if (cancelled) return;
+        setCircleUnseenById((prev) => ({
+          ...prev,
+          [selectedCircleId]: { ...prev[selectedCircleId], unseenOthers: 0 },
+        }));
+        void refreshCircleUnseenBadges();
+      } catch (e) {
+        console.warn("Circles: markCircleLastSeen failed", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, selectedCircleId, user, refreshCircleUnseenBadges]);
+
+  useEffect(() => {
+    circleDetailActivityWatermarkRef.current = null;
+    setCircleDetailShowNewActivityBar(false);
+  }, [selectedCircleId]);
+
   const reloadMyCircles = useCallback(async () => {
     if (!user) return;
     setCirclesLoading(true);
@@ -6891,6 +7025,7 @@ export default function App() {
     if (screen !== "circles") return;
     if (!circlesLoaded) return;
     void reloadMyCircles();
+    void refreshCircleUnseenBadges();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
 
@@ -7053,6 +7188,15 @@ export default function App() {
           view: "recent",
         });
         if (cancelled) return;
+        let w = null;
+        try {
+          w = await getCircleOthersActivityWatermark(selectedCircleId);
+        } catch (we) {
+          console.warn("Circles: activity watermark after strip", we);
+        }
+        if (cancelled) return;
+        circleDetailActivityWatermarkRef.current = w;
+        setCircleDetailShowNewActivityBar(false);
         setCircleStripPayload(data);
       } catch (e) {
         if (cancelled) return;
@@ -8776,11 +8920,17 @@ export default function App() {
                 {circlesList.map((circle) => {
                   const meta = vibeMeta(circle.vibe);
                   const isCreator = currentUserRole(circle, user?.id) === "creator";
+                  const unseenN = Math.max(0, Number(circleUnseenById[circle.id]?.unseenOthers) || 0);
+                  const cardAria =
+                    unseenN > 0
+                      ? `${circle.name}, ${unseenN === 1 ? "1 new" : `${unseenN} new`} from your circle`
+                      : undefined;
                   return (
                     <button
                       type="button"
                       key={circle.id}
                       className="circle-card"
+                      aria-label={cardAria}
                       onClick={() => openCircleDetail(circle.id)}
                       style={{
                         "--vibe-accent": meta.accent,
@@ -8791,9 +8941,22 @@ export default function App() {
                       <div className="circle-card__body">
                         <div className="circle-card__top">
                           <div className="circle-card__name">{circle.name}</div>
-                          {isCreator && (
-                            <div className="circle-card__crown" title="You're the creator">👑</div>
-                          )}
+                          <div className="circle-card__top-badges">
+                            {isCreator && (
+                              <div className="circle-card__crown" title="You're the creator">👑</div>
+                            )}
+                            {unseenN > 0 ? (
+                              <div
+                                className="circle-card__activity"
+                                title="New from other members"
+                              >
+                                <span className="circle-card__activity-ico" aria-hidden="true">🔔</span>
+                                <span className="circle-card__activity-count">
+                                  {unseenN > 99 ? "99+" : unseenN}
+                                </span>
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                         {circle.description && (
                           <div className="circle-card__desc">{circle.description}</div>
@@ -8945,7 +9108,11 @@ export default function App() {
             </div>
 
             {circleDetailData && (
-              <div className="circle-detail-body">
+              <div
+                className="circle-detail-body"
+                onTouchStart={onCircleDetailBodyTouchStart}
+                onTouchMove={onCircleDetailBodyTouchMove}
+              >
                 {(() => {
                   const mc = circleDetailData.memberCount;
                   if (mc < 2) {
@@ -9320,8 +9487,24 @@ export default function App() {
                         <div className="empty-sub">Rate a title, then use Publish to circles to show it here (there&apos;s no backfill).</div>
                       </div>
                     ) : null;
+                  const newActivityRow =
+                    circleDetailShowNewActivityBar && selectedCircleId ? (
+                      <div className="circle-new-activity-bar" role="status" aria-live="polite">
+                        <span className="circle-new-activity-bar__text">New activity</span>
+                        <button
+                          type="button"
+                          className="circle-new-activity-bar__btn"
+                          onClick={() => {
+                            setCircleRatedRefreshKey((k) => k + 1);
+                          }}
+                        >
+                          Refresh
+                        </button>
+                      </div>
+                    ) : null;
                   return (
                     <>
+                      {newActivityRow}
                       <div className="circle-detail-strip-wrap">
                         <div className="section circle-detail-strip-section">
                           {ratingsTabs}

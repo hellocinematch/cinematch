@@ -1,13 +1,13 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-22 (**§ Master backlog** consolidated + speed section)
+**Last updated:** 2026-04-22 (**Next chat:** circle activity Phase B polish / native push, or other backlog)
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.32** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
-> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **Primary nav:** no **`profiles.name`** pill (**5.6.30**). **Posters:** **`loading="lazy"`** (**5.6.31**); **`img src`** rewrites small UI to TMDB **`w342`**, detail / large cards **`w500`** (**5.6.32**); stored/catalogue URLs still **`w500`**. **PWA:** **`/site.webmanifest`**; **`apple-touch-icon`** = **`/apple-touch-icon.png`** (180×180); manifest **`/pwa-icon-192.png`**; **`/cinemastro-pwa-icon.svg`** = larger **wordmark**, slight **diagonal** (no tagline on icon; in-app logo unchanged). **Tab** **`/favicon.svg`**. **`npm run icons:pwa`** after SVG edits. **Client:** **git push** → Vercel. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Backlog:** **§ Master backlog (consolidated checklist)** (+ **Open / follow-ups** narrative). **`HANDOFF.md`** for architecture paths.
+> Cinematch is on **`main` at 5.6.33** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
+> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **Primary nav:** no **`profiles.name`** pill (**5.6.30**). **Posters:** **`loading="lazy"`** (**5.6.31**); **`img src`** rewrites small UI to TMDB **`w342`**, detail / large cards **`w500`** (**5.6.32**); stored/catalogue URLs still **`w500`**. **5.6.33 — Circles activity (Phase A web):** list **bell + count**; in-circle **new activity** bar + refresh; **`circle_member_last_seen`** + RPCs (apply **`20260527120000_circle_member_last_seen.sql`** on prod). **PWA:** **`/site.webmanifest`**; **`apple-touch-icon`** = **`/apple-touch-icon.png`** (180×180); manifest **`/pwa-icon-192.png`**; **`/cinemastro-pwa-icon.svg`** = larger **wordmark**, slight **diagonal** (no tagline on icon; in-app logo unchanged). **Tab** **`/favicon.svg`**. **`npm run icons:pwa`** after SVG edits. **Client:** **git push** → Vercel. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next build:** **native** push (APNs/FCM) for background circle updates; optional Realtime (Phase B). **§ Master backlog** + **`HANDOFF.md`** for the rest.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,9 +17,9 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.32** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** — **5.6.32** = TMDB **`w342`** at render for thumbs/strips/lists + **`w500`** for detail float / big cards; **5.6.31** = lazy posters; **5.6.30** = removed header name pill. |
-| **Supabase — apply if not already** | **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`** (watchlist row **UPDATE** for reorder under RLS). |
+| **App version** | **5.6.33** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main`** — **5.6.33** = Circles list **unseen** badges + in-circle **new activity** refresh; **5.6.32** = TMDB **`w342`/`w500`** at render; **5.6.31** = lazy posters; **5.6.30** = removed header name pill. |
+| **Supabase — apply if not already** | **`20260527120000_circle_member_last_seen.sql`** (circle **last seen** + RPCs for badges / watermark) — **required** for 5.6.33 Circles activity. Plus **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`** (watchlist row **UPDATE** for reorder under RLS). |
 | **Edge** | **`get-circle-rated-titles`** — RPC-only; **redeploy** only if function source changes. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
 
@@ -93,6 +93,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.33** — **Circles — activity (Phase A, web):** per-circle list badges (others’ **`rating_circle_shares`** vs **last seen**), in-circle **new activity** + refresh + pull; migration **`20260527120000_circle_member_last_seen.sql`**.  
 - **5.6.32** — **TMDB:** **`posterSrcThumb`** (**`w342`**) vs **`posterSrcDetail`** (**`w500`**) at **`img`**; mood keeps backdrop **`w780`**.  
 - **5.6.31** — **Performance:** Lazy-load off-screen poster **`img`**s; eager detail hero + onboarding / rate-more card.  
 - **5.6.30** — **Primary nav:** Removed **`profiles.name`** pill (layout vs **Circles** et al. on narrow screens).  
@@ -168,6 +169,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 | Migration | Purpose |
 |-----------|---------|
+| **`20260527120000_circle_member_last_seen.sql`** | **`circle_member_last_seen`**, **last-seen** RPCs, index on **`(circle_id, created_at)`** for **`rating_circle_shares`** — **required** for 5.6.33 circle activity badges. |
 | **`20260524120000_rating_circle_shares.sql`** | **`rating_circle_shares`** + strip/all/top RPCs — **required** for circle rated feeds (publish model). |
 | **`20260523120000_watchlist_sort_index.sql`** | **`watchlist.sort_index`** — **required** for watchlist ordering / **⋯** Top·Up·Down·Bottom. |
 | **`20260525120000_watchlist_max_30.sql`** | **30** watchlist rows per user (trim + trigger); client **`WATCHLIST_MAX`**. |
@@ -197,14 +199,28 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 ---
 
+## For the next chat — circle “updates” (after Phase A 5.6.33)
+
+**Phase A (5.6.33) shipped on web** — `circle_member_last_seen`, **`get_my_circle_unseen_counts`**, **`mark_circle_last_seen`**, **`get_circle_others_activity_watermark`**, `src/circles.js` helpers, **`App.jsx`**: Circles list **🔔 + count** (others’ **`rating_circle_shares`** with `created_at` \> your **last_seen** for that circle); in-circle **“New activity”** bar + **Refresh**; **pull down** (touch, near page top) to refresh; **no** silent auto-refresh. Badges: **login**, **tab focus** / **visibility** / bfcache **pageshow (persisted)**, and **navigate to Circles list**.
+
+**Still out of scope / next steps:**
+
+- **Native (Phase A continuation):** **APNs / FCM** when there is a native app — not part of 5.6.33.
+- **Web Phase B (optional):** **Realtime** or light polling for power users; **Web Push** only if product wants (heavy / iOS limits).
+- **Apply migration on prod:** **`20260527120000_circle_member_last_seen.sql`**.
+
+**Last user note (this session):** *Ship circle activity Phase A (list badges, in-circle refresh, persistence, web focus/resume) per PASSDOWN; bump version, CHANGELOG, and passdown.*
+
+---
+
 ## Master backlog (consolidated checklist)
 
 *One merged list from **§ Open / follow-ups**, **Roadmap**, **Speed / performance**, **Ongoing / ops**, and **`HANDOFF.md` § What’s next. Trust **`package.json`** for version. When you ship or cancel an item, update this section and/or the narrative blocks below so they don’t contradict.*
 
 ### Circles & feeds
 
-1. **Live circle feeds (multi-user):** auto-refresh when another member **publishes** (Realtime, polling, and/or refetch on tab visibility) — today: refetch only on re-enter / manual refresh.
-2. **“Unseen” activity:** on circles list after login, signal groups with activity not yet seen — **last-seen** (likely DB) + **UI** (can ship without (1)).
+1. **Circle activity / “live” feeds (phased):** **Phase A (5.6.33) shipped** — list **bell + count**, in-circle **new activity** + refresh, **`circle_member_last_seen`** + RPCs. **Next:** **native** push (APNs/FCM), optional **Realtime/polling** (Phase B), Web Push if desired. *See* **§ For the next chat — circle “updates”** above.
+2. **“Unseen” activity (polish):** optional: dismiss rules, animation, or tuning count rules; core badges shipped in 5.6.33.
 3. **Invites at max circles:** today **`auto_declined`** — recipient never sees invite; creator gets auto-decline. *Idea:* muted row for recipient (“at cap”) + open/pending for creator until resolved.
 4. **Creator leave → transfer ownership:** keep circle **active**, hand off to next member (order: e.g. `joined_at`); **solo creator** edge case **TBD**. Today: archive-then-leave / dissolve-style (see **`HANDOFF.md`** architecture).
 
@@ -261,6 +277,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Shipped 2026-04-22**
 
+- **5.6.33 — Circles activity (Phase A):** **PASSDOWN** / user asked to **implement** list **unseen** badges, **last_seen** + counts (**others’** **`rating_circle_shares`** after your **last visit**), in-circle **new activity** + **Refresh** + pull-down, web **login / focus / visibility / bfcache resume**; **no** background push (defer native). **Apply** migration **`20260527120000_circle_member_last_seen.sql`** on production Supabase.  
 - **5.6.32 — Right-size posters:** User asked to ship **priority (1)** — rewrite **`img src`** to **`w342`** for strips/lists/grids/thumbs; **`w500`** for detail float, onboarding, rate-more, mood poster-only; backdrops unchanged.  
 - **5.6.31 — Lazy posters:** **`loading="lazy"`** on poster **`img`**s (Vercel image proxy **TBD**). Detail **backdrop** **`fetchPriority="high"`**; hero poster + single-card flows **eager**.  
 - **5.6.30 — Header name:** User asked to **remove** **`profiles.name`** pill from primary nav for now (was **bleeding** over **Circles** title on mobile). **Profile** screen unchanged.  
@@ -268,10 +285,14 @@ Apply any that are missing on prod (user often uses SQL editor):
 - **5.6.28 — PWA / iOS home screen:** User saw **blank** tile on iPhone after Add to Home Screen (**SVG** touch icon with nested **`cinemastro-logo.svg`** not rasterized). Shipped **PNG** **`apple-touch-icon`** + **192** manifest icon; **self-contained** **`cinemastro-pwa-icon.svg`**; **`npm run icons:pwa`** to refresh PNGs from SVG. Push **`main`** → Vercel; user may need to **remove** old home-screen shortcut and **re-add** after deploy (Safari caches icons).
 - **5.6.27 — PWA / beta install:** `site.webmanifest` + `cinemastro-pwa-icon.svg` (wordmark via embed; superseded for iOS by **5.6.28**).
 
-**Last session backlog (2026-04-21) — not implemented unless user says *code now* / *implement* / *fix* for that item**
+**Last session backlog (2026-04-22)**
 
-1. **Circle feeds — live / multi-user:** no auto-refresh when another member **publishes**; only refetch/refresh/leave-then-re-enter. *Later:* Realtime, polling, and/or refetch on tab visibility.
-2. **Circles list — “unseen” activity:** after login, show that some groups have **activity not yet seen**; needs **last-seen** (likely DB) + **UI**; can ship without (1).
+1. **Circle activity Phase A:** **shipped 5.6.33** — see **Changelog** and **§ For the next chat — circle “updates”**. **Prod:** run migration **`20260527120000_circle_member_last_seen.sql`**.
+
+**Earlier backlog (2026-04-21) — not implemented unless user says *code now* / *implement* / *fix* for that item**
+
+1. **Circle feeds — live / multi-user:** **Phase A** done (5.6.33); **native** push + optional **Realtime** remain.
+2. **Circles list — “unseen” activity:** **shipped** in 5.6.33 (list badges; count = others’ shares after last_seen).
 3. **Invites at max circles:** today **`auto_declined`**; recipient **never sees** invite; creator gets auto-decline. *Idea:* **muted** row for recipient (“at cap”) + **open/pending** for creator until resolved.
 4. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if watchlist RLS is enabled and reorder must work.
 5. **Docs:** keep **`package.json` / `CHANGELOG` / this file** in sync; **`HANDOFF.md`** roadmap **version** line lags if not refreshed — trust **`package.json`**.
