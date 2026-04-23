@@ -28,11 +28,22 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
+const EDGE_FUNCTION_SLUG = "accept-circle-invite";
+const EDGE_FUNCTION_VERSION = "1.0.0";
+
 const CIRCLE_MEMBER_CAP = 25;
 const CIRCLE_USER_ACTIVE_CAP = 10;
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
+  const payload =
+    body !== null && typeof body === "object" && !Array.isArray(body)
+      ? {
+        ...(body as Record<string, unknown>),
+        edge: { name: EDGE_FUNCTION_SLUG, version: EDGE_FUNCTION_VERSION },
+      }
+      : body;
+  return new Response(JSON.stringify(payload), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });

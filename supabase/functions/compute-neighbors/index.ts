@@ -7,6 +7,10 @@ const corsHeaders: Record<string, string> = {
     "authorization, x-client-info, apikey, content-type, x-compute-neighbors-secret",
 };
 
+/** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
+const EDGE_FUNCTION_SLUG = "compute-neighbors";
+const EDGE_FUNCTION_VERSION = "1.0.0";
+
 /** Profiles whose `name` starts with this (case-insensitive) are not subjects; they may still be neighbors. */
 const SEED_PREFIX = "seed";
 
@@ -85,7 +89,14 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
+  const payload =
+    body !== null && typeof body === "object" && !Array.isArray(body)
+      ? {
+        ...(body as Record<string, unknown>),
+        edge: { name: EDGE_FUNCTION_SLUG, version: EDGE_FUNCTION_VERSION },
+      }
+      : body;
+  return new Response(JSON.stringify(payload), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });

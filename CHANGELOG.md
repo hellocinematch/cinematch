@@ -1,5 +1,53 @@
 # Changelog
 
+## 5.6.49
+
+- **Circles — rating stars (strip + list):** **Circle (orange) and Cinemastro (gold) now use the same SVG** with **fixed sizes** (strip **16px**, list **13px**) so they always **match each other**. The gold side used to be a ⭐ **emoji** (scales with font/line-height, OS-dependent); the orange side was an SVG sized with **em**, which did not line up. Green “You” / other UI unchanged.
+
+## 5.6.48
+
+- **Circles — circle score star:** Larger orange SVG (**1.28em** in the strip pill, **14px** on All/Top) to better match the **visual** size of the adjacent gold ⭐ (emoji still reads bigger than 1em box).
+
+## 5.6.47
+
+- **Circles — circle score orange star size:** The SVG is larger (**1em** in the under-title pill, **11px** on All/Top list) so it matches the **visual** size of the gold Cinemastro ⭐. Using the same **0.68em** as the cine `font-size` had made the SVG look smaller, because emojis do not size like a 0.68em box.
+
+## 5.6.46
+
+- **Build:** Removed **backticks** inside a CSS comment in the `styles` template literal (they terminated the string and broke `vite build`).
+
+## 5.6.45
+
+- **Circles — circle score star color:** The **circle** score star now uses a small **SVG** with `fill="currentColor"` and **`#f97316`**, because the **⭐ emoji** is usually drawn as a fixed-color graphic and **does not follow** CSS `color` (numbers did). Sizing unchanged vs Cinemastro (strip **0.68em**, list **8.5px**).
+
+## 5.6.44
+
+- **Circles — circle score mark:** **No ring** around the circle-group score. **Orange (`#f97316`) ⭐** only, **same size** as the Cinemastro ⭐ (strip **0.68em**, list **8.5px**). Orange **number** unchanged.
+
+## 5.6.43
+
+- **Circles — circle (group) rating color:** The **circle** score segment uses **orange `#f97316`** for the **ring**, **star**, and **numeric score** (Recent strip under-title pill and All/Top list rows). **Cinemastro** remains **gold**. List rater count **(n)** after the circle score uses a **muted orange**.
+
+## 5.6.42
+
+- **Circles — circle group score mark:** Uses the same **⭐ size** as the **Cinemastro** star in that row (strip: **`cinematch-cine-star`** at **0.68em**; All/Top list: **8.5px** like **`circle-list-rating__star`**) with a **gold circular border** around the red ⭐. Replaces the custom SVG so both scores stay visually consistent.
+
+## 5.6.41
+
+- **Circles — circle group score icon (readability):** Much larger on the **Recent** strip (**20px**) and on **All/Top** rows (**18px**), slightly **thicker gold ring**, **brighter red** star, and a hover **tooltip** (“Circle group score”) on the mark. Easier to see on desktop / high-DPI screens.
+
+## 5.6.40
+
+- **Circles — circle group score icon:** Slightly larger **gold ring + red star** (strip **12px**, All/Top list **10px**; was 10px / 8px).
+
+## 5.6.39
+
+- **Circles — circle score pill icon:** The **group (circle) score** segment no longer uses a **hollow gold ring** (often read as “0”). It now shows a **gold ring with a red star** inside, before the numeric score — on the **Recent** strip under-title pill and on **All / Top** list rows. **Cinemastro** (gold ⭐) segment unchanged.
+
+## 5.6.38
+
+- **Supabase Edge functions — deploy lineage:** Each function’s `index.ts` now defines **`EDGE_FUNCTION_VERSION`** (semver) and includes **`edge: { name, version }`** on every **JSON** response so you can confirm which build is live after deploy. **Convention:** bump **`EDGE_FUNCTION_VERSION`** in the same change as any behavior or dependency change, then **redeploy** that function. Initial baseline **`1.0.0`** for `get-circle-rated-titles`, `send-circle-invite`, `accept-circle-invite`, `compute-neighbors`, and `match`.
+
 ## 5.6.37
 
 - **Circles — New activity on the Recent strip:** The **New activity / Refresh** control is no longer a wide bar at the top of the scroll. On **Recent**, it appears as a **76px** strip tile (same width column as the **+**) **immediately to the left of the +** add tile. On **All** / **Top**, a compact one-line **New activity** + **Refresh** still appears under the view tabs (those lists are not a horizontal strip).

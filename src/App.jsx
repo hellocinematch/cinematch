@@ -3395,12 +3395,12 @@ const styles = `
   .circle-list-rating__star { font-size:10px; line-height:1; margin-right:1px; }
   .circle-list-rating--cine .circle-list-rating__star { font-size:8.5px; line-height:1; margin-right:1px; opacity:0.95; }
   .circle-list-rating__num { font-weight:600; font-family:'DM Sans',sans-serif; line-height:1; }
-  .circle-list-rating--circle .circle-gold-ring-mark { width:8px; height:8px; border-width:1.5px; }
-  .circle-list-rating--circle .circle-list-rating__num { color:#d4a84a; }
+  .circle-list-rating--circle .circle-list-rating__num { color:#f97316; }
+  .circle-list-rating--circle .circle-list-rating__paren { color:rgba(249,115,22,0.78); }
   .circle-list-rating__paren { color:#888; font-weight:600; margin-left:2px; font-size:11px; }
   .circle-list-rating--you .circle-list-rating__lbl { color:#6aaa6a; text-transform:none; font-size:11px; letter-spacing:0.03em; }
   .circle-list-rating--you .circle-list-rating__num { color:#6aaa6a; }
-  .circle-list-rating--cine { align-items:center; gap:1px; }
+  .circle-list-rating--cine { display:inline-flex; align-items:center; gap:1px; color:#e8c96a; }
   .circle-list-rating--cine .circle-list-rating__num { color:#e8c96a; }
   /* All / Top: 3 lines — title; type·year; scores */
   .wl-list-title.circle-list-all-top__title {
@@ -3438,19 +3438,12 @@ const styles = `
   .circle-rated-list-skel-line--ty { height:10px; width:min(100%, 120px); }
   .circle-rated-list-skel-line--meta { height:11px; width:min(100%, 180px); }
   .circle-detail-strip-block { margin-top:4px; }
-  /* Gold hollow ring (circle score) — matches Cinemastro gold accent */
-  .circle-gold-ring-mark {
-    display:block;
-    width:10px; height:10px;
-    box-sizing:border-box;
-    flex-shrink:0;
-    border:1.65px solid rgba(201,162,39,0.88);
-    border-radius:50%;
-    box-shadow:0 0 0 0.5px rgba(232,201,106,0.2), inset 0 0 0 0.5px rgba(255,220,150,0.12);
-    background:transparent;
-    /* align to numerals: flex parents use align-items:center; no inline-block baseline drift */
-  }
-  .circle-list-rating--circle { display:inline-flex; align-items:center; gap:4px; }
+  /* Circles under-title + list: one SVG star for circle (orange) and Cinemastro (gold) — same px, emoji was inconsistent with em-SVG */
+  .circle-pill-star-glyph { display:block; flex-shrink:0; color:inherit; }
+  .circle-pill-star-glyph--strip { width:16px; height:16px; }
+  .circle-pill-star-glyph--list { width:13px; height:13px; }
+  .circle-group-score-icon { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; line-height:0; vertical-align:middle; }
+  .circle-list-rating--circle { display:inline-flex; align-items:center; gap:4px; color:#f97316; }
   .strip-poster--circle-recent { position:relative; }
   .circle-strip-poster-meta {
     position:absolute; left:5px; bottom:5px; z-index:2;
@@ -3464,7 +3457,7 @@ const styles = `
     background:rgba(8,8,8,0.55); border:1px solid rgba(255,255,255,0.06);
     box-sizing:border-box;
   }
-  /* Under strip title: circle (gold ring) + · + Cinemastro — pill groups with poster badge. */
+  /* Under strip title: circle (orange ⭐ + score) · Cinemastro (gold ⭐) — pill with poster badge. */
   .circle-strip-below-title-scores {
     display:flex; align-items:center; justify-content:center; flex-wrap:wrap;
     margin-top:5px; gap:3px; row-gap:2px;
@@ -3478,11 +3471,8 @@ const styles = `
     font-weight:600;
     line-height:1;
   }
-  .circle-strip-below-title-scores__seg { display:inline-flex; align-items:center; gap:3px; color:#e8c96a; line-height:1; }
-  .circle-strip-below-title-scores__seg--cine .cinematch-cine-star {
-    font-size:0.68em; line-height:1; margin-right:0.5px; display:block;
-    color:#e0c26a; text-shadow:none;
-  }
+  .circle-strip-below-title-scores__seg { display:inline-flex; align-items:center; gap:4px; color:#e8c96a; line-height:1; }
+  .circle-strip-below-title-scores__seg--circle { color:#f97316; }
   .circle-strip-below-title-scores__dot { color:#666; font-weight:500; user-select:none; line-height:1; }
   .circle-strip-below-title-scores__num { font-weight:600; line-height:1; }
   .circle-strip-rater-count { font-size:11px; color:#666; margin-top:2px; letter-spacing:0.2px; text-align:center; }
@@ -3921,8 +3911,34 @@ function formatCircleTypeYearShort(movie, tvMetaByTmdbId) {
   return `${kind} · ${formatCircleListYear(movie, tvMetaByTmdbId)}`;
 }
 
+/** Same 24×24 path for circle (orange) and Cinemastro (gold) in strip + list — `currentColor` from parent. */
+const CIRCLE_PILL_STAR_D =
+  "M12,17.27L18.18,21l-1.64-7.03L22,9.24l-7.19-0.61L12,2L9.19,8.63L2,9.24l5.46,4.73L5.82,21L12,17.27z";
+
+function CirclePillStarGlyph({ variant = "strip" }) {
+  const sz = variant === "list" ? "circle-pill-star-glyph--list" : "circle-pill-star-glyph--strip";
+  return (
+    <svg
+      className={`circle-pill-star-glyph ${sz}`}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path fill="currentColor" d={CIRCLE_PILL_STAR_D} />
+    </svg>
+  );
+}
+
+function CircleGroupScoreIcon({ variant = "strip" }) {
+  return (
+    <span className="circle-group-score-icon" aria-hidden="true" title="Circle group score">
+      <CirclePillStarGlyph variant={variant} />
+    </span>
+  );
+}
+
 /**
- * Circles — Recent strip: under the title — gold ring + circle score · smaller ⭐ + Cinemastro (row fields).
+ * Circles — Recent strip: under the title — orange star (SVG)+circle score · gold ⭐+Cinemastro (row fields).
  * Omits if both scores are missing.
  */
 function CircleStripRingCineBelowTitle({ groupRating, siteRating }) {
@@ -3939,7 +3955,7 @@ function CircleStripRingCineBelowTitle({ groupRating, siteRating }) {
     <div className="circle-strip-below-title-scores" title={a11y} aria-label={a11y}>
       {hasGr ? (
         <span className="circle-strip-below-title-scores__seg circle-strip-below-title-scores__seg--circle">
-          <span className="circle-gold-ring-mark" aria-hidden="true" />
+          <CircleGroupScoreIcon />
           <span className="circle-strip-below-title-scores__num">{formatScore(Number(groupRating))}</span>
         </span>
       ) : null}
@@ -3950,7 +3966,7 @@ function CircleStripRingCineBelowTitle({ groupRating, siteRating }) {
       ) : null}
       {hasSr ? (
         <span className="circle-strip-below-title-scores__seg circle-strip-below-title-scores__seg--cine">
-          <span className="cinematch-cine-star" aria-hidden="true">⭐</span>
+          <CirclePillStarGlyph variant="strip" />
           <span className="circle-strip-below-title-scores__num">{formatScore(Number(siteRating))}</span>
         </span>
       ) : null}
@@ -3958,7 +3974,7 @@ function CircleStripRingCineBelowTitle({ groupRating, siteRating }) {
   );
 }
 
-/** Circle All/Top list row: ring+Circle score · smaller ★+Cinemastro · “You”+score (order; omit when missing). */
+/** Circle All/Top list row: orange ⭐+Circle score · gold ⭐+Cinemastro · “You”+score (order; omit when missing). */
 function CircleAllTopRatingsLine({ row, showRaterParen }) {
   const gr = row.group_rating;
   const vs = row.viewer_score;
@@ -3980,7 +3996,7 @@ function CircleAllTopRatingsLine({ row, showRaterParen }) {
             : `Circle score ${formatScore(Number(gr))}`
         }
       >
-        <span className="circle-gold-ring-mark" aria-hidden="true" />
+        <CircleGroupScoreIcon variant="list" />
         <span className="circle-list-rating__num">{formatScore(Number(gr))}</span>
         {showParen ? (
           <span className="circle-list-rating__paren" aria-hidden="true">
@@ -3993,7 +4009,7 @@ function CircleAllTopRatingsLine({ row, showRaterParen }) {
   if (hasCine) {
     nodes.push(
       <span key="s" className="circle-list-rating circle-list-rating--cine">
-        <span className="circle-list-rating__star" aria-hidden="true">⭐</span>
+        <CirclePillStarGlyph variant="list" />
         <span className="circle-list-rating__num">{formatScore(Number(sr))}</span>
       </span>,
     );

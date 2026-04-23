@@ -1,13 +1,13 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-22 (**Next chat:** circle activity Phase B polish / native push, or other backlog)
+**Last updated:** 2026-04-22 — **Edge function response versions (5.6.38)** + prior Circles activity handoff; **next chat:** redeploy all Edge functions to pick up **`edge.version`** in JSON, then backlog as before.
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.37** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
-> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **Primary nav:** no **`profiles.name`** pill (**5.6.30**). **Posters:** **`loading="lazy"`** (**5.6.31**); **`img src`** rewrites small UI to TMDB **`w342`**, detail / large cards **`w500`** (**5.6.32**); stored/catalogue URLs still **`w500`**. **5.6.33 — Circles activity (Phase A web):** list **bell + count**; in-circle **new activity** bar + refresh; **`circle_member_last_seen`** + RPCs (apply **`20260527120000_circle_member_last_seen.sql`** on prod). **PWA:** **`/site.webmanifest`**; **`apple-touch-icon`** = **`/apple-touch-icon.png`** (180×180); manifest **`/pwa-icon-192.png`**; **`/cinemastro-pwa-icon.svg`** = larger **wordmark**, slight **diagonal** (no tagline on icon; in-app logo unchanged). **Tab** **`/favicon.svg`**. **`npm run icons:pwa`** after SVG edits. **Client:** **git push** → Vercel. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next build:** **native** push (APNs/FCM) for background circle updates; optional Realtime (Phase B). **§ Master backlog** + **`HANDOFF.md`** for the rest.
+> Cinematch is on **`main` at 5.6.38** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
+> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **Posters / nav:** see snapshot (**5.6.30–5.6.32**). **5.6.33 — 5.6.37 — Circles activity (Phase A web, shipped):** DB **`circle_member_last_seen`** + RPCs; **prod** migration was applied. **5.6.38 — Edge:** each function has **`EDGE_FUNCTION_VERSION`** in code and JSON responses include **`edge: { name, version }`** — **bump version + redeploy** whenever that function’s behavior changes. **Client:** `src/circles.js` helpers; **`App.jsx`:** Circles list **🔔+count**; **Recent** strip **“New” / Refresh** tile **76px left of +**; All/Top **New activity** line under tabs; **~10s** ref-stable poll + visibility/focus/pageshow; **5.6.36** removed **body pull-to-refresh** (misfired on mobile). **Product doc:** **§ Circles activity — assumed use (web / PWA v1)** in this file; pointer in **`HANDOFF.md`**. **Git:** work pushed to **`main`**. **PWA / manifest** assets: **`PASSDOWN`** PWA block + **`npm run icons:pwa`**. **Client deploy:** **git push** → **Vercel** (migrations **not** auto-applied). **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next:** **native** push (APNs/FCM), optional **Realtime**; **§ Master backlog** + **`HANDOFF.md`**.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,10 +17,10 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.37** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** — **5.6.37** = **New activity** tile on **Recent** strip (left of **+**); **5.6.36** = no misfiring body pull; **5.6.35** = **10s** poll; **5.6.33**+ circle activity; **5.6.32** = TMDB **`w342`/`w500`**; **5.6.31** = lazy posters; **5.6.30** = removed header name pill. |
+| **App version** | **5.6.38** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main`** (pushed) — **5.6.33–5.6.37** = **Circles activity**; **5.6.38** = Edge **`edge.version`** in JSON. **5.6.37** = strip **New/Refresh** tile; **5.6.36** = drop body pull; **5.6.35** = **10s** stable poll; **5.6.34** = mobile `pageshow` + focus; **5.6.33** = migration + badges + in-circle activity. |
 | **Supabase — apply if not already** | **`20260527120000_circle_member_last_seen.sql`** (circle **last seen** + RPCs for badges / watermark) — **required** for 5.6.33 Circles activity. Plus **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`** (watchlist row **UPDATE** for reorder under RLS). |
-| **Edge** | **`get-circle-rated-titles`** — RPC-only; **redeploy** only if function source changes. |
+| **Edge** | Each of **`get-circle-rated-titles`**, **`send-circle-invite`**, **`accept-circle-invite`**, **`compute-neighbors`**, **`match`**: `index.ts` has **`EDGE_FUNCTION_VERSION`**; JSON bodies include **`edge: { name, version }`**. On any code change: **bump** that constant (semver) in the **same** commit, **redeploy** that function, confirm **`edge.version`** in a test response. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
 
 **PWA / install (5.6.29)**
@@ -62,7 +62,7 @@
 - The user says **`code now`**, **or**
 - They answer **yes** after you ask something like **“Should I implement this now?”**
 
-**When you do ship code:** bump **`package.json`** version and add a **`CHANGELOG.md`** entry in the **same change** (repo convention).
+**When you do ship code:** bump **`package.json`** version and add a **`CHANGELOG.md`** entry in the **same change** (repo convention). **Edge functions:** in **`supabase/functions/<name>/index.ts`**, bump **`EDGE_FUNCTION_VERSION`** in the **same** change as any behavior or import change, then **redeploy**; responses expose **`edge.version`** for prod verification.
 
 **Exception:** If they say **implement**, **fix**, **migrate**, or **do it** in **that** message for a specific task, that counts as permission for **that** task.
 
@@ -93,6 +93,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.38** — **Supabase Edge — deploy lineage:** **`EDGE_FUNCTION_VERSION`** per function + **`edge: { name, version }`** on all JSON responses; bump version whenever that function’s code changes, then redeploy.  
 - **5.6.37** — **Circles — New activity** on **Recent** horizontal strip: compact tile **left of +**; All/Top keep **under-tabs** line.  
 - **5.6.36** — **Circles:** Dropped **body** pull-to-refresh (false triggers on mobile scroll/overscroll; strip reload only via **New activity → Refresh** or publish/unpublish).  
 - **5.6.35** — **Circles — new activity in foreground:** **10s** poll + **ref**-stable interval (was 45s and reset on re-renders, so in-tab updates rarely showed).  
@@ -145,9 +146,10 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ### Circles
 
+- **Circle activity (5.6.33–5.6.37):** **`circle_member_last_seen`** (Supabase) + RPCs; **`fetchMyCircleUnseenActivity`**, **`markCircleLastSeen`**, **`getCircleOthersActivityWatermark`** in **`src/circles.js`**. **`App.jsx`:** `circleUnseenById` / list **bell+count**; `checkRemoteCircleNewActivity` + 10s interval (ref) + **visibility** / **focus** / **pageshow**; **“New”** strip tile (left of **+**) + All/Top compact row; `mark` on open circle. **Assumed use** (short sessions; leave/resume may refetch) — see **§ Circles activity — assumed use** in this file.
 - **Circle detail:** Ratings **Recent / All / Top**; feeds = **`ratings` ∩ `rating_circle_shares`** for that circle. **`fetchCircleRatedTitles`** + Edge **`get-circle-rated-titles`**. Migrations: **`20260524120000_rating_circle_shares.sql`**, **`20260522120000_...`**, strip **`20260506120000_...`**, etc.
 - **Publish:** first-time rating from detail → modal (skip OK); from circle flow, defaults include that circle. **Publish to circles…** on detail when already rated.
-- **Recent strip:** Titles **oldest → newest** (L→R); **long-press** (~520ms) or **⋯** → Details, Rate/Rerate, watchlist add/remove (**`toggleWatchlist`** + **`skipGoBack`**), Forward (**`publishRatingModal` manage**), Remove from circle (**`unpublishTitleFromCircleStrip`**); **Earlier** (paginate) on the **left**; **+** in a **76px** poster band; **center-on-land**; **faded ←** when pannable.
+- **Recent strip:** Titles **oldest → newest** (L→R); **long-press** (~520ms) or **⋯** → Details, Rate/Rerate, watchlist add/remove (**`toggleWatchlist`** + **`skipGoBack`**), Forward (**`publishRatingModal` manage**), Remove from circle (**`unpublishTitleFromCircleStrip`**); **Earlier** (paginate) on the **left**; **+** in a **76px** poster band; **center-on-land**; **faded ←** when pannable; optional **New activity** tile **left of +** when the activity watermark is newer than the last loaded baseline (5.6.33+).
 - **All / Top:** **List** (like Watchlist): **title · year** on line 1; line 2 **Circle** / **You** / **Cinemastro** with **⭐** (omit if missing); **Circle** may show **(n)** after the score when **`memberCount > 2`** and **`distinct_circle_raters`**. **`CircleAllTopRatingsLine`**, **`formatCircleListYear`** in **`App.jsx`**. **Recent** strip cards still use **`formatCircleSublineTypeYearCine`** (centered poster row).
 - **+** or empty state → **Discover**; **`rateTitleReturnCircleIdRef`** / **`detailReturnScreenRef`** for return to circle.
 
@@ -164,6 +166,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 ## Recent work (`src/circles.js`)
 
 - **`fetchCircleRatedTitles({ circleId, limit, offset, view })`** — Edge + RPC fallbacks for strip/grids.
+- **Circle activity (5.6.33+):** **`fetchMyCircleUnseenActivity`**, **`markCircleLastSeen`**, **`getCircleOthersActivityWatermark`** (Supabase RPCs; see migration **`20260527120000_circle_member_last_seen.sql`**).
 
 ---
 
@@ -205,7 +208,14 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 ## For the next chat — circle “updates” (after Phase A 5.6.33)
 
-**Phase A (5.6.33) shipped on web** — `circle_member_last_seen`, **`get_my_circle_unseen_counts`**, **`mark_circle_last_seen`**, **`get_circle_others_activity_watermark`**, `src/circles.js` helpers, **`App.jsx`**: Circles list **🔔 + count** (others’ **`rating_circle_shares`** with `created_at` \> your **last_seen** for that circle); in-circle **“New activity”** bar + **Refresh**; **pull down** (touch, near page top) to refresh; **no** silent auto-refresh. Badges: **login**, **tab focus** / **visibility** / bfcache **pageshow (persisted)**, and **navigate to Circles list**.
+**Phase A (5.6.33+) shipped on web** — `circle_member_last_seen`, **`get_my_circle_unseen_counts`**, **`mark_circle_last_seen`**, **`get_circle_others_activity_watermark`**, `src/circles.js` helpers, **`App.jsx`**: Circles list **🔔 + count** (others’ **`rating_circle_shares`** with `created_at` \> your **last_seen** for that circle); in-circle **“New activity”** as a **76px** strip tile (**Recent**, immediately **left of +**) + **Refresh**; compact line under **All/Top** tabs when applicable; **~10s** visible-document watermark poll (not a full silent strip rewrite by itself; see **assumed use** below). Badges: **login**, **tab focus** / **visibility** / **pageshow**, and **navigate to Circles list**. (Body-level pull-to-refresh was **removed** in 5.6.36 — it misfired on mobile scroll.)
+
+**Circles activity — assumed use (web / PWA v1)**
+
+- **Session length:** We assume members **do not** keep **circle detail** open for a **very long** continuous visit in one sitting. Short trips in and out of the circle are the norm.
+- **Implicit updates are acceptable:** Leaving the circle (**navigation**), switching **tabs** or **apps**, or **focus / visibility** changes can cause the **Recent** strip (or related loaders) to **refetch** or show newer data **without** the user tapping **New activity → Refresh**. That is **OK for v1** on browser / PWA; it covers “I stepped away and came back.”
+- **Explicit path when staying on screen:** The **New activity** tile on the **Recent** strip, the **~10s** watermark check, and **Circles list** badges are the deliberate “something changed” affordances. A stricter contract (**no** refetch on resume, **only** on explicit **Refresh**) is **deferred** to a **native** client or a later **WebView** / lifecycle pass—not required for current web v1.
+- **Why defer:** Simpler shipping; PWA and browser **lifecycle** events are inconsistent (especially on **iOS**). Revisit when building a true app.
 
 **Still out of scope / next steps:**
 
@@ -213,7 +223,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 - **Web Phase B (optional):** **Realtime** or light polling for power users; **Web Push** only if product wants (heavy / iOS limits).
 - **Apply migration on prod:** **`20260527120000_circle_member_last_seen.sql`**.
 
-**Last user note (this session):** *Ship circle activity Phase A (list badges, in-circle refresh, persistence, web focus/resume) per PASSDOWN; bump version, CHANGELOG, and passdown.*
+**Last user note (end of thread / new chat):** *Passdown updated for a fresh session. **5.6.33–5.6.37** Circles **activity** is on **`main`** and pushed. **Apply** `20260527120000_circle_member_last_seen.sql` on **prod** Supabase if not already. **Assumed use** (PWA v1: short in-circle sessions; leave/tab switch may refetch) is documented in this file; **`HANDOFF.md`** has a pointer. Next: product chooses **Phase B (Realtime)**, **native** push, or other backlog; see **§ Master backlog**.*
 
 ---
 
@@ -278,6 +288,14 @@ Apply any that are missing on prod (user often uses SQL editor):
 **Master checklist:** **§ Master backlog (consolidated checklist)** above — this section keeps **narrative**, **shipped** history, and **numbered 1–6** shorthand aligned with that list.
 
 **Handoff rule:** the **last user note** from the prior session (see **§ For the assistant** item 4) must be reflected here or under **Last session** when you update this file.
+
+**Last session (2026-04-22) — for the next chat**
+
+- **5.6.38 — Edge function deploy lineage:** Each of **`get-circle-rated-titles`**, **`send-circle-invite`**, **`accept-circle-invite`**, **`compute-neighbors`**, **`match`** has **`EDGE_FUNCTION_VERSION`** in **`index.ts`** and JSON responses include **`edge: { name, version }`**. **Going forward:** bump that constant in the **same** commit as any behavior/dependency change, then **redeploy** that function. After pulling **5.6.38**, **redeploy** all five so production responses show **`edge.version: "1.0.0"`** (or verify in dashboard + one test invoke).
+- **Shipped in repo (earlier tranche):** **5.6.33** through **5.6.37** — Circles activity (see **Changelog**). **`20260527120000_circle_member_last_seen.sql`** applied on **prod** (per user).
+- **Docs:** **§ Circles activity — assumed use (web / PWA v1)**; **`HANDOFF.md`**; **`.cursor/rules/cinematch-handoff.mdc`** (Edge version rule).
+- **User intent for v1 web/PWA:** short in-circle sessions; **switching away** may refetch without **Refresh**; stricter behavior → **native** later.
+- **Next work:** **native** APNs/FCM, optional **Supabase Realtime**, or other **§ Master backlog** items.
 
 **Shipped 2026-04-22**
 

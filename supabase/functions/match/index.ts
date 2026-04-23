@@ -6,6 +6,17 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
+const EDGE_FUNCTION_SLUG = "match";
+const EDGE_FUNCTION_VERSION = "1.0.0";
+
+function jsonResponseMatch(body: Record<string, unknown>, status = 200): Response {
+  return new Response(
+    JSON.stringify({ ...body, edge: { name: EDGE_FUNCTION_SLUG, version: EDGE_FUNCTION_VERSION } }),
+    { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
 // --- Match algorithm (server-only) ------------------------------------------
 
 const MIN_NEIGHBOR_OVERLAP = 1;
@@ -930,10 +941,7 @@ Deno.serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponseMatch({ error: "Unauthorized" }, 401);
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -946,10 +954,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponseMatch({ error: "Unauthorized" }, 401);
     }
 
     const admin = serviceKey
@@ -972,10 +977,7 @@ Deno.serve(async (req: Request) => {
     const catalogue: Movie[] = Array.isArray(rawCatalogue) ? (rawCatalogue as Movie[]) : [];
 
     if (admin && (await isSeedSubject(admin, user.id))) {
-      return new Response(JSON.stringify({ error: "Not available for seed users" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponseMatch({ error: "Not available for seed users" }, 403);
     }
 
     if (action === "predict" || action === "predict_cached") {
@@ -987,12 +989,9 @@ Deno.serve(async (req: Request) => {
         (id) => parseMovieId(id) != null,
       );
       if (titleIds.length === 0) {
-        return new Response(
-          JSON.stringify({ error: "movieId or non-empty titles[] required (movie-* / tv-* ids)" }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
+        return jsonResponseMatch(
+          { error: "movieId or non-empty titles[] required (movie-* / tv-* ids)" },
+          400,
         );
       }
       const primaryId = movieIdRaw && parseMovieId(movieIdRaw) ? movieIdRaw : titleIds[0]!;
@@ -1002,12 +1001,11 @@ Deno.serve(async (req: Request) => {
         const cached = await readCachedPrediction(admin, user.id, only);
         const isSameModel = cached?.model_version === PREDICTION_MODEL_VERSION;
         if (cached && isSameModel && isFreshCachedPrediction(cached)) {
-          return new Response(
-            JSON.stringify({ prediction: toPredFromCache(cached), predictions: { [only]: toPredFromCache(cached) }, cached: true }),
-            {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            },
-          );
+          return jsonResponseMatch({
+            prediction: toPredFromCache(cached),
+            predictions: { [only]: toPredFromCache(cached) },
+            cached: true,
+          });
         }
       }
 
@@ -1020,29 +1018,20 @@ Deno.serve(async (req: Request) => {
       }
 
       if (prediction) {
-        return new Response(JSON.stringify({ prediction, predictions }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponseMatch({ prediction, predictions } as Record<string, unknown>);
       }
 
       const cachedStale = await readCachedPrediction(admin, user.id, primaryId);
       const isSameModelStale = cachedStale?.model_version === PREDICTION_MODEL_VERSION;
       if (cachedStale && isSameModelStale) {
-        return new Response(
-          JSON.stringify({
-            prediction: toPredFromCache(cachedStale),
-            predictions: { [primaryId]: toPredFromCache(cachedStale) },
-            cached: true,
-            stale: true,
-          }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
+        return jsonResponseMatch({
+          prediction: toPredFromCache(cachedStale),
+          predictions: { [primaryId]: toPredFromCache(cachedStale) },
+          cached: true,
+          stale: true,
+        });
       }
-      return new Response(JSON.stringify({ prediction: null, predictions }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponseMatch({ prediction: null, predictions } as Record<string, unknown>);
     }
 
     if (action === "mood") {
@@ -1069,9 +1058,7 @@ Deno.serve(async (req: Request) => {
         })
       ;
       const scored = rankMoodByVibe(scoredPool, vibe).slice(0, 40);
-      return new Response(JSON.stringify({ scored }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponseMatch({ scored });
     }
 
     if (action === "recommendations_only") {
@@ -1083,9 +1070,7 @@ Deno.serve(async (req: Request) => {
         console.warn("match: recommendations_only degraded", (err as Error).message);
         result = { recommendations: [], worthALookRecs: [] };
       }
-      return new Response(JSON.stringify(result), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponseMatch(result as Record<string, unknown>);
     }
 
     if (action === "your_picks_page") {
@@ -1136,21 +1121,15 @@ Deno.serve(async (req: Request) => {
         predictions[key] = toPredFromCache(row);
       }
 
-      return new Response(
-        JSON.stringify({
-          recommendations: recsResult.recommendations,
-          worthALookRecs: recsResult.worthALookRecs,
-          predictions,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponseMatch({
+        recommendations: recsResult.recommendations,
+        worthALookRecs: recsResult.worthALookRecs,
+        predictions,
+      });
     }
 
     if (action !== "full") {
-      return new Response(JSON.stringify({ error: "Unknown action" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponseMatch({ error: "Unknown action" }, 400);
     }
 
     const inTheaters = (body.inTheaters as Movie[]) || [];
@@ -1171,14 +1150,9 @@ Deno.serve(async (req: Request) => {
       omitStripRecs ? { omitStripRecs: true } : undefined,
     );
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponseMatch(result as Record<string, unknown>);
   } catch (e) {
     console.error(e);
-    return new Response(JSON.stringify({ error: (e as Error).message || "Server error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponseMatch({ error: (e as Error).message || "Server error" }, 500);
   }
 });

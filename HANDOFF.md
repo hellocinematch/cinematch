@@ -16,9 +16,9 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 ## Current state (as of last update)
 
 - **`main` is pushed** to `origin` (includes Circles Phase A + RLS hotfix + Phase B + Phase C strip backend + Phase C strip UI).
-- **`package.json` version:** see **`package.json`** / **`CHANGELOG.md`** (e.g. **5.6.26** at last sync); circle feeds use **`rating_circle_shares`**.
+- **`package.json` version:** see **`package.json`** / **`CHANGELOG.md`** (e.g. **5.6.38** at last sync); circle feeds use **`rating_circle_shares`**; **circle activity** (badges, last seen) also needs **`20260527120000_circle_member_last_seen.sql`** on prod if not already applied — see **`PASSDOWN-NEXT-CHAT.md`**.
 - **Prod DB:** Circles schema through strip/grids + watchlist + **rating publish** — ensure **`20260524120000_rating_circle_shares.sql`** is applied (feeds join through shares; leave-circle trigger clears shares for that member+circle). Earlier migrations as in repo / **`PASSDOWN-NEXT-CHAT.md`** checklist.
-- **Edge functions:** `send-circle-invite`, `accept-circle-invite`, and **`get-circle-rated-titles`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`).
+- **Edge functions:** `match`, `compute-neighbors`, `send-circle-invite`, `accept-circle-invite`, and **`get-circle-rated-titles`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`). Each function’s `index.ts` has **`EDGE_FUNCTION_VERSION`**; JSON responses include **`edge.version`** — bump the constant whenever that function’s code changes, then redeploy.
 
 ---
 
@@ -30,6 +30,7 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 - **Circle membership for anyone other than creator seed** → **Edge** + service role; RLS allows creator-seed-self only.
 - **Creator leave:** `circles.status = 'archived'`, `archived_at = now()` **before** deleting creator’s `circle_members` row (update policy gates on `status = 'active'`).
 - **Invite caps:** send-time 10-circle cap → `auto_declined`; accept-time cap → **error**, invite stays `pending` (spec in migration header). **Production numbers** (10 active circles / user, 25 members / circle) and **where to revert** after test-only lower caps: **`PASSDOWN-NEXT-CHAT.md`** section **“Circles — production caps (revert from testing)”.**
+- **Circle activity (badges + “new activity” on web / PWA):** Product **assumptions** and what happens on **tab switch / resume** are documented in **`PASSDOWN-NEXT-CHAT.md`**, section **“Circles activity — assumed use (web / PWA v1)”** — read before tightening lifecycle or moving to **native**.
 
 ---
 
@@ -100,7 +101,7 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 
 - **Supabase SQL:** user often applies migrations via SQL editor; keep repo migrations in sync with prod.  
 - **Client-only push** → Vercel auto-deploys.  
-- **Edge:** deploy after changing `supabase/functions/**`.  
+- **Edge:** deploy after changing `supabase/functions/**`. Each function’s **`index.ts`** defines **`EDGE_FUNCTION_VERSION`**; every JSON response includes **`edge: { name, version }`**. **Whenever you change a function’s code, bump its version in the same commit and redeploy** — then confirm the live build by inspecting `edge` in a response (or the dashboard deploy time).  
 - **Do not git push / deploy** unless the user asks (house rule).
 
 ---
