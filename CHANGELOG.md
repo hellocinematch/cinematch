@@ -1,5 +1,21 @@
 # Changelog
 
+## 5.6.37
+
+- **Circles — New activity on the Recent strip:** The **New activity / Refresh** control is no longer a wide bar at the top of the scroll. On **Recent**, it appears as a **76px** strip tile (same width column as the **+**) **immediately to the left of the +** add tile. On **All** / **Top**, a compact one-line **New activity** + **Refresh** still appears under the view tabs (those lists are not a horizontal strip).
+
+## 5.6.36
+
+- **Circles — no accidental strip refresh on mobile:** Removed **body-level “pull to refresh”** touch handlers. They misfired on normal **scroll from the top**, **overscroll** / rubber-band, and **horizontal strip** use (`window.scrollY` ≈ 0 + downward move **> 68px** looked like a pull). The **Recent** feed only reloads when the user taps **Refresh** in the **New activity** bar (or from publish/unpublish flows that already trigger a reload on purpose). The **10s** poll still only **detects** new activity; it does **not** refetch the strip.
+
+## 5.6.35
+
+- **Circles — “new activity” while screen stays on:** The watermark **poll** is now every **10s** (only when the document is **visible**; still not a full feed refetch) and uses a **ref** to the check callback so the timer is **not** reset on every re-render. That makes “someone else published while I’m still on this circle” work without **switching away and back** (resume events were already reliable).
+
+## 5.6.34
+
+- **Circles — new activity (mobile / PWA):** Resume checks no longer require **`pageshow.persisted`** (that only matches bfcache; mobile tab/PWA return usually has `persisted: false` while **`window` `focus` is unreliable** on iOS). Added a **~500ms** follow-up `check` after **`visibilitychange` → visible**, a **45s** lightweight watermark poll only on **circle detail** (not a full feed refetch, tab hidden = no tick), and **`pageshow`** always re-syncs badges / “new activity” so behavior matches **desktop** when another member publishes.
+
 ## 5.6.33
 
 - **Circles — activity (Phase A, web):** **Circles** list (logged in): each circle can show a **bell + count** for **new publishes from other members** since your last open (`rating_circle_shares` with `user_id` ≠ you and `created_at` > per-circle **last seen**). **Inside a circle** (2+ members): after you load the feed, we compare a server **watermark** (latest other member share time) to what you had when the feed was last refreshed; on **tab focus** / **visibility** / bfcache **pageshow** we may show **“New activity”** with **Refresh**; pull **down** on the circle body (from scroll top) also bumps refresh. **No** automatic silent refetch of the strip. **DB:** `circle_member_last_seen` + RPCs **`get_my_circle_unseen_counts`**, **`mark_circle_last_seen`**, **`get_circle_others_activity_watermark`** — apply migration **`20260527120000_circle_member_last_seen.sql`** on Supabase. Badges also refresh on **login** and when returning to the **Circles** list.

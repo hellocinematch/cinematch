@@ -6,7 +6,7 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.33** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
+> Cinematch is on **`main` at 5.6.37** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
 > **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **Primary nav:** no **`profiles.name`** pill (**5.6.30**). **Posters:** **`loading="lazy"`** (**5.6.31**); **`img src`** rewrites small UI to TMDB **`w342`**, detail / large cards **`w500`** (**5.6.32**); stored/catalogue URLs still **`w500`**. **5.6.33 — Circles activity (Phase A web):** list **bell + count**; in-circle **new activity** bar + refresh; **`circle_member_last_seen`** + RPCs (apply **`20260527120000_circle_member_last_seen.sql`** on prod). **PWA:** **`/site.webmanifest`**; **`apple-touch-icon`** = **`/apple-touch-icon.png`** (180×180); manifest **`/pwa-icon-192.png`**; **`/cinemastro-pwa-icon.svg`** = larger **wordmark**, slight **diagonal** (no tagline on icon; in-app logo unchanged). **Tab** **`/favicon.svg`**. **`npm run icons:pwa`** after SVG edits. **Client:** **git push** → Vercel. **Edge** `get-circle-rated-titles` = RPC-only. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next build:** **native** push (APNs/FCM) for background circle updates; optional Realtime (Phase B). **§ Master backlog** + **`HANDOFF.md`** for the rest.
 
 (Adjust or shorten if the next task is something else.)
@@ -17,8 +17,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.33** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** — **5.6.33** = Circles list **unseen** badges + in-circle **new activity** refresh; **5.6.32** = TMDB **`w342`/`w500`** at render; **5.6.31** = lazy posters; **5.6.30** = removed header name pill. |
+| **App version** | **5.6.37** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main`** — **5.6.37** = **New activity** tile on **Recent** strip (left of **+**); **5.6.36** = no misfiring body pull; **5.6.35** = **10s** poll; **5.6.33**+ circle activity; **5.6.32** = TMDB **`w342`/`w500`**; **5.6.31** = lazy posters; **5.6.30** = removed header name pill. |
 | **Supabase — apply if not already** | **`20260527120000_circle_member_last_seen.sql`** (circle **last seen** + RPCs for badges / watermark) — **required** for 5.6.33 Circles activity. Plus **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`** (watchlist row **UPDATE** for reorder under RLS). |
 | **Edge** | **`get-circle-rated-titles`** — RPC-only; **redeploy** only if function source changes. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
@@ -93,6 +93,10 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.37** — **Circles — New activity** on **Recent** horizontal strip: compact tile **left of +**; All/Top keep **under-tabs** line.  
+- **5.6.36** — **Circles:** Dropped **body** pull-to-refresh (false triggers on mobile scroll/overscroll; strip reload only via **New activity → Refresh** or publish/unpublish).  
+- **5.6.35** — **Circles — new activity in foreground:** **10s** poll + **ref**-stable interval (was 45s and reset on re-renders, so in-tab updates rarely showed).  
+- **5.6.34** — **Circles — new activity on mobile / PWA:** `pageshow` for all resume types, `visibility` + delayed re-check, **45s** watermark-only poll on circle detail (visible doc only).  
 - **5.6.33** — **Circles — activity (Phase A, web):** per-circle list badges (others’ **`rating_circle_shares`** vs **last seen**), in-circle **new activity** + refresh + pull; migration **`20260527120000_circle_member_last_seen.sql`**.  
 - **5.6.32** — **TMDB:** **`posterSrcThumb`** (**`w342`**) vs **`posterSrcDetail`** (**`w500`**) at **`img`**; mood keeps backdrop **`w780`**.  
 - **5.6.31** — **Performance:** Lazy-load off-screen poster **`img`**s; eager detail hero + onboarding / rate-more card.  

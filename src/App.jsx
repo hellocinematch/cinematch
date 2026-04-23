@@ -3047,11 +3047,18 @@ const styles = `
   .circle-card__activity { position:relative; display:inline-flex; align-items:center; gap:3px; padding:4px 8px 4px 6px; border-radius:999px; border:1px solid #3a3020; background:#1a1510; font-size:13px; line-height:1; }
   .circle-card__activity-ico { font-size:14px; line-height:1; }
   .circle-card__activity-count { font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; color:#e8c96a; min-width:1.1em; text-align:center; }
-  .circle-new-activity-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; padding:10px 14px; border-radius:12px; border:1px solid #3a3020; background:linear-gradient(90deg, color-mix(in srgb, #e8c96a 12%, #141208) 0%, #12100a 100%); font-family:'DM Sans',sans-serif; }
-  .circle-new-activity-bar__text { font-size:14px; color:#e8e0d0; font-weight:600; }
-  .circle-new-activity-bar__btn { flex-shrink:0; padding:8px 14px; border-radius:999px; border:1px solid #e8c96a; background:#e8c96a; color:#0a0a0a; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
-  .circle-new-activity-bar__btn:hover { filter:brightness(1.05); }
-  .circle-new-activity-bar__btn:focus-visible { outline:2px solid #e8c96a; outline-offset:2px; }
+  .circle-new-activity-bar--other-tab { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 12px; padding:8px 12px; border-radius:10px; border:1px solid #3a3020; background:color-mix(in srgb, #e8c96a 8%, #12100a); font-family:'DM Sans',sans-serif; }
+  .circle-new-activity-bar--other-tab__text { font-size:13px; color:#e8e0d0; font-weight:600; }
+  .circle-new-activity-bar--other-tab__btn { flex-shrink:0; padding:6px 12px; border-radius:999px; border:1px solid #e8c96a; background:#e8c96a; color:#0a0a0a; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .circle-new-activity-bar--other-tab__btn:hover { filter:brightness(1.05); }
+  .circle-new-activity-bar--other-tab__btn:focus-visible { outline:2px solid #e8c96a; outline-offset:2px; }
+  .strip-card.strip-card--circle-new-activity { width:76px; max-width:76px; flex-shrink:0; border:none; background:transparent; padding:0; text-align:left; display:flex; flex-direction:column; align-items:stretch; font:inherit; align-self:flex-start; box-sizing:border-box; }
+  .strip-poster.strip-poster--circle-new-activity { width:76px; min-width:76px; max-width:76px; min-height:100px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; box-sizing:border-box; padding:4px 2px; border-radius:12px; border:1px solid #4a3d28; background:linear-gradient(160deg, color-mix(in srgb, #e8c96a 18%, #1a150c) 0%, #0f0d08 100%); }
+  .circle-new-activity-strip__label { font-size:8px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; color:#e8c96a; text-align:center; line-height:1.1; }
+  .circle-new-activity-strip__btn { width:100%; padding:5px 0; border-radius:8px; border:1px solid #e8c96a; background:#e8c96a; color:#0a0a0a; font-size:10px; font-weight:700; font-family:'DM Sans',sans-serif; cursor:pointer; }
+  .circle-new-activity-strip__btn:hover { filter:brightness(1.04); }
+  .circle-new-activity-strip__btn:focus-visible { outline:2px solid #e8c96a; outline-offset:2px; }
+  .strip-title--circle-new-activity { font-size:9px; font-weight:600; color:#7a7060; text-align:center; line-height:1.2; max-width:100%; }
   .circle-card__desc { font-size:13px; color:#aaa; line-height:1.4; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .circle-card__meta-row { display:flex; align-items:center; gap:10px; margin-top:4px; flex-wrap:wrap; }
   .circle-card__vibe-badge { display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; border:1px solid var(--vibe-accent); color:var(--vibe-accent); background:color-mix(in srgb, var(--vibe-accent) 12%, transparent); font-size:11px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; }
@@ -4185,8 +4192,8 @@ export default function App() {
   /** Per circle: others' unpublishes since last mark_circle_last_seen; powers list card badge (5.6.33). */
   const [circleUnseenById, setCircleUnseenById] = useState(() => ({}));
   const circleDetailActivityWatermarkRef = useRef(null);
+  const checkRemoteCircleNewActivityRef = useRef(null);
   const [circleDetailShowNewActivityBar, setCircleDetailShowNewActivityBar] = useState(false);
-  const circleDetailPullRef = useRef({ y0: 0, fired: false });
   /** Recent strip: which row key has the ⋯ / long-press menu open. */
   const [circleRecentStripMenuRowKey, setCircleRecentStripMenuRowKey] = useState(null);
   const circleRecentStripLongPressTimerRef = useRef(null);
@@ -6911,25 +6918,7 @@ export default function App() {
       console.warn("Circles: activity watermark check failed", e);
     }
   }, [screen, selectedCircleId, circleDetailData, circleStripLoading]);
-
-  const onCircleDetailBodyTouchStart = (e) => {
-    if (e.touches.length !== 1) return;
-    circleDetailPullRef.current = { y0: e.touches[0].clientY, fired: false };
-  };
-
-  const onCircleDetailBodyTouchMove = (e) => {
-    if (e.touches.length !== 1) return;
-    if (screen !== "circle-detail" || !circleDetailData || circleDetailData.memberCount < 2) return;
-    if (window.scrollY > 4) return;
-    const t = e.touches[0];
-    const st = circleDetailPullRef.current;
-    if (st == null || st.fired) return;
-    const dy = t.clientY - st.y0;
-    if (dy > 68) {
-      st.fired = true;
-      setCircleRatedRefreshKey((k) => k + 1);
-    }
-  };
+  checkRemoteCircleNewActivityRef.current = checkRemoteCircleNewActivity;
 
   useEffect(() => {
     if (!user) {
@@ -6945,16 +6934,20 @@ export default function App() {
       if (document.visibilityState !== "visible") return;
       void refreshCircleUnseenBadges();
       void checkRemoteCircleNewActivity();
+      // iOS / PWA: first tick can run before the tab is fully active; re-check once.
+      window.setTimeout(() => {
+        void checkRemoteCircleNewActivity();
+      }, 500);
     };
     const onFoc = () => {
       void refreshCircleUnseenBadges();
       void checkRemoteCircleNewActivity();
     };
-    const onPageShow = (ev) => {
-      if (ev.persisted) {
-        void refreshCircleUnseenBadges();
-        void checkRemoteCircleNewActivity();
-      }
+    // pageshow: iOS and mobile often resume with persisted=false (bfcache is for back/forward).
+    // Desktop alt-tab may use window focus; PWA/ Safari may not. Always resync on pageshow.
+    const onPageShow = () => {
+      void refreshCircleUnseenBadges();
+      void checkRemoteCircleNewActivity();
     };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", onFoc);
@@ -6965,6 +6958,21 @@ export default function App() {
       window.removeEventListener("pageshow", onPageShow);
     };
   }, [user, refreshCircleUnseenBadges, checkRemoteCircleNewActivity]);
+
+  // In-foreground: no OS “resume” event while you stay on this screen — must poll. Ref keeps the
+  // interval from resetting on every checkRemoteCircleNewActivity / circleDetailData reference churn.
+  const circleDetailIdForPoll = circleDetailData?.id;
+  const circleMemberCountForPoll = circleDetailData?.memberCount;
+  useEffect(() => {
+    if (!user || screen !== "circle-detail" || !selectedCircleId) return;
+    if (!circleDetailIdForPoll || !circleMemberCountForPoll || circleMemberCountForPoll < 2) return;
+    const t = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      const run = checkRemoteCircleNewActivityRef.current;
+      if (typeof run === "function") void run();
+    }, 10_000);
+    return () => window.clearInterval(t);
+  }, [user, screen, selectedCircleId, circleDetailIdForPoll, circleMemberCountForPoll]);
 
   useEffect(() => {
     if (screen !== "circle-detail" || !selectedCircleId || !user) return;
@@ -9108,11 +9116,7 @@ export default function App() {
             </div>
 
             {circleDetailData && (
-              <div
-                className="circle-detail-body"
-                onTouchStart={onCircleDetailBodyTouchStart}
-                onTouchMove={onCircleDetailBodyTouchMove}
-              >
+              <div className="circle-detail-body">
                 {(() => {
                   const mc = circleDetailData.memberCount;
                   if (mc < 2) {
@@ -9487,13 +9491,14 @@ export default function App() {
                         <div className="empty-sub">Rate a title, then use Publish to circles to show it here (there&apos;s no backfill).</div>
                       </div>
                     ) : null;
-                  const newActivityRow =
-                    circleDetailShowNewActivityBar && selectedCircleId ? (
-                      <div className="circle-new-activity-bar" role="status" aria-live="polite">
-                        <span className="circle-new-activity-bar__text">New activity</span>
+                  const newActivityOnOtherTab =
+                    circleDetailShowNewActivityBar && selectedCircleId
+                    && (circleRatingsView === "all" || circleRatingsView === "top") ? (
+                      <div className="circle-new-activity-bar--other-tab" role="status" aria-live="polite">
+                        <span className="circle-new-activity-bar--other-tab__text">New activity</span>
                         <button
                           type="button"
-                          className="circle-new-activity-bar__btn"
+                          className="circle-new-activity-bar--other-tab__btn"
                           onClick={() => {
                             setCircleRatedRefreshKey((k) => k + 1);
                           }}
@@ -9504,10 +9509,10 @@ export default function App() {
                     ) : null;
                   return (
                     <>
-                      {newActivityRow}
                       <div className="circle-detail-strip-wrap">
                         <div className="section circle-detail-strip-section">
                           {ratingsTabs}
+                          {newActivityOnOtherTab}
                           {circleRatingsView === "recent" && circleStripError ? (
                             <div className="circles-error-banner" role="alert">{circleStripError}</div>
                           ) : null}
@@ -9570,6 +9575,26 @@ export default function App() {
                                   {stripTitlesOrdered.map((row, i) =>
                                     renderStripRow(row, i === stripTitlesOrdered.length - 1)
                                   )}
+                                  {circleDetailShowNewActivityBar && selectedCircleId && circleDetailData.status === "active" ? (
+                                    <div className="strip-card strip-card--circle-new-activity" role="status" aria-live="polite">
+                                      <div className="strip-poster strip-poster--circle-new-activity">
+                                        <span className="circle-new-activity-strip__label">New</span>
+                                        <button
+                                          type="button"
+                                          className="circle-new-activity-strip__btn"
+                                          onClick={() => {
+                                            setCircleRatedRefreshKey((k) => k + 1);
+                                          }}
+                                        >
+                                          Refresh
+                                        </button>
+                                      </div>
+                                      <div className="strip-title strip-title--circle-new-activity">Activity</div>
+                                      <div className="strip-genre strip-genre--spacer" aria-hidden="true">
+                                        &nbsp;
+                                      </div>
+                                    </div>
+                                  ) : null}
                                   {circleDetailData.status === "active" && (
                                     <button
                                       type="button"
