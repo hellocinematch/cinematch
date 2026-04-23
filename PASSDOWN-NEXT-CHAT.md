@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-22 (5.6.32; **§ Speed / performance** backlog added)
+**Last updated:** 2026-04-22 (**§ Master backlog** consolidated + speed section)
 
 ---
 
@@ -197,7 +197,65 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 ---
 
+## Master backlog (consolidated checklist)
+
+*One merged list from **§ Open / follow-ups**, **Roadmap**, **Speed / performance**, **Ongoing / ops**, and **`HANDOFF.md` § What’s next. Trust **`package.json`** for version. When you ship or cancel an item, update this section and/or the narrative blocks below so they don’t contradict.*
+
+### Circles & feeds
+
+1. **Live circle feeds (multi-user):** auto-refresh when another member **publishes** (Realtime, polling, and/or refetch on tab visibility) — today: refetch only on re-enter / manual refresh.
+2. **“Unseen” activity:** on circles list after login, signal groups with activity not yet seen — **last-seen** (likely DB) + **UI** (can ship without (1)).
+3. **Invites at max circles:** today **`auto_declined`** — recipient never sees invite; creator gets auto-decline. *Idea:* muted row for recipient (“at cap”) + open/pending for creator until resolved.
+4. **Creator leave → transfer ownership:** keep circle **active**, hand off to next member (order: e.g. `joined_at`); **solo creator** edge case **TBD**. Today: archive-then-leave / dissolve-style (see **`HANDOFF.md`** architecture).
+
+### Product — discovery & polish
+
+5. **Phase D — `profiles.handle`:** search/invite by handle — **blocked on schema**.
+6. **Edit circle:** name / description / (maybe) vibe from Circle info; **archived read-only**; reuse **`validateCircleName`** / limits in **`src/circles.js`**.
+7. **Phase E polish:** animations, cover upload, **`icon_emoji`**, per-circle color, **archived** section.
+
+### Watchlist, invites, ratings
+
+8. **Watchlist on Circles landing:** surface watchlist on main Circles — **layout TBD** (`HANDOFF.md`).
+9. **Watchlist rows — circle name:** when saved from a circle, show name via **`source_circle_id`** (partially in roadmap today).
+10. **Invite → non-user email:** deliver path to **join** + accept circle invite — product detail **TBD**.
+11. **In-circle quick rate pill:** rate from circle context → same **publish to circles** flow (`rating_circle_shares`).
+12. **Bayesian (or similar) normalization** for ratings — formula + pipeline **TBD**.
+
+### Security & trust
+
+13. **`ACCOUNT-SECURITY.md`:** OAuth (e.g. Apple / Google), **CAPTCHA** on signup, optional **phone** verification — see file.
+
+### Engineering — performance & platform
+
+14. **Code-splitting:** route/screen **`lazy()` + `Suspense`** to cut first-load JS parse/compile.
+15. **Fetch waterfalls:** shell + skeletons first; don’t await non-critical TMDB/secondary fetches before meaningful paint after auth.
+16. **Split `App.jsx`:** move to **`pages/*`** (pure refactor, large file — `HANDOFF.md`).
+17. **Caching:** Vercel CDN for hashed assets; optional short TTL for stable owned API responses.
+18. **Vercel Image Optimization (optional):** `/_vercel/image` or framework integration — WebP/AVIF + resize vs raw TMDB.
+19. **Smaller thumbs (optional):** e.g. **`w185`** for tiny list rows only if quality OK.
+20. **Prefetch (optional):** low-priority hints for likely next screen — **careful on cellular**.
+21. **Supabase hot paths:** fewer columns, indexes, avoid N+1; watch **RLS** cost on hot queries.
+22. **Fonts:** subset / **`font-display`** if text blocks paint.
+23. **PWA service worker (optional):** repeat-visit cache for shell/assets; respect **TMDB** hotlinking; cold first load unchanged.
+
+### Ops, quality, docs
+
+24. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if **RLS** on **`watchlist`** and **⋯ reorder** must work.
+25. **Docs sync:** **`package.json`**, **`CHANGELOG.md`**, this file, **`HANDOFF.md`** version/callouts — don’t let **`HANDOFF`** version drift vs **`package.json`**.
+26. **Marketing stats:** may return in top bar / About (not bottom nav).
+27. **Cron:** **`compute-neighbors`** wave coverage vs MAU — **`COMPUTE-NEIGHBORS-CRON.md`**.
+28. **Lint:** pre-existing **`react-hooks/set-state-in-effect`** in **`AppPrimaryNav`**.
+
+### Small follow-ups (nice-to-have)
+
+29. **Circle strip tabs:** **Top** copy vs **Most rated** by count — combine or rename if product wants both (`HANDOFF.md` item 11).
+
+---
+
 ## Open / follow-ups
+
+**Master checklist:** **§ Master backlog (consolidated checklist)** above — this section keeps **narrative**, **shipped** history, and **numbered 1–6** shorthand aligned with that list.
 
 **Handoff rule:** the **last user note** from the prior session (see **§ For the assistant** item 4) must be reflected here or under **Last session** when you update this file.
 
@@ -244,7 +302,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 ---
 
-*Legacy pointer:* Previous ask to **list all pending** for the project is **folded** into **Open / follow-ups** and **Last session** above; future passdowns should not drop that class of “last note.”
+*Legacy pointer:* Pending work lives in **§ Master backlog** plus narrative in **Open / follow-ups**; future passdowns should not drop **last-note** class updates.
 
 ---
 
