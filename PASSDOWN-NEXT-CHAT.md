@@ -1,13 +1,13 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-22 — **5.6.51** (creator leave **transfers** ownership if others remain; **CHANGELOG** / RPC **`creator_leave_circle`**). **5.6.50** — **Forward** add-only + strip **share-time** order. **To do:** **§ Master backlog 4a–4c, 4e**; **4d** partial (transfer shipped; last-member disintegrate **TBD**). **Deferred (product):** scroll-stop **`predict_cached`** for circle Recent strip. See **§ Last session** and **§ Circles — ratings & strip predictions**.
+**Last updated:** 2026-04-22 — **`main` at 5.6.52** (see `package.json` / **CHANGELOG**). **Recent Circles:** **5.6.50** **Forward** (add-only) + **strip** `last_at` = **`greatest(rated_at, share.created_at)`** (migration `20260528120000…`); **5.6.51** **creator leave** = **transfer** to earliest other member via RPC **`creator_leave_circle`** (migration `20260529120000…`); **5.6.52** **creator** can **edit** name / description / **vibe** (list **Edit** + **Circle info**, **`updateCircle`** in `circles.js`, **no** new SQL). **To do (moderation):** **§ Master backlog 4a–4c, 4e**; **4d** open: last-member **disintegrate** / **delete group**. **Deferred:** scroll-stop **`predict_cached`**. See **§ Last session** below.
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 5.6.49** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
-> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **5.6.33 — 5.6.37 — Circles activity (Phase A web, shipped):** DB **`circle_member_last_seen`** + RPCs; **prod** migration applied. **5.6.38+ — Edge:** each function has **`EDGE_FUNCTION_VERSION`**; JSON includes **`edge: { name, version }`** — **bump + redeploy** on behavior change. **5.6.39–5.6.48 — Circles UI:** circle score color/icon iterations; **5.6.49 —** shared **SVG** for **orange (circle)** + **gold (Cinemastro)** stars, fixed **16px / 13px**; build fix (CSS template literal). **Strip vs detail predictions:** `get-circle-rated-titles` reads **`user_title_predictions`** only; **cold cache** → no blue on strip until **detail** (or other path) **hydrates** — **by design**; optional **scroll-stop** prefetch was **deferred** pre-beta (see passdown). **Client:** `src/circles.js`; **`App.jsx`** Circles per prior passdown. **Product doc:** **§ Circles activity — assumed use**; **§ Circles — ratings & strip predictions** in this file. **Git:** **`main` pushed** (e.g. release commit with 5.6.49). **Deploy:** **Vercel** on push; **migrations** not auto; **Edge** not auto. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next:** beta feedback; then backlog (**native** push, **Realtime**, **§ Master backlog**).
+> Cinematch is on **`main` at 5.6.52** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
+> **Context:** **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **5.6.33+ — activity:** **`circle_member_last_seen`** + RPCs (apply prod migration if missing). **5.6.38+ — Edge:** each function has **`EDGE_FUNCTION_VERSION`**; JSON includes **`edge: { name, version }`** — **bump + redeploy** on change. **5.6.50–5.6.52 — Circles:** **Forward** add-only; **Recent** strip order uses **share** time; **creator leave** **transfers** when **≥2** members (RPC); **edit circle** (name, description, vibe) for **creator** from list + circle info. **5.6.49** — shared **SVG** stars (orange / gold). **Strip vs detail** predictions: **`user_title_predictions`**; cold strip → **deferred** scroll-stop prefetch. **`fetchMyCircles`** includes **`joined_at`** on members. **Git:** e.g. **5.6.52** on **`main`**. **Deploy:** **Vercel** on push; **migrations** not auto (apply **§ Supabase migrations checklist** for prod). **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next:** **§ Master backlog** (moderation, **4e** grace, etc.); beta feedback.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,8 +17,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **5.6.51** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
-| **Git** | **`main`** (pushed) — **5.6.51** = creator **leave** = **transfer** RPC + UI copy; **5.6.50** = **Forward** + strip order; **5.6.38** = Edge **`edge.version`**; **5.6.33–5.6.37** = Circles activity. |
+| **App version** | **5.6.52** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`** in `src/App.jsx`. |
+| **Git** | **`main`** (pushed) — **5.6.52** = **Edit circle** (`updateCircle`); **5.6.51** = **`creator_leave_circle`**; **5.6.50** = **Forward** + strip **share** ordering; **5.6.38** = Edge **`edge.version`**; **5.6.33+** = Circles activity. |
 | **Supabase — apply if not already** | **`20260529120000_creator_leave_transfer_ownership.sql`** — **creator** leave **transfers** `creator_id` when **≥2** members. Plus prior: **`20260528120000_circle_strip_share_activity_order.sql`**, **`20260527120000_circle_member_last_seen.sql`**, **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`**. |
 | **Edge** | Each of **`get-circle-rated-titles`**, **`send-circle-invite`**, **`accept-circle-invite`**, **`compute-neighbors`**, **`match`**: `index.ts` has **`EDGE_FUNCTION_VERSION`**; JSON bodies include **`edge: { name, version }`**. On any code change: **bump** that constant (semver) in the **same** commit, **redeploy** that function, confirm **`edge.version`** in a test response. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
@@ -94,6 +94,9 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **5.6.52** — **Circles — edit info:** **Creator** updates **name**, **description**, **vibe** for **active** circles; **Edit** on **Circles list** + **“Edit name & description”** in **Circle info**; **`updateCircle`** in **`src/circles.js`**. **No** migration.  
+- **5.6.51** — **Creator leave** — if **other members** remain, **`creator_id`** **transfers** to **earliest** `joined_at` (RPC **`creator_leave_circle`**); **solo** creator → **archive** + leave. Migration **`20260529120000_creator_leave_transfer_ownership.sql`**.  
+- **5.6.50** — **Forward** add-only + **`addRatingCircleShares`**; **strip** **`greatest(rated_at, share.created_at)`** (migration **`20260528120000_circle_strip_share_activity_order.sql`**).  
 - **5.6.49** — **Circles — star parity:** **Circle (orange) and Cinemastro (gold)** use the **same SVG** path with **`currentColor`**, **fixed** sizes — strip **16px**, All/Top list **13px** — so stars **match** (replaces gold **emoji** + `em`-sized orange SVG mismatch). **Build:** removed **backticks** inside a **CSS** comment in the `styles` template literal (they **broke** `vite build`). **Edge** (`match` + lineage): same **`edge: { name, version }`** convention.  
 - **5.6.38** — **Supabase Edge — deploy lineage:** **`EDGE_FUNCTION_VERSION`** per function + **`edge: { name, version }`** on all JSON responses; bump version whenever that function’s code changes, then redeploy.  
 - **5.6.37** — **Circles — New activity** on **Recent** horizontal strip: compact tile **left of +**; All/Top keep **under-tabs** line.  
@@ -150,6 +153,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 - **Circle activity (5.6.33–5.6.37):** **`circle_member_last_seen`** (Supabase) + RPCs; **`fetchMyCircleUnseenActivity`**, **`markCircleLastSeen`**, **`getCircleOthersActivityWatermark`** in **`src/circles.js`**. **`App.jsx`:** `circleUnseenById` / list **bell+count**; `checkRemoteCircleNewActivity` + 10s interval (ref) + **visibility** / **focus** / **pageshow**; **“New”** strip tile (left of **+**) + All/Top compact row; `mark` on open circle. **Assumed use** (short sessions; leave/resume may refetch) — see **§ Circles activity — assumed use** in this file.
 - **5.6.49 — Circle score stars:** **`CirclePillStarGlyph`** + shared path constant; **orange** circle + **gold** Cinemastro use the same SVG (**`currentColor`**), **16×16** Recent under-title pill, **13×13** All/Top list — replaces mismatched **emoji** / `em` sizing. **`CircleStripRingCineBelowTitle`**, **`CircleAllTopRatingsLine`** / **`CircleGroupScoreIcon`** (`variant="list"`).
+- **5.6.50 — Forward** (strip ⋯): **`addRatingCircleShares`**; **Recent** strip sort uses **share** `created_at` (DB migration). **5.6.51 — Creator leave:** RPC **`creator_leave_circle`** (client **`leaveCircle`**); leave **copy** solo vs transfer. **5.6.52 — Edit circle:** **`updateCircle`**; list card **Edit** + **Circle info** “Edit name & description”; **`fetchMyCircles`** includes **`joined_at`** on members.
 - **Circle detail:** Ratings **Recent / All / Top**; feeds = **`ratings` ∩ `rating_circle_shares`** for that circle. **`fetchCircleRatedTitles`** + Edge **`get-circle-rated-titles`**. Migrations: **`20260524120000_rating_circle_shares.sql`**, **`20260522120000_...`**, strip **`20260506120000_...`**, etc.
 - **Publish:** first-time rating from detail → modal (skip OK); from circle flow, defaults include that circle. **Publish to circles…** on detail when already rated.
 - **Recent strip:** Titles **oldest → newest** (L→R); **long-press** (~520ms) or **⋯** → Details, Rate/Rerate, watchlist add/remove (**`toggleWatchlist`** + **`skipGoBack`**), Forward (**`publishRatingModal` manage**), Remove from circle (**`unpublishTitleFromCircleStrip`**); **Earlier** (paginate) on the **left**; **+** in a **76px** poster band; **center-on-land**; **faded ←** when pannable; optional **New activity** tile **left of +** when the activity watermark is newer than the last loaded baseline (5.6.33+).
@@ -169,6 +173,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 ## Recent work (`src/circles.js`)
 
 - **`fetchCircleRatedTitles({ circleId, limit, offset, view })`** — Edge + RPC fallbacks for strip/grids.
+- **5.6.52 — `updateCircle`**, **5.6.50 — `addRatingCircleShares`**, **`fetchMyCircles`** with **`joined_at`** on **`circle_members`**.
 - **Circle activity (5.6.33+):** **`fetchMyCircleUnseenActivity`**, **`markCircleLastSeen`**, **`getCircleOthersActivityWatermark`** (Supabase RPCs; see migration **`20260527120000_circle_member_last_seen.sql`**).
 
 ---
@@ -250,7 +255,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 - **Web Phase B (optional):** **Realtime** or light polling for power users; **Web Push** only if product wants (heavy / iOS limits).
 - **Apply migration on prod:** **`20260527120000_circle_member_last_seen.sql`**.
 
-**Last user note (end of thread / new chat):** *See **§ Open / follow-ups — Last session (2026-04-22, 5.6.49)** for the current “tell the next chat” line.*
+**Last user note (end of thread / new chat):** *See **§ Open / follow-ups — Last session (2026-04-22)** for the current handoff (5.6.52 + migrations).*
 
 ---
 
@@ -264,7 +269,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 1b. **Recent strip — personal prediction (blue) hydration (deferred post-beta):** optional **scroll-stop** / idle **`predict_cached`** for **1–2** visible **unrated** titles to show **blue** without opening **detail**; **not** implemented as of 5.6.49 — user chose **beta first**, **detail** already fetches; **revisit** after feedback. *See* **§ Circles — ratings & strip predictions**.
 2. **“Unseen” activity (polish):** optional: dismiss rules, animation, or tuning count rules; core badges shipped in 5.6.33.
 3. **Invites at max circles:** today **`auto_declined`** — recipient never sees invite; creator gets auto-decline. *Idea:* muted row for recipient (“at cap”) + open/pending for creator until resolved.
-4. **Circles — moderation, succession, and end-of-life (product/RLS; not built in app yet).**
+4. **Circles — moderation, succession, and end-of-life (partially shipped; see sub-bullets).**
    - **4a. Admin line:** **Creator** = primary mod. **Auto-designate** up to two **sub-admins** as the **2nd and 3rd members to join** (by `joined_at` / join order) so **successor order** is always known without manual picks.
    - **4b. Remove member:** **Creator/admins** can **remove a user** from the circle (new RLS / RPC or Edge; today `circle_members` DELETE is **self-only** — see passdown / schema). Aligns with familiar chat **admin** behavior.
    - **4c. Request unpublish title:** **Request** flow — ask the **publisher** to **unpublish** a title from the group (notification + deep link to unpublish) for **wrong fit** without ejecting the member. Complements **show who published** (when implemented).
@@ -282,7 +287,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 ### Product — discovery & polish
 
 5. **Phase D — `profiles.handle`:** search/invite by handle — **blocked on schema**.
-6. **Edit circle:** name / description / (maybe) vibe from Circle info; **archived read-only**; reuse **`validateCircleName`** / limits in **`src/circles.js`**.
+6. **Edit circle** — **shipped 5.6.52:** name / description / vibe; **active** + **creator** only; **`updateCircle`**. *Polish (optional):* **archived** read-only is already the case (list only **active**); no extra work unless showing archived later.
 7. **Phase E polish:** animations, cover upload, **`icon_emoji`**, per-circle color, **archived** section.
 
 ### Watchlist, invites, ratings
@@ -332,10 +337,12 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Last session (2026-04-22) — for the next chat**
 
-- **5.6.50 — shipped:** Circles **Forward** (add-only, destination-only) + **DB** strip **`greatest(rated_at, share.created_at)`**; see **CHANGELOG**. **5.6.49 — shipped to `main` (pushed):** **Circles** — shared **SVG** stars for **circle (orange)** and **Cinemastro (gold)** with **fixed 16px / 13px** sizing; **CHANGELOG** + **`package.json`**; **match** and other Edge **index.ts** files aligned with **JSON `edge`** metadata; handoff / **`cinematch-handoff.mdc`** context. **Build fix:** CSS `styles` block — no **backticks** inside comments that would **terminate** the template literal. **Product discussion (earlier 2026-04-22 thread):** **rating color meanings**, **strip vs detail** prediction, **deferred** scroll-stop; **stale** strip after **someone else unpublishes** — accepted for beta. **Moderation (discussion → backlog, not implemented):** **§ Master backlog 4 (4a–4d)** — **creator** + **auto 2nd/3rd joiner** as admins / succession; **remove member**; **request to unpublish**; **creator leave** → **transfer** if **>1** member, **disintegrate** at **0–1** members when the **last** person leaves or deletes. **WhatsApp** comparison: admins remove members, creator often protected; Cinematch needs **title-level** request too. **Revisit** strip prefetch / **1b** after beta (see **§ Circles — ratings & strip predictions**).
-- **5.6.38 — Edge function deploy lineage (still the rule):** each function **`EDGE_FUNCTION_VERSION`** + **`edge: { name, version }`** — **bump + redeploy** on change.
-- **Prod migrations (unchanged):** **`20260527120000_circle_member_last_seen.sql`** et al. per checklist if any env lags.
-- **Next work:** **beta** rollout and observation; then **native** / **Realtime** / backlog or **scroll-stop** strip prefetch if product wants.
+- **5.6.52 — shipped to `main` (commit e.g. `7ae12ad`):** **Creator** can **edit** circle **name**, **description**, and **vibe** — **Circles** list **Edit** pill + **Circle info** “Edit name & description” (bottom sheet). **`updateCircle`** in **`src/circles.js`**; in-memory updates to **`circlesList`** and **`circleDetailData`**. **No** new Supabase migration (RLS **creator can update**).
+- **5.6.51 — shipped** (prior): **`creator_leave_circle`** — creator leave with **≥2** members **transfers** **`creator_id`**; **solo** → archive. **Prod:** run **`20260529120000_creator_leave_transfer_ownership.sql`** if not applied.
+- **5.6.50 — shipped (prior):** **Forward** add-only, strip **`greatest(rated_at, share.created_at)`**; migration **`20260528120000…`** on prod.
+- **Passdown** updated this thread for the **next** assistant (versions, **§ Tell the next chat**, **changelog** trail, backlog **item 6** edit circle = shipped).
+- **Open:** **§ Master backlog 4a–4c, 4e** (moderation, request unpublish, solo-after-exodus **~7d** grace). **4d** **partial** (transfer **done**; last-member **delete** / disintegrate **TBD**). **Deferred product:** **scroll-stop `predict_cached`**; **stale** strip when others **unpublish** — accepted for beta. **5.6.38** Edge **bump + redeploy** rule unchanged.
+- **Next work:** same as **§ Master backlog** + beta feedback; **native** / **Realtime** when prioritized.
 
 **Shipped 2026-04-22**
 
@@ -358,12 +365,12 @@ Apply any that are missing on prod (user often uses SQL editor):
 3. **Invites at max circles:** today **`auto_declined`**; recipient **never sees** invite; creator gets auto-decline. *Idea:* **muted** row for recipient (“at cap”) + **open/pending** for creator until resolved.
 4. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if watchlist RLS is enabled and reorder must work.
 5. **Docs:** keep **`package.json` / `CHANGELOG` / this file** in sync; **`HANDOFF.md`** roadmap **version** line lags if not refreshed — trust **`package.json`**.
-6. **Creator leave / moderation stack:** *Full spec:* **§ Master backlog** item **4 (4a–4d)** — auto-admins (2nd/3rd joiner), **remove member**, **request unpublish**, **survival** vs **disintegrate** when the last members leave. *Current (5.6.x):* creator leave is still **archive-then-leave**; no admin removal or request-unpublish in app.
+6. **Creator leave / moderation stack:** *Full spec:* **§ Master backlog** item **4 (4a–4e)**. **5.6.51:** creator leave **transfers** when others remain; **solo** still archives. *Still not in app:* **remove member** (4b), **request unpublish** (4c), **4e** grace clock, last-member **delete group** (4d).
 
 **Roadmap (see also `HANDOFF.md`)**
 
 - **Phase D — `profiles.handle`:** search/invite by handle (blocked on schema).
-- **Edit circle** name/description/(maybe vibe) from Circle info; archived read-only.
+- **Edit circle** — **shipped** (5.6.52); list + info; name / description / vibe.
 - **Phase E polish:** animations, cover, `icon_emoji`, per-circle color, archived section.
 - **Watchlist on Circles** landing; **`source_circle_id`** / circle name on list rows; **invites to non-user emails**; **in-circle quick rate**; **Bayesian** ratings; **`ACCOUNT-SECURITY.md`** (OAuth, CAPTCHA, optional phone); **split `App.jsx`**.
 
