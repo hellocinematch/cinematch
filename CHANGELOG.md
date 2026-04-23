@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.6.50
+
+- **Circles — Forward:** Uses a dedicated **Forward to circles** step: only **other** groups (not the circle you’re in) with **add-only** saves — the source circle is never un-published. (Detail still uses **Circles for this title** for full add/remove.) **DB:** `get_circle_rated_strip` now orders Recent by `max(greatest(ratings.rated_at, rating_circle_shares.created_at))` per title so a forward surfaces as **recent** in destination circles, not only when someone re-rates. Apply migration **`20260528120000_circle_strip_share_activity_order.sql`**.
+
 ## 5.6.49
 
 - **Circles — rating stars (strip + list):** **Circle (orange) and Cinemastro (gold) now use the same SVG** with **fixed sizes** (strip **16px**, list **13px**) so they always **match each other**. The gold side used to be a ⭐ **emoji** (scales with font/line-height, OS-dependent); the orange side was an SVG sized with **em**, which did not line up. Green “You” / other UI unchanged.

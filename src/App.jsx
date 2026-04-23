@@ -22,6 +22,7 @@ import {
   declineCircleInvite,
   fetchRatingCircleShareIds,
   syncRatingCircleShares,
+  addRatingCircleShares,
   fetchCircleRatedTitles,
   CIRCLE_STRIP_INITIAL,
   CIRCLE_STRIP_PAGE,
@@ -6560,7 +6561,11 @@ export default function App() {
     setPublishModalBusy(true);
     setPublishModalError("");
     try {
-      await syncRatingCircleShares(ctx.movieId, selectedIds);
+      if (ctx.mode === "forward") {
+        await addRatingCircleShares(ctx.movieId, selectedIds);
+      } else {
+        await syncRatingCircleShares(ctx.movieId, selectedIds);
+      }
       const nav = ctx.pendingNavigate;
       setPublishRatingModal(null);
       setPublishModalBusy(false);
@@ -7069,6 +7074,13 @@ export default function App() {
     [circlesList],
   );
 
+  /** For “Forward”: active circles other than the source (current circle) — not toggles for the current group. */
+  const publishModalForwardDestinations = useMemo(() => {
+    const m = publishRatingModal;
+    if (!m || m.mode !== "forward" || !m.forwardFromCircleId) return null;
+    return publishModalCircles.filter((c) => c.id !== m.forwardFromCircleId);
+  }, [publishModalCircles, publishRatingModal]);
+
   function openCreateCircleSheet() {
     if (atCircleCap) return;
     setCreateCircleName("");
@@ -7249,7 +7261,9 @@ export default function App() {
       return;
     }
     let cancelled = false;
-    if (publishRatingModal.mode === "manage") {
+    if (publishRatingModal.mode === "forward") {
+      setPublishModalSelection(new Set());
+    } else if (publishRatingModal.mode === "manage") {
       fetchRatingCircleShareIds(publishRatingModal.movieId)
         .then((ids) => {
           if (!cancelled) setPublishModalSelection(new Set(ids));
@@ -9341,7 +9355,11 @@ export default function App() {
                                 role="menuitem"
                                 onClick={() => {
                                   closeStripMenu();
-                                  setPublishRatingModal({ movieId: movie.id, mode: "manage" });
+                                  setPublishRatingModal({
+                                    movieId: movie.id,
+                                    mode: "forward",
+                                    forwardFromCircleId: selectedCircleId,
+                                  });
                                 }}
                               >
                                 Forward
@@ -10064,7 +10082,11 @@ export default function App() {
           <div className="circles-modal-panel">
             <div className="circles-modal-header">
               <h2 className="circles-modal-title">
-                {publishRatingModal.mode === "manage" ? "Circles for this title" : "Publish to circles"}
+                {publishRatingModal.mode === "forward"
+                  ? "Forward to circles"
+                  : publishRatingModal.mode === "manage"
+                    ? "Circles for this title"
+                    : "Publish to circles"}
               </h2>
               <button
                 type="button"
@@ -10076,15 +10098,22 @@ export default function App() {
               </button>
             </div>
             <p className="circles-modal-sub">
-              {publishRatingModal.mode === "manage"
-                ? "Choose which groups see this title with your score. Your rating stays the same everywhere."
-                : "Pick which groups see this title. You can skip and add circles later from the title detail."}
+              {publishRatingModal.mode === "forward"
+                ? "Add this title to other groups. It stays in the circle you’re in; only new group picks are added."
+                : publishRatingModal.mode === "manage"
+                  ? "Choose which groups see this title with your score. Your rating stays the same everywhere."
+                  : "Pick which groups see this title. You can skip and add circles later from the title detail."}
             </p>
-            {publishModalCircles.length === 0 ? (
+            {publishRatingModal.mode === "forward" && (publishModalForwardDestinations == null || publishModalForwardDestinations.length === 0) ? (
+              <p className="circles-modal-sub">You’re not in any other active circles. Join or create one to forward.</p>
+            ) : publishModalCircles.length === 0 ? (
               <p className="circles-modal-sub">You’re not in any active circles yet.</p>
             ) : (
               <div className="publish-rating-circle-list">
-                {publishModalCircles.map((c) => (
+                {(publishRatingModal.mode === "forward" && publishModalForwardDestinations != null
+                  ? publishModalForwardDestinations
+                  : publishModalCircles
+                ).map((c) => (
                   <label key={c.id} className="publish-rating-circle-row">
                     <input
                       type="checkbox"
@@ -10109,7 +10138,12 @@ export default function App() {
               <button
                 type="button"
                 className="circles-btn-primary"
-                disabled={publishModalBusy || publishModalCircles.length === 0}
+                disabled={
+                  publishModalBusy ||
+                  (publishRatingModal.mode === "forward"
+                    ? false
+                    : publishModalCircles.length === 0)
+                }
                 onClick={() => void completePublishRatingModal([...publishModalSelection])}
               >
                 {publishModalBusy ? "Saving…" : "Done"}

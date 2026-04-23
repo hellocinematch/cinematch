@@ -284,6 +284,38 @@ export async function syncRatingCircleShares(movieId, circleIds) {
   }
 }
 
+/** Add shares only (no deletes). Used for “Forward” from a circle so the source circle is never removed. */
+export async function addRatingCircleShares(movieId, circleIds) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Sign in required.");
+  const { media_type, tmdb_id } = parseMovieIdForShare(movieId);
+  const want = [...new Set((circleIds || []).filter(Boolean))];
+  if (want.length === 0) return;
+
+  const { data: existing, error: selErr } = await supabase
+    .from("rating_circle_shares")
+    .select("circle_id")
+    .eq("user_id", user.id)
+    .eq("tmdb_id", tmdb_id)
+    .eq("media_type", media_type);
+  if (selErr) throw new Error(selErr.message || "Could not load circles.");
+
+  const have = new Set((existing || []).map((r) => r.circle_id));
+  const toAdd = want.filter((id) => !have.has(id));
+  if (toAdd.length === 0) return;
+
+  const rows = toAdd.map((circle_id) => ({
+    user_id: user.id,
+    tmdb_id,
+    media_type,
+    circle_id,
+  }));
+  const { error: insErr } = await supabase.from("rating_circle_shares").insert(rows);
+  if (insErr) throw new Error(insErr.message || "Could not add to circles.");
+}
+
 export function currentUserRole(circle, userId) {
   if (!circle || !userId) return null;
   const row = (circle.members || []).find((m) => m.user_id === userId);
