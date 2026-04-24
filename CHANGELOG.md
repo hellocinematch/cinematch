@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.0.5
+
+- **Streaming page — service filter:** Picking a provider **re-fills** both strips from TMDB **discover** (US, **flatrate**, `with_watch_providers`), up to **20** titles, instead of filtering the all-services pool with per-title `watch/providers`. **All services** = unchanged. **Now** and **Popular** are still the same pool with **newest date first** vs **popularity** client sorts. Titles are revealed in **4, then 9, 14, 19, 20** (short stagger after load) when the final pool is ready; while the first request is in flight, a skeleton shows only until the first items exist. Excludes default **animation** etc. the same as other discover paths. **Your Picks** is unchanged. **`predict_cached`** uses the refilled list when a provider is selected (preserves order).
+
+## 6.0.4
+
+- **Streaming page:** **All services** (default) keeps the same two strips as before. A **service** dropdown (above **Series** / **Movies**) optionally filters both strips to titles that have that provider on **US subscription (flatrate)** in TMDB — loaded asynchronously, shared cache with **Your Picks**. Independent of **profile** streaming provider picks (those still apply only in **Your Picks**).
+
 ## 6.0.3
 
 - **Title detail — facts bar:** The shaded row under the scores (US rating / air date, runtime, etc.) now also shows **original language** (from TMDB detail `original_language`, same display names as the secondary Region strip).

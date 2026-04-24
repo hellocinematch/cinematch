@@ -543,6 +543,8 @@
   .filter-pill { flex-shrink:0; padding:7px 14px; border-radius:20px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; border:1px solid #2a2a2a; background:transparent; color:#888; transition:all 0.2s; white-space:nowrap; }
   .filter-pill.active { background:#e8c96a; color:#0a0a0a; border-color:#e8c96a; font-weight:500; }
   .filter-pill:not(.active):hover { border-color:#555; color:#ccc; }
+  .streaming-page-service-select { flex:1; min-width:0; max-width:100%; padding:7px 12px; border-radius:20px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; border:1px solid #2a2a2a; background:#0a0a0a; color:#e8e8e8; -webkit-appearance:none; appearance:none; }
+  .streaming-page-service-select:focus { outline:none; border-color:#e8c96a; }
   .search-status { padding:8px 24px; font-size:12px; color:#666; overflow-wrap:anywhere; word-break:break-word; }
   .disc-grid { padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
   .disc-card { cursor:pointer; transition:transform 0.2s; min-width:0; }

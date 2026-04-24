@@ -1206,6 +1206,53 @@ async function fetchWatchProviders(tmdbId, type) {
   } catch { return null; }
 }
 
+/** US `flatrate` provider IDs; shares cache map with Your Picks (`worthProviderCacheRef`). */
+async function getOrFetchFlatrateProviderIds(movie, cacheMap) {
+  if (!movie || movie.tmdbId == null) return [];
+  const key = `${movie.type}-${movie.tmdbId}`;
+  if (cacheMap.has(key)) return cacheMap.get(key);
+  const data = await fetchWatchProviders(movie.tmdbId, movie.type);
+  const ids = Array.isArray(data?.flatrate)
+    ? data.flatrate.map((p) => Number(p?.provider_id)).filter((n) => Number.isFinite(n))
+    : [];
+  cacheMap.set(key, ids);
+  return ids;
+}
+
+/** Streaming page — refill strips via discover (not profile); cap 20; US flatrate. */
+const STREAMING_PAGE_PROVIDER_REFILL_CAP = 20;
+
+/**
+ * Paged US discover with a single watch provider; `onProgress` receives cumulative rows (pre-cap).
+ * Sort is newest air/release first; client applies strip orders.
+ */
+async function fetchStreamingPageProviderRefillPool(mediaType, providerId, onProgress) {
+  const type = mediaType === "movie" ? "movie" : "tv";
+  const sortBy =
+    mediaType === "movie" ? "primary_release_date.desc" : "first_air_date.desc";
+  const all = [];
+  const seen = new Set();
+  let page = 1;
+  const maxPage = 5;
+  while (all.length < STREAMING_PAGE_PROVIDER_REFILL_CAP && page <= maxPage) {
+    const path = `/discover/${type}?language=en-US&sort_by=${sortBy}&page=${page}&watch_region=US&with_watch_providers=${providerId}&with_watch_monetization_types=flatrate`;
+    const data = await fetchTMDB(path);
+    if (isTmdbApiErrorPayload(data)) break;
+    const results = data?.results || [];
+    for (const item of results) {
+      if (all.length >= STREAMING_PAGE_PROVIDER_REFILL_CAP) break;
+      if (seen.has(item.id)) continue;
+      if (hasExcludedGenre(item)) continue;
+      seen.add(item.id);
+      all.push(normalizeTMDBItem(item, type));
+    }
+    onProgress([...all]);
+    if (results.length < 1) break;
+    page += 1;
+  }
+  return all.slice(0, STREAMING_PAGE_PROVIDER_REFILL_CAP);
+}
+
 // ---------------------------------------------------------------------------
 // Cinema preference options
 // ---------------------------------------------------------------------------
@@ -2364,6 +2411,13 @@ export default function App() {
   /** Same US theatrical pool as {@link inTheaters}, sorted by TMDB popularity (In Theaters page second strip). */
   const [inTheatersPopularRanked, setInTheatersPopularRanked] = useState([]);
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
+  /** Streaming page only — optional one service; refill via discover (not profile). */
+  const [streamingPageProviderId, setStreamingPageProviderId] = useState(null);
+  const [streamingPageRefillLoading, setStreamingPageRefillLoading] = useState(false);
+  const [streamingPageRefillMovies, setStreamingPageRefillMovies] = useState([]);
+  const [streamingPageRefillTv, setStreamingPageRefillTv] = useState([]);
+  /** How many refill rows to show in strips (4 → 9 → 14 → 19 → 20 as loads settle). */
+  const [streamingPageRefillDisplayLen, setStreamingPageRefillDisplayLen] = useState(0);
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   // v5.0.0: Circles page state (Phase A — no Edge functions, direct supabase client calls).
@@ -2491,6 +2545,8 @@ export default function App() {
   const computeNeighborsInFlightRef = useRef(false);
   const attemptedRatedHydrationRef = useRef(new Set());
   const worthProviderCacheRef = useRef(new Map());
+  /** Deduplicate streaming page refill reveal animation when pool signature repeats. */
+  const streamingRefillRevealSigRef = useRef("");
   const tvStripMetaCacheRef = useRef(new Map());
   const [tvStripMetaByTmdbId, setTvStripMetaByTmdbId] = useState({});
   useEffect(() => {
@@ -2835,7 +2891,7 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user, showRegionKeys]);
 
-  /** Streaming page: US subscription-style pools (phase 1 = movies, phase 2 = TV + details). Not tied to profile provider picks (see More). */
+  /** Streaming page: US subscription-style pools (phase 1 = movies, phase 2 = TV + details). Optional on-page service filter; profile provider picks (Your Picks) stay separate. */
   useEffect(() => {
     if (!user || screen !== "streaming-page") return;
     let cancelled = false;
@@ -3035,6 +3091,118 @@ export default function App() {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingTV;
     return streamingTV.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
   }, [streamingTV, user, showGenreIds, showRegionKeys]);
+
+  const streamingPageRefillMoviesFiltered = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillMovies;
+    return streamingPageRefillMovies.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingPageRefillMovies, user, showGenreIds, showRegionKeys]);
+  const streamingPageRefillTvFiltered = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillTv;
+    return streamingPageRefillTv.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingPageRefillTv, user, showGenreIds, showRegionKeys]);
+
+  const streamingMoviesForPageStrips = useMemo(() => {
+    if (streamingPageProviderId == null) return streamingMoviesForRecs;
+    return streamingPageRefillMoviesFiltered.slice(
+      0,
+      Math.min(streamingPageRefillDisplayLen, STREAMING_PAGE_PROVIDER_REFILL_CAP),
+    );
+  }, [
+    streamingPageProviderId,
+    streamingMoviesForRecs,
+    streamingPageRefillMoviesFiltered,
+    streamingPageRefillDisplayLen,
+  ]);
+  const streamingTVForPageStrips = useMemo(() => {
+    if (streamingPageProviderId == null) return streamingTVForRecs;
+    return streamingPageRefillTvFiltered.slice(
+      0,
+      Math.min(streamingPageRefillDisplayLen, STREAMING_PAGE_PROVIDER_REFILL_CAP),
+    );
+  }, [streamingPageProviderId, streamingTVForRecs, streamingPageRefillTvFiltered, streamingPageRefillDisplayLen]);
+
+  const streamingMoviesForPredict = useMemo(() => {
+    if (streamingPageProviderId == null) return streamingMoviesForRecs;
+    return streamingPageRefillMoviesFiltered;
+  }, [streamingPageProviderId, streamingMoviesForRecs, streamingPageRefillMoviesFiltered]);
+  const streamingTVForPredict = useMemo(() => {
+    if (streamingPageProviderId == null) return streamingTVForRecs;
+    return streamingPageRefillTvFiltered;
+  }, [streamingPageProviderId, streamingTVForRecs, streamingPageRefillTvFiltered]);
+
+  useEffect(() => {
+    if (screen !== "streaming-page" || streamingPageProviderId == null) {
+      setStreamingPageRefillLoading(false);
+      setStreamingPageRefillMovies([]);
+      setStreamingPageRefillTv([]);
+      setStreamingPageRefillDisplayLen(0);
+      streamingRefillRevealSigRef.current = "";
+      return;
+    }
+    const media = streamingTab === "movie" ? "movie" : "tv";
+    let cancelled = false;
+    streamingRefillRevealSigRef.current = "";
+    setStreamingPageRefillLoading(true);
+    setStreamingPageRefillDisplayLen(0);
+    if (media === "movie") setStreamingPageRefillMovies([]);
+    else setStreamingPageRefillTv([]);
+
+    (async () => {
+      const pool = await fetchStreamingPageProviderRefillPool(
+        media,
+        streamingPageProviderId,
+        (partial) => {
+          if (cancelled) return;
+          const next = partial.slice(0, STREAMING_PAGE_PROVIDER_REFILL_CAP);
+          if (media === "movie") setStreamingPageRefillMovies(next);
+          else setStreamingPageRefillTv(next);
+        },
+      );
+      if (cancelled) return;
+      if (media === "movie") setStreamingPageRefillMovies(pool);
+      else setStreamingPageRefillTv(pool);
+      setStreamingPageRefillLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, streamingPageProviderId, streamingTab]);
+
+  useEffect(() => {
+    if (streamingPageProviderId == null) return;
+    const poolF =
+      streamingTab === "movie" ? streamingPageRefillMoviesFiltered : streamingPageRefillTvFiltered;
+    const n = poolF.length;
+    if (n === 0) {
+      setStreamingPageRefillDisplayLen(0);
+      return;
+    }
+    if (streamingPageRefillLoading) {
+      setStreamingPageRefillDisplayLen((p) => Math.max(p, Math.min(4, n)));
+      return;
+    }
+    const sig = `${streamingPageProviderId}-${streamingTab}-${n}`;
+    if (streamingRefillRevealSigRef.current === sig) return;
+    streamingRefillRevealSigRef.current = sig;
+    const steps = [4, 9, 14, 19, 20].map((s) => Math.min(s, n));
+    const uniq = [...new Set(steps)].sort((a, b) => a - b);
+    const timers = [];
+    let delay = 0;
+    uniq.forEach((step, i) => {
+      delay += i === 0 ? 0 : 120;
+      timers.push(setTimeout(() => setStreamingPageRefillDisplayLen(step), delay));
+    });
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [
+    streamingPageProviderId,
+    streamingTab,
+    streamingPageRefillLoading,
+    streamingPageRefillMoviesFiltered,
+    streamingPageRefillTvFiltered,
+  ]);
 
   const whatsHotForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return whatsHot;
@@ -3413,8 +3581,8 @@ export default function App() {
           await predictStripThenMerge(pulsePopularForRecs, "pulsePopularRecs", true);
         }
         if (screen === "streaming-page") {
-          await predictStripThenMerge(streamingMoviesForRecs, "streamingMovieRecs");
-          await predictStripThenMerge(streamingTVForRecs, "streamingTvRecs");
+          await predictStripThenMerge(streamingMoviesForPredict, "streamingMovieRecs", true);
+          await predictStripThenMerge(streamingTVForPredict, "streamingTvRecs", true);
         }
       } catch (e) {
         if (!cancelled) console.error(e);
@@ -3431,8 +3599,8 @@ export default function App() {
     inTheatersPagePopularForRecs,
     pulseTrendingForRecs,
     pulsePopularForRecs,
-    streamingMoviesForRecs,
-    streamingTVForRecs,
+    streamingMoviesForPredict,
+    streamingTVForPredict,
     secondaryStripCatalogRows,
     screen,
   ]);
@@ -4124,29 +4292,39 @@ export default function App() {
   const streamingMoviesNowResolved = useMemo(() => {
     const fromMatch = matchData?.streamingMovieRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
-    return sortStreamingByReleaseDateDesc(streamingMoviesForRecs).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
-  }, [matchData?.streamingMovieRecs, streamingMoviesForRecs]);
+    return sortStreamingByReleaseDateDesc(streamingMoviesForPageStrips).map(
+      (m) => byId?.[m.id] ?? tmdbOnlyRec(m),
+    );
+  }, [matchData?.streamingMovieRecs, streamingMoviesForPageStrips]);
 
   const streamingMoviesPopularResolved = useMemo(() => {
     const fromMatch = matchData?.streamingMovieRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
-    return sortStreamingByPopularityDesc(streamingMoviesForRecs).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
-  }, [matchData?.streamingMovieRecs, streamingMoviesForRecs]);
+    return sortStreamingByPopularityDesc(streamingMoviesForPageStrips).map(
+      (m) => byId?.[m.id] ?? tmdbOnlyRec(m),
+    );
+  }, [matchData?.streamingMovieRecs, streamingMoviesForPageStrips]);
 
   const streamingTvNowResolved = useMemo(() => {
     const fromMatch = matchData?.streamingTvRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
-    return sortStreamingByReleaseDateDesc(streamingTVForRecs).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
-  }, [matchData?.streamingTvRecs, streamingTVForRecs]);
+    return sortStreamingByReleaseDateDesc(streamingTVForPageStrips).map(
+      (m) => byId?.[m.id] ?? tmdbOnlyRec(m),
+    );
+  }, [matchData?.streamingTvRecs, streamingTVForPageStrips]);
 
   const streamingTvPopularResolved = useMemo(() => {
     const fromMatch = matchData?.streamingTvRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
-    return sortStreamingByPopularityDesc(streamingTVForRecs).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
-  }, [matchData?.streamingTvRecs, streamingTVForRecs]);
+    return sortStreamingByPopularityDesc(streamingTVForPageStrips).map(
+      (m) => byId?.[m.id] ?? tmdbOnlyRec(m),
+    );
+  }, [matchData?.streamingTvRecs, streamingTVForPageStrips]);
 
   const streamingNowRecs = streamingTab === "movie" ? streamingMoviesNowResolved : streamingTvNowResolved;
   const streamingPopularRecs = streamingTab === "movie" ? streamingMoviesPopularResolved : streamingTvPopularResolved;
+  const streamingDisplayNowRecs = streamingNowRecs;
+  const streamingDisplayPopularRecs = streamingPopularRecs;
 
   /**
    * Movies fetch completes before TV; default streaming tab is Series. Users who switch to Movies often
@@ -4157,6 +4335,18 @@ export default function App() {
     streamingTab === "movie" &&
     (!streamingMoviesReady ||
       (matchLoading && streamingMovieRecsResolved.length === 0));
+
+  const showStreamingRefillEmptySkeleton = Boolean(
+    streamingPageProviderId != null &&
+      streamingPageRefillLoading &&
+      (streamingTab === "movie"
+        ? streamingPageRefillMoviesFiltered.length === 0
+        : streamingPageRefillTvFiltered.length === 0),
+  );
+  const showStreamingStripsSkeleton =
+    showStreamingMovieSkeleton ||
+    (streamingTab === "tv" && !streamingTvReady) ||
+    showStreamingRefillEmptySkeleton;
 
   /** `homePicksLoadFailed` removed in v4.0.8 — the Home screen retired and every remaining primary
    *  page owns its own empty/error state. */
@@ -8750,8 +8940,30 @@ export default function App() {
 
       {screen === "streaming-page" && (
         <div className="home">
-          <PageShell title="Streaming" subtitle="New & popular on major services — scored for your taste (not filtered by your app list)">
+          <PageShell
+            title="Streaming"
+            subtitle="New & popular — optional service filter (profile picks apply only in Your Picks). Scored for your taste."
+          >
             <div className="section" style={{ paddingTop: 0 }}>
+              <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
+                <select
+                  id="streaming-page-service"
+                  className="streaming-page-service-select"
+                  aria-label="Filter by streaming service"
+                  value={streamingPageProviderId == null ? "" : String(streamingPageProviderId)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setStreamingPageProviderId(v === "" ? null : Number(v));
+                  }}
+                >
+                  <option value="">All services</option>
+                  {STREAMING_SERVICES.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
                 <button type="button" className={`filter-pill ${streamingTab === "tv" ? "active" : ""}`} onClick={() => setStreamingTab("tv")}>
                   Series
@@ -8764,17 +8976,19 @@ export default function App() {
                 <div className="section-title">Now Streaming</div>
                 <div className="section-meta">Newest {streamingTab === "movie" ? "releases" : "series & seasons"}</div>
               </div>
-              {showStreamingMovieSkeleton ? (
+              {showStreamingStripsSkeleton ? (
                 <SkeletonStrip />
-              ) : streamingTab === "tv" && !streamingTvReady ? (
-                <SkeletonStrip />
-              ) : streamingNowRecs.length === 0 ? (
+              ) : streamingDisplayNowRecs.length === 0 ? (
                 <div className="empty-box">
-                  <div className="empty-text">No streaming {streamingTab === "movie" ? "movies" : "series"} right now</div>
+                  <div className="empty-text">
+                    {streamingPageProviderId != null
+                      ? `No ${streamingTab === "movie" ? "movies" : "series"} in this discover view for that service (US, subscription) — try All services or another.`
+                      : `No streaming ${streamingTab === "movie" ? "movies" : "series"} right now`}
+                  </div>
                 </div>
               ) : (
                 <div className="strip">
-                  {streamingNowRecs.map((rec) => (
+                  {streamingDisplayNowRecs.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
                         {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
@@ -8792,17 +9006,19 @@ export default function App() {
                 <div className="section-title">What&apos;s popular in streaming</div>
                 <div className="section-meta">Same pool, TMDB popularity order</div>
               </div>
-              {showStreamingMovieSkeleton ? (
+              {showStreamingStripsSkeleton ? (
                 <SkeletonStrip />
-              ) : streamingTab === "tv" && !streamingTvReady ? (
-                <SkeletonStrip />
-              ) : streamingPopularRecs.length === 0 ? (
+              ) : streamingDisplayPopularRecs.length === 0 ? (
                 <div className="empty-box">
-                  <div className="empty-text">No streaming {streamingTab === "movie" ? "movies" : "series"} right now</div>
+                  <div className="empty-text">
+                    {streamingPageProviderId != null
+                      ? `No ${streamingTab === "movie" ? "movies" : "series"} in this discover view for that service (US, subscription) — try All services or another.`
+                      : `No streaming ${streamingTab === "movie" ? "movies" : "series"} right now`}
+                  </div>
                 </div>
               ) : (
                 <div className="strip">
-                  {streamingPopularRecs.map((rec) => (
+                  {streamingDisplayPopularRecs.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
                         {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
@@ -8816,7 +9032,7 @@ export default function App() {
               )}
             </div>
             {Object.keys(userRatings).length === 0 &&
-              streamingNowRecs.length + streamingPopularRecs.length > 0 && (
+              streamingDisplayNowRecs.length + streamingDisplayPopularRecs.length > 0 && (
                 <div className="section">
                   <div className="no-recs" style={{ marginTop: 0, border: "none", padding: "0 0 8px" }}>
                     <div className="no-recs-text" style={{ fontSize: 12 }}>Rate a few titles for tighter predictions</div>
