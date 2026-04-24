@@ -1,5 +1,25 @@
 # Changelog
 
+## 6.0.10
+
+- **Secondary Region / Streaming (service):** `secondaryRegionRefill*` no longer runs **`showRegionKeys`** (global “Regions to show”) on discover refill rows. That filter is for the home catalogue; combined with the Indian/Asian/… **language** query it could empty lists for every provider (e.g. Prime, Hulu) while another looked fine. **Genres to show** still apply. The **All services** path is unchanged; that pool was not using this post-filter. **Not** a TMDB date cut — service discover has no 90-day window.
+
+## 6.0.9
+
+- **Secondary Region screen — US availability:** Theatrical, default streaming pools, and **service** discover refill now use **`region` / `watch_region` = US** (`SECONDARY_AVAILABILITY_TMDB_REGION`) so titles are ones you can watch **in the United States**, while **`secondary_region_key`** only drives **taste** via **`getRegionLanguageCodes`** (and the same filters as before). Removes the old **`secondaryMarketTmdbRegion`** mapping (IN/KR/MX/GB). **Streaming** service IDs in the dropdown match **US** TMDB providers (e.g. Prime **9**). Copy updated (subtitle, empty states, section meta).
+
+## 6.0.8
+
+- **Secondary Region (Streaming) — service discover refill:** Applies the same **`with_original_language`** filter as the non-refill regional streaming pools (via **`getRegionLanguageCodes(secondary_region_key)`**), so provider-filtered discover stays **region-native titles** (e.g. Indian languages for the Indian bucket) instead of mostly English “available in that `watch_region`” catalog. Main **Streaming** page (US) unchanged.
+
+## 6.0.7
+
+- **Secondary Region (Streaming):** Same **service** pill row as the **Streaming** page (All services, chevron, gold active state, vertical rule before **Series** / **Movies**). Picking a provider **re-fills** the strip from TMDB **discover** for that market’s **watch region** (same mapping as the existing regional pool: e.g. **IN** / **KR** / **MX** / **GB**), **flatrate**, cap **20**, **staggered** reveal, genre filters, and **`predict_cached`** on the refilled list; **All services** = previous regional streaming behavior.
+
+## 6.0.6
+
+- **Streaming page — service pill:** The service control sits in one row with **Series** / **Movies** (divider only before those pills), **chevron** on the right, and the pill uses the same **gold active** style as the media pills when a specific provider is selected (not **All services**).
+
 ## 6.0.5
 
 - **Streaming page — service filter:** Picking a provider **re-fills** both strips from TMDB **discover** (US, **flatrate**, `with_watch_providers`), up to **20** titles, instead of filtering the all-services pool with per-title `watch/providers`. **All services** = unchanged. **Now** and **Popular** are still the same pool with **newest date first** vs **popularity** client sorts. Titles are revealed in **4, then 9, 14, 19, 20** (short stagger after load) when the final pool is ready; while the first request is in flight, a skeleton shows only until the first items exist. Excludes default **animation** etc. the same as other discover paths. **Your Picks** is unchanged. **`predict_cached`** uses the refilled list when a provider is selected (preserves order).

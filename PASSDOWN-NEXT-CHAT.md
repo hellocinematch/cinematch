@@ -1,13 +1,13 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-23 — **`main` at 6.0.1** (see `package.json` / **CHANGELOG**). **6.0.1** — secondary **Region** strip: fast **`secondary_region_key`** read + **try/catch/finally** on TMDB fetch (reliability). **6.0.0** — global styles in **`src/App.css`**. **Recent Circles:** **5.6.50** **Forward** (add-only) + **strip** `last_at` = **`greatest(rated_at, share.created_at)`** (migration `20260528120000…`); **5.6.51** **creator leave** = **transfer** to earliest other member via RPC **`creator_leave_circle`** (migration `20260529120000…`); **5.6.52** **creator** can **edit** name / description / **vibe** (list **Edit** + **Circle info**, **`updateCircle`** in `circles.js`, **no** new SQL). **To do (moderation):** **§ Master backlog 4a–4c, 4e**; **4d** open: last-member **disintegrate** / **delete group**. **Deferred:** scroll-stop **`predict_cached`**. See **§ Last session** below.
+**Last updated:** 2026-04-24 — **`main` at 6.0.10** (see `package.json` / **CHANGELOG**). **6.0.10** — Secondary **Streaming** service refill: **no** global **`showRegionKeys`** on refill rows (genre filter only); **6.0.9** — **US** secondary availability + taste. **6.0.7** — **Secondary Region** → **Streaming**: service pill + **discover** refill (`watch_region` = market). **6.0.6** — **Streaming** service control: one **row** with **Series** / **Movies**; **divider**; **chevron**; **gold** when a provider is selected. **6.0.2–6.0.3** — **original language** (TMDB) on **secondary Region** strip + **title detail** facts bar (`formatOriginalLanguageDisplay`, `detailMeta.languageLabel` from detail fetch). **6.0.4–6.0.5** — **Streaming** page: **All services** = legacy pools; **service `<select>`** (`.streaming-page-service-select` in **`App.css`**) = **independent of profile** `streaming_provider_ids` (**Your Picks** still uses profile). **6.0.5** — choosing a service **re-fills** from TMDB **discover** (`with_watch_providers`, `watch_region=US`, `with_watch_monetization_types=flatrate`), cap **20**, `hasExcludedGenre` on results; **staggered** reveal 4→9→14→19→20; `predict_cached` uses refilled list when filtered (`streamingMoviesForPredict` / `streamingTVForPredict`, preserve order). **6.0.1** — secondary **Region** strip load reliability. **6.0.0** — **`src/App.css`**. **Recent Circles (unchanged):** **5.6.50–5.6.52** (Forward, creator leave, edit circle). **To do (moderation):** **§ Master backlog 4a–4c, 4e**; **4d** last-member **disintegrate** TBD. **Deferred:** scroll-stop **`predict_cached`**. See **§ Last session** below.
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 6.0.1** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
-> **Context:** **6.0.0** — global CSS in **`src/App.css`**. **6.0.1** — secondary **Region** page: reliable TMDB load (fast **`secondary_region_key`** + **try/catch/finally** on fetch). **Circles** use **`rating_circle_shares`**. **Caps (prod):** **10** / **25** (client + invite Edge). **Watchlist** max **30**, **`sort_index`**, RLS **UPDATE** migration on prod if needed. **5.6.33+ — activity:** **`circle_member_last_seen`** + RPCs. **5.6.38+ — Edge:** **`EDGE_FUNCTION_VERSION`** + **`edge.version`**; bump + redeploy on change. **5.6.50–5.6.52 — Circles:** **Forward**; strip **`last_at`** with shares; **creator leave** RPC; **edit circle**. **5.6.49** — shared **SVG** stars. **Strip vs detail** predictions: **`user_title_predictions`**; scroll-stop **deferred**. **`fetchMyCircles`** includes **`joined_at`**. **Prod SQL:** manual runs do **not** appear in **`supabase_migrations.schema_migrations`** — verify with **`pg_get_functiondef`** / **`pg_proc`** (see passdown / session note). **Deploy:** **Vercel** on push; **migrations** not auto. **Cron:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Next:** **§ Master backlog**; optional **secondary region** strip: show **language** from TMDB **`original_language`** (`movie.language`) for Indian (discussed, not implemented). **Beta** feedback.
+> Cinematch is on **`main` at 6.0.10** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
+> **Context:** **6.0.6–6.0.7** — **Streaming** page: service **pill** + **divider** + **Series**/**Movies**; **6.0.5** = **US** discover refill, cap 20. **6.0.7–6.0.8** — **Secondary Region** / **Streaming**: same + **`with_original_language`**. **6.0.9** — secondary **US** only (**`SECONDARY_AVAILABILITY_TMDB_REGION`**), taste = **`getRegionLanguageCodes`**; removed **IN/KR/…** map. **6.0.10** — secondary **service** refill: **genres** filter only, **not** global **`showRegionKeys`** (fixed empty Prime/Hulu). **6.0.2–6.0.3** — original **language** on Region strip + detail. **Your Picks** = profile `streaming_provider_ids` only. **6.0.0** — **`App.css`**. **Circles** / **caps** / **Edge** / **migrations** / **Vercel** / **cron** — see full passdown. **Next:** **§ Master backlog**; **beta** feedback.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,8 +17,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **6.0.1** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`**. **6.0.0+** — global CSS **`src/App.css`**. **6.0.1** — secondary region strip load fixes. |
-| **Git** | **`main`** — **6.0.1** = secondary region reliability; **6.0.0** = **App.css** split; **5.6.52** = **Edit circle**; **5.6.51** = **`creator_leave_circle`**; **5.6.50** = **Forward** + strip order; **5.6.38** = Edge **`edge.version`**; **5.6.33+** = Circles activity. |
+| **App version** | **6.0.10** (`package.json` / `CHANGELOG.md`); Profile shows **Cinemastro v…** via **`APP_VERSION`**. **6.0.10** — secondary service refill + **genres** only (no global **`showRegionKeys`** on those rows). **6.0.0** — global CSS **`src/App.css`**. **6.0.1** — secondary Region strip reliability. **6.0.2–6.0.3** — original **language** (Region strip + detail). **6.0.4–6.0.5** — Streaming: **service** + **6.0.5** **discover** refill. |
+| **Git** | **`main`** = **6.0.10** (pushed to **`origin`**); same release bundles Streaming + secondary Region work above. **5.6.52** edit circle; **5.6.51** **`creator_leave_circle`**; **5.6.50** Forward + strip order. |
 | **Supabase — apply if not already** | **`20260529120000_creator_leave_transfer_ownership.sql`** — **creator** leave **transfers** `creator_id` when **≥2** members. Plus prior: **`20260528120000_circle_strip_share_activity_order.sql`**, **`20260527120000_circle_member_last_seen.sql`**, **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`**. |
 | **Edge** | Each of **`get-circle-rated-titles`**, **`send-circle-invite`**, **`accept-circle-invite`**, **`compute-neighbors`**, **`match`**: `index.ts` has **`EDGE_FUNCTION_VERSION`**; JSON bodies include **`edge: { name, version }`**. On any code change: **bump** that constant (semver) in the **same** commit, **redeploy** that function, confirm **`edge.version`** in a test response. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
@@ -94,6 +94,8 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
+- **6.0.9** — **Secondary Region:** **`SECONDARY_AVAILABILITY_TMDB_REGION` = US** for theaters, streaming, service discover; **`secondary_region_key`** → language only; removed **`secondaryMarketTmdbRegion`**. **6.0.8** — secondary refill **`with_original_language`**. **6.0.7** — secondary service UI + discover. **6.0.6** — **Streaming** pill row. **6.0.5** — **US** **discover**, **`predict_cached`**. **6.0.4** — service `<select>`.  
+- **6.0.3** — **Title detail:** **Original language** in **facts** bar (from TMDB detail `original_language` via `detailMeta.languageLabel`). **6.0.2** — **Region (secondary) strip:** **Language** in strip meta (`formatSecondaryRegionStripMeta` / `formatOriginalLanguageDisplay`).  
 - **6.0.1** — **Region (secondary) strip:** Fast **`secondary_region_key`** from Supabase after bootstrap; **try/catch/finally** for TMDB **Promise.all** so the strip is not left loading or empty until refresh.  
 - **6.0.0** — **Refactor:** global stylesheet in **`src/App.css`** (imported from **`App.jsx`**); no intended UI or product change. **Major** = structural milestone.  
 - **5.6.52** — **Circles — edit info:** **Creator** updates **name**, **description**, **vibe** for **active** circles; **Edit** on **Circles list** + **“Edit name & description”** in **Circle info**; **`updateCircle`** in **`src/circles.js`**. **No** migration.  
@@ -141,7 +143,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Recent work (client — `src/App.jsx`)
 
-**Primary file:** `src/App.jsx` + global **`src/App.css`** (nav, detail, circles, bottom nav, watchlist list CSS, etc.). **6.0.1** — secondary **Region** screen (`screen === "secondary-region"`): **reliable** strip data (profile key hydration + error handling on TMDB `Promise.all`). **Optional (not shipped):** show **original language** on that strip for Indian multi-language clarity — data exists as **`movie.language`** from **`normalizeTMDBItem`**.
+**Primary file:** `src/App.jsx` + global **`src/App.css`**. **6.0.1** — secondary **Region** (`screen === "secondary-region"`): reliable strip fetch. **6.0.2** — Region strip: **`formatSecondaryRegionStripMeta`** = **`formatStripMediaMeta`** + **`formatOriginalLanguageDisplay`(`movie.language`)**. **6.0.3** — **Detail:** **`detailMetaFromTmdbDetail`** adds **`languageLabel`**; facts row includes language with cert / date / runtime. **6.0.4–6.0.5** — **`screen === "streaming-page"`:** service **`<select>`** (`STREAMING_SERVICES` ids); **6.0.5** `fetchStreamingPageProviderRefillPool` (default **`watch_region=US`**) + `streamingPageRefill*`; **6.0.6** — single **`filter-row`** + **active** class. **6.0.7–6.0.8** — secondary **Streaming** service UI + **discover** refill. **6.0.9** — secondary **Region** uses **`SECONDARY_AVAILABILITY_TMDB_REGION` (US)** for all **TMDB** `region` / `watch_region` on that page; **taste** = **`getRegionLanguageCodes`**. **All** = unchanged for main **Streaming** page.
 
 ### Bottom navigation & Watchlist
 
@@ -164,7 +166,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ### Title detail (basics)
 
-- Backdrop **`object-position: 30% top`**; mobile **`.d-title`** DM Sans; **`BottomNav`** inside **`.detail`**.
+- Backdrop **`object-position: 30% top`**; mobile **`.d-title`** DM Sans; **`BottomNav`** inside **`.detail`**. **6.0.3+** — **facts** bar: optional **`languageLabel`** (TMDB **`original_language`**) with certification / US release / runtime.
 
 ### PWA (5.6.29)
 
@@ -336,14 +338,16 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Handoff rule:** the **last user note** from the prior session (see **§ For the assistant** item 4) must be reflected here or under **Last session** when you update this file.
 
-**Last session (2026-04-23) — for the next chat**
+**Last session (2026-04-24) — for the next chat**
 
-- **Shipped to `main`:** **6.0.0** — **`App.css`** split from inline **`styles`** in **`App.jsx`**; **`import "./App.css"`**; no intended UI change. **6.0.1** — secondary **Region** strip: dedicated **`secondary_region_key`** read after catalogue bootstrap; **try/catch/finally** on secondary TMDB **`Promise.all`** (fixes empty / stuck loading until hard refresh). **Pushed** to **GitHub** → **Vercel** deploy.
-- **Prod Supabase (session note):** **`supabase_migrations.schema_migrations`** is **empty** for hand-pasted SQL — use **`pg_get_functiondef`**, **`pg_proc`**, or Dashboard to confirm **`get_circle_rated_strip`** / **`creator_leave_circle`** if migrations **`20260528` / `20260529`** were applied manually.
-- **Passdown structure (earlier 2026-04-23):** **§ Master backlog** — moderation **4a–4e** = numbered items **4–8**; list continues **9–33**.
-- **Product (discussion only, not implemented):** On **secondary Region** screen, show **language** (TMDB **`original_language`** → already on rows as **`movie.language`**) on the strip for **Indian** (and similar) — **feasible**; single code per title; use **`formatStripMediaMeta`** or a branch; map ISO → name (**`Intl.DisplayNames`** or static map). Await **code now** / **implement** if user wants it shipped.
-- **Open (unchanged):** **§ Master backlog 4a–4c, 4e**; **4d** last-member **delete group** TBD. **Deferred:** scroll-stop **`predict_cached`**. **Next:** same backlog + **beta** feedback; **native** / **Realtime** when prioritized.
-- **Carry from 2026-04-22 / earlier:** **5.6.52** edit circle, **5.6.51** `creator_leave_circle`, **5.6.50** forward + strip order — all on **`main`**; see **Changelog** / **Snapshot**.
+- **Shipped to `main` and pushed (user request):** **`main` at 6.0.10** (verify: `git log -1` on `main` after pull). **6.0.6–6.0.7** — **Streaming** page: service **pill** row (chevron, gold active), **6.0.5** discover refill. **6.0.7–6.0.8** — **Secondary Region** / **Streaming** same UI + regional then **US**+**`with_original_language`** on refill. **6.0.9** — **`SECONDARY_AVAILABILITY_TMDB_REGION` = `US`** for all secondary TMDB “where to watch / theaters” (taste = **`getRegionLanguageCodes`**; dropped **`secondaryMarketTmdbRegion`**). **6.0.10** — secondary **service** refill: **`passesShowGenresFilter` only** — **not** **`passesProfileFilters`** (fixed **Prime / Hulu** empty when global **Regions to show** conflicted with Indian-language discover). **Files:** `src/App.jsx`, `src/App.css`, **`package.json`**, **`CHANGELOG.md`**, this passdown.
+- **Prior (same period):** **6.0.0** **`App.css`**; **6.0.1** secondary **Region** strip load race + **try/catch/finally** on secondary TMDB batch.
+- **Prod Supabase (stable note):** hand-pasted SQL may not appear in **`supabase_migrations.schema_migrations`** — verify with **`pg_get_functiondef`** / Dashboard for **`get_circle_rated_strip`**, **`creator_leave_circle`**, etc.
+- **Open (unchanged):** **§ Master backlog 4a–4c, 4e**; **4d** last-member **delete / disintegrate** TBD. **Deferred:** scroll-stop **`predict_cached`**. **Next:** **beta** feedback, backlog, **native** / **Realtime** when prioritized.
+
+**Earlier — Last session (2026-04-23)**
+
+- **6.0.0 / 6.0.1** on **`main`**; passdown at that time listed **optional** Region **language** as discussion-only — now **shipped** in **6.0.2–6.0.3**.
 
 **Earlier — Last session (2026-04-22)**
 

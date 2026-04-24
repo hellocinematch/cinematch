@@ -543,8 +543,11 @@
   .filter-pill { flex-shrink:0; padding:7px 14px; border-radius:20px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; border:1px solid #2a2a2a; background:transparent; color:#888; transition:all 0.2s; white-space:nowrap; }
   .filter-pill.active { background:#e8c96a; color:#0a0a0a; border-color:#e8c96a; font-weight:500; }
   .filter-pill:not(.active):hover { border-color:#555; color:#ccc; }
-  .streaming-page-service-select { flex:1; min-width:0; max-width:100%; padding:7px 12px; border-radius:20px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; border:1px solid #2a2a2a; background:#0a0a0a; color:#e8e8e8; -webkit-appearance:none; appearance:none; }
+  .streaming-page-service-select { flex-shrink:0; min-width:0; max-width:min(100%, 220px); padding:7px 28px 7px 14px; border-radius:20px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; border:1px solid #2a2a2a; background-color:#0a0a0a; color:#e8e8e8; -webkit-appearance:none; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; background-size:10px 10px; transition:background-color 0.2s,border-color 0.2s,color 0.2s; }
+  .streaming-page-service-select--active { background-color:#e8c96a; color:#0a0a0a; border-color:#e8c96a; font-weight:500; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%230a0a0a' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); }
   .streaming-page-service-select:focus { outline:none; border-color:#e8c96a; }
+  .streaming-page-service-select--active:focus { border-color:#e8c96a; }
+  .streaming-page-service-pill-divider { flex-shrink:0; align-self:center; width:1px; height:20px; background:#2a2a2a; margin:0 2px 0 0; }
   .search-status { padding:8px 24px; font-size:12px; color:#666; overflow-wrap:anywhere; word-break:break-word; }
   .disc-grid { padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
   .disc-card { cursor:pointer; transition:transform 0.2s; min-width:0; }

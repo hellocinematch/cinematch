@@ -918,6 +918,12 @@ const SECONDARY_STRIP_TAB_CAP = 25;
 /** V1.3.0: Profile keys allowed for {@link profiles.secondary_region_key}; excludes hollywood (primary). */
 const V130_SECONDARY_REGION_IDS = ["indian", "asian", "latam", "european"];
 
+/**
+ * V1.3.0: TMDB `region` / `watch_region` for “where you can watch” on the secondary Region screen (US = primary app market).
+ * Taste (Indian, Asian, etc.) comes from `secondary_region_key` via {@link getRegionLanguageCodes} — not from this ISO code.
+ */
+const SECONDARY_AVAILABILITY_TMDB_REGION = "US";
+
 /** V1.3.0: Home section title — plain region words (friend-testing copy). */
 const V130_SECONDARY_HOME_TITLE = {
   indian: "Indian",
@@ -925,15 +931,6 @@ const V130_SECONDARY_HOME_TITLE = {
   latam: "Latin / Iberian",
   european: "European",
 };
-
-/**
- * V1.3.0: Map profile secondary key → TMDB theatrical / discover `region` (single ISO market anchor per bucket).
- * Asian→KR, Latin→MX, European→GB are pragmatic defaults; refine per market after user research.
- */
-function secondaryMarketTmdbRegion(regionKey) {
-  const map = { indian: "IN", asian: "KR", latam: "MX", european: "GB" };
-  return map[regionKey] || "US";
-}
 
 /** V1.3.2: Dedupe normalized catalogue rows by `id` (secondary block catalogue union). */
 function dedupeMediaRowsById(rows) {
@@ -944,7 +941,7 @@ function dedupeMediaRowsById(rows) {
 const SECONDARY_BLOCK_THEATERS = "theaters";
 const SECONDARY_BLOCK_STREAMING = "streaming";
 
-/** V1.3.0: Now playing for a non-US TMDB region (mirrors primary US theatrical flow; limited window uses that region’s release rows). */
+/** Theatrical `region` = viewer market. Secondary Region uses {@link SECONDARY_AVAILABILITY_TMDB_REGION} + `langCodes` for taste. */
 async function fetchInTheatersForMarket(tmdbRegionIso, langCodes = []) {
   try {
     const TARGET_COUNT = SECONDARY_STRIP_TAB_CAP;
@@ -992,7 +989,7 @@ async function fetchInTheatersForMarket(tmdbRegionIso, langCodes = []) {
   }
 }
 
-/** V1.3.0: Streaming movies discover for secondary TMDB region (same fallbacks as US, different `region=`). */
+/** Streaming movie discover: `tmdbRegionIso` = availability market (US for secondary). `langQuery` = original-language taste. */
 async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery) {
   try {
     const reg = encodeURIComponent(tmdbRegionIso);
@@ -1037,7 +1034,7 @@ async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery) {
   }
 }
 
-/** V1.3.0: Streaming TV for secondary region — regional discover + global trending day (same shape as primary strip). */
+/** Streaming TV discover: `tmdbRegionIso` = availability market (US for secondary) + `langQuery` for taste. */
 async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery) {
   try {
     const reg = encodeURIComponent(tmdbRegionIso);
@@ -1219,23 +1216,33 @@ async function getOrFetchFlatrateProviderIds(movie, cacheMap) {
   return ids;
 }
 
-/** Streaming page — refill strips via discover (not profile); cap 20; US flatrate. */
+/** Streaming / secondary Region (streaming) — refill strips via discover (not profile); cap 20; flatrate in `watch_region`. */
 const STREAMING_PAGE_PROVIDER_REFILL_CAP = 20;
 
 /**
- * Paged US discover with a single watch provider; `onProgress` receives cumulative rows (pre-cap).
+ * Paged discover with a single watch provider; `onProgress` receives cumulative rows (pre-cap).
+ * `watchRegion` = TMDB ISO (e.g. `US`, `IN`) — same as `watch_region` in discover.
+ * `originalLanguageQuery` = optional suffix e.g. `&with_original_language=hi|ta|...` (secondary Region: match {@link fetchStreamingMoviesForMarket}).
  * Sort is newest air/release first; client applies strip orders.
  */
-async function fetchStreamingPageProviderRefillPool(mediaType, providerId, onProgress) {
+async function fetchStreamingPageProviderRefillPool(
+  mediaType,
+  providerId,
+  onProgress,
+  watchRegion = "US",
+  originalLanguageQuery = "",
+) {
   const type = mediaType === "movie" ? "movie" : "tv";
+  const reg = encodeURIComponent(String(watchRegion || "US").toUpperCase());
   const sortBy =
     mediaType === "movie" ? "primary_release_date.desc" : "first_air_date.desc";
+  const langSuffix = typeof originalLanguageQuery === "string" ? originalLanguageQuery : "";
   const all = [];
   const seen = new Set();
   let page = 1;
   const maxPage = 5;
   while (all.length < STREAMING_PAGE_PROVIDER_REFILL_CAP && page <= maxPage) {
-    const path = `/discover/${type}?language=en-US&sort_by=${sortBy}&page=${page}&watch_region=US&with_watch_providers=${providerId}&with_watch_monetization_types=flatrate`;
+    const path = `/discover/${type}?language=en-US&sort_by=${sortBy}&page=${page}&watch_region=${reg}&with_watch_providers=${providerId}&with_watch_monetization_types=flatrate${langSuffix}`;
     const data = await fetchTMDB(path);
     if (isTmdbApiErrorPayload(data)) break;
     const results = data?.results || [];
@@ -2515,6 +2522,12 @@ export default function App() {
   const [secondaryBlockSegment, setSecondaryBlockSegment] = useState(SECONDARY_BLOCK_THEATERS);
   /** V1.3.2: Under Streaming: “Movies” | “Series” (same pattern as primary Streaming strip). */
   const [secondaryBlockStreamingTab, setSecondaryBlockStreamingTab] = useState("tv");
+  /** Secondary Region screen, Streaming only — optional one service; discover refill for that market’s `watch_region` (not profile). */
+  const [secondaryRegionStreamingProviderId, setSecondaryRegionStreamingProviderId] = useState(null);
+  const [secondaryRegionRefillLoading, setSecondaryRegionRefillLoading] = useState(false);
+  const [secondaryRegionRefillMovies, setSecondaryRegionRefillMovies] = useState([]);
+  const [secondaryRegionRefillTv, setSecondaryRegionRefillTv] = useState([]);
+  const [secondaryRegionRefillDisplayLen, setSecondaryRegionRefillDisplayLen] = useState(0);
   const [secondaryStripReady, setSecondaryStripReady] = useState(true);
   /** Public marketing counts (RPC). Undefined until first successful fetch. */
   const [siteStats, setSiteStats] = useState(null);
@@ -2547,6 +2560,7 @@ export default function App() {
   const worthProviderCacheRef = useRef(new Map());
   /** Deduplicate streaming page refill reveal animation when pool signature repeats. */
   const streamingRefillRevealSigRef = useRef("");
+  const secondaryRegionRefillRevealSigRef = useRef("");
   const tvStripMetaCacheRef = useRef(new Map());
   const [tvStripMetaByTmdbId, setTvStripMetaByTmdbId] = useState({});
   useEffect(() => {
@@ -3024,7 +3038,7 @@ export default function App() {
     };
   }, [user?.id, catalogueBootstrapDone]);
 
-  /** V1.3.0: Fetch secondary-market theaters + streaming (parallel); V1.3.2: keep pools separate for tabs. */
+  /** V1.3.0: US availability + secondary bucket languages; V1.3.2: separate pools for tabs. */
   useEffect(() => {
     if (!user || !secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
       setSecondaryTheaterRows([]);
@@ -3032,6 +3046,12 @@ export default function App() {
       setSecondaryStreamingTvRows([]);
       setSecondaryBlockSegment(SECONDARY_BLOCK_THEATERS);
       setSecondaryBlockStreamingTab("tv");
+      setSecondaryRegionStreamingProviderId(null);
+      setSecondaryRegionRefillLoading(false);
+      setSecondaryRegionRefillMovies([]);
+      setSecondaryRegionRefillTv([]);
+      setSecondaryRegionRefillDisplayLen(0);
+      secondaryRegionRefillRevealSigRef.current = "";
       setSecondaryStripReady(true);
       return;
     }
@@ -3040,13 +3060,12 @@ export default function App() {
     const defer = setTimeout(() => {
       (async () => {
         try {
-          const tmdbReg = secondaryMarketTmdbRegion(secondaryRegionKey);
           const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
           const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
           const [theaters, sm, st] = await Promise.all([
-            fetchInTheatersForMarket(tmdbReg, langCodes),
-            fetchStreamingMoviesForMarket(tmdbReg, langQuery),
-            fetchStreamingTVForMarket(tmdbReg, langQuery),
+            fetchInTheatersForMarket(SECONDARY_AVAILABILITY_TMDB_REGION, langCodes),
+            fetchStreamingMoviesForMarket(SECONDARY_AVAILABILITY_TMDB_REGION, langQuery),
+            fetchStreamingTVForMarket(SECONDARY_AVAILABILITY_TMDB_REGION, langQuery),
           ]);
           if (cancelled) return;
           const mergedCatalog = dedupeMediaRowsById([...theaters, ...sm, ...st]);
@@ -3100,6 +3119,18 @@ export default function App() {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillTv;
     return streamingPageRefillTv.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
   }, [streamingPageRefillTv, user, showGenreIds, showRegionKeys]);
+
+  /** Service discover refill is already scoped by `getRegionLanguageCodes(secondary_region_key)`; do not apply `showRegionKeys` (would drop e.g. all Hindi for Hollywood-only global profile). Genres in Settings still apply. */
+  const secondaryRegionRefillMoviesFiltered = useMemo(() => {
+    if (!user) return [];
+    if (!showGenreIds.length) return secondaryRegionRefillMovies;
+    return secondaryRegionRefillMovies.filter((m) => passesShowGenresFilter(m, showGenreIds));
+  }, [secondaryRegionRefillMovies, user, showGenreIds]);
+  const secondaryRegionRefillTvFiltered = useMemo(() => {
+    if (!user) return [];
+    if (!showGenreIds.length) return secondaryRegionRefillTv;
+    return secondaryRegionRefillTv.filter((m) => passesShowGenresFilter(m, showGenreIds));
+  }, [secondaryRegionRefillTv, user, showGenreIds]);
 
   const streamingMoviesForPageStrips = useMemo(() => {
     if (streamingPageProviderId == null) return streamingMoviesForRecs;
@@ -3204,6 +3235,88 @@ export default function App() {
     streamingPageRefillTvFiltered,
   ]);
 
+  useEffect(() => {
+    if (screen !== "secondary-region" || secondaryRegionStreamingProviderId == null || !secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
+      setSecondaryRegionRefillLoading(false);
+      setSecondaryRegionRefillMovies([]);
+      setSecondaryRegionRefillTv([]);
+      setSecondaryRegionRefillDisplayLen(0);
+      secondaryRegionRefillRevealSigRef.current = "";
+      return;
+    }
+    const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
+    const secondaryRefillLangQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+    const media = secondaryBlockStreamingTab === "movie" ? "movie" : "tv";
+    let cancelled = false;
+    secondaryRegionRefillRevealSigRef.current = "";
+    setSecondaryRegionRefillLoading(true);
+    setSecondaryRegionRefillDisplayLen(0);
+    if (media === "movie") setSecondaryRegionRefillMovies([]);
+    else setSecondaryRegionRefillTv([]);
+
+    (async () => {
+      const pool = await fetchStreamingPageProviderRefillPool(
+        media,
+        secondaryRegionStreamingProviderId,
+        (partial) => {
+          if (cancelled) return;
+          const next = partial.slice(0, STREAMING_PAGE_PROVIDER_REFILL_CAP);
+          if (media === "movie") setSecondaryRegionRefillMovies(next);
+          else setSecondaryRegionRefillTv(next);
+        },
+        SECONDARY_AVAILABILITY_TMDB_REGION,
+        secondaryRefillLangQuery,
+      );
+      if (cancelled) return;
+      if (media === "movie") setSecondaryRegionRefillMovies(pool);
+      else setSecondaryRegionRefillTv(pool);
+      setSecondaryRegionRefillLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, secondaryRegionKey, secondaryRegionStreamingProviderId, secondaryBlockStreamingTab]);
+
+  useEffect(() => {
+    if (secondaryRegionStreamingProviderId == null) return;
+    const poolF =
+      secondaryBlockStreamingTab === "movie"
+        ? secondaryRegionRefillMoviesFiltered
+        : secondaryRegionRefillTvFiltered;
+    const n = poolF.length;
+    if (n === 0) {
+      setSecondaryRegionRefillDisplayLen(0);
+      return;
+    }
+    if (secondaryRegionRefillLoading) {
+      setSecondaryRegionRefillDisplayLen((p) => Math.max(p, Math.min(4, n)));
+      return;
+    }
+    const sig = `${secondaryRegionKey}-${secondaryRegionStreamingProviderId}-${secondaryBlockStreamingTab}-${n}`;
+    if (secondaryRegionRefillRevealSigRef.current === sig) return;
+    secondaryRegionRefillRevealSigRef.current = sig;
+    const cap = Math.min(n, STREAMING_PAGE_PROVIDER_REFILL_CAP);
+    const steps = [4, 9, 14, 19, 20].map((s) => Math.min(s, cap));
+    const uniq = [...new Set(steps)].sort((a, b) => a - b);
+    const timers = [];
+    let delay = 0;
+    uniq.forEach((step, i) => {
+      delay += i === 0 ? 0 : 120;
+      timers.push(setTimeout(() => setSecondaryRegionRefillDisplayLen(step), delay));
+    });
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [
+    secondaryRegionKey,
+    secondaryRegionStreamingProviderId,
+    secondaryBlockStreamingTab,
+    secondaryRegionRefillLoading,
+    secondaryRegionRefillMoviesFiltered,
+    secondaryRegionRefillTvFiltered,
+  ]);
+
   const whatsHotForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return whatsHot;
     return whatsHot.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
@@ -3248,11 +3361,24 @@ export default function App() {
     return inTheatersPagePopularForRecs.map((m) => tmdbOnlyRec(m));
   }, [matchData?.inTheatersPagePopularRecs, inTheatersPagePopularForRecs]);
 
-  /** V1.3.2: All secondary-market titles (for recMap, TV meta, cold-start CTA). */
-  const secondaryStripCatalogRows = useMemo(
-    () => dedupeMediaRowsById([...secondaryTheaterRows, ...secondaryStreamingMovieRows, ...secondaryStreamingTvRows]),
-    [secondaryTheaterRows, secondaryStreamingMovieRows, secondaryStreamingTvRows],
-  );
+  /** V1.3.2: Union of secondary strip rows (US availability + taste). Service refill uses same `watch_region` as {@link SECONDARY_AVAILABILITY_TMDB_REGION}. */
+  const secondaryStripCatalogRows = useMemo(() => {
+    if (secondaryRegionStreamingProviderId != null) {
+      return dedupeMediaRowsById([
+        ...secondaryTheaterRows,
+        ...secondaryRegionRefillMoviesFiltered,
+        ...secondaryRegionRefillTvFiltered,
+      ]);
+    }
+    return dedupeMediaRowsById([...secondaryTheaterRows, ...secondaryStreamingMovieRows, ...secondaryStreamingTvRows]);
+  }, [
+    secondaryTheaterRows,
+    secondaryStreamingMovieRows,
+    secondaryStreamingTvRows,
+    secondaryRegionStreamingProviderId,
+    secondaryRegionRefillMoviesFiltered,
+    secondaryRegionRefillTvFiltered,
+  ]);
 
   /**
    * V1.3.4: When `secondary_region_key` is set, merge secondary shelf titles into the CF catalogue even if
@@ -3366,8 +3492,24 @@ export default function App() {
   /** V1.3.2: Raw rows for the active In theaters / Streaming → Movies|Series tab. */
   const secondaryActiveRawRows = useMemo(() => {
     if (secondaryBlockSegment === SECONDARY_BLOCK_THEATERS) return secondaryTheaterRows;
-    return secondaryBlockStreamingTab === "movie" ? secondaryStreamingMovieRows : secondaryStreamingTvRows;
-  }, [secondaryBlockSegment, secondaryBlockStreamingTab, secondaryTheaterRows, secondaryStreamingMovieRows, secondaryStreamingTvRows]);
+    if (secondaryRegionStreamingProviderId == null) {
+      return secondaryBlockStreamingTab === "movie" ? secondaryStreamingMovieRows : secondaryStreamingTvRows;
+    }
+    const cap = Math.min(secondaryRegionRefillDisplayLen, STREAMING_PAGE_PROVIDER_REFILL_CAP);
+    return secondaryBlockStreamingTab === "movie"
+      ? secondaryRegionRefillMoviesFiltered.slice(0, cap)
+      : secondaryRegionRefillTvFiltered.slice(0, cap);
+  }, [
+    secondaryBlockSegment,
+    secondaryBlockStreamingTab,
+    secondaryTheaterRows,
+    secondaryStreamingMovieRows,
+    secondaryStreamingTvRows,
+    secondaryRegionStreamingProviderId,
+    secondaryRegionRefillMoviesFiltered,
+    secondaryRegionRefillTvFiltered,
+    secondaryRegionRefillDisplayLen,
+  ]);
   /** V1.3.3: Fixed cap per tab — no Load more (tabs replace pagination). */
   const secondaryStripRecsVisible = useMemo(() => {
     const byId = Object.fromEntries(secondaryStripRecsResolved.map((r) => [r.movie.id, r]));
@@ -4347,6 +4489,16 @@ export default function App() {
     showStreamingMovieSkeleton ||
     (streamingTab === "tv" && !streamingTvReady) ||
     showStreamingRefillEmptySkeleton;
+
+  const showSecondaryRefillEmptySkeleton = Boolean(
+    screen === "secondary-region" &&
+      secondaryBlockSegment === SECONDARY_BLOCK_STREAMING &&
+      secondaryRegionStreamingProviderId != null &&
+      secondaryRegionRefillLoading &&
+      (secondaryBlockStreamingTab === "movie"
+        ? secondaryRegionRefillMoviesFiltered.length === 0
+        : secondaryRegionRefillTvFiltered.length === 0),
+  );
 
   /** `homePicksLoadFailed` removed in v4.0.8 — the Home screen retired and every remaining primary
    *  page owns its own empty/error state. */
@@ -8948,7 +9100,7 @@ export default function App() {
               <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
                 <select
                   id="streaming-page-service"
-                  className="streaming-page-service-select"
+                  className={`streaming-page-service-select${streamingPageProviderId != null ? " streaming-page-service-select--active" : ""}`}
                   aria-label="Filter by streaming service"
                   value={streamingPageProviderId == null ? "" : String(streamingPageProviderId)}
                   onChange={(e) => {
@@ -8963,8 +9115,7 @@ export default function App() {
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
+                <span className="streaming-page-service-pill-divider" aria-hidden />
                 <button type="button" className={`filter-pill ${streamingTab === "tv" ? "active" : ""}`} onClick={() => setStreamingTab("tv")}>
                   Series
                 </button>
@@ -9179,12 +9330,12 @@ export default function App() {
         <div className="home">
           <PageShell
             title={V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region"}
-            subtitle="Theaters & streaming — scored for your taste"
+            subtitle="US theaters &amp; streaming for this taste — scored for you"
           >
             {!secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey) ? (
               <div className="disc-empty">
                 <div className="disc-empty-text">
-                  Pick a secondary region in your profile to see regional theaters &amp; streaming here.
+                  Pick a secondary region in your profile to see matching US theaters and streaming here.
                 </div>
               </div>
             ) : (
@@ -9208,6 +9359,24 @@ export default function App() {
                   </div>
                   {secondaryBlockSegment === SECONDARY_BLOCK_STREAMING && (
                     <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
+                      <select
+                        id="secondary-region-streaming-service"
+                        className={`streaming-page-service-select${secondaryRegionStreamingProviderId != null ? " streaming-page-service-select--active" : ""}`}
+                        aria-label="Filter by streaming service"
+                        value={secondaryRegionStreamingProviderId == null ? "" : String(secondaryRegionStreamingProviderId)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSecondaryRegionStreamingProviderId(v === "" ? null : Number(v));
+                        }}
+                      >
+                        <option value="">All services</option>
+                        {STREAMING_SERVICES.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="streaming-page-service-pill-divider" aria-hidden />
                       <button
                         type="button"
                         className={`filter-pill ${secondaryBlockStreamingTab === "tv" ? "active" : ""}`}
@@ -9234,20 +9403,22 @@ export default function App() {
                     </div>
                     <div className="section-meta">
                       {secondaryBlockSegment === SECONDARY_BLOCK_THEATERS
-                        ? "Newest regional releases"
-                        : "New & popular on major services"}
+                        ? "US theaters for this taste"
+                        : "US streaming for this taste"}
                     </div>
                   </div>
-                  {!secondaryStripReady ? (
+                  {!secondaryStripReady || showSecondaryRefillEmptySkeleton ? (
                     <SkeletonStrip />
                   ) : secondaryActiveRawRows.length === 0 ? (
                     <div className="empty-box">
                       <div className="empty-text">
                         {secondaryBlockSegment === SECONDARY_BLOCK_THEATERS
-                          ? "No theatrical releases in this market right now"
-                          : secondaryBlockStreamingTab === "movie"
-                            ? "No streaming movies in this market right now"
-                            : "No streaming series in this market right now"}
+                          ? "No matching theatrical releases in the US right now"
+                          : secondaryRegionStreamingProviderId != null
+                            ? `No ${secondaryBlockStreamingTab === "movie" ? "movies" : "series"} in this US discover view for that service — try All services or another.`
+                            : secondaryBlockStreamingTab === "movie"
+                              ? "No matching streaming movies in the US right now"
+                              : "No matching streaming series in the US right now"}
                       </div>
                     </div>
                   ) : (
