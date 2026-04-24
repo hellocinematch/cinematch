@@ -1,5 +1,22 @@
 # Changelog
 
+## 6.0.14
+
+- **Secondary Region — Indian + service, TV — Netflix vs Prime/Hulu:** `with_origin_country=IN` on `/discover/tv` (6.0.13) is applied only when the selected provider is **Netflix** (TMDB id **8**). **Prime Video** and **Hulu** use the prior **broad US + provider** discover plus the in-app Indian taste filter; `with_origin_country=IN` + those providers was returning no/few series for Indian.
+
+## 6.0.13
+
+- **Secondary Region — Indian + provider, TV only:** `fetchStreamingPageProviderRefillPool` now adds TMDB **`with_origin_country=IN`** on **`/discover/tv`** when the Indian language allowlist is used. Broad US+flatrate discover is dominated by non-Indian titles; the in-app filter then only leaves a couple of rows (often worse for **Netflix** where list payloads omit `origin_country`). Constraining discover to **India origin** + **provider** + **US** `watch_region` first aligns TV strip density with **Prime** / **Hulu**. Movies use the same client taste filter as before (no new discover param in this release).
+
+## 6.0.12
+
+- **Secondary Region — Indian (TV / movies / provider strip / Theaters):** Indian taste no longer uses **`original_language` only**. Many Indian **Netflix** (and other) titles are `en` in TMDB. Rows now also match when **`origin_country` includes `IN`**, in line with how catalog metadata often works. Applies to `fetchStreamingPageProviderRefillPool`, `fetchStreamingMoviesForMarket` / `fetchStreamingTVForMarket` (Indian client taste), and **`In theaters**` language gate.
+
+## 6.0.11
+
+- **Secondary Region — titles (all surfaces):** Do **not** apply profile **Genres to show** (or the genre gate on CF merge) to secondary-shelf / service-refill rows; taste is the secondary bucket and TMDB only.
+- **Secondary Region — Indian:** TMDB `with_original_language=hi|ta|…` on **discover** (especially with **watch providers**) is unreliable for Indian. For **`secondary_region_key` = Indian** only: use **broad US** discover / provider refill, then keep titles whose `original_language` is in the Indian language set (same as `getRegionLanguageCodes`).
+
 ## 6.0.10
 
 - **Secondary Region / Streaming (service):** `secondaryRegionRefill*` no longer runs **`showRegionKeys`** (global “Regions to show”) on discover refill rows. That filter is for the home catalogue; combined with the Indian/Asian/… **language** query it could empty lists for every provider (e.g. Prime, Hulu) while another looked fine. **Genres to show** still apply. The **All services** path is unchanged; that pool was not using this post-filter. **Not** a TMDB date cut — service discover has no 90-day window.

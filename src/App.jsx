@@ -114,6 +114,12 @@ const STREAMING_SERVICES = [
   { id: 34, label: "AMC+" },
 ];
 
+/**
+ * Indian secondary **TV** service discover: `with_origin_country=IN` helps **Netflix** US strip density.
+ * **Prime** / **Hulu** Indian catalog in TMDB is often not `IN` origin on discover — use broad US+provider + client filter only.
+ */
+const INDIAN_SECONDARY_TV_USE_ORIGIN_COUNTRY_IN_PROVIDER_ID = 8; // Netflix; not 9/15 (Prime/Hulu) — 6.0.14
+
 async function fetchTMDB(path) {
   const res = await fetch(`${TMDB_BASE}${path}`, { headers: TMDB_HEADERS });
   return res.json();
@@ -407,6 +413,33 @@ function getRegionLanguageCodes(regionKeys) {
       .flatMap(option => option.languages || [])
       .map(code => String(code).toLowerCase()),
   )];
+}
+
+/** `origin_country` on discover / list payloads (raw TMDB). */
+function rawTmdbItemHasOriginIn(item) {
+  const raw = item?.origin_country;
+  if (!Array.isArray(raw) || raw.length === 0) return false;
+  return raw.map((c) => String(c).toUpperCase()).includes("IN");
+}
+
+/** `originCountries` on {@link normalizeTMDBItem} rows. */
+function normalizedTmdbItemHasOriginIn(norm) {
+  const raw = norm?.originCountries;
+  if (!Array.isArray(raw) || raw.length === 0) return false;
+  return raw.map((c) => String(c).toUpperCase()).includes("IN");
+}
+
+/**
+ * Indian secondary taste: `original_language` in profile bucket (hi, ta, …) **or** India as origin.
+ * Many Indian Netflix / US-catalog titles are `original_language: en` in TMDB; editorial lists still match `origin_country: IN`.
+ */
+function filterNormalizedRowsByIndianSecondaryTaste(rows, langCodes) {
+  if (!Array.isArray(langCodes) || langCodes.length === 0) return rows;
+  const allow = new Set(langCodes.map((c) => String(c).toLowerCase()));
+  return (rows || []).filter((m) => {
+    if (allow.has(String(m?.language || "").toLowerCase())) return true;
+    return normalizedTmdbItemHasOriginIn(m);
+  });
 }
 
 /** /discover/tv uses first_air_date.* — movie uses primary_release_date.* */
@@ -921,6 +954,7 @@ const V130_SECONDARY_REGION_IDS = ["indian", "asian", "latam", "european"];
 /**
  * V1.3.0: TMDB `region` / `watch_region` for “where you can watch” on the secondary Region screen (US = primary app market).
  * Taste (Indian, Asian, etc.) comes from `secondary_region_key` via {@link getRegionLanguageCodes} — not from this ISO code.
+ * **Indian** uses broad discover + client `original_language` filter (6.0.11); other buckets may still use TMDB `with_original_language` on discover where helpful.
  */
 const SECONDARY_AVAILABILITY_TMDB_REGION = "US";
 
@@ -963,9 +997,11 @@ async function fetchInTheatersForMarket(tmdbRegionIso, langCodes = []) {
 
     const merged = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || [])])
       .filter((item) => item?.release_date && item.release_date <= now)
-      .filter((item) =>
-        langCodes.length > 0 ? langCodes.includes(String(item?.original_language || "").toLowerCase()) : true,
-      );
+      .filter((item) => {
+        if (langCodes.length === 0) return true;
+        if (langCodes.includes(String(item?.original_language || "").toLowerCase())) return true;
+        return rawTmdbItemHasOriginIn(item);
+      });
 
     const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
     const releaseDatesMap = await fetchMovieReleaseDatesById(deduped.map((item) => item.id));
@@ -989,8 +1025,20 @@ async function fetchInTheatersForMarket(tmdbRegionIso, langCodes = []) {
   }
 }
 
-/** Streaming movie discover: `tmdbRegionIso` = availability market (US for secondary). `langQuery` = original-language taste. */
-async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery) {
+/**
+ * Streaming movie discover: `tmdbRegionIso` = availability market (US for secondary). `langQuery` = `&with_original_language=…` for TMDB.
+ * Optional `clientOriginalLanguageCodes` (e.g. **Indian** secondary): omit TMDB language filter, then {@link filterNormalizedRowsByIndianSecondaryTaste} (language or **`IN`** origin) — `with_original_language` + discover is too sparse, and many Indian SVOD rows are `en` in TMDB.
+ */
+async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery, clientOriginalLanguageCodes = null) {
+  const clientLangs =
+    Array.isArray(clientOriginalLanguageCodes) && clientOriginalLanguageCodes.length > 0
+      ? clientOriginalLanguageCodes.map((c) => String(c).toLowerCase())
+      : null;
+  const tmdbLangSuffix = clientLangs ? "" : (langQuery || "");
+  const taste = (rows) => (clientLangs
+    ? filterNormalizedRowsByIndianSecondaryTaste(rows, clientLangs)
+    : rows);
+
   try {
     const reg = encodeURIComponent(tmdbRegionIso);
     const digitalStart = dateDaysAgo(90);
@@ -1016,31 +1064,40 @@ async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery) {
       return dedupeByTmdbId(rows).slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => normalizeTMDBItem(m, "movie"));
     };
 
-    let out = await discoverToMovies(`${digitalDiscoverBase}${langQuery}`);
+    let out = taste(await discoverToMovies(`${digitalDiscoverBase}${tmdbLangSuffix}`));
     if (out.length > 0) return out;
-    if (langQuery) {
-      out = await discoverToMovies(`${digitalDiscoverBase}`);
+    if (tmdbLangSuffix) {
+      out = taste(await discoverToMovies(`${digitalDiscoverBase}`));
       if (out.length > 0) return out;
     }
-    out = await discoverToMovies(`${broadDateDiscoverBase}${langQuery}`);
+    out = taste(await discoverToMovies(`${broadDateDiscoverBase}${tmdbLangSuffix}`));
     if (out.length > 0) return out;
-    if (langQuery) {
-      out = await discoverToMovies(`${broadDateDiscoverBase}`);
+    if (tmdbLangSuffix) {
+      out = taste(await discoverToMovies(`${broadDateDiscoverBase}`));
       if (out.length > 0) return out;
     }
-    return await trendingToMovies();
+    return taste(await trendingToMovies());
   } catch {
     return [];
   }
 }
 
-/** Streaming TV discover: `tmdbRegionIso` = availability market (US for secondary) + `langQuery` for taste. */
-async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery) {
+/**
+ * Streaming TV discover: `tmdbRegionIso` = US for secondary. `clientOriginalLanguageCodes` same as {@link fetchStreamingMoviesForMarket}.
+ */
+async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery, clientOriginalLanguageCodes = null) {
+  const clientLangs =
+    Array.isArray(clientOriginalLanguageCodes) && clientOriginalLanguageCodes.length > 0
+      ? clientOriginalLanguageCodes.map((c) => String(c).toLowerCase())
+      : null;
+  const tmdbLangSuffix = clientLangs ? "" : (langQuery || "");
+  const langSet = clientLangs ? new Set(clientLangs) : null;
+
   try {
     const reg = encodeURIComponent(tmdbRegionIso);
     const tvNewSeriesStart = dateDaysAgo(180);
     const excludedTrendingGenres = new Set([10767, 10763]);
-    const tvNewSeriesBase = `/discover/tv?language=en-US&region=${reg}&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${langQuery}`;
+    const tvNewSeriesBase = `/discover/tv?language=en-US&region=${reg}&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${tmdbLangSuffix}`;
     const trendingTvBase = "/trending/tv/day?language=en-US";
 
     const [tvSeriesPages, tvTrendingPages] = await Promise.all([
@@ -1061,7 +1118,7 @@ async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery) {
     ).values()];
 
     const tvDetailsMap = await fetchTvDetailsById(tvCandidates.map((item) => item.id));
-    const tvResults = tvCandidates.filter((item) => {
+    let tvResults = tvCandidates.filter((item) => {
       const detail = tvDetailsMap.get(item.id);
       const seasons = Number(detail?.number_of_seasons ?? 0);
       const isNewSeries = seasons === 1 && withinPastDays(item?.first_air_date, 180);
@@ -1069,6 +1126,12 @@ async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery) {
       const trendingEligible = tvTrendingCandidates.some((t) => t.id === item.id);
       return isNewSeries || isNewSeason || trendingEligible;
     });
+    if (langSet) {
+      tvResults = tvResults.filter((item) => {
+        if (langSet.has(String(item?.original_language || "").toLowerCase())) return true;
+        return rawTmdbItemHasOriginIn(item);
+      });
+    }
 
     const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
     return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => normalizeTMDBItem(m, "tv"));
@@ -1222,7 +1285,9 @@ const STREAMING_PAGE_PROVIDER_REFILL_CAP = 20;
 /**
  * Paged discover with a single watch provider; `onProgress` receives cumulative rows (pre-cap).
  * `watchRegion` = TMDB ISO (e.g. `US`, `IN`) — same as `watch_region` in discover.
- * `originalLanguageQuery` = optional suffix e.g. `&with_original_language=hi|ta|...` (secondary Region: match {@link fetchStreamingMoviesForMarket}).
+ * `originalLanguageQuery` = optional `&with_original_language=…` (omit for **Indian** when passing `originalLanguageAllowlist` — see 6.0.11).
+ * `originalLanguageAllowlist` = e.g. Indian codes: broad US+provider discover, then keep rows that match **Indian** taste (see {@link filterNormalizedRowsByIndianSecondaryTaste}).
+ * **Indian + TV + Netflix only:** `with_origin_country=IN` on discover (list payloads omit `IN` often; need dense India slice). **Prime / Hulu** omit that param so licensed Indian shows (non-`IN` origin in TMDB) still surface.
  * Sort is newest air/release first; client applies strip orders.
  */
 async function fetchStreamingPageProviderRefillPool(
@@ -1231,18 +1296,30 @@ async function fetchStreamingPageProviderRefillPool(
   onProgress,
   watchRegion = "US",
   originalLanguageQuery = "",
+  originalLanguageAllowlist = null,
 ) {
   const type = mediaType === "movie" ? "movie" : "tv";
   const reg = encodeURIComponent(String(watchRegion || "US").toUpperCase());
   const sortBy =
     mediaType === "movie" ? "primary_release_date.desc" : "first_air_date.desc";
-  const langSuffix = typeof originalLanguageQuery === "string" ? originalLanguageQuery : "";
+  const allow =
+    Array.isArray(originalLanguageAllowlist) && originalLanguageAllowlist.length > 0
+      ? new Set(originalLanguageAllowlist.map((c) => String(c).toLowerCase()))
+      : null;
+  const langSuffix = allow
+    ? ""
+    : (typeof originalLanguageQuery === "string" ? originalLanguageQuery : "");
+  const useIndianOriginInDiscover =
+    allow
+    && type === "tv"
+    && Number(providerId) === INDIAN_SECONDARY_TV_USE_ORIGIN_COUNTRY_IN_PROVIDER_ID;
+  const indianTvDiscoverOrigin = useIndianOriginInDiscover ? "&with_origin_country=IN" : "";
   const all = [];
   const seen = new Set();
   let page = 1;
   const maxPage = 5;
   while (all.length < STREAMING_PAGE_PROVIDER_REFILL_CAP && page <= maxPage) {
-    const path = `/discover/${type}?language=en-US&sort_by=${sortBy}&page=${page}&watch_region=${reg}&with_watch_providers=${providerId}&with_watch_monetization_types=flatrate${langSuffix}`;
+    const path = `/discover/${type}?language=en-US&sort_by=${sortBy}&page=${page}&watch_region=${reg}&with_watch_providers=${providerId}&with_watch_monetization_types=flatrate${langSuffix}${indianTvDiscoverOrigin}`;
     const data = await fetchTMDB(path);
     if (isTmdbApiErrorPayload(data)) break;
     const results = data?.results || [];
@@ -1250,8 +1327,15 @@ async function fetchStreamingPageProviderRefillPool(
       if (all.length >= STREAMING_PAGE_PROVIDER_REFILL_CAP) break;
       if (seen.has(item.id)) continue;
       if (hasExcludedGenre(item)) continue;
+      const norm = normalizeTMDBItem(item, type);
+      if (allow) {
+        const okLang = allow.has(String(norm.language || "").toLowerCase());
+        if (!okLang && !normalizedTmdbItemHasOriginIn(norm) && !rawTmdbItemHasOriginIn(item)) {
+          continue;
+        }
+      }
       seen.add(item.id);
-      all.push(normalizeTMDBItem(item, type));
+      all.push(norm);
     }
     onProgress([...all]);
     if (results.length < 1) break;
@@ -3061,11 +3145,17 @@ export default function App() {
       (async () => {
         try {
           const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
-          const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+          /** Indian: TMDB `with_original_language` on discover is too thin; use broad US discover + client language filter. */
+          const useIndianClientTaste = secondaryRegionKey === "indian";
+          const langQuery =
+            useIndianClientTaste || langCodes.length === 0
+              ? ""
+              : `&with_original_language=${langCodes.join("|")}`;
+          const clientLangTaste = useIndianClientTaste ? langCodes : null;
           const [theaters, sm, st] = await Promise.all([
             fetchInTheatersForMarket(SECONDARY_AVAILABILITY_TMDB_REGION, langCodes),
-            fetchStreamingMoviesForMarket(SECONDARY_AVAILABILITY_TMDB_REGION, langQuery),
-            fetchStreamingTVForMarket(SECONDARY_AVAILABILITY_TMDB_REGION, langQuery),
+            fetchStreamingMoviesForMarket(SECONDARY_AVAILABILITY_TMDB_REGION, langQuery, clientLangTaste),
+            fetchStreamingTVForMarket(SECONDARY_AVAILABILITY_TMDB_REGION, langQuery, clientLangTaste),
           ]);
           if (cancelled) return;
           const mergedCatalog = dedupeMediaRowsById([...theaters, ...sm, ...st]);
@@ -3120,17 +3210,15 @@ export default function App() {
     return streamingPageRefillTv.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
   }, [streamingPageRefillTv, user, showGenreIds, showRegionKeys]);
 
-  /** Service discover refill is already scoped by `getRegionLanguageCodes(secondary_region_key)`; do not apply `showRegionKeys` (would drop e.g. all Hindi for Hollywood-only global profile). Genres in Settings still apply. */
+  /** Secondary Region service refill: do not apply profile `showGenreIds` / `showRegionKeys` (taste = secondary bucket + TMDB). */
   const secondaryRegionRefillMoviesFiltered = useMemo(() => {
     if (!user) return [];
-    if (!showGenreIds.length) return secondaryRegionRefillMovies;
-    return secondaryRegionRefillMovies.filter((m) => passesShowGenresFilter(m, showGenreIds));
-  }, [secondaryRegionRefillMovies, user, showGenreIds]);
+    return secondaryRegionRefillMovies;
+  }, [secondaryRegionRefillMovies, user]);
   const secondaryRegionRefillTvFiltered = useMemo(() => {
     if (!user) return [];
-    if (!showGenreIds.length) return secondaryRegionRefillTv;
-    return secondaryRegionRefillTv.filter((m) => passesShowGenresFilter(m, showGenreIds));
-  }, [secondaryRegionRefillTv, user, showGenreIds]);
+    return secondaryRegionRefillTv;
+  }, [secondaryRegionRefillTv, user]);
 
   const streamingMoviesForPageStrips = useMemo(() => {
     if (streamingPageProviderId == null) return streamingMoviesForRecs;
@@ -3245,7 +3333,12 @@ export default function App() {
       return;
     }
     const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
-    const secondaryRefillLangQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+    const useIndianClientTaste = secondaryRegionKey === "indian";
+    const secondaryRefillLangQuery =
+      useIndianClientTaste || langCodes.length === 0
+        ? ""
+        : `&with_original_language=${langCodes.join("|")}`;
+    const secondaryRefillLangAllow = useIndianClientTaste ? langCodes : null;
     const media = secondaryBlockStreamingTab === "movie" ? "movie" : "tv";
     let cancelled = false;
     secondaryRegionRefillRevealSigRef.current = "";
@@ -3266,6 +3359,7 @@ export default function App() {
         },
         SECONDARY_AVAILABILITY_TMDB_REGION,
         secondaryRefillLangQuery,
+        secondaryRefillLangAllow,
       );
       if (cancelled) return;
       if (media === "movie") setSecondaryRegionRefillMovies(pool);
@@ -3382,7 +3476,7 @@ export default function App() {
 
   /**
    * V1.3.4: When `secondary_region_key` is set, merge secondary shelf titles into the CF catalogue even if
-   * “Regions to show” would exclude them (e.g. Hollywood-only + Indian secondary). Genre filter still applies.
+   * “Regions to show” would exclude them (e.g. Hollywood-only + Indian secondary). Secondary rows ignore profile genre too.
    */
   const catalogueForRecs = useMemo(() => {
     if (!user) return catalogue;
@@ -3399,7 +3493,6 @@ export default function App() {
     const extras = [];
     for (const m of secondaryStripCatalogRows) {
       if (seen.has(m.id)) continue;
-      if (showGenreIds.length > 0 && !passesShowGenresFilter(m, showGenreIds)) continue;
       seen.add(m.id);
       extras.push(m);
     }
