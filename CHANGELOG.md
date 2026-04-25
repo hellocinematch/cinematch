@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.0.15
+
+- **Secondary Region (screen) → Streaming strip only:** Reveal is **5** titles immediately, then **9 → 20** on **~120ms** steps (capped at **20** and pool length). Applies to **All services** and **per-provider** refills. **In theaters** and the main **Streaming** page are unchanged (that page still uses 4,9,14,19,20).
+
 ## 6.0.14
 
 - **Secondary Region — Indian + service, TV — Netflix vs Prime/Hulu:** `with_origin_country=IN` on `/discover/tv` (6.0.13) is applied only when the selected provider is **Netflix** (TMDB id **8**). **Prime Video** and **Hulu** use the prior **broad US + provider** discover plus the in-app Indian taste filter; `with_origin_country=IN` + those providers was returning no/few series for Indian.

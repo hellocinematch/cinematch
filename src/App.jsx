@@ -1281,6 +1281,13 @@ async function getOrFetchFlatrateProviderIds(movie, cacheMap) {
 
 /** Streaming / secondary Region (streaming) — refill strips via discover (not profile); cap 20; flatrate in `watch_region`. */
 const STREAMING_PAGE_PROVIDER_REFILL_CAP = 20;
+/**
+ * **Secondary Region screen → Streaming** strip only: first wave 5, then 9…20 with delay (main **Streaming** page keeps 4,9,14,19,20).
+ * Applies to **All services** and **per-provider** pools on that screen.
+ */
+const SECONDARY_REGION_STREAM_REVEAL_MAX = 20;
+const SECONDARY_REGION_STREAM_REVEAL_FIRST = 5;
+const SECONDARY_REGION_STREAM_REVEAL_STEPS = [5, 9, 14, 19, 20];
 
 /**
  * Paged discover with a single watch provider; `onProgress` receives cumulative rows (pre-cap).
@@ -2612,6 +2619,8 @@ export default function App() {
   const [secondaryRegionRefillMovies, setSecondaryRegionRefillMovies] = useState([]);
   const [secondaryRegionRefillTv, setSecondaryRegionRefillTv] = useState([]);
   const [secondaryRegionRefillDisplayLen, setSecondaryRegionRefillDisplayLen] = useState(0);
+  /** Secondary Region → Streaming, **All services** only: staggered visible count (see `SECONDARY_REGION_STREAM_REVEAL_*`). */
+  const [secondaryRegionAllServicesStreamDisplayLen, setSecondaryRegionAllServicesStreamDisplayLen] = useState(0);
   const [secondaryStripReady, setSecondaryStripReady] = useState(true);
   /** Public marketing counts (RPC). Undefined until first successful fetch. */
   const [siteStats, setSiteStats] = useState(null);
@@ -3136,6 +3145,7 @@ export default function App() {
       setSecondaryRegionRefillTv([]);
       setSecondaryRegionRefillDisplayLen(0);
       secondaryRegionRefillRevealSigRef.current = "";
+      setSecondaryRegionAllServicesStreamDisplayLen(0);
       setSecondaryStripReady(true);
       return;
     }
@@ -3384,19 +3394,23 @@ export default function App() {
       return;
     }
     if (secondaryRegionRefillLoading) {
-      setSecondaryRegionRefillDisplayLen((p) => Math.max(p, Math.min(4, n)));
+      setSecondaryRegionRefillDisplayLen((p) => Math.max(p, Math.min(SECONDARY_REGION_STREAM_REVEAL_FIRST, n)));
       return;
     }
     const sig = `${secondaryRegionKey}-${secondaryRegionStreamingProviderId}-${secondaryBlockStreamingTab}-${n}`;
     if (secondaryRegionRefillRevealSigRef.current === sig) return;
     secondaryRegionRefillRevealSigRef.current = sig;
     const cap = Math.min(n, STREAMING_PAGE_PROVIDER_REFILL_CAP);
-    const steps = [4, 9, 14, 19, 20].map((s) => Math.min(s, cap));
-    const uniq = [...new Set(steps)].sort((a, b) => a - b);
+    const first = Math.min(SECONDARY_REGION_STREAM_REVEAL_FIRST, cap);
+    setSecondaryRegionRefillDisplayLen(first);
+    const rest = SECONDARY_REGION_STREAM_REVEAL_STEPS
+      .map((s) => Math.min(s, cap))
+      .filter((s) => s > first);
+    const uniq = [...new Set(rest)].sort((a, b) => a - b);
     const timers = [];
     let delay = 0;
-    uniq.forEach((step, i) => {
-      delay += i === 0 ? 0 : 120;
+    uniq.forEach((step) => {
+      delay += 120;
       timers.push(setTimeout(() => setSecondaryRegionRefillDisplayLen(step), delay));
     });
     return () => {
@@ -3409,6 +3423,61 @@ export default function App() {
     secondaryRegionRefillLoading,
     secondaryRegionRefillMoviesFiltered,
     secondaryRegionRefillTvFiltered,
+  ]);
+
+  useEffect(() => {
+    if (screen !== "secondary-region") {
+      setSecondaryRegionAllServicesStreamDisplayLen(0);
+      return;
+    }
+    if (secondaryBlockSegment !== SECONDARY_BLOCK_STREAMING) {
+      setSecondaryRegionAllServicesStreamDisplayLen(0);
+      return;
+    }
+    if (secondaryRegionStreamingProviderId != null) {
+      setSecondaryRegionAllServicesStreamDisplayLen(0);
+      return;
+    }
+    if (!user || !secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
+      setSecondaryRegionAllServicesStreamDisplayLen(0);
+      return;
+    }
+    const poolF =
+      secondaryBlockStreamingTab === "movie"
+        ? secondaryStreamingMovieRows
+        : secondaryStreamingTvRows;
+    const n = poolF.length;
+    if (n === 0) {
+      setSecondaryRegionAllServicesStreamDisplayLen(0);
+      return;
+    }
+    if (!secondaryStripReady) return;
+    const cap = Math.min(n, SECONDARY_REGION_STREAM_REVEAL_MAX);
+    const first = Math.min(SECONDARY_REGION_STREAM_REVEAL_FIRST, cap);
+    setSecondaryRegionAllServicesStreamDisplayLen(first);
+    const rest = SECONDARY_REGION_STREAM_REVEAL_STEPS
+      .map((s) => Math.min(s, cap))
+      .filter((s) => s > first);
+    const uniq = [...new Set(rest)].sort((a, b) => a - b);
+    const timers = [];
+    let delay = 0;
+    uniq.forEach((step) => {
+      delay += 120;
+      timers.push(setTimeout(() => setSecondaryRegionAllServicesStreamDisplayLen(step), delay));
+    });
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [
+    screen,
+    user,
+    secondaryBlockSegment,
+    secondaryRegionKey,
+    secondaryBlockStreamingTab,
+    secondaryRegionStreamingProviderId,
+    secondaryStreamingMovieRows,
+    secondaryStreamingTvRows,
+    secondaryStripReady,
   ]);
 
   const whatsHotForRecs = useMemo(() => {
@@ -3586,7 +3655,16 @@ export default function App() {
   const secondaryActiveRawRows = useMemo(() => {
     if (secondaryBlockSegment === SECONDARY_BLOCK_THEATERS) return secondaryTheaterRows;
     if (secondaryRegionStreamingProviderId == null) {
-      return secondaryBlockStreamingTab === "movie" ? secondaryStreamingMovieRows : secondaryStreamingTvRows;
+      const rows =
+        secondaryBlockStreamingTab === "movie"
+          ? secondaryStreamingMovieRows
+          : secondaryStreamingTvRows;
+      const k = Math.min(
+        rows.length,
+        secondaryRegionAllServicesStreamDisplayLen,
+        SECONDARY_REGION_STREAM_REVEAL_MAX,
+      );
+      return rows.slice(0, k);
     }
     const cap = Math.min(secondaryRegionRefillDisplayLen, STREAMING_PAGE_PROVIDER_REFILL_CAP);
     return secondaryBlockStreamingTab === "movie"
@@ -3602,6 +3680,7 @@ export default function App() {
     secondaryRegionRefillMoviesFiltered,
     secondaryRegionRefillTvFiltered,
     secondaryRegionRefillDisplayLen,
+    secondaryRegionAllServicesStreamDisplayLen,
   ]);
   /** V1.3.3: Fixed cap per tab — no Load more (tabs replace pagination). */
   const secondaryStripRecsVisible = useMemo(() => {
