@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.0.21
+
+- **Title detail — In Theaters:** When a **movie** is in the current **In Theaters** strips (**Now** or **Popular**) and **Where to Watch** has no streaming options (or TMDB returns no regional providers), show **Find showtimes near you (Google)** — opens a Google search for `{title} {year} movie showtimes`. Short hint that results depend on location.
+
 ## 6.0.20
 
 - **In Theaters (main screen):** Raise per-strip cap from **15** to **20** (`IN_THEATERS_PAGE_STRIP_CAP`).

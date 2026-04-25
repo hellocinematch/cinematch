@@ -2308,24 +2308,56 @@ function passwordRecoveryRedirectTo() {
 // ---------------------------------------------------------------------------
 // Where to Watch
 // ---------------------------------------------------------------------------
-function WhereToWatch({ tmdbId, type }) {
+function googleTheatricalShowtimesSearchUrl(title, year) {
+  const t = String(title || "").trim();
+  const y = year != null && String(year).trim() !== "" ? String(year).trim() : "";
+  const q = [t, y, "movie showtimes"].filter((p) => p.length > 0).join(" ");
+  return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+}
+
+function WhereToWatch({ tmdbId, type, movieTitle, movieYear, showTheatricalShowtimesFallback }) {
   const [providers, setProviders] = useState(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     fetchWatchProviders(tmdbId, type).then(data => { setProviders(data); setLoading(false); });
   }, [tmdbId, type]);
+
+  const theatricalHref =
+    type === "movie" &&
+    showTheatricalShowtimesFallback &&
+    String(movieTitle || "").trim().length > 0
+      ? googleTheatricalShowtimesSearchUrl(movieTitle, movieYear)
+      : null;
+  const theatricalBlock = theatricalHref ? (
+    <>
+      <a className="wtw-link" href={theatricalHref} target="_blank" rel="noopener noreferrer">
+        Find showtimes near you (Google) →
+      </a>
+      <div className="wtw-theatrical-hint">Opens Google search; theaters and times depend on your location.</div>
+    </>
+  ) : null;
+
   if (loading) return <div className="wtw-section"><div className="wtw-title">Where to Watch</div><div className="wtw-loading">Checking availability…</div></div>;
-  if (!providers) return <div className="wtw-section"><div className="wtw-title">Where to Watch</div><div className="wtw-none">Availability not found</div></div>;
+  if (!providers) {
+    return (
+      <div className="wtw-section">
+        <div className="wtw-title">Where to Watch</div>
+        <div className="wtw-none">Availability not found</div>
+        {theatricalBlock}
+      </div>
+    );
+  }
   const groups = [
     { label: "Free", data: providers.free },
     { label: "Subscription", data: providers.flatrate },
     { label: "Rent", data: providers.rent },
     { label: "Buy", data: providers.buy },
   ].filter(g => g.data.length > 0);
+  const streamingEmpty = groups.length === 0;
   return (
     <div className="wtw-section">
       <div className="wtw-title">Where to Watch</div>
-      {groups.length === 0 ? <div className="wtw-none">Not currently available for streaming</div> : groups.map(g => (
+      {streamingEmpty ? <div className="wtw-none">Not currently available for streaming</div> : groups.map(g => (
         <div className="wtw-group" key={g.label}>
           <div className="wtw-group-label">{g.label}</div>
           <div className="wtw-providers">
@@ -2346,6 +2378,7 @@ function WhereToWatch({ tmdbId, type }) {
         </div>
       ))}
       {providers.link && <a className="wtw-link" href={providers.link} target="_blank" rel="noopener noreferrer">View all options →</a>}
+      {streamingEmpty ? theatricalBlock : null}
     </div>
   );
 }
@@ -10932,6 +10965,11 @@ export default function App() {
             : prediction?.confidence === "medium"
               ? "detail-score-conf-inline--medium"
               : "detail-score-conf-inline--low";
+        const detailInTheatersPool =
+          movie.type === "movie" &&
+          movie.tmdbId != null &&
+          (inTheaters.some((m) => m.tmdbId === movie.tmdbId) ||
+            inTheatersPopularRanked.some((m) => m.tmdbId === movie.tmdbId));
         return (
           <div className="detail">
             {!showPrimaryNav ? (
@@ -11095,7 +11133,13 @@ export default function App() {
                 <h2 className="d-overview-heading">Overview</h2>
                 <div className="d-synopsis">{movie.synopsis}</div>
                 <div className="detail-wtw-wrap">
-                  <WhereToWatch tmdbId={movie.tmdbId} type={movie.type} />
+                  <WhereToWatch
+                    tmdbId={movie.tmdbId}
+                    type={movie.type}
+                    movieTitle={movie.title}
+                    movieYear={movie.year}
+                    showTheatricalShowtimesFallback={detailInTheatersPool}
+                  />
                 </div>
                 <div className="detail-rate-section">
                   {myRating && !detailEditRating ? (

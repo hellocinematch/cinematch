@@ -649,6 +649,8 @@
   .wtw-none { font-size:12px; color:#444; font-style:italic; }
   .wtw-link { display:block; margin-top:10px; font-size:12px; color:#e8c96a; text-decoration:none; }
   .wtw-link:hover { text-decoration:underline; }
+  .wtw-theatrical-hint { margin-top:8px; font-size:11px; color:#555; line-height:1.35; }
+  .detail-wtw-wrap .wtw-theatrical-hint { text-align:center; }
 
   .detail { height:100%; min-height:0; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; position:relative; width:100%; max-width:100%; }
   /* Hero: backdrop + TMDB-style poster float on the right, overlapping the band. */
