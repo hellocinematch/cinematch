@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.0.20
+
+- **In Theaters (main screen):** Raise per-strip cap from **15** to **20** (`IN_THEATERS_PAGE_STRIP_CAP`).
+
+## 6.0.19
+
+- **In Theaters (main screen):** **Popular in theaters** is no longer a popularity sort of the **Now Playing** pool. It uses **`/trending/movie/week`** (pages 1–2), **trending order**, with the **same** filters as **Now Playing** (no default-excluded genres, already released, profile region languages when set, US limited-theatrical type-2 window or pass when no US type-2 row). Strip subtitle updated. Catalogue merge **dedupes** by id across both strips so overlap does not duplicate rows.
+
 ## 6.0.18
 
 - **Streaming page (main):** **Now** and **What’s popular** use **separate** TMDB pools (no longer one list, two sorts). **All services — Movies:** *Now* = US `flatrate`, **90-day** `primary_release_date`, newest first; *Popular* = **`/trending/movie/week`**. **All services — Series:** *Now* = US `flatrate`, `first_air_date` desc; *Popular* = **`/trending/tv/week`** (excl. talk/news). **With a service:** *Now* = that provider + US `flatrate`, date sort (movies also **90d** window via discover); *Popular* = same provider + **`popularity.desc`** (in-service). Pool cap **25** for each strip; reveal **5** then **10, 15, 20, 25** (~120ms steps) for **both** rows independently. `fetchStreamingPageProviderRefillPool` gains `options.discoverSort` (`date` \| `popularity`) and **90d** window for **movie** + **date**. Profile region languages apply to main-page provider discover via `with_original_language`. Removed legacy single-refill stagger **4→20** on this page.

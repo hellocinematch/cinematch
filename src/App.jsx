@@ -613,6 +613,21 @@ function withinPastDays(dateString, days) {
   return ageMs >= 0 && ageMs <= days * 24 * 60 * 60 * 1000;
 }
 
+/** US limited theatrical (TMDB release type 2): newest type-2 date within `maxDays`, or pass if no US type-2 row. */
+function passesUsTheatricalLimitedWindow(releasePayload, maxDays) {
+  const usDates = Array.isArray(releasePayload?.results)
+    ? releasePayload.results.find((r) => r?.iso_3166_1 === "US")?.release_dates || []
+    : [];
+  const limitedDates = usDates
+    .filter((r) => Number(r?.type) === 2 && typeof r?.release_date === "string")
+    .map((r) => r.release_date.slice(0, 10))
+    .filter(Boolean)
+    .sort();
+  if (limitedDates.length === 0) return true;
+  const newestLimited = limitedDates[limitedDates.length - 1];
+  return withinPastDays(newestLimited, maxDays);
+}
+
 async function fetchTvDetailsById(ids = []) {
   const uniqueIds = [...new Set((ids || []).filter((id) => Number.isFinite(Number(id))))].slice(0, 30);
   const detailRows = await Promise.all(uniqueIds.map(async (id) => {
@@ -689,19 +704,6 @@ function sortTheatricalMoviesByReleaseDateDesc(items) {
   });
 }
 
-/** Same pool: TMDB popularity → vote average → release (for “popular in theaters” strip). */
-function sortTheatricalMoviesByPopularityDesc(items) {
-  return [...items].sort((a, b) => {
-    const popDiff = Number(b.popularity ?? 0) - Number(a.popularity ?? 0);
-    if (popDiff !== 0) return popDiff;
-    const ratingDiff = Number(b.tmdbRating ?? 0) - Number(a.tmdbRating ?? 0);
-    if (ratingDiff !== 0) return ratingDiff;
-    const da = Date.parse(a.releaseDate || `${a.year}-01-01`) || 0;
-    const db = Date.parse(b.releaseDate || `${b.year}-01-01`) || 0;
-    return db - da;
-  });
-}
-
 /** Streaming page “Now” order: newest release/air date first, popularity tiebreak. */
 function sortStreamingByReleaseDateDesc(items) {
   return [...items].sort((a, b) => {
@@ -726,47 +728,63 @@ function sortStreamingByPopularityDesc(items) {
 }
 
 /**
- * US now_playing (filtered). Returns two orderings over the same gated pool: release-date order and popularity order.
+ * US theatrical: **Now** = `now_playing` + gates, release-date order. **Popular** = `/trending/movie/week` (pages 1–2),
+ * same genre / released / language / US limited-window gates; **trending order** (parallel to main Streaming “popular”).
  */
 async function fetchInTheaters(regionKeys = []) {
   try {
-    const TARGET_COUNT = 15;
     const LIMITED_THEATRICAL_MAX_DAYS = 14;
     const langCodes = getRegionLanguageCodes(regionKeys);
     const now = formatIsoDate(new Date());
-    const [p1, p2] = await Promise.all([
+    const [p1, p2, w1, w2] = await Promise.all([
       fetchTMDB("/movie/now_playing?language=en-US&region=US&page=1"),
       fetchTMDB("/movie/now_playing?language=en-US&region=US&page=2"),
+      fetchTMDB("/trending/movie/week?language=en-US"),
+      fetchTMDB("/trending/movie/week?language=en-US&page=2"),
     ]);
 
-    const merged = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || [])])
-      // Exclude soon-to-release titles that TMDB may include in now_playing payloads.
-      .filter((item) => item?.release_date && item.release_date <= now)
-      .filter((item) => (langCodes.length > 0 ? langCodes.includes(String(item?.original_language || "").toLowerCase()) : true));
+    const filterLangAndReleased = (item) =>
+      item?.release_date &&
+      item.release_date <= now &&
+      (langCodes.length > 0 ? langCodes.includes(String(item?.original_language || "").toLowerCase()) : true);
 
-    const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
-    const releaseDatesMap = await fetchMovieReleaseDatesById(deduped.map((item) => item.id));
-    const withLimitedWindowGate = deduped.filter((item) => {
-      const releasePayload = releaseDatesMap.get(item.id);
-      const usDates = Array.isArray(releasePayload?.results)
-        ? releasePayload.results.find((r) => r?.iso_3166_1 === "US")?.release_dates || []
-        : [];
-      const limitedDates = usDates
-        .filter((r) => Number(r?.type) === 2 && typeof r?.release_date === "string")
-        .map((r) => r.release_date.slice(0, 10))
-        .filter(Boolean)
-        .sort();
-      if (limitedDates.length === 0) return true;
-      const newestLimited = limitedDates[limitedDates.length - 1];
-      return withinPastDays(newestLimited, LIMITED_THEATRICAL_MAX_DAYS);
-    });
-    const normalized = withLimitedWindowGate.map((item) => normalizeTMDBItem(item, "movie"));
-    const nowPlaying = sortTheatricalMoviesByReleaseDateDesc(normalized).slice(0, TARGET_COUNT);
-    const popularInTheaters = sortTheatricalMoviesByPopularityDesc(normalized).slice(0, TARGET_COUNT);
+    const mergedNp = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || [])]).filter(filterLangAndReleased);
+
+    const dedupedNp = [...new Map(mergedNp.map((item) => [item.id, item])).values()];
+    const releaseDatesMapNp = await fetchMovieReleaseDatesById(dedupedNp.map((item) => item.id));
+    const gatedNp = dedupedNp.filter((item) =>
+      passesUsTheatricalLimitedWindow(releaseDatesMapNp.get(item.id), LIMITED_THEATRICAL_MAX_DAYS),
+    );
+    const normalizedNp = gatedNp.map((item) => normalizeTMDBItem(item, "movie"));
+    const nowPlaying = sortTheatricalMoviesByReleaseDateDesc(normalizedNp).slice(0, IN_THEATERS_PAGE_STRIP_CAP);
+
+    const trendingMerged = [...(w1.results || []), ...(w2.results || [])];
+    const trendingDeduped = [...new Map(trendingMerged.map((item) => [item.id, item])).values()];
+    const trendingPreGate = filterDefaultExcludedGenres(trendingDeduped).filter(filterLangAndReleased);
+    const releaseDatesMapTrend = await fetchMovieReleaseDatesById(trendingPreGate.map((item) => item.id));
+    const trendingGated = trendingPreGate.filter((item) =>
+      passesUsTheatricalLimitedWindow(releaseDatesMapTrend.get(item.id), LIMITED_THEATRICAL_MAX_DAYS),
+    );
+    const popularInTheaters = trendingGated
+      .slice(0, IN_THEATERS_PAGE_STRIP_CAP)
+      .map((item) => normalizeTMDBItem(item, "movie"));
+
     return { nowPlaying, popularInTheaters };
   } catch {
     return { nowPlaying: [], popularInTheaters: [] };
   }
+}
+
+/** Dedupe by id for catalogue / predict: **Now** first, then **Popular** titles not already listed. */
+function mergeInTheatersStripsForCatalogue(nowPlaying, popularInTheaters) {
+  const out = [];
+  const seen = new Set();
+  for (const m of [...(nowPlaying || []), ...(popularInTheaters || [])]) {
+    if (m == null || m.id == null || seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+  return out;
 }
 
 /** Now Playing — trending movies + TV (day), interleaved; not deduped against other strips. */
@@ -1583,6 +1601,8 @@ async function getOrFetchFlatrateProviderIds(movie, cacheMap) {
  * Per-provider refill uses the same cap (in-service **date** row vs **popularity** row).
  */
 const STREAMING_PAGE_STRIP_CAP = 25;
+/** Main **In Theaters** screen (`fetchInTheaters`): max titles per row (Now Playing + Popular). */
+const IN_THEATERS_PAGE_STRIP_CAP = 20;
 /** @deprecated name — use {@link STREAMING_PAGE_STRIP_CAP}. */
 const STREAMING_PAGE_PROVIDER_REFILL_CAP = STREAMING_PAGE_STRIP_CAP;
 const STREAMING_PAGE_REVEAL_FIRST = 5;
@@ -2828,7 +2848,7 @@ export default function App() {
   const [pulseTrending, setPulseTrending] = useState([]);
   const [pulsePopular, setPulsePopular] = useState([]);
   const [pulseCatalogReady, setPulseCatalogReady] = useState(false);
-  /** Same US theatrical pool as {@link inTheaters}, sorted by TMDB popularity (In Theaters page second strip). */
+  /** In Theaters page second strip: weekly trending + same theatrical gates as Now ({@link fetchInTheaters}). */
   const [inTheatersPopularRanked, setInTheatersPopularRanked] = useState([]);
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
   /** Streaming page only — optional one service; refill via discover (not profile). */
@@ -3266,7 +3286,7 @@ export default function App() {
         const [data, th] = await Promise.all([fetchCataloguePhasePopular(), fetchInTheaters([])]);
         if (cancelled) return;
         const seen = new Set(data.map(m => m.id));
-        const pool = [...th.nowPlaying, ...th.popularInTheaters];
+        const pool = mergeInTheatersStripsForCatalogue(th.nowPlaying, th.popularInTheaters);
         const addedTheaters = pool.filter((m) => !seen.has(m.id));
         const merged = [...data, ...addedTheaters];
         setCatalogue(merged);
@@ -3311,7 +3331,7 @@ export default function App() {
         setInTheatersPopularRanked(th.popularInTheaters);
         setCatalogue((prev) => {
           const seen = new Set(prev.map((m) => m.id));
-          const pool = [...th.nowPlaying, ...th.popularInTheaters];
+          const pool = mergeInTheatersStripsForCatalogue(th.nowPlaying, th.popularInTheaters);
           const added = pool.filter((m) => !seen.has(m.id));
           if (added.length === 0) return prev;
           return [...prev, ...added];
@@ -4942,7 +4962,7 @@ export default function App() {
     try {
       const [data, th] = await Promise.all([fetchCatalogue(), fetchInTheaters([])]);
       const seen = new Set(data.map((m) => m.id));
-      const pool = [...th.nowPlaying, ...th.popularInTheaters];
+      const pool = mergeInTheatersStripsForCatalogue(th.nowPlaying, th.popularInTheaters);
       const addedTheaters = pool.filter((m) => !seen.has(m.id));
       const merged = [...data, ...addedTheaters];
       setCatalogue(merged);
@@ -9822,7 +9842,7 @@ export default function App() {
             <div className="section">
               <div className="section-header">
                 <div className="section-title">Popular in theaters</div>
-                <div className="section-meta">Same US releases, TMDB popularity order</div>
+                <div className="section-meta">Weekly TMDB trending — same US theatrical filters as Now Playing</div>
               </div>
               {inTheatersPagePopularRecsResolved.length === 0 ? (
                 <div className="empty-box">
