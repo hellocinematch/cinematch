@@ -868,101 +868,106 @@ async function fetchPulsePopularCatalog() {
   }
 }
 
-/**
- * Home Picks — subscription-style streaming (US TMDB). Not filtered by user-selected providers (faster, stable).
- * Phase 1: digital-release movies only (fast).
- */
-async function fetchStreamingMoviesOnly(regionKeys) {
+function filterRowsByProfileLanguageCodes(rows, langCodes) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+  if (!Array.isArray(langCodes) || langCodes.length === 0) return rows;
+  const allow = new Set(langCodes.map((c) => String(c).toLowerCase()));
+  return rows.filter((m) => allow.has(String(m?.language || "").toLowerCase()));
+}
+
+/** Main **Streaming** page — All services: movies **now** = US `flatrate`, **90d** release window, newest date first (B). */
+async function fetchStreamingPageMoviesNowAllServices(regionKeys) {
+  const fill = async (langSuffix) => {
+    const gte = dateDaysAgo(90);
+    const lte = formatIsoDate(new Date());
+    const out = [];
+    const seen = new Set();
+    for (let page = 1; page <= 5 && out.length < STREAMING_PAGE_STRIP_CAP; page++) {
+      const path = `/discover/movie?language=en-US&sort_by=primary_release_date.desc&page=${page}&region=US&watch_region=US&with_watch_monetization_types=flatrate&primary_release_date.gte=${gte}&primary_release_date.lte=${lte}${langSuffix}`;
+      const data = await fetchTMDB(path);
+      if (isTmdbApiErrorPayload(data)) break;
+      for (const item of filterDefaultExcludedGenres(data?.results || [])) {
+        if (out.length >= STREAMING_PAGE_STRIP_CAP) break;
+        if (seen.has(item.id)) continue;
+        seen.add(item.id);
+        out.push(normalizeTMDBItem(item, "movie"));
+      }
+      if ((data?.results || []).length < 1) break;
+    }
+    return out;
+  };
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
     const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
-    const digitalStart = dateDaysAgo(90);
-    const digitalEnd = formatIsoDate(new Date());
-    const digitalDiscoverBase =
-      `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&with_release_type=4&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}`;
-    const broadDateDiscoverBase =
-      `/discover/movie?language=en-US&region=US&sort_by=popularity.desc&primary_release_date.gte=${digitalStart}&primary_release_date.lte=${digitalEnd}`;
-
-    const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
-
-    const discoverToMovies = async (pathNoPage) => {
-      const moviePages = await Promise.all([1, 2].map((page) => fetchTMDB(`${pathNoPage}&page=${page}`)));
-      if (moviePages.some(isTmdbApiErrorPayload)) return [];
-      const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
-      return dedupeByTmdbId(movieResults).slice(0, 16).map((m) => normalizeTMDBItem(m, "movie"));
-    };
-
-    const trendingToMovies = async () => {
-      const trendPages = await Promise.all([1, 2].map((page) => fetchTMDB(`/trending/movie/week?language=en-US&page=${page}`)));
-      if (trendPages.some(isTmdbApiErrorPayload)) return [];
-      const rows = filterDefaultExcludedGenres(trendPages.flatMap((p) => p.results || []));
-      return dedupeByTmdbId(rows).slice(0, 16).map((m) => normalizeTMDBItem(m, "movie"));
-    };
-
-    // 1) US digital-release window (primary intent for this strip).
-    let out = await discoverToMovies(`${digitalDiscoverBase}${langQuery}`);
-    if (out.length > 0) return out;
-
-    // 2) Profile language filters often return zero rows for US digital discover; strip is labeled "broad picks".
-    if (langQuery) {
-      out = await discoverToMovies(`${digitalDiscoverBase}`);
-      if (out.length > 0) return out;
-    }
-
-    // 3) Same date window without release-type gate (TMDB digital typing can be sparse in discover).
-    out = await discoverToMovies(`${broadDateDiscoverBase}${langQuery}`);
-    if (out.length > 0) return out;
-    if (langQuery) {
-      out = await discoverToMovies(`${broadDateDiscoverBase}`);
-      if (out.length > 0) return out;
-    }
-
-    // 4) Last resort so the row is never permanently empty when TMDB discover is thin.
-    return await trendingToMovies();
+    let out = await fill(langQuery);
+    if (out.length === 0 && langQuery) out = await fill("");
+    return filterRowsByProfileLanguageCodes(out, langCodes);
   } catch {
     return [];
   }
 }
 
-/** Phase 2: TV discover + trending + per-show /tv/{id} details (slower). Not provider-filtered. */
-async function fetchStreamingTVOnly(regionKeys) {
+/** All services: movies **popular** = TMDB **trending** week (D). */
+async function fetchStreamingPageMoviesPopularAllServices(regionKeys) {
+  try {
+    const langCodes = getRegionLanguageCodes(regionKeys);
+    const pages = await Promise.all([1, 2].map((p) => fetchTMDB(`/trending/movie/week?language=en-US&page=${p}`)));
+    if (pages.some(isTmdbApiErrorPayload)) return [];
+    const merged = filterDefaultExcludedGenres(pages.flatMap((p) => p.results || []));
+    const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
+    const normalized = deduped.slice(0, STREAMING_PAGE_STRIP_CAP).map((m) => normalizeTMDBItem(m, "movie"));
+    return filterRowsByProfileLanguageCodes(normalized, langCodes);
+  } catch {
+    return [];
+  }
+}
+
+/** All services: TV **now** = US `flatrate`, `first_air_date` desc (new to SVOD; no 90d). */
+async function fetchStreamingPageTvNowAllServices(regionKeys) {
+  const fill = async (langSuffix) => {
+    const out = [];
+    const seen = new Set();
+    for (let page = 1; page <= 5 && out.length < STREAMING_PAGE_STRIP_CAP; page++) {
+      const path = `/discover/tv?language=en-US&sort_by=first_air_date.desc&page=${page}&watch_region=US&with_watch_monetization_types=flatrate${langSuffix}`;
+      const data = await fetchTMDB(path);
+      if (isTmdbApiErrorPayload(data)) break;
+      for (const item of filterDefaultExcludedGenres(data?.results || [])) {
+        if (out.length >= STREAMING_PAGE_STRIP_CAP) break;
+        if (seen.has(item.id)) continue;
+        seen.add(item.id);
+        out.push(normalizeTMDBItem(item, "tv"));
+      }
+      if ((data?.results || []).length < 1) break;
+    }
+    return out;
+  };
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
     const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
-    const tvNewSeriesStart = dateDaysAgo(180);
-    const excludedTrendingGenres = new Set([10767, 10763]); // Talk + News
-    const tvNewSeriesBase = `/discover/tv?language=en-US&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${langQuery}`;
-    const trendingTvBase = "/trending/tv/day?language=en-US";
+    let out = await fill(langQuery);
+    if (out.length === 0 && langQuery) out = await fill("");
+    return filterRowsByProfileLanguageCodes(out, langCodes);
+  } catch {
+    return [];
+  }
+}
 
-    const [tvSeriesPages, tvTrendingPages] = await Promise.all([
-      Promise.all([1, 2].map((page) => fetchTMDB(`${tvNewSeriesBase}&page=${page}`))),
-      Promise.all([1, 2].map((page) => fetchTMDB(`${trendingTvBase}&page=${page}`))),
-    ]);
-
-    const tvNewSeriesCandidates = tvSeriesPages.flatMap((page) => page.results || []);
-    const tvTrendingCandidates = tvTrendingPages
-      .flatMap((page) => page.results || [])
-      .filter((item) => {
+/** All services: TV **popular** = `trending/tv/week` (excl. talk/news like elsewhere). */
+async function fetchStreamingPageTvPopularAllServices(regionKeys) {
+  try {
+    const langCodes = getRegionLanguageCodes(regionKeys);
+    const excludedTrendingGenres = new Set([10767, 10763]);
+    const pages = await Promise.all([1, 2].map((p) => fetchTMDB(`/trending/tv/week?language=en-US&page=${p}`)));
+    if (pages.some(isTmdbApiErrorPayload)) return [];
+    const merged = filterDefaultExcludedGenres(
+      pages.flatMap((p) => p.results || []).filter((item) => {
         const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
         return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
-      });
-
-    const tvCandidates = [...new Map(
-      [...tvNewSeriesCandidates, ...tvTrendingCandidates].map((item) => [item.id, item]),
-    ).values()];
-
-    const tvDetailsMap = await fetchTvDetailsById(tvCandidates.map((item) => item.id));
-    const tvResults = tvCandidates.filter((item) => {
-      const detail = tvDetailsMap.get(item.id);
-      const seasons = Number(detail?.number_of_seasons ?? 0);
-      const isNewSeries = seasons === 1 && withinPastDays(item?.first_air_date, 180);
-      const isNewSeason = seasons > 1 && withinPastDays(detail?.last_air_date, 7);
-      const trendingEligible = tvTrendingCandidates.some((t) => t.id === item.id);
-      return isNewSeries || isNewSeason || trendingEligible;
-    });
-
-    const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
-    return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, 16).map((m) => normalizeTMDBItem(m, "tv"));
+      }),
+    );
+    const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
+    const normalized = deduped.slice(0, STREAMING_PAGE_STRIP_CAP).map((m) => normalizeTMDBItem(m, "tv"));
+    return filterRowsByProfileLanguageCodes(normalized, langCodes);
   } catch {
     return [];
   }
@@ -1573,8 +1578,15 @@ async function getOrFetchFlatrateProviderIds(movie, cacheMap) {
   return ids;
 }
 
-/** Streaming / secondary Region (streaming) — refill strips via discover (not profile); cap 20; flatrate in `watch_region`. */
-const STREAMING_PAGE_PROVIDER_REFILL_CAP = 20;
+/**
+ * Main **Streaming** page strips: pool size **25**; stagger **5 → 25** in steps of 5.
+ * Per-provider refill uses the same cap (in-service **date** row vs **popularity** row).
+ */
+const STREAMING_PAGE_STRIP_CAP = 25;
+/** @deprecated name — use {@link STREAMING_PAGE_STRIP_CAP}. */
+const STREAMING_PAGE_PROVIDER_REFILL_CAP = STREAMING_PAGE_STRIP_CAP;
+const STREAMING_PAGE_REVEAL_FIRST = 5;
+const STREAMING_PAGE_REVEAL_STEPS = [5, 10, 15, 20, 25];
 /**
  * **Secondary Region screen → Streaming** strip only: first wave 5, then 9…20 with delay (main **Streaming** page keeps 4,9,14,19,20).
  * Applies to **All services** and **per-provider** pools on that screen.
@@ -1589,7 +1601,7 @@ const SECONDARY_REGION_STREAM_REVEAL_STEPS = [5, 9, 14, 19, 20];
  * `originalLanguageQuery` = optional `&with_original_language=…` (omit for **Indian** when passing `originalLanguageAllowlist` — see 6.0.11).
  * `originalLanguageAllowlist` = e.g. Indian codes: broad US+provider discover, then keep rows that match **Indian** taste (see {@link filterNormalizedRowsByIndianSecondaryTaste}).
  * **Indian + TV + Netflix only:** `with_origin_country=IN` on discover (list payloads omit `IN` often; need dense India slice). **Prime / Hulu** omit that param so licensed Indian shows (non-`IN` origin in TMDB) still surface.
- * Sort is newest air/release first; client applies strip orders.
+ * `options.discoverSort`: **`date`** (default) = newest US release or first air; **`popularity`** = in-service TMDB popularity (main Streaming “What’s popular” with a service selected). Movies + **date** use a **90-day** `primary_release_date` window.
  */
 async function fetchStreamingPageProviderRefillPool(
   mediaType,
@@ -1600,11 +1612,21 @@ async function fetchStreamingPageProviderRefillPool(
   originalLanguageAllowlist = null,
   options = {},
 ) {
-  const { maxPage: maxPageLimit = 5, cap: resultCap = STREAMING_PAGE_PROVIDER_REFILL_CAP } = options;
+  const {
+    maxPage: maxPageLimit = 5,
+    cap: resultCap = STREAMING_PAGE_STRIP_CAP,
+    discoverSort = "date",
+  } = options;
   const type = mediaType === "movie" ? "movie" : "tv";
   const reg = encodeURIComponent(String(watchRegion || "US").toUpperCase());
   const sortBy =
-    mediaType === "movie" ? "primary_release_date.desc" : "first_air_date.desc";
+    discoverSort === "popularity"
+      ? "popularity.desc"
+      : (mediaType === "movie" ? "primary_release_date.desc" : "first_air_date.desc");
+  const movie90dWindow =
+    type === "movie" && discoverSort === "date"
+      ? `&primary_release_date.gte=${dateDaysAgo(90)}&primary_release_date.lte=${formatIsoDate(new Date())}`
+      : "";
   const allow =
     Array.isArray(originalLanguageAllowlist) && originalLanguageAllowlist.length > 0
       ? new Set(originalLanguageAllowlist.map((c) => String(c).toLowerCase()))
@@ -1621,7 +1643,7 @@ async function fetchStreamingPageProviderRefillPool(
   const seen = new Set();
   let page = 1;
   while (all.length < resultCap && page <= maxPageLimit) {
-    const path = `/discover/${type}?language=en-US&sort_by=${sortBy}&page=${page}&watch_region=${reg}&with_watch_providers=${providerId}&with_watch_monetization_types=flatrate${langSuffix}${indianTvDiscoverOrigin}`;
+    const path = `/discover/${type}?language=en-US&sort_by=${sortBy}&page=${page}&watch_region=${reg}&with_watch_providers=${providerId}&with_watch_monetization_types=flatrate${langSuffix}${indianTvDiscoverOrigin}${movie90dWindow}`;
     const data = await fetchTMDB(path);
     if (isTmdbApiErrorPayload(data)) break;
     const results = data?.results || [];
@@ -2791,9 +2813,14 @@ export default function App() {
   /** `predict_cached` over popular unrated catalogue rows (neighbor-backed preds merged into For you). */
   const [yourPicksCatalogPredictions, setYourPicksCatalogPredictions] = useState({});
   const [inTheaters, setInTheaters] = useState([]);
+  /** Merged `now ∪ popular` for match / catalogue (deduped). */
   const [streamingMovies, setStreamingMovies] = useState([]);
   const [streamingTV, setStreamingTV] = useState([]);
-  /** Two-phase streaming fetch: movies first, then TV (+ /tv/{id} details). */
+  const [streamingMoviesNow, setStreamingMoviesNow] = useState([]);
+  const [streamingMoviesPopular, setStreamingMoviesPopular] = useState([]);
+  const [streamingTVNow, setStreamingTVNow] = useState([]);
+  const [streamingTVPopular, setStreamingTVPopular] = useState([]);
+  /** Two-phase streaming fetch: movies (now+popular) first, then TV. */
   const [streamingMoviesReady, setStreamingMoviesReady] = useState(false);
   const [streamingTvReady, setStreamingTvReady] = useState(false);
   const [whatsHot, setWhatsHot] = useState([]);
@@ -2807,10 +2834,12 @@ export default function App() {
   /** Streaming page only — optional one service; refill via discover (not profile). */
   const [streamingPageProviderId, setStreamingPageProviderId] = useState(null);
   const [streamingPageRefillLoading, setStreamingPageRefillLoading] = useState(false);
-  const [streamingPageRefillMovies, setStreamingPageRefillMovies] = useState([]);
-  const [streamingPageRefillTv, setStreamingPageRefillTv] = useState([]);
-  /** How many refill rows to show in strips (4 → 9 → 14 → 19 → 20 as loads settle). */
-  const [streamingPageRefillDisplayLen, setStreamingPageRefillDisplayLen] = useState(0);
+  const [streamingPageRefillMoviesNow, setStreamingPageRefillMoviesNow] = useState([]);
+  const [streamingPageRefillMoviesPopular, setStreamingPageRefillMoviesPopular] = useState([]);
+  const [streamingPageRefillTvNow, setStreamingPageRefillTvNow] = useState([]);
+  const [streamingPageRefillTvPopular, setStreamingPageRefillTvPopular] = useState([]);
+  const [streamingPageNowDisplayLen, setStreamingPageNowDisplayLen] = useState(0);
+  const [streamingPagePopularDisplayLen, setStreamingPagePopularDisplayLen] = useState(0);
   const [selectedStreamingProviderIds, setSelectedStreamingProviderIds] = useState([]);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   // v5.0.0: Circles page state (Phase A — no Edge functions, direct supabase client calls).
@@ -2946,8 +2975,9 @@ export default function App() {
   const computeNeighborsInFlightRef = useRef(false);
   const attemptedRatedHydrationRef = useRef(new Set());
   const worthProviderCacheRef = useRef(new Map());
-  /** Deduplicate streaming page refill reveal animation when pool signature repeats. */
-  const streamingRefillRevealSigRef = useRef("");
+  /** Deduplicate main Streaming page stagger for **Now** and **Popular** rows (all services + per-provider). */
+  const streamingPageNowRevealSigRef = useRef("");
+  const streamingPagePopularRevealSigRef = useRef("");
   const secondaryRegionRefillRevealSigRef = useRef("");
   const tvStripMetaCacheRef = useRef(new Map());
   const [tvStripMetaByTmdbId, setTvStripMetaByTmdbId] = useState({});
@@ -3293,7 +3323,10 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user, showRegionKeys]);
 
-  /** Streaming page: US subscription-style pools (phase 1 = movies, phase 2 = TV + details). Optional on-page service filter; profile provider picks (Your Picks) stay separate. */
+  /**
+   * Main **Streaming** page — All services: separate **now** and **popular** pools (B + D for movies, flatrate+date
+   * and trending week for TV). Merged into `streamingMovies` / `streamingTV` for match + catalogue.
+   */
   useEffect(() => {
     if (!user || screen !== "streaming-page") return;
     let cancelled = false;
@@ -3301,13 +3334,22 @@ export default function App() {
     setStreamingTvReady(false);
     const defer = setTimeout(() => {
       (async () => {
-        let sm = [];
+        let mNow = [];
+        let mPop = [];
+        let tNow = [];
+        let tPop = [];
         try {
-          sm = await fetchStreamingMoviesOnly(showRegionKeys);
+          [mNow, mPop] = await Promise.all([
+            fetchStreamingPageMoviesNowAllServices(showRegionKeys),
+            fetchStreamingPageMoviesPopularAllServices(showRegionKeys),
+          ]);
         } catch (e) {
           console.error(e);
         }
         if (cancelled) return;
+        setStreamingMoviesNow(mNow);
+        setStreamingMoviesPopular(mPop);
+        const sm = dedupeMediaRowsById([...mNow, ...mPop]);
         setStreamingMovies(sm);
         setStreamingMoviesReady(true);
         setCatalogue((prev) => {
@@ -3317,13 +3359,18 @@ export default function App() {
           return [...prev, ...added];
         });
 
-        let st = [];
         try {
-          st = await fetchStreamingTVOnly(showRegionKeys);
+          [tNow, tPop] = await Promise.all([
+            fetchStreamingPageTvNowAllServices(showRegionKeys),
+            fetchStreamingPageTvPopularAllServices(showRegionKeys),
+          ]);
         } catch (e) {
           console.error(e);
         }
         if (cancelled) return;
+        setStreamingTVNow(tNow);
+        setStreamingTVPopular(tPop);
+        const st = dedupeMediaRowsById([...tNow, ...tPop]);
         setStreamingTV(st);
         setStreamingTvReady(true);
         setCatalogue((prev) => {
@@ -3506,14 +3553,39 @@ export default function App() {
     return streamingTV.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
   }, [streamingTV, user, showGenreIds, showRegionKeys]);
 
-  const streamingPageRefillMoviesFiltered = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillMovies;
-    return streamingPageRefillMovies.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingPageRefillMovies, user, showGenreIds, showRegionKeys]);
-  const streamingPageRefillTvFiltered = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillTv;
-    return streamingPageRefillTv.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingPageRefillTv, user, showGenreIds, showRegionKeys]);
+  const streamingMoviesNowForRecs = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingMoviesNow;
+    return streamingMoviesNow.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingMoviesNow, user, showGenreIds, showRegionKeys]);
+  const streamingMoviesPopularForRecs = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingMoviesPopular;
+    return streamingMoviesPopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingMoviesPopular, user, showGenreIds, showRegionKeys]);
+  const streamingTVNowForRecs = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingTVNow;
+    return streamingTVNow.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingTVNow, user, showGenreIds, showRegionKeys]);
+  const streamingTVPopularForRecs = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingTVPopular;
+    return streamingTVPopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingTVPopular, user, showGenreIds, showRegionKeys]);
+
+  const streamingPageRefillMoviesNowFiltered = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillMoviesNow;
+    return streamingPageRefillMoviesNow.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingPageRefillMoviesNow, user, showGenreIds, showRegionKeys]);
+  const streamingPageRefillMoviesPopularFiltered = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillMoviesPopular;
+    return streamingPageRefillMoviesPopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingPageRefillMoviesPopular, user, showGenreIds, showRegionKeys]);
+  const streamingPageRefillTvNowFiltered = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillTvNow;
+    return streamingPageRefillTvNow.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingPageRefillTvNow, user, showGenreIds, showRegionKeys]);
+  const streamingPageRefillTvPopularFiltered = useMemo(() => {
+    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillTvPopular;
+    return streamingPageRefillTvPopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+  }, [streamingPageRefillTvPopular, user, showGenreIds, showRegionKeys]);
 
   /** Secondary Region service refill: do not apply profile `showGenreIds` / `showRegionKeys` (taste = secondary bucket + TMDB). */
   const secondaryRegionRefillMoviesFiltered = useMemo(() => {
@@ -3525,107 +3597,298 @@ export default function App() {
     return secondaryRegionRefillTv;
   }, [secondaryRegionRefillTv, user]);
 
-  const streamingMoviesForPageStrips = useMemo(() => {
-    if (streamingPageProviderId == null) return streamingMoviesForRecs;
-    return streamingPageRefillMoviesFiltered.slice(
-      0,
-      Math.min(streamingPageRefillDisplayLen, STREAMING_PAGE_PROVIDER_REFILL_CAP),
-    );
+  const streamingMoviesForPredict = useMemo(() => {
+    if (streamingPageProviderId == null) {
+      return dedupeMediaRowsById([...streamingMoviesNowForRecs, ...streamingMoviesPopularForRecs]);
+    }
+    return dedupeMediaRowsById([
+      ...streamingPageRefillMoviesNowFiltered,
+      ...streamingPageRefillMoviesPopularFiltered,
+    ]);
   }, [
     streamingPageProviderId,
-    streamingMoviesForRecs,
-    streamingPageRefillMoviesFiltered,
-    streamingPageRefillDisplayLen,
+    streamingMoviesNowForRecs,
+    streamingMoviesPopularForRecs,
+    streamingPageRefillMoviesNowFiltered,
+    streamingPageRefillMoviesPopularFiltered,
   ]);
-  const streamingTVForPageStrips = useMemo(() => {
-    if (streamingPageProviderId == null) return streamingTVForRecs;
-    return streamingPageRefillTvFiltered.slice(
-      0,
-      Math.min(streamingPageRefillDisplayLen, STREAMING_PAGE_PROVIDER_REFILL_CAP),
-    );
-  }, [streamingPageProviderId, streamingTVForRecs, streamingPageRefillTvFiltered, streamingPageRefillDisplayLen]);
-
-  const streamingMoviesForPredict = useMemo(() => {
-    if (streamingPageProviderId == null) return streamingMoviesForRecs;
-    return streamingPageRefillMoviesFiltered;
-  }, [streamingPageProviderId, streamingMoviesForRecs, streamingPageRefillMoviesFiltered]);
   const streamingTVForPredict = useMemo(() => {
-    if (streamingPageProviderId == null) return streamingTVForRecs;
-    return streamingPageRefillTvFiltered;
-  }, [streamingPageProviderId, streamingTVForRecs, streamingPageRefillTvFiltered]);
+    if (streamingPageProviderId == null) {
+      return dedupeMediaRowsById([...streamingTVNowForRecs, ...streamingTVPopularForRecs]);
+    }
+    return dedupeMediaRowsById([
+      ...streamingPageRefillTvNowFiltered,
+      ...streamingPageRefillTvPopularFiltered,
+    ]);
+  }, [
+    streamingPageProviderId,
+    streamingTVNowForRecs,
+    streamingTVPopularForRecs,
+    streamingPageRefillTvNowFiltered,
+    streamingPageRefillTvPopularFiltered,
+  ]);
 
   useEffect(() => {
     if (screen !== "streaming-page" || streamingPageProviderId == null) {
       setStreamingPageRefillLoading(false);
-      setStreamingPageRefillMovies([]);
-      setStreamingPageRefillTv([]);
-      setStreamingPageRefillDisplayLen(0);
-      streamingRefillRevealSigRef.current = "";
+      setStreamingPageRefillMoviesNow([]);
+      setStreamingPageRefillMoviesPopular([]);
+      setStreamingPageRefillTvNow([]);
+      setStreamingPageRefillTvPopular([]);
+      setStreamingPageNowDisplayLen(0);
+      setStreamingPagePopularDisplayLen(0);
       return;
     }
     const media = streamingTab === "movie" ? "movie" : "tv";
+    const langCodes = getRegionLanguageCodes(showRegionKeys);
+    const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
     let cancelled = false;
-    streamingRefillRevealSigRef.current = "";
+    streamingPageNowRevealSigRef.current = "";
+    streamingPagePopularRevealSigRef.current = "";
     setStreamingPageRefillLoading(true);
-    setStreamingPageRefillDisplayLen(0);
-    if (media === "movie") setStreamingPageRefillMovies([]);
-    else setStreamingPageRefillTv([]);
+    setStreamingPageNowDisplayLen(0);
+    setStreamingPagePopularDisplayLen(0);
+    if (media === "movie") {
+      setStreamingPageRefillMoviesNow([]);
+      setStreamingPageRefillMoviesPopular([]);
+    } else {
+      setStreamingPageRefillTvNow([]);
+      setStreamingPageRefillTvPopular([]);
+    }
 
     (async () => {
-      const pool = await fetchStreamingPageProviderRefillPool(
-        media,
-        streamingPageProviderId,
-        (partial) => {
-          if (cancelled) return;
-          const next = partial.slice(0, STREAMING_PAGE_PROVIDER_REFILL_CAP);
-          if (media === "movie") setStreamingPageRefillMovies(next);
-          else setStreamingPageRefillTv(next);
-        },
-      );
-      if (cancelled) return;
-      if (media === "movie") setStreamingPageRefillMovies(pool);
-      else setStreamingPageRefillTv(pool);
+      if (media === "movie") {
+        const [poolNow, poolPop] = await Promise.all([
+          fetchStreamingPageProviderRefillPool(
+            "movie",
+            streamingPageProviderId,
+            (partial) => {
+              if (cancelled) return;
+              setStreamingPageRefillMoviesNow(partial.slice(0, STREAMING_PAGE_STRIP_CAP));
+            },
+            "US",
+            langQuery,
+            null,
+            { discoverSort: "date" },
+          ),
+          fetchStreamingPageProviderRefillPool(
+            "movie",
+            streamingPageProviderId,
+            (partial) => {
+              if (cancelled) return;
+              setStreamingPageRefillMoviesPopular(partial.slice(0, STREAMING_PAGE_STRIP_CAP));
+            },
+            "US",
+            langQuery,
+            null,
+            { discoverSort: "popularity" },
+          ),
+        ]);
+        if (cancelled) return;
+        setStreamingPageRefillMoviesNow(poolNow);
+        setStreamingPageRefillMoviesPopular(poolPop);
+      } else {
+        const [poolNow, poolPop] = await Promise.all([
+          fetchStreamingPageProviderRefillPool(
+            "tv",
+            streamingPageProviderId,
+            (partial) => {
+              if (cancelled) return;
+              setStreamingPageRefillTvNow(partial.slice(0, STREAMING_PAGE_STRIP_CAP));
+            },
+            "US",
+            langQuery,
+            null,
+            { discoverSort: "date" },
+          ),
+          fetchStreamingPageProviderRefillPool(
+            "tv",
+            streamingPageProviderId,
+            (partial) => {
+              if (cancelled) return;
+              setStreamingPageRefillTvPopular(partial.slice(0, STREAMING_PAGE_STRIP_CAP));
+            },
+            "US",
+            langQuery,
+            null,
+            { discoverSort: "popularity" },
+          ),
+        ]);
+        if (cancelled) return;
+        setStreamingPageRefillTvNow(poolNow);
+        setStreamingPageRefillTvPopular(poolPop);
+      }
       setStreamingPageRefillLoading(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [screen, streamingPageProviderId, streamingTab]);
+  }, [screen, streamingPageProviderId, streamingTab, showRegionKeys]);
 
   useEffect(() => {
-    if (streamingPageProviderId == null) return;
-    const poolF =
-      streamingTab === "movie" ? streamingPageRefillMoviesFiltered : streamingPageRefillTvFiltered;
-    const n = poolF.length;
+    if (screen !== "streaming-page" || streamingPageProviderId == null) return;
+    const n =
+      (streamingTab === "movie" ? streamingPageRefillMoviesNowFiltered : streamingPageRefillTvNowFiltered)
+        .length;
     if (n === 0) {
-      setStreamingPageRefillDisplayLen(0);
+      setStreamingPageNowDisplayLen(0);
       return;
     }
     if (streamingPageRefillLoading) {
-      setStreamingPageRefillDisplayLen((p) => Math.max(p, Math.min(4, n)));
+      setStreamingPageNowDisplayLen((p) => Math.max(p, Math.min(STREAMING_PAGE_REVEAL_FIRST, n)));
       return;
     }
-    const sig = `${streamingPageProviderId}-${streamingTab}-${n}`;
-    if (streamingRefillRevealSigRef.current === sig) return;
-    streamingRefillRevealSigRef.current = sig;
-    const steps = [4, 9, 14, 19, 20].map((s) => Math.min(s, n));
-    const uniq = [...new Set(steps)].sort((a, b) => a - b);
-    const timers = [];
-    let delay = 0;
-    uniq.forEach((step, i) => {
-      delay += i === 0 ? 0 : 120;
-      timers.push(setTimeout(() => setStreamingPageRefillDisplayLen(step), delay));
-    });
+    const sig = `pnow-${streamingPageProviderId}-${streamingTab}-${n}`;
+    if (streamingPageNowRevealSigRef.current === sig) return;
+    streamingPageNowRevealSigRef.current = sig;
+    const cap = Math.min(n, STREAMING_PAGE_STRIP_CAP);
+    const first = Math.min(STREAMING_PAGE_REVEAL_FIRST, cap);
+    setStreamingPageNowDisplayLen(first);
+    const rest = STREAMING_PAGE_REVEAL_STEPS
+      .map((s) => Math.min(s, cap))
+      .filter((s) => s > first);
+    const timers = rest.map(
+      (step, i) => setTimeout(() => setStreamingPageNowDisplayLen(step), 120 * (i + 1)),
+    );
     return () => {
       timers.forEach(clearTimeout);
     };
   }, [
+    screen,
     streamingPageProviderId,
     streamingTab,
     streamingPageRefillLoading,
-    streamingPageRefillMoviesFiltered,
-    streamingPageRefillTvFiltered,
+    streamingPageRefillMoviesNowFiltered,
+    streamingPageRefillTvNowFiltered,
+  ]);
+
+  useEffect(() => {
+    if (screen !== "streaming-page" || streamingPageProviderId == null) return;
+    const n =
+      (streamingTab === "movie"
+        ? streamingPageRefillMoviesPopularFiltered
+        : streamingPageRefillTvPopularFiltered).length;
+    if (n === 0) {
+      setStreamingPagePopularDisplayLen(0);
+      return;
+    }
+    if (streamingPageRefillLoading) {
+      setStreamingPagePopularDisplayLen((p) => Math.max(p, Math.min(STREAMING_PAGE_REVEAL_FIRST, n)));
+      return;
+    }
+    const sig = `ppop-${streamingPageProviderId}-${streamingTab}-${n}`;
+    if (streamingPagePopularRevealSigRef.current === sig) return;
+    streamingPagePopularRevealSigRef.current = sig;
+    const cap = Math.min(n, STREAMING_PAGE_STRIP_CAP);
+    const first = Math.min(STREAMING_PAGE_REVEAL_FIRST, cap);
+    setStreamingPagePopularDisplayLen(first);
+    const rest = STREAMING_PAGE_REVEAL_STEPS
+      .map((s) => Math.min(s, cap))
+      .filter((s) => s > first);
+    const timers = rest.map(
+      (step, i) => setTimeout(() => setStreamingPagePopularDisplayLen(step), 120 * (i + 1)),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [
+    screen,
+    streamingPageProviderId,
+    streamingTab,
+    streamingPageRefillLoading,
+    streamingPageRefillMoviesPopularFiltered,
+    streamingPageRefillTvPopularFiltered,
+  ]);
+
+  useEffect(() => {
+    if (screen !== "streaming-page") {
+      setStreamingPageNowDisplayLen(0);
+      return;
+    }
+    if (streamingPageProviderId != null) return;
+    if (streamingTab === "movie") {
+      if (!streamingMoviesReady) return;
+    } else if (!streamingTvReady) {
+      return;
+    }
+    const nNow =
+      streamingTab === "movie"
+        ? streamingMoviesNowForRecs.length
+        : streamingTVNowForRecs.length;
+    if (nNow === 0) {
+      setStreamingPageNowDisplayLen(0);
+      return;
+    }
+    const cap = Math.min(nNow, STREAMING_PAGE_STRIP_CAP);
+    const sig = `anow-${streamingTab}-${nNow}-${String(showRegionKeys)}`;
+    if (streamingPageNowRevealSigRef.current === sig) return;
+    streamingPageNowRevealSigRef.current = sig;
+    const first = Math.min(STREAMING_PAGE_REVEAL_FIRST, cap);
+    setStreamingPageNowDisplayLen(first);
+    const rest = STREAMING_PAGE_REVEAL_STEPS
+      .map((s) => Math.min(s, cap))
+      .filter((s) => s > first);
+    const timers = rest.map(
+      (step, i) => setTimeout(() => setStreamingPageNowDisplayLen(step), 120 * (i + 1)),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [
+    screen,
+    streamingPageProviderId,
+    streamingTab,
+    streamingMoviesReady,
+    streamingTvReady,
+    streamingMoviesNowForRecs,
+    streamingTVNowForRecs,
+    showRegionKeys,
+  ]);
+
+  useEffect(() => {
+    if (screen !== "streaming-page") {
+      setStreamingPagePopularDisplayLen(0);
+      return;
+    }
+    if (streamingPageProviderId != null) return;
+    if (streamingTab === "movie") {
+      if (!streamingMoviesReady) return;
+    } else if (!streamingTvReady) {
+      return;
+    }
+    const nPop =
+      streamingTab === "movie"
+        ? streamingMoviesPopularForRecs.length
+        : streamingTVPopularForRecs.length;
+    if (nPop === 0) {
+      setStreamingPagePopularDisplayLen(0);
+      return;
+    }
+    const cap = Math.min(nPop, STREAMING_PAGE_STRIP_CAP);
+    const sig = `apop-${streamingTab}-${nPop}-${String(showRegionKeys)}`;
+    if (streamingPagePopularRevealSigRef.current === sig) return;
+    streamingPagePopularRevealSigRef.current = sig;
+    const first = Math.min(STREAMING_PAGE_REVEAL_FIRST, cap);
+    setStreamingPagePopularDisplayLen(first);
+    const rest = STREAMING_PAGE_REVEAL_STEPS
+      .map((s) => Math.min(s, cap))
+      .filter((s) => s > first);
+    const timers = rest.map(
+      (step, i) => setTimeout(() => setStreamingPagePopularDisplayLen(step), 120 * (i + 1)),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [
+    screen,
+    streamingPageProviderId,
+    streamingTab,
+    streamingMoviesReady,
+    streamingTvReady,
+    streamingMoviesPopularForRecs,
+    streamingTVPopularForRecs,
+    showRegionKeys,
   ]);
 
   useEffect(() => {
@@ -4652,6 +4915,16 @@ export default function App() {
     setSecondaryBlockStreamingTab("tv");
     setStreamingMovies([]);
     setStreamingTV([]);
+    setStreamingMoviesNow([]);
+    setStreamingMoviesPopular([]);
+    setStreamingTVNow([]);
+    setStreamingTVPopular([]);
+    setStreamingPageRefillMoviesNow([]);
+    setStreamingPageRefillMoviesPopular([]);
+    setStreamingPageRefillTvNow([]);
+    setStreamingPageRefillTvPopular([]);
+    setStreamingPageNowDisplayLen(0);
+    setStreamingPagePopularDisplayLen(0);
     setWhatsHot([]);
     setWhatsHotReady(false);
     setPulseTrending([]);
@@ -4894,41 +5167,77 @@ export default function App() {
   const streamingRecs = streamingTab === "movie" ? streamingMovieRecsResolved : streamingTvRecsResolved;
 
   /**
-   * Streaming page derives two strips over the same pool: **Now Streaming** (release / air-date desc)
-   * and **What’s popular in streaming** (TMDB popularity desc). `predict_cached` scores overlay via id map
-   * when `matchData.streamingMovieRecs` / `streamingTvRecs` are present; TMDB fallback otherwise.
+   * Streaming page: **Now** and **Popular** use **different** TMDB pools (all services: B+D for movies, etc.);
+   * with a service: date-ordered vs in-service popularity. Stagger **5→25** via `streamingPage*DisplayLen`.
    */
   const streamingMoviesNowResolved = useMemo(() => {
     const fromMatch = matchData?.streamingMovieRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
-    return sortStreamingByReleaseDateDesc(streamingMoviesForPageStrips).map(
-      (m) => byId?.[m.id] ?? tmdbOnlyRec(m),
-    );
-  }, [matchData?.streamingMovieRecs, streamingMoviesForPageStrips]);
+    const base =
+      streamingPageProviderId == null
+        ? streamingMoviesNowForRecs
+        : streamingPageRefillMoviesNowFiltered;
+    const sorted = sortStreamingByReleaseDateDesc(base);
+    const cap = Math.min(streamingPageNowDisplayLen, STREAMING_PAGE_STRIP_CAP, sorted.length);
+    return sorted.slice(0, cap).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
+  }, [
+    matchData?.streamingMovieRecs,
+    streamingPageProviderId,
+    streamingMoviesNowForRecs,
+    streamingPageRefillMoviesNowFiltered,
+    streamingPageNowDisplayLen,
+  ]);
 
   const streamingMoviesPopularResolved = useMemo(() => {
     const fromMatch = matchData?.streamingMovieRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
-    return sortStreamingByPopularityDesc(streamingMoviesForPageStrips).map(
-      (m) => byId?.[m.id] ?? tmdbOnlyRec(m),
-    );
-  }, [matchData?.streamingMovieRecs, streamingMoviesForPageStrips]);
+    const base =
+      streamingPageProviderId == null
+        ? streamingMoviesPopularForRecs
+        : streamingPageRefillMoviesPopularFiltered;
+    const sorted = sortStreamingByPopularityDesc(base);
+    const cap = Math.min(streamingPagePopularDisplayLen, STREAMING_PAGE_STRIP_CAP, sorted.length);
+    return sorted.slice(0, cap).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
+  }, [
+    matchData?.streamingMovieRecs,
+    streamingPageProviderId,
+    streamingMoviesPopularForRecs,
+    streamingPageRefillMoviesPopularFiltered,
+    streamingPagePopularDisplayLen,
+  ]);
 
   const streamingTvNowResolved = useMemo(() => {
     const fromMatch = matchData?.streamingTvRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
-    return sortStreamingByReleaseDateDesc(streamingTVForPageStrips).map(
-      (m) => byId?.[m.id] ?? tmdbOnlyRec(m),
-    );
-  }, [matchData?.streamingTvRecs, streamingTVForPageStrips]);
+    const base = streamingPageProviderId == null ? streamingTVNowForRecs : streamingPageRefillTvNowFiltered;
+    const sorted = sortStreamingByReleaseDateDesc(base);
+    const cap = Math.min(streamingPageNowDisplayLen, STREAMING_PAGE_STRIP_CAP, sorted.length);
+    return sorted.slice(0, cap).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
+  }, [
+    matchData?.streamingTvRecs,
+    streamingPageProviderId,
+    streamingTVNowForRecs,
+    streamingPageRefillTvNowFiltered,
+    streamingPageNowDisplayLen,
+  ]);
 
   const streamingTvPopularResolved = useMemo(() => {
     const fromMatch = matchData?.streamingTvRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
-    return sortStreamingByPopularityDesc(streamingTVForPageStrips).map(
-      (m) => byId?.[m.id] ?? tmdbOnlyRec(m),
-    );
-  }, [matchData?.streamingTvRecs, streamingTVForPageStrips]);
+    const base =
+      streamingPageProviderId == null
+        ? streamingTVPopularForRecs
+        : streamingPageRefillTvPopularFiltered;
+    const sorted = sortStreamingByPopularityDesc(base);
+    const cap = Math.min(streamingPagePopularDisplayLen, STREAMING_PAGE_STRIP_CAP, sorted.length);
+    return sorted.slice(0, cap).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
+  }, [
+    matchData?.streamingTvRecs,
+    streamingPageProviderId,
+    streamingTVPopularForRecs,
+    streamingPageRefillTvPopularFiltered,
+    streamingPagePopularDisplayLen,
+  ]);
 
   const streamingNowRecs = streamingTab === "movie" ? streamingMoviesNowResolved : streamingTvNowResolved;
   const streamingPopularRecs = streamingTab === "movie" ? streamingMoviesPopularResolved : streamingTvPopularResolved;
@@ -4949,8 +5258,10 @@ export default function App() {
     streamingPageProviderId != null &&
       streamingPageRefillLoading &&
       (streamingTab === "movie"
-        ? streamingPageRefillMoviesFiltered.length === 0
-        : streamingPageRefillTvFiltered.length === 0),
+        ? streamingPageRefillMoviesNowFiltered.length === 0
+          && streamingPageRefillMoviesPopularFiltered.length === 0
+        : streamingPageRefillTvNowFiltered.length === 0
+          && streamingPageRefillTvPopularFiltered.length === 0),
   );
   const showStreamingStripsSkeleton =
     showStreamingMovieSkeleton ||
@@ -9622,7 +9933,11 @@ export default function App() {
             <div className="section">
               <div className="section-header">
                 <div className="section-title">What&apos;s popular in streaming</div>
-                <div className="section-meta">Same pool, TMDB popularity order</div>
+                <div className="section-meta">
+                  {streamingPageProviderId == null
+                    ? "Trending this week on TMDB"
+                    : "Most popular on this service (US, subscription)"}
+                </div>
               </div>
               {showStreamingStripsSkeleton ? (
                 <SkeletonStrip />

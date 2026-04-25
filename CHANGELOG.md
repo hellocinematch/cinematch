@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.0.18
+
+- **Streaming page (main):** **Now** and **What’s popular** use **separate** TMDB pools (no longer one list, two sorts). **All services — Movies:** *Now* = US `flatrate`, **90-day** `primary_release_date`, newest first; *Popular* = **`/trending/movie/week`**. **All services — Series:** *Now* = US `flatrate`, `first_air_date` desc; *Popular* = **`/trending/tv/week`** (excl. talk/news). **With a service:** *Now* = that provider + US `flatrate`, date sort (movies also **90d** window via discover); *Popular* = same provider + **`popularity.desc`** (in-service). Pool cap **25** for each strip; reveal **5** then **10, 15, 20, 25** (~120ms steps) for **both** rows independently. `fetchStreamingPageProviderRefillPool` gains `options.discoverSort` (`date` \| `popularity`) and **90d** window for **movie** + **date**. Profile region languages apply to main-page provider discover via `with_original_language`. Removed legacy single-refill stagger **4→20** on this page.
+
 ## 6.0.17
 
 - **Secondary Region → Streaming, All services, Movies:** After the existing **~90d** + **trending** path, the pool is now widened for **every** secondary taste (not only Indian): **US `flatrate`** discover (`primary_release_date.desc`, no date window) with the same `with_original_language` query as the tight path when applicable, then if unique count is still **under 12**, **6** parallel **per-provider** `discover/movie` pulls (cap **8** each, 1 page) — parallel to the **Series** All-services strategy. **Indian** still uses the same Indian taste on broad `flatrate` + per-provider; final cap **25** and strip stagger unchanged.
