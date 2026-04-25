@@ -442,6 +442,30 @@ function filterNormalizedRowsByIndianSecondaryTaste(rows, langCodes) {
   });
 }
 
+/**
+ * Deduplicate by TMDB id; keep **newer** `releaseDate` (then popularity) for secondary streaming strips.
+ * `cap` = {@link SECONDARY_STRIP_TAB_CAP} in practice.
+ */
+function mergeSecondaryStripByNewestUnique(rows, cap) {
+  if (!Array.isArray(rows) || cap < 1) return [];
+  const sorted = [...rows].sort((a, b) => {
+    const da = a?.releaseDate || "0000-00-00";
+    const db = b?.releaseDate || "0000-00-00";
+    if (db !== da) return String(db).localeCompare(String(da));
+    return (Number(b?.popularity) || 0) - (Number(a?.popularity) || 0);
+  });
+  const seen = new Set();
+  const out = [];
+  for (const m of sorted) {
+    if (m?.tmdbId == null) continue;
+    if (seen.has(m.tmdbId)) continue;
+    seen.add(m.tmdbId);
+    out.push(m);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
 /** /discover/tv uses first_air_date.* — movie uses primary_release_date.* */
 function tmdbTvParamsFromMovieParams(movieOriented) {
   const tv = new URLSearchParams(movieOriented.toString());
@@ -1025,9 +1049,265 @@ async function fetchInTheatersForMarket(tmdbRegionIso, langCodes = []) {
   }
 }
 
+const SECONDARY_INDIAN_FLATRATE_DISCOVER_MAX_PAGE = 5;
+/** Shallow 1 page / small cap each — when All-services pool is still short after flatrate (Indian TV + movies; non-Indian movies). */
+const SECONDARY_INDIAN_BROAD_PROVIDERS_TAKE = 6;
+/** After base + US `flatrate` merge, run per-provider discover if unique count is still below this (matches Series). */
+const SECONDARY_ALLSVC_MOVIE_PROVIDER_WIDEN_BELOW = 12;
+const noopStreamingRefill = () => {};
+
+/**
+ * **Indian secondary, All services, movies:** US `flatrate` discover (no single `with_watch_providers`) to pad the
+ * 90d/trending pool when taste leaves too few rows.
+ */
+async function fetchDiscoverMovieUsSubscriptionFlatrateBroad(
+  tmdbRegionIso,
+  clientLangs,
+  maxCollect,
+) {
+  if (!Array.isArray(clientLangs) || clientLangs.length < 1) return [];
+  const reg = encodeURIComponent(tmdbRegionIso);
+  const out = [];
+  const seen = new Set();
+  for (let page = 1; page <= SECONDARY_INDIAN_FLATRATE_DISCOVER_MAX_PAGE && out.length < maxCollect; page++) {
+    const path = `/discover/movie?language=en-US&sort_by=primary_release_date.desc&page=${page}&region=${reg}&watch_region=${reg}&with_watch_monetization_types=flatrate`;
+    const data = await fetchTMDB(path);
+    if (isTmdbApiErrorPayload(data)) break;
+    const results = filterDefaultExcludedGenres(data?.results || []);
+    for (const item of results) {
+      if (out.length >= maxCollect) break;
+      if (seen.has(item.id)) continue;
+      const norm = normalizeTMDBItem(item, "movie");
+      if (!filterNormalizedRowsByIndianSecondaryTaste([norm], clientLangs).length) continue;
+      seen.add(item.id);
+      out.push(norm);
+    }
+    if ((data?.results || []).length < 1) break;
+  }
+  return out;
+}
+
+/**
+ * **Non-Indian** secondary, All services **movies:** US `flatrate` discover with optional
+ * `&with_original_language=…` (same shape as 90d paths) — no calendar window; sorts newest first, paged.
+ */
+async function fetchDiscoverMovieUsFlatrateBroadWithLangSuffix(
+  tmdbRegionIso,
+  langQuerySuffix,
+  maxCollect,
+) {
+  const reg = encodeURIComponent(tmdbRegionIso);
+  const suff = typeof langQuerySuffix === "string" ? langQuerySuffix : "";
+  const out = [];
+  const seen = new Set();
+  for (let page = 1; page <= SECONDARY_INDIAN_FLATRATE_DISCOVER_MAX_PAGE && out.length < maxCollect; page++) {
+    const path = `/discover/movie?language=en-US&sort_by=primary_release_date.desc&page=${page}&region=${reg}&watch_region=${reg}&with_watch_monetization_types=flatrate${suff}`;
+    const data = await fetchTMDB(path);
+    if (isTmdbApiErrorPayload(data)) break;
+    const results = filterDefaultExcludedGenres(data?.results || []);
+    for (const item of results) {
+      if (out.length >= maxCollect) break;
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      out.push(normalizeTMDBItem(item, "movie"));
+    }
+    if ((data?.results || []).length < 1) break;
+  }
+  return out;
+}
+
+/**
+ * Shallow per-provider US `discover` for **movies** (All services) — same as service strip, small cap per service.
+ * @param {string} tmdbRegionIso
+ * @param {string[]|null} clientLangs — Indian allowlist, or `null` / empty to use `originalLanguageQuery` on discover only.
+ * @param {string} [originalLanguageQuery] — e.g. `&with_original_language=ko` for non-Indian secondary.
+ */
+async function fetchDiscoverSecondaryMovieShallowFromTopProviders(
+  tmdbRegionIso,
+  clientLangs,
+  originalLanguageQuery = "",
+) {
+  const slice = STREAMING_SERVICES.slice(0, SECONDARY_INDIAN_BROAD_PROVIDERS_TAKE);
+  const isIndian = Array.isArray(clientLangs) && clientLangs.length > 0;
+  const q = typeof originalLanguageQuery === "string" ? originalLanguageQuery : "";
+  const pools = await Promise.all(
+    slice.map((s) =>
+      fetchStreamingPageProviderRefillPool(
+        "movie",
+        s.id,
+        noopStreamingRefill,
+        tmdbRegionIso,
+        isIndian ? "" : q,
+        isIndian ? clientLangs : null,
+        { maxPage: 1, cap: 8 },
+      ),
+    ),
+  );
+  return pools.flat();
+}
+
+/**
+ * Widen the **All services** movie pool: US `flatrate` (no 90d cap), then per-provider if still thin — Indian and non-Indian.
+ */
+async function widenSecondaryAllServicesMoviePool(
+  tmdbRegionIso,
+  tmdbLangSuffix,
+  clientLangs,
+  baseRows,
+) {
+  let merged = mergeSecondaryStripByNewestUnique(
+    [...(baseRows || [])],
+    SECONDARY_STRIP_TAB_CAP * 2,
+  );
+  if (merged.length >= SECONDARY_STRIP_TAB_CAP) {
+    return merged.slice(0, SECONDARY_STRIP_TAB_CAP);
+  }
+  if (clientLangs) {
+    const flat = await fetchDiscoverMovieUsSubscriptionFlatrateBroad(
+      tmdbRegionIso,
+      clientLangs,
+      SECONDARY_STRIP_TAB_CAP * 2,
+    );
+    merged = mergeSecondaryStripByNewestUnique([...merged, ...flat], SECONDARY_STRIP_TAB_CAP * 2);
+    if (merged.length < SECONDARY_ALLSVC_MOVIE_PROVIDER_WIDEN_BELOW) {
+      const prov = await fetchDiscoverSecondaryMovieShallowFromTopProviders(
+        tmdbRegionIso,
+        clientLangs,
+        "",
+      );
+      merged = mergeSecondaryStripByNewestUnique([...merged, ...prov], SECONDARY_STRIP_TAB_CAP * 2);
+    }
+    return mergeSecondaryStripByNewestUnique(merged, SECONDARY_STRIP_TAB_CAP);
+  }
+  const flat = await fetchDiscoverMovieUsFlatrateBroadWithLangSuffix(
+    tmdbRegionIso,
+    tmdbLangSuffix || "",
+    SECONDARY_STRIP_TAB_CAP * 2,
+  );
+  merged = mergeSecondaryStripByNewestUnique([...merged, ...flat], SECONDARY_STRIP_TAB_CAP * 2);
+  if (merged.length < SECONDARY_ALLSVC_MOVIE_PROVIDER_WIDEN_BELOW) {
+    const prov = await fetchDiscoverSecondaryMovieShallowFromTopProviders(
+      tmdbRegionIso,
+      null,
+      tmdbLangSuffix || "",
+    );
+    merged = mergeSecondaryStripByNewestUnique([...merged, ...prov], SECONDARY_STRIP_TAB_CAP * 2);
+  }
+  return mergeSecondaryStripByNewestUnique(merged, SECONDARY_STRIP_TAB_CAP);
+}
+
+/**
+ * **Indian secondary, All services, TV:** US subscription discover without a single provider id (broad `flatrate` pool).
+ * Falls back to nothing if TMDB returns an error for this query shape in some regions.
+ */
+async function fetchDiscoverTvUsSubscriptionFlatrateBroad(
+  tmdbRegionIso,
+  clientLangs,
+  maxCollect,
+) {
+  if (!Array.isArray(clientLangs) || clientLangs.length < 1) return [];
+  const reg = encodeURIComponent(tmdbRegionIso);
+  const out = [];
+  const seen = new Set();
+  for (let page = 1; page <= SECONDARY_INDIAN_FLATRATE_DISCOVER_MAX_PAGE && out.length < maxCollect; page++) {
+    const path = `/discover/tv?language=en-US&sort_by=first_air_date.desc&page=${page}&watch_region=${reg}&with_watch_monetization_types=flatrate`;
+    const data = await fetchTMDB(path);
+    if (isTmdbApiErrorPayload(data)) break;
+    const results = filterDefaultExcludedGenres(data?.results || []);
+    for (const item of results) {
+      if (out.length >= maxCollect) break;
+      if (seen.has(item.id)) continue;
+      const norm = normalizeTMDBItem(item, "tv");
+      if (!filterNormalizedRowsByIndianSecondaryTaste([norm], clientLangs).length) continue;
+      seen.add(item.id);
+      out.push(norm);
+    }
+    if ((data?.results || []).length < 1) break;
+  }
+  return out;
+}
+
+/**
+ * Shallow per-provider US `discover` (same as service strip) — used only to widen the Indian **All services** TV pool.
+ */
+async function fetchDiscoverIndianSecondaryTvShallowFromTopProviders(
+  tmdbRegionIso,
+  clientLangs,
+) {
+  if (!Array.isArray(clientLangs) || clientLangs.length < 1) return [];
+  const slice = STREAMING_SERVICES.slice(0, SECONDARY_INDIAN_BROAD_PROVIDERS_TAKE);
+  const pools = await Promise.all(
+    slice.map((s) =>
+      fetchStreamingPageProviderRefillPool(
+        "tv",
+        s.id,
+        noopStreamingRefill,
+        tmdbRegionIso,
+        "",
+        clientLangs,
+        { maxPage: 1, cap: 8 },
+      ),
+    ),
+  );
+  return pools.flat();
+}
+
+/**
+ * 180d new + trending with detail gate; **non-Indian** = full path; for **Indian** this pool is **merged** with
+ * US subscription discover so the All-services strip is not limited to the tight gate.
+ */
+async function fetchStreamingTVTightPoolForMarket(
+  tmdbRegionIso,
+  tmdbLangSuffix,
+  langSet,
+) {
+  const reg = encodeURIComponent(tmdbRegionIso);
+  const tvNewSeriesStart = dateDaysAgo(180);
+  const excludedTrendingGenres = new Set([10767, 10763]);
+  const tvNewSeriesBase = `/discover/tv?language=en-US&region=${reg}&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${tmdbLangSuffix}`;
+  const trendingTvBase = "/trending/tv/day?language=en-US";
+
+  const [tvSeriesPages, tvTrendingPages] = await Promise.all([
+    Promise.all([1, 2].map((page) => fetchTMDB(`${tvNewSeriesBase}&page=${page}`))),
+    Promise.all([1, 2].map((page) => fetchTMDB(`${trendingTvBase}&page=${page}`))),
+  ]);
+
+  const tvNewSeriesCandidates = tvSeriesPages.flatMap((page) => page.results || []);
+  const tvTrendingCandidates = tvTrendingPages
+    .flatMap((page) => page.results || [])
+    .filter((item) => {
+      const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
+      return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
+    });
+
+  const tvCandidates = [...new Map(
+    [...tvNewSeriesCandidates, ...tvTrendingCandidates].map((item) => [item.id, item]),
+  ).values()];
+
+  const tvDetailsMap = await fetchTvDetailsById(tvCandidates.map((item) => item.id));
+  let tvResults = tvCandidates.filter((item) => {
+    const detail = tvDetailsMap.get(item.id);
+    const seasons = Number(detail?.number_of_seasons ?? 0);
+    const isNewSeries = seasons === 1 && withinPastDays(item?.first_air_date, 180);
+    const isNewSeason = seasons > 1 && withinPastDays(detail?.last_air_date, 7);
+    const trendingEligible = tvTrendingCandidates.some((t) => t.id === item.id);
+    return isNewSeries || isNewSeason || trendingEligible;
+  });
+  if (langSet) {
+    tvResults = tvResults.filter((item) => {
+      if (langSet.has(String(item?.original_language || "").toLowerCase())) return true;
+      return rawTmdbItemHasOriginIn(item);
+    });
+  }
+
+  const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
+  return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).map((m) => normalizeTMDBItem(m, "tv"));
+}
+
 /**
  * Streaming movie discover: `tmdbRegionIso` = availability market (US for secondary). `langQuery` = `&with_original_language=…` for TMDB.
  * Optional `clientOriginalLanguageCodes` (e.g. **Indian** secondary): omit TMDB language filter, then {@link filterNormalizedRowsByIndianSecondaryTaste} (language or **`IN`** origin) — `with_original_language` + discover is too sparse, and many Indian SVOD rows are `en` in TMDB.
+ * **All services:** after 90d/trending attempts, {@link widenSecondaryAllServicesMoviePool} adds US `flatrate` (no 90d cap) and, if the merged unique count is still under **12**, shallow per-provider movie discover (6.0.17+) — **Indian** and **non-Indian** secondaries.
  */
 async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery, clientOriginalLanguageCodes = null) {
   const clientLangs =
@@ -1065,18 +1345,39 @@ async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery, clientOri
     };
 
     let out = taste(await discoverToMovies(`${digitalDiscoverBase}${tmdbLangSuffix}`));
-    if (out.length > 0) return out;
+    if (out.length > 0) {
+      return await widenSecondaryAllServicesMoviePool(
+        tmdbRegionIso, tmdbLangSuffix, clientLangs, out,
+      );
+    }
     if (tmdbLangSuffix) {
       out = taste(await discoverToMovies(`${digitalDiscoverBase}`));
-      if (out.length > 0) return out;
+      if (out.length > 0) {
+        return await widenSecondaryAllServicesMoviePool(
+          tmdbRegionIso, tmdbLangSuffix, clientLangs, out,
+        );
+      }
     }
     out = taste(await discoverToMovies(`${broadDateDiscoverBase}${tmdbLangSuffix}`));
-    if (out.length > 0) return out;
+    if (out.length > 0) {
+      return await widenSecondaryAllServicesMoviePool(
+        tmdbRegionIso, tmdbLangSuffix, clientLangs, out,
+      );
+    }
     if (tmdbLangSuffix) {
       out = taste(await discoverToMovies(`${broadDateDiscoverBase}`));
-      if (out.length > 0) return out;
+      if (out.length > 0) {
+        return await widenSecondaryAllServicesMoviePool(
+          tmdbRegionIso, tmdbLangSuffix, clientLangs, out,
+        );
+      }
     }
-    return taste(await trendingToMovies());
+    return await widenSecondaryAllServicesMoviePool(
+      tmdbRegionIso,
+      tmdbLangSuffix,
+      clientLangs,
+      taste(await trendingToMovies()),
+    );
   } catch {
     return [];
   }
@@ -1084,6 +1385,8 @@ async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery, clientOri
 
 /**
  * Streaming TV discover: `tmdbRegionIso` = US for secondary. `clientOriginalLanguageCodes` same as {@link fetchStreamingMoviesForMarket}.
+ * **Indian (All services):** merges US `flatrate` discover (and shallow per-provider + tight 180d/trending gate) so the pool is
+ * not only “new/7d + trending” after taste — 6.0.16+; stagger still only **reveals** (see `secondaryRegionAllServicesStreamDisplayLen`).
  */
 async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery, clientOriginalLanguageCodes = null) {
   const clientLangs =
@@ -1093,48 +1396,39 @@ async function fetchStreamingTVForMarket(tmdbRegionIso, langQuery, clientOrigina
   const tmdbLangSuffix = clientLangs ? "" : (langQuery || "");
   const langSet = clientLangs ? new Set(clientLangs) : null;
 
-  try {
-    const reg = encodeURIComponent(tmdbRegionIso);
-    const tvNewSeriesStart = dateDaysAgo(180);
-    const excludedTrendingGenres = new Set([10767, 10763]);
-    const tvNewSeriesBase = `/discover/tv?language=en-US&region=${reg}&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${tmdbLangSuffix}`;
-    const trendingTvBase = "/trending/tv/day?language=en-US";
-
-    const [tvSeriesPages, tvTrendingPages] = await Promise.all([
-      Promise.all([1, 2].map((page) => fetchTMDB(`${tvNewSeriesBase}&page=${page}`))),
-      Promise.all([1, 2].map((page) => fetchTMDB(`${trendingTvBase}&page=${page}`))),
-    ]);
-
-    const tvNewSeriesCandidates = tvSeriesPages.flatMap((page) => page.results || []);
-    const tvTrendingCandidates = tvTrendingPages
-      .flatMap((page) => page.results || [])
-      .filter((item) => {
-        const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
-        return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
-      });
-
-    const tvCandidates = [...new Map(
-      [...tvNewSeriesCandidates, ...tvTrendingCandidates].map((item) => [item.id, item]),
-    ).values()];
-
-    const tvDetailsMap = await fetchTvDetailsById(tvCandidates.map((item) => item.id));
-    let tvResults = tvCandidates.filter((item) => {
-      const detail = tvDetailsMap.get(item.id);
-      const seasons = Number(detail?.number_of_seasons ?? 0);
-      const isNewSeries = seasons === 1 && withinPastDays(item?.first_air_date, 180);
-      const isNewSeason = seasons > 1 && withinPastDays(detail?.last_air_date, 7);
-      const trendingEligible = tvTrendingCandidates.some((t) => t.id === item.id);
-      return isNewSeries || isNewSeason || trendingEligible;
-    });
-    if (langSet) {
-      tvResults = tvResults.filter((item) => {
-        if (langSet.has(String(item?.original_language || "").toLowerCase())) return true;
-        return rawTmdbItemHasOriginIn(item);
-      });
+  if (clientLangs) {
+    try {
+      const [tightNorm, flatBroad] = await Promise.all([
+        fetchStreamingTVTightPoolForMarket(tmdbRegionIso, tmdbLangSuffix, langSet),
+        fetchDiscoverTvUsSubscriptionFlatrateBroad(
+          tmdbRegionIso,
+          clientLangs,
+          SECONDARY_STRIP_TAB_CAP * 2,
+        ),
+      ]);
+      const mergedN = mergeSecondaryStripByNewestUnique(
+        [...tightNorm, ...flatBroad],
+        SECONDARY_STRIP_TAB_CAP * 2,
+      );
+      if (mergedN.length < 12) {
+        const fromProv = await fetchDiscoverIndianSecondaryTvShallowFromTopProviders(
+          tmdbRegionIso,
+          clientLangs,
+        );
+        return mergeSecondaryStripByNewestUnique(
+          [...mergedN, ...fromProv],
+          SECONDARY_STRIP_TAB_CAP,
+        );
+      }
+      return mergeSecondaryStripByNewestUnique(mergedN, SECONDARY_STRIP_TAB_CAP);
+    } catch {
+      return [];
     }
+  }
 
-    const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
-    return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => normalizeTMDBItem(m, "tv"));
+  try {
+    const rows = await fetchStreamingTVTightPoolForMarket(tmdbRegionIso, tmdbLangSuffix, langSet);
+    return rows.slice(0, SECONDARY_STRIP_TAB_CAP);
   } catch {
     return [];
   }
@@ -1304,7 +1598,9 @@ async function fetchStreamingPageProviderRefillPool(
   watchRegion = "US",
   originalLanguageQuery = "",
   originalLanguageAllowlist = null,
+  options = {},
 ) {
+  const { maxPage: maxPageLimit = 5, cap: resultCap = STREAMING_PAGE_PROVIDER_REFILL_CAP } = options;
   const type = mediaType === "movie" ? "movie" : "tv";
   const reg = encodeURIComponent(String(watchRegion || "US").toUpperCase());
   const sortBy =
@@ -1324,14 +1620,13 @@ async function fetchStreamingPageProviderRefillPool(
   const all = [];
   const seen = new Set();
   let page = 1;
-  const maxPage = 5;
-  while (all.length < STREAMING_PAGE_PROVIDER_REFILL_CAP && page <= maxPage) {
+  while (all.length < resultCap && page <= maxPageLimit) {
     const path = `/discover/${type}?language=en-US&sort_by=${sortBy}&page=${page}&watch_region=${reg}&with_watch_providers=${providerId}&with_watch_monetization_types=flatrate${langSuffix}${indianTvDiscoverOrigin}`;
     const data = await fetchTMDB(path);
     if (isTmdbApiErrorPayload(data)) break;
     const results = data?.results || [];
     for (const item of results) {
-      if (all.length >= STREAMING_PAGE_PROVIDER_REFILL_CAP) break;
+      if (all.length >= resultCap) break;
       if (seen.has(item.id)) continue;
       if (hasExcludedGenre(item)) continue;
       const norm = normalizeTMDBItem(item, type);
@@ -1348,7 +1643,7 @@ async function fetchStreamingPageProviderRefillPool(
     if (results.length < 1) break;
     page += 1;
   }
-  return all.slice(0, STREAMING_PAGE_PROVIDER_REFILL_CAP);
+  return all.slice(0, resultCap);
 }
 
 // ---------------------------------------------------------------------------

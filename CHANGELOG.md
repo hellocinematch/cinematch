@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.0.17
+
+- **Secondary Region → Streaming, All services, Movies:** After the existing **~90d** + **trending** path, the pool is now widened for **every** secondary taste (not only Indian): **US `flatrate`** discover (`primary_release_date.desc`, no date window) with the same `with_original_language` query as the tight path when applicable, then if unique count is still **under 12**, **6** parallel **per-provider** `discover/movie` pulls (cap **8** each, 1 page) — parallel to the **Series** All-services strategy. **Indian** still uses the same Indian taste on broad `flatrate` + per-provider; final cap **25** and strip stagger unchanged.
+
+## 6.0.16
+
+- **Secondary Region → Streaming, All services, Indian:** Widen the **pool** (not the stagger) for **Movies** and **Series** by adding US `flatrate` `discover` (no single `with_watch_providers`) after the existing 90d / 180d+trending paths, with **dedupe** and the same **Indian** taste (language or **`IN`** origin). **Series** also **merge** the prior tight “new/7d air/trending” pool, and if the merged list is still short, run a **shallow** per-provider `discover` (first **6** of `STREAMING_SERVICES`, 1 page, cap **8** each) in parallel — matching **6.0.14** Netflix **`with_origin_country=IN`** on that path. `fetchStreamingPageProviderRefillPool` accepts optional `{ maxPage, cap }` for these smaller pulls. Staggered **5 → 20** on this screen is unchanged.
+
 ## 6.0.15
 
 - **Secondary Region (screen) → Streaming strip only:** Reveal is **5** titles immediately, then **9 → 20** on **~120ms** steps (capped at **20** and pool length). Applies to **All services** and **per-provider** refills. **In theaters** and the main **Streaming** page are unchanged (that page still uses 4,9,14,19,20).
