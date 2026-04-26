@@ -1,13 +1,15 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-25 — **`main` at 6.0.21** (see `package.json` / **CHANGELOG**). **6.0.21** — **Detail:** **In Theaters** titles with no streaming in **Where to Watch** → **Google showtimes** link. **6.0.20** — **In Theaters** strip cap **20** per row (`IN_THEATERS_PAGE_STRIP_CAP`). **6.0.19** — **In Theaters** **Popular** = **`/trending/movie/week`** (p1–2), **trending order**, same gates as **Now**; catalogue **dedupes** both strips. **6.0.18** — **main Streaming** page: **two different TMDB pools** for **Now** vs **What’s popular** (no longer one list, two sorts); cap **25** per strip; stagger **5→25** in steps of **5** on **each** row; **All services** movies = 90d US `flatrate` newest (B) + **trending/movie/week** (D); series = US `flatrate` `first_air` desc + **trending/tv/week**; **with a service** = date vs **`popularity.desc`** via `fetchStreamingPageProviderRefillPool` `discoverSort`. **6.0.17** — secondary **All services** **movies** widened (flatrate + per-provider) like TV. **6.0.16** — Indian secondary All services TV/movies pool merge. **6.0.15** — **Secondary** → **Streaming** strip stagger **5→20** (unchanged there). **Circles:** **§ Master backlog 4a–4e**; **Deferred** scroll-stop **`predict_cached`**.
+**Last updated:** 2026-04-27 — **`main` at 6.0.22** (see `package.json` / **CHANGELOG**). **6.0.22** — **Circles main list:** **pending invites** in **one** list (invites first, no section headers, no slide-down panel), **Accept** + **Decline** on rows, **`.invite-card--list`**; **at cap** = **no** invite rows + hint; **unseen** on joined rows = **number in a circle**; header **bell** = invite count + **scroll to** first invite / at-cap hint. **6.0.21** — **Where to Watch** **In Theaters** + no streaming → **Google showtimes**. **6.0.20** — **In Theaters** cap **20**/strip. **6.0.19** **Popular** = **`/trending/movie/week`**; **6.0.18** main **Streaming** two pools, **25** cap, stagger; **6.0.15** secondary **Streaming** **5→20**. **Circles backlog:** next **§** main list **2** (copy-to-mail) … **4a–4e**; **Deferred** scroll-stop **`predict_cached`**.
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 6.0.21** (see `package.json`). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`** (don’t code unless I say *code now* / *implement* / *fix* / *do it* for that task, unless I clearly ask for code in the same message). On **handoff updates**, include the session’s **last note** in passdown (see **§ For the assistant** item 4).  
-> **Context:** **6.0.21** — **Detail** Google **showtimes** when **In Theaters** pool + no streaming providers. **6.0.20** — **In Theaters** **20** titles max per strip. **6.0.19** — **`screen === "in-theaters"`**: **Popular** = weekly **trending** + same theatrical filters as **Now**; **`mergeInTheatersStripsForCatalogue`**. **6.0.18** — **`screen === "streaming-page"`**: separate state/fetches for **Now** vs **popular**; constants **`STREAMING_PAGE_STRIP_CAP`**, **`STREAMING_PAGE_REVEAL_*`**; removed **`fetchStreamingMoviesOnly` / `fetchStreamingTVOnly`**. **6.0.11–6.0.12** — secondary: **no** profile **genres** on secondary shelves/merge; **Indian** = broad US + **client** taste. **6.0.9** `SECONDARY_AVAILABILITY_TMDB_REGION` = **US**; **6.0.14** Netflix **TV** = `with_origin_country=IN` on discover; **Secondary** **Streaming** strip still **5→20** (6.0.15). **Your Picks** = profile. **6.0.0** **`App.css`**. **Circles** / **Vercel** / **cron** — full passdown. **Backlog** — **§ Master backlog**.
+> Cinematch is on **`main` at 6.0.22** (see `package.json` / **CHANGELOG**). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t implement or change app code** unless I say *code now* / *implement* / *fix* / *do it* (or clearly ask for code in the same message). **Passdown edits** when I ask for handoff/updates are fine. On handoff updates, include this session’s **last note** in passdown (**§ For the assistant** item 4 → **Open / follow-ups — Last session**).  
+> **Shipped (high level):** **6.0.22** — **Circles** main list: **item 1** (invites in list, solid rows, **Accept/Decline**, unseen = **count in circle**, no invites panel, at-cap rules). **6.0.21** — **In Theaters** + no streaming → **Google showtimes**. **6.0.19–20** **In Theaters**; **6.0.18** main **Streaming** two pools — detail in passdown / **CHANGELOG**.  
+> **§ Master backlog — Circles (in order):** **1** *invite list & activity* — **shipped 6.0.22** · **2** non-user copy-to-mail · **3** (4a) admin/successor · **3b** who published (tap circle+Cinemastro pill → centered overlay) · **4** detail **Rate this** vs **Rate more** (Circles vs Discover; after facts strip) · **5** **score chips** — row **1–10** + second row **.5** only; **—** unset; **no 10.5** · **6 / 6b / 7 / 8** live feeds / strip predict / unseen polish (list row presentation in **6.0.22**) / max invites · **9–12** moderation **(4b–4e)**. **Product 13–15** · **Watchlist 16–19** (full automated email invite path = **§ item 18**).  
+> **Ops:** **Vercel** deploys from **`main`**; **DB migrations** not auto-applied; **cron** / **MAU** / neighbors → **`COMPUTE-NEIGHBORS-CRON.md`**.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -17,8 +19,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **6.0.21** (`package.json` / `CHANGELOG.md`); **Cinemastro v…** = **`APP_VERSION`**. **6.0.21** — **Where to Watch** theatrical **Google** fallback; **6.0.20** — **In Theaters** cap **20**/strip; **6.0.19** — **Popular** = trending/week + same gates as **Now**; **6.0.18** — main **Streaming**: two pools, **25** cap, **5→25** stagger; **6.0.17** — secondary All-services **movie** pool widen; **6.0.16** — Indian secondary All-services **TV/movie** broad pools; **6.0.15** — **Secondary** → **Streaming** **5→20**; **6.0.0** **`App.css`**. |
-| **Git** | **`main`** = **6.0.21** (confirm **`origin`**); **5.6.52** edit circle, **5.6.51** **`creator_leave_circle`**, **5.6.50** Forward. |
+| **App version** | **6.0.22** (`package.json` / `CHANGELOG.md`); **Cinemastro v…** = **`APP_VERSION`**. **6.0.22** — **Circles** unified invite list + unseen **count-in-circle** (see top paragraph); **6.0.21** — **Where to Watch** theatrical **Google** fallback; **6.0.20** — **In Theaters** cap **20**/strip; **6.0.19** — **Popular** = trending/week + same gates as **Now**; **6.0.18** — main **Streaming**: two pools, **25** cap, **5→25** stagger; **6.0.0** **`App.css`**. |
+| **Git** | **`main`** = **6.0.22** (confirm **`origin`**); **6.0.22** Circles list UX; **5.6.52** edit circle, **5.6.51** **`creator_leave_circle`**, **5.6.50** Forward. |
 | **Supabase — apply if not already** | **`20260529120000_creator_leave_transfer_ownership.sql`** — **creator** leave **transfers** `creator_id` when **≥2** members. Plus prior: **`20260528120000_circle_strip_share_activity_order.sql`**, **`20260527120000_circle_member_last_seen.sql`**, **`20260524120000_rating_circle_shares.sql`**, **`20260523120000_watchlist_sort_index.sql`**, **`20260525120000_watchlist_max_30.sql`**, **`20260526120000_watchlist_rls_update_own.sql`**. |
 | **Edge** | Each of **`get-circle-rated-titles`**, **`send-circle-invite`**, **`accept-circle-invite`**, **`compute-neighbors`**, **`match`**: `index.ts` has **`EDGE_FUNCTION_VERSION`**; JSON bodies include **`edge: { name, version }`**. On any code change: **bump** that constant (semver) in the **same** commit, **redeploy** that function, confirm **`edge.version`** in a test response. |
 | **Client deploy** | **Vercel** on **`main`** push; migrations **not** auto-applied. |
@@ -81,7 +83,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
    `select jobname, schedule from cron.job where jobname like 'compute-neighbors-w%';`
 3. When the user asks to **“update passdown”** or after a milestone: **edit this file** (date, version, migrations, open items).
 4. **When you write or update this handoff for the next chat** (including when the user says **“write a handoff”** / **“handoff for next chat”**), always include the session’s *last note* — the final thing the user asked for, decided, or left open in that thread (e.g. *“don’t implement X yet”*, a product call, a bug repro, or a **pending backlog** list). **Do not** only bump version: merge that **last note** into **Open / follow-ups** (or a short **Last session** bullet under it) so the next assistant sees it. After long threads, a **bulleted pending list** (Circles, watchlist, ops) is **required**; see **Open / follow-ups** in this file.
-5. **Circles moderation backlog (not implemented):** scannable **checkbox** list under **§ Master backlog** — **“Circles moderation & lifecycle — things to do”** (items **4a–4e**, main list **4–8**). Update checkboxes when features ship; full spec is in those **items 4–8** (not only a nested sub-list).
+5. **Circles moderation backlog (not implemented):** scannable **checkbox** list under **§ Master backlog** — **“Circles moderation & lifecycle — things to do”** (items **4a–4e**; full specs at **main list 3** for **4a**, **main list 9–12** for **4b–4e**). Update checkboxes when features ship; full spec is in those lines (not only a nested sub-list). **Invite list UX** = **main list 1**; **non-user copy-to-email invite** = **main list 2**; **who published (tap pill)** = **main list 3b**; **detail Rate this / Rate more** = **main list 4**; **score chips** = **main list 5** (separate checkboxes). **Moderation** checkboxes remain **4a–4e**.
 
 ---
 
@@ -94,7 +96,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Changelog trail (recent)
 
-- **6.0.21** — **Detail / Where to Watch:** **In Theaters** pool + no streaming → **Google** showtimes search link (`googleTheatricalShowtimesSearchUrl`). **6.0.20** — **In Theaters:** **20** titles max per strip (`IN_THEATERS_PAGE_STRIP_CAP`). **6.0.19** — **In Theaters:** **Popular** strip = **`/trending/movie/week`** (2 pages), **trending order**, same theatrical / language gates as **Now Playing**; **`passesUsTheatricalLimitedWindow`**; catalogue **`mergeInTheatersStripsForCatalogue`**. **6.0.18** — **Main Streaming** page: **Now** and **popular** = **separate** TMDB feeds; cap **25**; stagger **5,10,15,20,25** per row; provider **date** vs **popularity** via `discoverSort`. **6.0.17** — **Secondary** All-services **movies**: widen pool (US flatrate + per-provider). **6.0.16** — **Secondary** Indian All-services: broad TV/movie `discover` + merge. **6.0.15** — **Secondary** **Streaming** strip: **5**-then-stagger **9→20**. **6.0.9** — **Secondary Region:** **`SECONDARY_AVAILABILITY_TMDB_REGION` = US** for theaters, streaming, service discover; **`secondary_region_key`** → language only; removed **`secondaryMarketTmdbRegion`**. **6.0.8** — secondary refill **`with_original_language`**. **6.0.7** — secondary service UI + discover. **6.0.6** — **Streaming** pill row. **6.0.5** — **US** **discover**, **`predict_cached`**. **6.0.4** — service `<select>`.  
+- **6.0.22** — **Circles (master backlog 1):** **Pending invites** in the **main Circles list** (first), **no** slide-down invites panel; **Accept** + **Decline**; solid **`.invite-card--list`**; **at** `CIRCLE_CAP` **no** invite rows + header hint; **unseen** activity on **joined** circle rows = **number in a circle** (not bell); header **bell** = pending count and **scroll** to first invite or hint. `showInvitesPanel` **removed**; `listInvitesShown`, `firstPendingInviteRowRef`, `capPendingInvitesHintRef`. **6.0.21** — **Detail / Where to Watch:** **In Theaters** pool + no streaming → **Google** showtimes search link (`googleTheatricalShowtimesSearchUrl`). **6.0.20** — **In Theaters:** **20** titles max per strip (`IN_THEATERS_PAGE_STRIP_CAP`). **6.0.19** — **In Theaters:** **Popular** strip = **`/trending/movie/week`** (2 pages), **trending order**, same theatrical / language gates as **Now Playing**; **`passesUsTheatricalLimitedWindow`**; catalogue **`mergeInTheatersStripsForCatalogue`**. **6.0.18** — **Main Streaming** page: **Now** and **popular** = **separate** TMDB feeds; cap **25**; stagger **5,10,15,20,25** per row; provider **date** vs **popularity** via `discoverSort`. **6.0.17** — **Secondary** All-services **movies**: widen pool (US flatrate + per-provider). **6.0.16** — **Secondary** Indian All-services: broad TV/movie `discover` + merge. **6.0.15** — **Secondary** **Streaming** strip: **5**-then-stagger **9→20**. **6.0.9** — **Secondary Region:** **`SECONDARY_AVAILABILITY_TMDB_REGION` = US** for theaters, streaming, service discover; **`secondary_region_key`** → language only; removed **`secondaryMarketTmdbRegion`**. **6.0.8** — secondary refill **`with_original_language`**. **6.0.7** — secondary service UI + discover. **6.0.6** — **Streaming** pill row. **6.0.5** — **US** **discover**, **`predict_cached`**. **6.0.4** — service `<select>`.  
 - **6.0.3** — **Title detail:** **Original language** in **facts** bar (from TMDB detail `original_language` via `detailMeta.languageLabel`). **6.0.2** — **Region (secondary) strip:** **Language** in strip meta (`formatSecondaryRegionStripMeta` / `formatOriginalLanguageDisplay`).  
 - **6.0.1** — **Region (secondary) strip:** Fast **`secondary_region_key`** from Supabase after bootstrap; **try/catch/finally** for TMDB **Promise.all** so the strip is not left loading or empty until refresh.  
 - **6.0.0** — **Refactor:** global stylesheet in **`src/App.css`** (imported from **`App.jsx`**); no intended UI or product change. **Major** = structural milestone.  
@@ -143,7 +145,7 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ## Recent work (client — `src/App.jsx`)
 
-**Primary file:** `src/App.jsx` + global **`src/App.css`**. **6.0.21** — **Detail `WhereToWatch`:** **Google** showtimes when title is in **`inTheaters` / `inTheatersPopularRanked`** and streaming unavailable. **6.0.20** — **In Theaters:** **`IN_THEATERS_PAGE_STRIP_CAP`** = **20**. **6.0.19** — **`screen === "in-theaters"`**: **`fetchInTheaters`** — **Now** = **`now_playing`** (unchanged); **Popular** = **`/trending/movie/week`** p1–2, **trending order**, **`passesUsTheatricalLimitedWindow`**; **`mergeInTheatersStripsForCatalogue`** when merging into catalogue. **6.0.18** — **`screen === "streaming-page"`** (`PageShell` “Streaming”): **Now** and **What’s popular** are **independent** pools (`streamingMoviesNow` / `Popular`, `streamingTVNow` / `Popular`, or per-provider `streamingPageRefill*Now` / `Popular`); `streamingMovies` / `streamingTV` = **deduped merge** for catalogue + `match`. Helpers: `fetchStreamingPageMoviesNowAllServices`, `…PopularAllServices`, `fetchStreamingPageTvNowAllServices`, `…TvPopularAllServices`; `filterRowsByProfileLanguageCodes`. **`fetchStreamingPageProviderRefillPool`**: `options.discoverSort` **date** \| **popularity**, **90d** window on **movie+date**; cap **`STREAMING_PAGE_STRIP_CAP` (25)**. Stagger: **`streamingPageNowDisplayLen`** and **`streamingPagePopularDisplayLen`**; refs **`streamingPageNowRevealSigRef`**, **`streamingPagePopularRevealSigRef`**. **Removed** `fetchStreamingMoviesOnly` / `fetchStreamingTVOnly` (replaced by the new helpers + merge). **6.0.1** — secondary **Region** (`screen === "secondary-region"`): reliable strip fetch. **6.0.2** — Region strip: **`formatSecondaryRegionStripMeta`**. **6.0.3** — **Detail** `languageLabel`. **6.0.4–6.0.5** — **`streaming-page`:** service **`<select>`**; `fetchStreamingPageProviderRefillPool` + `streamingPageRefill*`. **6.0.7–6.0.8** — secondary **Streaming** service + discover. **6.0.9** — secondary **Region** TMDB **US** + **`getRegionLanguageCodes`**. **6.0.11–6.0.14** / **6.0.16–6.0.17** — secondary All-services / Indian / movie widen — see **CHANGELOG**.
+**Primary file:** `src/App.jsx` + global **`src/App.css`**. **6.0.22** — **`screen === "circles"`:** **`listInvitesShown`** (empty at cap); main **`circles-list`** = invite rows (**`invite-card--list`**) + **`circlesList`**; **`openInvitesPanel`** scrolls to **`firstPendingInviteRowRef`** or **`capPendingInvitesHintRef`**; joined-row unseen = **`circle-card__unseen`** + **`circleUnseenById`**. **6.0.21** — **Detail `WhereToWatch`:** **Google** showtimes when title is in **`inTheaters` / `inTheatersPopularRanked`** and streaming unavailable. **6.0.20** — **In Theaters:** **`IN_THEATERS_PAGE_STRIP_CAP`** = **20**. **6.0.19** — **`screen === "in-theaters"`**: **`fetchInTheaters`** — **Now** = **`now_playing`** (unchanged); **Popular** = **`/trending/movie/week`** p1–2, **trending order**, **`passesUsTheatricalLimitedWindow`**; **`mergeInTheatersStripsForCatalogue`** when merging into catalogue. **6.0.18** — **`screen === "streaming-page"`** (`PageShell` “Streaming”): **Now** and **What’s popular** are **independent** pools (`streamingMoviesNow` / `Popular`, `streamingTVNow` / `Popular`, or per-provider `streamingPageRefill*Now` / `Popular`); `streamingMovies` / `streamingTV` = **deduped merge** for catalogue + `match`. Helpers: `fetchStreamingPageMoviesNowAllServices`, `…PopularAllServices`, `fetchStreamingPageTvNowAllServices`, `…TvPopularAllServices`; `filterRowsByProfileLanguageCodes`. **`fetchStreamingPageProviderRefillPool`**: `options.discoverSort` **date** \| **popularity**, **90d** window on **movie+date**; cap **`STREAMING_PAGE_STRIP_CAP` (25)**. Stagger: **`streamingPageNowDisplayLen`** and **`streamingPagePopularDisplayLen`**; refs **`streamingPageNowRevealSigRef`**, **`streamingPagePopularRevealSigRef`**. **Removed** `fetchStreamingMoviesOnly` / `fetchStreamingTVOnly` (replaced by the new helpers + merge). **6.0.1** — secondary **Region** (`screen === "secondary-region"`): reliable strip fetch. **6.0.2** — Region strip: **`formatSecondaryRegionStripMeta`**. **6.0.3** — **Detail** `languageLabel`. **6.0.4–6.0.5** — **`streaming-page`:** service **`<select>`**; `fetchStreamingPageProviderRefillPool` + `streamingPageRefill*`. **6.0.7–6.0.8** — secondary **Streaming** service + discover. **6.0.9** — secondary **Region** TMDB **US** + **`getRegionLanguageCodes`**. **6.0.11–6.0.14** / **6.0.16–6.0.17** — secondary All-services / Indian / movie widen — see **CHANGELOG**.
 
 ### Bottom navigation & Watchlist
 
@@ -155,14 +157,14 @@ Partner rules: `.cursor/rules/cinematch-handoff.mdc`, `.cursor/rules/compute-nei
 
 ### Circles
 
-- **Circle activity (5.6.33–5.6.37):** **`circle_member_last_seen`** (Supabase) + RPCs; **`fetchMyCircleUnseenActivity`**, **`markCircleLastSeen`**, **`getCircleOthersActivityWatermark`** in **`src/circles.js`**. **`App.jsx`:** `circleUnseenById` / list **bell+count**; `checkRemoteCircleNewActivity` + 10s interval (ref) + **visibility** / **focus** / **pageshow**; **“New”** strip tile (left of **+**) + All/Top compact row; `mark` on open circle. **Assumed use** (short sessions; leave/resume may refetch) — see **§ Circles activity — assumed use** in this file.
+- **Circle activity (5.6.33–5.6.37 + 6.0.22 list):** **`circle_member_last_seen`** (Supabase) + RPCs; **`fetchMyCircleUnseenActivity`**, **`markCircleLastSeen`**, **`getCircleOthersActivityWatermark`** in **`src/circles.js`**. **`App.jsx`:** `circleUnseenById` / **Circles list** = **unseen count in a round badge** (**`circle-card__unseen`**, 6.0.22); **header** **bell** = **pending invite** count + **scroll to** first invite; `checkRemoteCircleNewActivity` + 10s interval (ref) + **visibility** / **focus** / **pageshow**; **“New”** strip tile (left of **+**) + All/Top compact row; `mark` on open circle. **Assumed use** (short sessions; leave/resume may refetch) — see **§ Circles activity — assumed use** in this file.
 - **5.6.49 — Circle score stars:** **`CirclePillStarGlyph`** + shared path constant; **orange** circle + **gold** Cinemastro use the same SVG (**`currentColor`**), **16×16** Recent under-title pill, **13×13** All/Top list — replaces mismatched **emoji** / `em` sizing. **`CircleStripRingCineBelowTitle`**, **`CircleAllTopRatingsLine`** / **`CircleGroupScoreIcon`** (`variant="list"`).
 - **5.6.50 — Forward** (strip ⋯): **`addRatingCircleShares`**; **Recent** strip sort uses **share** `created_at` (DB migration). **5.6.51 — Creator leave:** RPC **`creator_leave_circle`** (client **`leaveCircle`**); leave **copy** solo vs transfer. **5.6.52 — Edit circle:** **`updateCircle`**; list card **Edit** + **Circle info** “Edit name & description”; **`fetchMyCircles`** includes **`joined_at`** on members.
 - **Circle detail:** Ratings **Recent / All / Top**; feeds = **`ratings` ∩ `rating_circle_shares`** for that circle. **`fetchCircleRatedTitles`** + Edge **`get-circle-rated-titles`**. Migrations: **`20260524120000_rating_circle_shares.sql`**, **`20260522120000_...`**, strip **`20260506120000_...`**, etc.
 - **Publish:** first-time rating from detail → modal (skip OK); from circle flow, defaults include that circle. **Publish to circles…** on detail when already rated.
 - **Recent strip:** Titles **oldest → newest** (L→R); **long-press** (~520ms) or **⋯** → Details, Rate/Rerate, watchlist add/remove (**`toggleWatchlist`** + **`skipGoBack`**), Forward (**`publishRatingModal` manage**), Remove from circle (**`unpublishTitleFromCircleStrip`**); **Earlier** (paginate) on the **left**; **+** in a **76px** poster band; **center-on-land**; **faded ←** when pannable; optional **New activity** tile **left of +** when the activity watermark is newer than the last loaded baseline (5.6.33+).
 - **All / Top:** **List** (like Watchlist): **title · year** on line 1; line 2 **Circle** / **You** / **Cinemastro** with **⭐** (omit if missing); **Circle** may show **(n)** after the score when **`memberCount > 2`** and **`distinct_circle_raters`**. **`CircleAllTopRatingsLine`**, **`formatCircleListYear`** in **`App.jsx`**. **Recent** strip cards still use **`formatCircleSublineTypeYearCine`** (centered poster row).
-- **+** or empty state → **Discover**; **`rateTitleReturnCircleIdRef`** / **`detailReturnScreenRef`** for return to circle.
+- **+** or empty state → **Discover**; **`rateTitleReturnCircleIdRef`** / **`detailReturnScreenRef`** for return to circle. **To build:** **§ Master backlog main list 4** — **Rate this title** (circle publish strip) **after** the title **facts** strip (scores, language, etc.), still in the first viewport before **Overview**; **Rate more** only when detail opened **from Discover**; **Rate this title** only when opened **from Circles** (e.g. **+** add / circle return ref).
 
 ### Title detail (basics)
 
@@ -259,7 +261,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 - **Web Phase B (optional):** **Realtime** or light polling for power users; **Web Push** only if product wants (heavy / iOS limits).
 - **Apply migration on prod:** **`20260527120000_circle_member_last_seen.sql`**.
 
-**Last user note (end of thread / new chat):** *See **§ Open / follow-ups — Last session (2026-04-22)** for the current handoff (5.6.52 + migrations).*
+**Last user note (end of thread / new chat):** *See **§ Open / follow-ups — Last session (2026-04-27)**.*
 
 ---
 
@@ -269,77 +271,102 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 ### Circles & feeds
 
-1. **Circle activity / “live” feeds (phased):** **Phase A (5.6.33) shipped** — list **bell + count**, in-circle **new activity** + refresh, **`circle_member_last_seen`** + RPCs. **Next:** **native** push (APNs/FCM), optional **Realtime/polling** (Phase B), Web Push if desired. *See* **§ For the next chat — circle “updates”** above.
-1b. **Recent strip — personal prediction (blue) hydration (deferred post-beta):** optional **scroll-stop** / idle **`predict_cached`** for **1–2** visible **unrated** titles to show **blue** without opening **detail**; **not** implemented as of 5.6.49 — user chose **beta first**, **detail** already fetches; **revisit** after feedback. *See* **§ Circles — ratings & strip predictions**.
-2. **“Unseen” activity (polish):** optional: dismiss rules, animation, or tuning count rules; core badges shipped in 5.6.33.
-3. **Invites at max circles:** today **`auto_declined`** — recipient never sees invite; creator gets auto-decline. *Idea:* muted row for recipient (“at cap”) + open/pending for creator until resolved.
-4. **(4a) Circles — admin line / successor order:** **Creator** = primary mod. **Auto-designate** up to two **sub-admins** as the **2nd and 3rd members to join** (by `joined_at` / join order) so **successor order** is always known without manual picks.
-5. **(4b) Circles — remove member:** **Creator/admins** can **remove a user** from the circle (new RLS / RPC or Edge; today `circle_members` DELETE is **self-only** — see passdown / schema). Aligns with familiar chat **admin** behavior.
-6. **(4c) Circles — request unpublish title:** **Request** flow — ask the **publisher** to **unpublish** a title from the group (notification + deep link to unpublish) for **wrong fit** without ejecting the member. Complements **show who published** (when implemented).
-7. **(4d) Circles — creator leave + group survival (partially shipped):** If **>1 member** remains, **do not** kill the circle: **transfer ownership** to the **next in line** (e.g. **2nd joiner** admin, else **3rd joiner**). If **0–1 members** and the **last person** leaves or **deletes the group**, **disintegrate** (archive/delete — exact rule **TBD**). **Shipped (5.6.51):** creator leave with **≥2 members** → **`creator_leave_circle`** RPC transfers **`creator_id`** to **earliest `joined_at`** among **other** members, then removes the leaver (no archive). **Solo** creator leave → **archive** + leave (unchanged). *Still TBD:* explicit **“delete group”** for last member, **2nd/3rd** as named **admin** roles beyond `creator_id` / one `role='creator'` row.
-8. **(4e) Circles — solo only after others left (anti–shadow-watchlist):** If the circle **used to have 2+ members** and the **last other member(s) leave**, the **one remaining** user is not in the same boat as a **fresh** solo create + invite. Product intent: **~7 day grace** (default; **TBD** at build) to **invite** someone or **close** the circle — avoids using an empty social shell as a **second watchlist**; after grace, **nudge** or **force** **Close** (or require invite) — enforcement **TBD**. *Implementation needs* a **transition timestamp** (e.g. when `member_count` first drops to **1** from **≥2**) or equivalent.
+1. **Circles — invite list & activity chrome — *shipped 6.0.22*.** (Former spec) Bell + count for pending invites, invites not in the main list. **Delivered:** **One** list, **no** “Invites / Your circles” headers; **invites** **first**; **solid** invite rows (**`invite-card--list`**); **Accept** + **Decline**; **unseen** on **joined** rows = **number in a circle**; **no** activity UI on not-yet-joined (invite) rows; **at cap** = **no** invite **rows** in list + **hint** + bell still shows count, tap **scrolls** to hint. **Removed** **slide-down invites panel**. *Deferred:* richer at-cap / muted row for **recipient** — see **§ item 8** (unchanged).
+2. **Circles — invite by email when recipient has no account (copy-to-mail v1 — to build):** **Today:** Inviting a **non-existent** user by email correctly surfaces that **no account** exists — keep that. **Add:** Short copy such as **this person isn’t on Cinemastro yet — you can invite them to join** (exact wording TBD). **UI:** A **read-only “email block”** (or textarea) with a **pre-written message** they can **copy** (optional: suggested **subject** line + **body** including app URL and, if available, **circle name** / context). **Instructions** beside or below: e.g. **Copy this text → open your email app → New message → paste into the body → send to `{email}`**. Optional later: **`mailto:`** link with prefilled subject/body (client-dependent). **Related:** fuller automated **email delivery** / deep invite links remain **§ item 18** (Watchlist & invites). **Not** implementing server-sent email in this slice unless product expands scope.
+3. **(4a) Circles — admin line / successor order:** **Creator** = primary mod. **Auto-designate** up to two **sub-admins** as the **2nd and 3rd members to join** (by `joined_at` / join order) so **successor order** is always known without manual picks.
+3b. **Circles — who published (circle-only, to build):** On **circle** surfaces only (Recent / All / Top rows, strip, etc.), **tap** the **pill that shows circle + Cinemastro** scores → **centered** overlay (light modal) with **Close** (and optional scrim tap to dismiss). **List:** only members who **published** this title **to this circle** (`rating_circle_shares` semantics), each with **their score** — **no** rows for people who haven’t published here. **Do not** repeat the **title** in the overlay (context is obvious). *Filed as **3b**.*
+4. **Circles vs Discover — detail rate CTAs (to build):** **Placement:** On the **circle** path, show **Rate this title** (publish-to-circle strip) **immediately after** the title **facts** row (existing strip: scores, **language**, certification, runtime, etc.) and **before** **Overview** — still in the **first viewport** on typical phone / PWA (no scroll to reach it). **Gating (feasible via entry context / refs):** show **Rate this title** **only** when the user reached **detail** **from Circles** (e.g. **+** on Recent strip → Discover → title, with **`rateTitleReturnCircleIdRef`** / circle return set — intent is **return to circle** even though Discover is intermediate). Show **Rate more** **only** when the user reached **detail** **from Discover** **without** that circle-add intent. **Do not** show both on the same visit; *other entry paths* (Mood, Watchlist, Streaming, etc.) — **TBD** at build (hide both, show one default, or match nearest cousin). Same **publish** semantics as today (`rating_circle_shares`) for the circle strip.
+5. **Rating input — score chips (to build; replaces confusing slider):** **Two rows total** — **not** two rows of **1–10**. **Row 1:** a **single** row of tappable integer chips **1–10** only. **Row 2:** **.5** only — half-step on the chosen integer (**N** → **N.5**) for **N = 1–9**; **10** stays **10** only (**no 10.5**). **Above** both rows: show the composed score; **unset** = **—** (not numeric **0**). Exact control for the **.5** row (**toggle** vs **.0 / .5** pair vs **one “+½”** chip) **TBD** at build; align submit/confirm with existing rating flows.
+6. **Circle activity / “live” feeds (phased):** **Phase A (5.6.33) shipped** — **Circles list** (6.0.22) shows **unseen** as **count in circle**; in-circle **new activity** + refresh, **`circle_member_last_seen`** + RPCs. **Next:** **native** push (APNs/FCM), optional **Realtime/polling** (Phase B), Web Push if desired. *See* **§ For the next chat — circle “updates”** above.
+6b. **Recent strip — personal prediction (blue) hydration (deferred post-beta):** optional **scroll-stop** / idle **`predict_cached`** for **1–2** visible **unrated** titles to show **blue** without opening **detail**; **not** implemented as of 5.6.49 — user chose **beta first**, **detail** already fetches; **revisit** after feedback. *See* **§ Circles — ratings & strip predictions**.
+7. **“Unseen” activity (polish):** optional: dismiss rules, animation, or tuning count rules; **list** **presentation** updated in **6.0.22**; in-circle chrome per **5.6.33+**.
+8. **Invites at max circles:** today **`auto_declined`** — recipient never sees invite; creator gets auto-decline. *Idea:* muted row for recipient (“at cap”) + open/pending for creator until resolved.
+9. **(4b) Circles — remove member:** **Creator/admins** can **remove a user** from the circle (new RLS / RPC or Edge; today `circle_members` DELETE is **self-only** — see passdown / schema). Aligns with familiar chat **admin** behavior.
+10. **(4c) Circles — request unpublish title:** **Request** flow — ask the **publisher** to **unpublish** a title from the group (notification + deep link to unpublish) for **wrong fit** without ejecting the member. **Complements** **§ main list 3b** (**who published** overlay); **(4c)** can ship after **3b** or alongside it.
+11. **(4d) Circles — creator leave + group survival (partially shipped):** If **>1 member** remains, **do not** kill the circle: **transfer ownership** to the **next in line** (e.g. **2nd joiner** admin, else **3rd joiner**). If **0–1 members** and the **last person** leaves or **deletes the group**, **disintegrate** (archive/delete — exact rule **TBD**). **Shipped (5.6.51):** creator leave with **≥2 members** → **`creator_leave_circle`** RPC transfers **`creator_id`** to **earliest `joined_at`** among **other** members, then removes the leaver (no archive). **Solo** creator leave → **archive** + leave (unchanged). *Still TBD:* explicit **“delete group”** for last member, **2nd/3rd** as named **admin** roles beyond `creator_id` / one `role='creator'` row.
+12. **(4e) Circles — solo only after others left (anti–shadow-watchlist):** If the circle **used to have 2+ members** and the **last other member(s) leave**, the **one remaining** user is not in the same boat as a **fresh** solo create + invite. Product intent: **~7 day grace** (default; **TBD** at build) to **invite** someone or **close** the circle — avoids using an empty social shell as a **second watchlist**; after grace, **nudge** or **force** **Close** (or require invite) — enforcement **TBD**. *Implementation needs* a **transition timestamp** (e.g. when `member_count` first drops to **1** from **≥2**) or equivalent.
 
-**Circles moderation & lifecycle — things to do** (same as **items 4–8**; use this as a scan list; check off when shipped.)
+**Circles moderation & lifecycle — things to do** (full specs for **4a–4e** = **main list 3** (4a) and **9–12** (4b–4e) above; **4a–4e** labels unchanged; use this as a scan list; check off when shipped.)
 
-- [ ] **4a** — Auto **2nd / 3rd joiner** admins / **successor** order (`joined_at`) — *main list **4***.
-- [ ] **4b** — **Remove member** (creator/admins; RLS / RPC or Edge) — *main list **5***.
-- [ ] **4c** — **Request unpublish** title + **show who published** (if not already) — *main list **6***.
-- [x] **4d** — **Creator leave** → **transfer** if **>1** member (**5.6.51** `creator_leave_circle`). *Open:* last-member **delete group** / full **disintegrate** rules — *main list **7***.
-- [ ] **4e** — **Solo after exodus** — **~7 day grace**, then **invite** or **close**; track **≥2 → 1** transition time in DB — *main list **8***.
+- [x] **1** — **Invite list & activity chrome** — *main list **1*** **shipped 6.0.22** (bell = invites summary + scroll; invites top; solid row; Accept + Decline; unseen = count-in-circle; no invite rows at cap; panel removed).
+- [ ] **2** — **Non-user email invite — copy message + send from mail app** — *main list **2*** (keep “no account” state; add invite-to-join copy, prefilled block, copy button, paste/send instructions; optional `mailto:` later).
+- [ ] **3b** — **Who published** — tap **circle+Cinemastro** pill → **centered** overlay; **published-only** members + scores; **no** title line; **Close**; circle-only — *main list **3b***.
+- [ ] **4** — **Detail Rate this / Rate more** — *main list **4*** (after facts strip; **Rate more** = Discover-only; **Rate this** = Circles-only; **§ Master backlog**).
+- [ ] **5** — **Score chips** (1–10 row + **.5** row; **—** unset; **no 10.5**) — *main list **5***.
+- [ ] **4a** — Auto **2nd / 3rd joiner** admins / **successor** order (`joined_at`) — *main list **3***.
+- [ ] **4b** — **Remove member** (creator/admins; RLS / RPC or Edge) — *main list **9***.
+- [ ] **4c** — **Request unpublish** title — *main list **10*** (*who published* = **3b**).
+- [x] **4d** — **Creator leave** → **transfer** if **>1** member (**5.6.51** `creator_leave_circle`). *Open:* last-member **delete group** / full **disintegrate** rules — *main list **11***.
+- [ ] **4e** — **Solo after exodus** — **~7 day grace**, then **invite** or **close**; track **≥2 → 1** transition time in DB — *main list **12***.
 
 ### Product — discovery & polish
 
-9. **Phase D — `profiles.handle`:** search/invite by handle — **blocked on schema**.
-10. **Edit circle** — **shipped 5.6.52:** name / description / vibe; **active** + **creator** only; **`updateCircle`**. *Polish (optional):* **archived** read-only is already the case (list only **active**); no extra work unless showing archived later.
-11. **Phase E polish:** animations, cover upload, **`icon_emoji`**, per-circle color, **archived** section.
+13. **Phase D — `profiles.handle`:** search/invite by handle — **blocked on schema**.
+14. **Edit circle** — **shipped 5.6.52:** name / description / vibe; **active** + **creator** only; **`updateCircle`**. *Polish (optional):* **archived** read-only is already the case (list only **active**); no extra work unless showing archived later.
+15. **Phase E polish:** animations, cover upload, **`icon_emoji`**, per-circle color, **archived** section.
 
 ### Watchlist, invites, ratings
 
-12. **Watchlist on Circles landing:** surface watchlist on main Circles — **layout TBD** (`HANDOFF.md`).
-13. **Watchlist rows — circle name:** when saved from a circle, show name via **`source_circle_id`** (partially in roadmap today).
-14. **Invite → non-user email:** deliver path to **join** + accept circle invite — product detail **TBD**.
-15. **In-circle quick rate pill:** rate from circle context → same **publish to circles** flow (`rating_circle_shares`).
-16. **Bayesian (or similar) normalization** for ratings — formula + pipeline **TBD**.
+16. **Watchlist on Circles landing:** surface watchlist on main Circles — **layout TBD** (`HANDOFF.md`).
+17. **Watchlist rows — circle name:** when saved from a circle, show name via **`source_circle_id`** (partially in roadmap today).
+18. **Invite → non-user email:** deliver path to **join** + accept circle invite — product detail **TBD**. *Lightweight v1 may be **main list item 2** (copy-to-mail from the app); this item is the fuller / automated path when product is ready.*
+19. **Bayesian (or similar) normalization** for ratings — formula + pipeline **TBD**.
 
 ### Security & trust
 
-17. **`ACCOUNT-SECURITY.md`:** OAuth (e.g. Apple / Google), **CAPTCHA** on signup, optional **phone** verification — see file.
+20. **`ACCOUNT-SECURITY.md`:** OAuth (e.g. Apple / Google), **CAPTCHA** on signup, optional **phone** verification — see file.
 
 ### Engineering — performance & platform
 
-18. **Code-splitting:** route/screen **`lazy()` + `Suspense`** to cut first-load JS parse/compile.
-19. **Fetch waterfalls:** shell + skeletons first; don’t await non-critical TMDB/secondary fetches before meaningful paint after auth.
-20. **Split `App.jsx`:** move to **`pages/*`** (pure refactor, large file — `HANDOFF.md`).
-21. **Caching:** Vercel CDN for hashed assets; optional short TTL for stable owned API responses.
-22. **Vercel Image Optimization (optional):** `/_vercel/image` or framework integration — WebP/AVIF + resize vs raw TMDB.
-23. **Smaller thumbs (optional):** e.g. **`w185`** for tiny list rows only if quality OK.
-24. **Prefetch (optional):** low-priority hints for likely next screen — **careful on cellular**.
-25. **Supabase hot paths:** fewer columns, indexes, avoid N+1; watch **RLS** cost on hot queries.
-26. **Fonts:** subset / **`font-display`** if text blocks paint.
-27. **PWA service worker (optional):** repeat-visit cache for shell/assets; respect **TMDB** hotlinking; cold first load unchanged.
+21. **Code-splitting:** route/screen **`lazy()` + `Suspense`** to cut first-load JS parse/compile.
+22. **Fetch waterfalls:** shell + skeletons first; don’t await non-critical TMDB/secondary fetches before meaningful paint after auth.
+23. **Split `App.jsx`:** move to **`pages/*`** (pure refactor, large file — `HANDOFF.md`).
+24. **Caching:** Vercel CDN for hashed assets; optional short TTL for stable owned API responses.
+25. **Vercel Image Optimization (optional):** `/_vercel/image` or framework integration — WebP/AVIF + resize vs raw TMDB.
+26. **Smaller thumbs (optional):** e.g. **`w185`** for tiny list rows only if quality OK.
+27. **Prefetch (optional):** low-priority hints for likely next screen — **careful on cellular**.
+28. **Supabase hot paths:** fewer columns, indexes, avoid N+1; watch **RLS** cost on hot queries.
+29. **Fonts:** subset / **`font-display`** if text blocks paint.
+30. **PWA service worker (optional):** repeat-visit cache for shell/assets; respect **TMDB** hotlinking; cold first load unchanged.
 
 ### Ops, quality, docs
 
-28. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if **RLS** on **`watchlist`** and **⋯ reorder** must work.
-29. **Docs sync:** **`package.json`**, **`CHANGELOG.md`**, this file, **`HANDOFF.md`** version/callouts — don’t let **`HANDOFF`** version drift vs **`package.json`**.
-30. **Marketing stats:** may return in top bar / About (not bottom nav).
-31. **Cron:** **`compute-neighbors`** wave coverage vs MAU — **`COMPUTE-NEIGHBORS-CRON.md`**.
-32. **Lint:** pre-existing **`react-hooks/set-state-in-effect`** in **`AppPrimaryNav`**.
+31. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if **RLS** on **`watchlist`** and **⋯ reorder** must work.
+32. **Docs sync:** **`package.json`**, **`CHANGELOG.md`**, this file, **`HANDOFF.md`** version/callouts — don’t let **`HANDOFF`** version drift vs **`package.json`**.
+33. **Marketing stats:** may return in top bar / About (not bottom nav).
+34. **Cron:** **`compute-neighbors`** wave coverage vs MAU — **`COMPUTE-NEIGHBORS-CRON.md`**.
+35. **Lint:** pre-existing **`react-hooks/set-state-in-effect`** in **`AppPrimaryNav`**.
 
 ### Small follow-ups (nice-to-have)
 
-33. **Circle strip tabs:** **Top** copy vs **Most rated** by count — combine or rename if product wants both (`HANDOFF.md` item 11).
+36. **Circle strip tabs:** **Top** copy vs **Most rated** by count — combine or rename if product wants both (`HANDOFF.md` item 11).
 
 ---
 
 ## Open / follow-ups
 
-**Master checklist:** **§ Master backlog (consolidated checklist)** above — this section keeps **narrative**, **shipped** history, and **numbered 1–33** shorthand aligned with that list (Circles **1–1b, 2, 3,** moderation **4–8** = **4a–4e**, then Product **9–11**, etc.).
+**Master checklist:** **§ Master backlog (consolidated checklist)** above — this section keeps **narrative**, **shipped** history, and **numbered** shorthand aligned with that list (Circles **1** = invite UX, **2** = non-user copy-to-email, **3** = **4a** admin/successor, **3b** = who published (tap pill), **4** = detail **Rate this / Rate more**, **5** = **score chips** (1–10 + **.5**), **6 / 6b / 7 / 8** = activity / strip predict / unseen polish / max invites, **9–12** = **4b–4e** moderation, then Product **13–15**, … **36**).
 
 **Handoff rule:** the **last user note** from the prior session (see **§ For the assistant** item 4) must be reflected here or under **Last session** when you update this file.
 
-**Last session (2026-04-25) — for the next chat**
+**Last session (2026-04-27) — 6.0.22 passdown + git push**
 
+- **Last note (§ For the assistant item 4):** After **`6.0.22`** shipped to **`main`** (Circles main list / invite UX, commit **`ea7a9ee`**) the user asked to **update** **`PASSDOWN-NEXT-CHAT.md`** for the release and **push** the passdown to **`git`**. This edit aligns **version**, **Tell the next chat**, **Snapshot**, **Changelog trail**, **Recent work**, **Master backlog** item **1** (shipped) + **checkbox 1**, and **Open / follow-ups** (this block).
+- **Shipped (current):** **`main` @ 6.0.22** — full detail **CHANGELOG** / passdown top; **6.0.21** and older in **Changelog trail**.
+- **Ops:** **Vercel** ← **`main`**; migrations **manual**; **cron/MAU** → **`COMPUTE-NEIGHBORS-CRON.md`**.
+
+**Earlier — Last session (2026-04-27) — user starting next chat (handoff, pre-6.0.22 passdown commit)**
+
+- User **refreshed** handoff to open a **fresh chat**; **no** app code in that thread. **6.0.22** was built/merged **after** that handoff in a follow-up.
+- **Product decisions in passdown (still next to build as approved):** **main list 4** — **Rate this** / **Rate more**; **5** — **score chips**; **3b** — **Who published**; **(4a / 4b–4e)**; **18** full email.
+
+**Earlier — Last session (2026-04-26) — passdown-only discussion**
+
+- **Rating / detail UX** filed as **main list 4–5**; **invite path** cross-refs **§ item 18**; **Master checklist** shorthand updated (**9–12** moderation, **13–15** Product, **16–19** Watchlist, **36** small follow-ups).
+
+**Earlier — Last session (2026-04-25) — for the next chat**
+
+- **Circles (discussion only):** **§ Master backlog item 1** — invite list / activity chrome (bell, invites top, solid row, Accept+Decline, no bell until joined, numeric unseen, hide invites at cap). **§ item 2** — when invite-by-email target **has no account**, add **copy-to-mail** invite text + “paste in email and send” instructions (optional `mailto:` later). Full automated path stays **§ item 18**.
 - **User chose** “**A**” for **In Theaters** **Popular** row: **`/trending/movie/week`** + same filters as **Now Playing** (shipped **6.0.19**). Earlier same day: **streaming** strip looks good; **6.0.18** pushed to **`main`**.
 - **Shipped (see `CHANGELOG.md`):** **6.0.19** — **Popular in theaters** = weekly **trending** (not re-sort of **Now** pool); **`mergeInTheatersStripsForCatalogue`** for predict/catalogue. **6.0.18** — main **Streaming**: separate **Now** vs **popular** pools; **25** cap; **5→25** stagger; **All services** / per-provider rules per **CHANGELOG**.
 - **Prod / Edge:** **6.0.19** client-only. **Vercel** deploy from **`main`** as usual.
@@ -384,7 +411,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 3. **Invites at max circles:** today **`auto_declined`**; recipient **never sees** invite; creator gets auto-decline. *Idea:* **muted** row for recipient (“at cap”) + **open/pending** for creator until resolved.
 4. **Prod Supabase:** confirm **`20260526120000_watchlist_rls_update_own.sql`** if watchlist RLS is enabled and reorder must work.
 5. **Docs:** keep **`package.json` / `CHANGELOG` / this file** in sync; **`HANDOFF.md`** roadmap **version** line lags if not refreshed — trust **`package.json`**.
-6. **Creator leave / moderation stack:** *Full spec:* **§ Master backlog** **items 4–8 (4a–4e)**. **5.6.51:** creator leave **transfers** when others remain; **solo** still archives. *Still not in app:* **remove member** (4b), **request unpublish** (4c), **4e** grace clock, last-member **delete group** (4d).
+6. **Creator leave / moderation stack:** *Full spec:* **§ Master backlog** **items 3 (4a)** and **9–12 (4b–4e)**. **5.6.51:** creator leave **transfers** when others remain; **solo** still archives. *Still not in app:* **remove member** (4b), **request unpublish** (4c), **4e** grace clock, last-member **delete group** (4d).
 
 **Roadmap (see also `HANDOFF.md`)**
 

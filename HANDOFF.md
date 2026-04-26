@@ -16,7 +16,7 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 ## Current state (as of last update)
 
 - **`main` is pushed** to `origin` (includes Circles Phase A + RLS hotfix + Phase B + Phase C strip backend + Phase C strip UI).
-- **`package.json` version:** see **`package.json`** / **`CHANGELOG.md`** (e.g. **5.6.38** at last sync); circle feeds use **`rating_circle_shares`**; **circle activity** (badges, last seen) also needs **`20260527120000_circle_member_last_seen.sql`** on prod if not already applied — see **`PASSDOWN-NEXT-CHAT.md`**.
+- **`package.json` version:** see **`package.json`** / **`CHANGELOG.md`** (e.g. **6.0.22** at last sync); circle feeds use **`rating_circle_shares`**; **circle activity** (badges, last seen) also needs **`20260527120000_circle_member_last_seen.sql`** on prod if not already applied — see **`PASSDOWN-NEXT-CHAT.md`**.
 - **Prod DB:** Circles schema through strip/grids + watchlist + **rating publish** — ensure **`20260524120000_rating_circle_shares.sql`** is applied (feeds join through shares; leave-circle trigger clears shares for that member+circle). Earlier migrations as in repo / **`PASSDOWN-NEXT-CHAT.md`** checklist.
 - **Edge functions:** `match`, `compute-neighbors`, `send-circle-invite`, `accept-circle-invite`, and **`get-circle-rated-titles`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`). Each function’s `index.ts` has **`EDGE_FUNCTION_VERSION`**; JSON responses include **`edge.version`** — bump the constant whenever that function’s code changes, then redeploy.
 
@@ -38,7 +38,7 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 
 | Area | Location |
 |------|----------|
-| Main app | `src/App.jsx` — Circles UI ~search `screen === "circles"`, `circle-detail`, `showInvitesPanel`, `showInviteSheet` |
+| Main app | `src/App.jsx` — Circles UI ~search `screen === "circles"`, `circle-detail`, `listInvitesShown`, `openInvitesPanel`, `showInviteSheet` |
 | Circles helpers | `src/circles.js` — vibes, caps, `fetchMyCircles`, invites, Edge invoke + `FunctionsHttpError` body parsing |
 | Circles schema + display contract | `supabase/migrations/20260422120000_circles_schema.sql` (read top comment block before Phase C) |
 | RLS hotfix (helpers) | `supabase/migrations/20260423120000_circles_rls_recursion_fix.sql` |
