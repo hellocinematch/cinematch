@@ -2963,7 +2963,8 @@ export default function App() {
   const [pendingInvitesLoaded, setPendingInvitesLoaded] = useState(false);
   const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
   const [pendingInvitesError, setPendingInvitesError] = useState("");
-  const [showInvitesPanel, setShowInvitesPanel] = useState(false);
+  const firstPendingInviteRowRef = useRef(null);
+  const capPendingInvitesHintRef = useRef(null);
   /** Map<inviteId, "accepting" | "declining">. Per-invite, so multiple rows can animate. */
   const [inviteActionBusy, setInviteActionBusy] = useState({});
   const [inviteActionError, setInviteActionError] = useState("");
@@ -6484,6 +6485,8 @@ export default function App() {
 
   const activeCirclesCount = circlesList.length;
   const atCircleCap = activeCirclesCount >= CIRCLE_CAP;
+  /** Pending invites merged into the main list; hidden entirely at max circles (passdown). */
+  const listInvitesShown = atCircleCap ? [] : pendingInvites;
 
   const circleNameById = useMemo(() => {
     const map = new Map();
@@ -7145,13 +7148,16 @@ export default function App() {
 
   function openInvitesPanel() {
     setInviteActionError("");
-    setShowInvitesPanel(true);
     if (user && !pendingInvitesLoading) void reloadPendingInvites();
-  }
-
-  function closeInvitesPanel() {
-    setShowInvitesPanel(false);
-    setInviteActionError("");
+    requestAnimationFrame(() => {
+      if (listInvitesShown.length > 0 && firstPendingInviteRowRef.current) {
+        firstPendingInviteRowRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (atCircleCap && pendingInvitesCount > 0 && capPendingInvitesHintRef.current) {
+        capPendingInvitesHintRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
   }
 
   function markInviteBusy(inviteId, action) {
@@ -7201,7 +7207,6 @@ export default function App() {
         tone: "ok",
         text: `Joined ${invite.circleName}.`,
       });
-      if (pendingInvites.length <= 1) setShowInvitesPanel(false);
     } catch (e) {
       console.error("Circles: acceptCircleInvite failed", e);
       setInviteActionError(e?.message || "Could not accept that invite.");
@@ -7217,7 +7222,6 @@ export default function App() {
     try {
       await declineCircleInvite({ inviteId: invite.id });
       setPendingInvites((prev) => prev.filter((row) => row.id !== invite.id));
-      if (pendingInvites.length <= 1) setShowInvitesPanel(false);
     } catch (e) {
       console.error("Circles: declineCircleInvite failed", e);
       setInviteActionError(e?.message || "Could not decline that invite.");
@@ -8375,12 +8379,12 @@ export default function App() {
                     className={`circles-bell${pendingInvitesCount > 0 ? " circles-bell--active" : ""}`}
                     aria-label={
                       pendingInvitesCount > 0
-                        ? `Pending invites (${pendingInvitesCount})`
+                        ? `Pending invites (${pendingInvitesCount}). Scroll to invites in list.`
                         : "Pending invites"
                     }
                     title={
                       pendingInvitesCount > 0
-                        ? `${pendingInvitesCount} pending invite${pendingInvitesCount === 1 ? "" : "s"}`
+                        ? `${pendingInvitesCount} pending — jump to invites in list`
                         : "No pending invites"
                     }
                     onClick={openInvitesPanel}
@@ -8408,18 +8412,35 @@ export default function App() {
                   You're at the {CIRCLE_CAP}-circle limit. Leave one to create or join another.
                 </div>
               )}
+              {atCircleCap && pendingInvitesCount > 0 ? (
+                <div
+                  ref={capPendingInvitesHintRef}
+                  className="circles-pending-at-cap-hint"
+                  role="status"
+                >
+                  You have {pendingInvitesCount} pending invite{pendingInvitesCount === 1 ? "" : "s"}.
+                  {" "}
+                  Leave a circle to accept or decline them in your list.
+                </div>
+              ) : null}
               {circlesError && (
                 <div className="circles-error-banner">{circlesError}</div>
               )}
+              {inviteActionError && (
+                <div className="circles-error-banner">{inviteActionError}</div>
+              )}
+              {pendingInvitesError && (
+                <div className="circles-error-banner">{pendingInvitesError}</div>
+              )}
             </div>
 
-            {circlesLoading && !circlesLoaded ? (
+            {circlesLoading && !circlesLoaded && listInvitesShown.length === 0 ? (
               <div className="circles-skeleton">
                 <div className="circles-skeleton-card" />
                 <div className="circles-skeleton-card" />
                 <div className="circles-skeleton-card" />
               </div>
-            ) : activeCirclesCount === 0 ? (
+            ) : circlesLoaded && pendingInvitesLoaded && activeCirclesCount === 0 && listInvitesShown.length === 0 ? (
               <div className="circles-empty">
                 <div className="circles-empty-title">Create your first circle</div>
                 <div className="circles-empty-sub">
@@ -8439,8 +8460,53 @@ export default function App() {
                   + Create a circle
                 </button>
               </div>
-            ) : (
+            ) : activeCirclesCount > 0 || listInvitesShown.length > 0 ? (
               <div className="circles-list">
+                {listInvitesShown.map((invite, inviteIdx) => {
+                  const meta = vibeMeta(invite.circleVibe);
+                  const busy = inviteActionBusy[invite.id];
+                  return (
+                    <div
+                      key={invite.id}
+                      ref={inviteIdx === 0 ? firstPendingInviteRowRef : undefined}
+                      className="invite-card invite-card--list"
+                      style={{ "--vibe-accent": meta.accent, "--vibe-tint": meta.tint }}
+                    >
+                      <div className="invite-card__tint" aria-hidden="true" />
+                      <div className="invite-card__body">
+                        <div className="invite-card__sender">
+                          <span className="invite-card__sender-name">{invite.inviterName}</span>
+                          <span className="invite-card__sender-verb"> invited you to</span>
+                        </div>
+                        <div className="invite-card__circle-name">{invite.circleName}</div>
+                        <div className="invite-card__meta-row">
+                          <span className="circle-card__vibe-badge">{meta.id}</span>
+                          <span className="circle-card__members">
+                            {invite.memberCount} {invite.memberCount === 1 ? "member" : "members"}
+                          </span>
+                        </div>
+                        <div className="invite-card__actions">
+                          <button
+                            type="button"
+                            className="circles-btn-ghost"
+                            onClick={() => void handleDeclineInvite(invite)}
+                            disabled={Boolean(busy)}
+                          >
+                            {busy === "declining" ? "Declining…" : "Decline"}
+                          </button>
+                          <button
+                            type="button"
+                            className="circles-btn-primary"
+                            onClick={() => void handleAcceptInvite(invite)}
+                            disabled={Boolean(busy)}
+                          >
+                            {busy === "accepting" ? "Joining…" : "Accept"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
                 {circlesList.map((circle) => {
                   const meta = vibeMeta(circle.vibe);
                   const isCreator = currentUserRole(circle, user?.id) === "creator";
@@ -8475,11 +8541,11 @@ export default function App() {
                                 )}
                                 {unseenN > 0 ? (
                                   <div
-                                    className="circle-card__activity"
+                                    className="circle-card__unseen"
                                     title="New from other members"
+                                    aria-hidden="true"
                                   >
-                                    <span className="circle-card__activity-ico" aria-hidden="true">🔔</span>
-                                    <span className="circle-card__activity-count">
+                                    <span className="circle-card__unseen-num">
                                       {unseenN > 99 ? "99+" : unseenN}
                                     </span>
                                   </div>
@@ -8511,6 +8577,12 @@ export default function App() {
                     </div>
                   );
                 })}
+              </div>
+            ) : (
+              <div className="circles-skeleton">
+                <div className="circles-skeleton-card" />
+                <div className="circles-skeleton-card" />
+                <div className="circles-skeleton-card" />
               </div>
             )}
           </div>
@@ -9470,97 +9542,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Phase B: pending-invites panel. Slides down from the top. */}
-      {showInvitesPanel && (
-        <div className="invites-panel-root" role="dialog" aria-modal="true" aria-label="Pending invites">
-          <button
-            type="button"
-            className="invites-panel-backdrop"
-            aria-label="Close"
-            onClick={closeInvitesPanel}
-          />
-          <div className="invites-panel">
-            <div className="invites-panel-header">
-              <div className="invites-panel-title">Invites</div>
-              <button
-                type="button"
-                className="invites-panel-close"
-                onClick={closeInvitesPanel}
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            {inviteActionError && (
-              <div className="circles-error-banner">{inviteActionError}</div>
-            )}
-            {pendingInvitesError && (
-              <div className="circles-error-banner">{pendingInvitesError}</div>
-            )}
-            {pendingInvitesLoading && pendingInvites.length === 0 ? (
-              <div className="invites-empty">Loading…</div>
-            ) : pendingInvites.length === 0 ? (
-              <div className="invites-empty">
-                <div className="invites-empty-title">No pending invites</div>
-                <div className="invites-empty-sub">When someone invites you to a circle, it'll show up here.</div>
-              </div>
-            ) : (
-              <div className="invites-list">
-                {pendingInvites.map((invite) => {
-                  const meta = vibeMeta(invite.circleVibe);
-                  const busy = inviteActionBusy[invite.id];
-                  return (
-                    <div
-                      key={invite.id}
-                      className="invite-card"
-                      style={{ "--vibe-accent": meta.accent, "--vibe-tint": meta.tint }}
-                    >
-                      <div className="invite-card__tint" aria-hidden="true" />
-                      <div className="invite-card__body">
-                        <div className="invite-card__sender">
-                          <span className="invite-card__sender-name">{invite.inviterName}</span>
-                          <span className="invite-card__sender-verb"> invited you to</span>
-                        </div>
-                        <div className="invite-card__circle-name">{invite.circleName}</div>
-                        <div className="invite-card__meta-row">
-                          <span className="circle-card__vibe-badge">{meta.id}</span>
-                          <span className="circle-card__members">
-                            {invite.memberCount} {invite.memberCount === 1 ? "member" : "members"}
-                          </span>
-                        </div>
-                        <div className="invite-card__actions">
-                          <button
-                            type="button"
-                            className="circles-btn-ghost"
-                            onClick={() => handleDeclineInvite(invite)}
-                            disabled={Boolean(busy)}
-                          >
-                            {busy === "declining" ? "Declining…" : "Decline"}
-                          </button>
-                          <button
-                            type="button"
-                            className="circles-btn-primary"
-                            onClick={() => handleAcceptInvite(invite)}
-                            disabled={Boolean(busy) || atCircleCap}
-                          >
-                            {busy === "accepting" ? "Joining…" : "Join circle"}
-                          </button>
-                        </div>
-                        {atCircleCap && (
-                          <div className="invite-card__cap-hint">
-                            You're at the {CIRCLE_CAP}-circle limit. Leave one first to join this.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Phase B: invite-by-email composer sheet (creator only, circle-detail). */}
       {showInviteSheet && circleDetailData && (
         <div className="circles-sheet-root" role="dialog" aria-modal="true" aria-label="Invite a member">
@@ -9574,7 +9555,7 @@ export default function App() {
             <div className="circles-sheet-handle" aria-hidden="true" />
             <div className="circles-sheet-title">Invite a member</div>
             <div className="circles-sheet-sub">
-              They'll need an existing Cinemastro account for the invite to land in their bell.
+              They'll need an existing Cinemastro account for the invite to show in their Circles list.
             </div>
 
             <div className="circles-field">

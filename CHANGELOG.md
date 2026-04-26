@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.0.22
+
+- **Circles — invite list & activity chrome (master backlog item 1):** **Pending invites** are **in the main Circles list** (no separate slide-down panel): **sort** = invite rows **first**, then your circles — one list, **no** “Invites / Your circles” section headers. **Invite** rows use a **solid, distinct** surface (`.invite-card--list`) with **Decline** and **Accept** on the row. **Header bell** stays a **summary**; tap **scrolls** to the first pending invite (or to a **hint** when you’re **at the circle cap** but still have pending invites — rows are **hidden** at cap until you free a slot). **Unseen** activity on **joined** circle rows is a **number in a circle** (no bell icon). Invite / pending errors show in the Circles header area.
+
 ## 6.0.21
 
 - **Title detail — In Theaters:** When a **movie** is in the current **In Theaters** strips (**Now** or **Popular**) and **Where to Watch** has no streaming options (or TMDB returns no regional providers), show **Find showtimes near you (Google)** — opens a Google search for `{title} {year} movie showtimes`. Short hint that results depend on location.

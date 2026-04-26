@@ -1215,6 +1215,7 @@
   .circles-new-btn:disabled { opacity:0.4; cursor:default; background:#2a2610; color:#e8c96a; }
   .circles-new-btn--lg { padding:14px 28px; font-size:14px; margin-top:20px; }
   .circles-cap-banner { margin-top:12px; padding:10px 14px; background:#2a1a0a; border:1px solid #4a2e12; color:#e8c96a; border-radius:10px; font-size:13px; }
+  .circles-pending-at-cap-hint { margin-top:10px; padding:10px 14px; background:#1a1810; border:1px solid #3a3220; color:#c8c0a8; border-radius:10px; font-size:13px; line-height:1.45; }
   .circles-error-banner { margin-top:12px; padding:10px 14px; background:#1a0808; border:1px solid #441111; color:#f09a9a; border-radius:10px; font-size:13px; overflow-wrap:anywhere; }
 
   .circles-skeleton { padding:20px 24px; display:flex; flex-direction:column; gap:12px; }
@@ -1245,6 +1246,8 @@
   .circle-card__activity { position:relative; display:inline-flex; align-items:center; gap:3px; padding:4px 8px 4px 6px; border-radius:999px; border:1px solid #3a3020; background:#1a1510; font-size:13px; line-height:1; }
   .circle-card__activity-ico { font-size:14px; line-height:1; }
   .circle-card__activity-count { font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; color:#e8c96a; min-width:1.1em; text-align:center; }
+  .circle-card__unseen { flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; min-width:28px; height:28px; padding:0 6px; border-radius:999px; border:1px solid #5a4a2a; background:color-mix(in srgb, #e8c96a 12%, #1a150c); box-sizing:border-box; }
+  .circle-card__unseen-num { font-family:'DM Sans',sans-serif; font-size:12px; font-weight:800; color:#e8c96a; line-height:1; }
   .circle-new-activity-bar--other-tab { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 12px; padding:8px 12px; border-radius:10px; border:1px solid #3a3020; background:color-mix(in srgb, #e8c96a 8%, #12100a); font-family:'DM Sans',sans-serif; }
   .circle-new-activity-bar--other-tab__text { font-size:13px; color:#e8e0d0; font-weight:600; }
   .circle-new-activity-bar--other-tab__btn { flex-shrink:0; padding:6px 12px; border-radius:999px; border:1px solid #e8c96a; background:#e8c96a; color:#0a0a0a; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
@@ -1825,6 +1828,9 @@
   .invites-empty-sub { font-size:13px; color:#777; line-height:1.4; }
   .invites-list { display:flex; flex-direction:column; gap:12px; }
   .invite-card { position:relative; background:#111; border:1px solid #1e1e1e; border-radius:14px; padding:14px 16px; overflow:hidden; --vibe-accent:#e8c96a; --vibe-tint:#3a2a0a; animation:slideUp 0.3s cubic-bezier(0.16,1,0.3,1); }
+  /** Main Circles list: solid distinct surface for pending invites (no section header). */
+  .invite-card--list { background:#2a2214; border:1px solid #4a3d24; }
+  .invite-card--list .invite-card__tint { opacity:0.55; }
   .invite-card__tint { position:absolute; inset:0; background:radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--vibe-tint) 65%, transparent) 0%, transparent 65%); pointer-events:none; opacity:0.85; }
   .invite-card__body { position:relative; z-index:1; display:flex; flex-direction:column; gap:6px; }
   .invite-card__sender { font-size:12px; color:#aaa; letter-spacing:0.2px; }
