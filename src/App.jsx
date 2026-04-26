@@ -2447,6 +2447,73 @@ function formatScore(n) {
   return (Math.round(x * 10) / 10).toFixed(1);
 }
 
+function ratingScoreHasHalfStep(v) {
+  if (!Number.isFinite(v)) return false;
+  return Math.abs(v - Math.trunc(v) - 0.5) < 1e-6;
+}
+
+/**
+ * Two-row score picker — row **1:** integers **1–10**; row **2:** one **.5** chip.
+ * Pick **3** then **.5** → **3.5**; pick **7** then **.5** → **7.5**. Without **.5**, the score is the integer alone. **10** cannot get a half. Tapping **.5** again removes the half (e.g. **7.5** → **7**).
+ * Shows **—** until the user picks an integer (`touched` false).
+ */
+function RatingScoreChips({ value, touched, onPick, variant = "default" }) {
+  const display = touched && Number.isFinite(value) ? formatScore(value) : "—";
+  const ints = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const intChipActive = (n) =>
+    touched &&
+    Number.isFinite(value) &&
+    (value === n || (ratingScoreHasHalfStep(value) && Math.trunc(value) === n));
+  const halfUsable =
+    touched &&
+    Number.isFinite(value) &&
+    (ratingScoreHasHalfStep(value) || (Number.isInteger(value) && value >= 1 && value <= 9));
+  const halfActive = touched && ratingScoreHasHalfStep(value);
+
+  function onHalfChipClick() {
+    if (!halfUsable) return;
+    const intPart = Math.trunc(value);
+    if (ratingScoreHasHalfStep(value)) {
+      onPick(intPart);
+      return;
+    }
+    if (Number.isInteger(value) && intPart >= 1 && intPart <= 9) {
+      onPick(intPart + 0.5);
+    }
+  }
+
+  return (
+    <div className={`rating-score-chips rating-score-chips--${variant}`}>
+      <div className={`rating-score-chips__display${touched ? "" : " rating-score-chips__display--unset"}`}>{display}</div>
+      <div className="rating-score-chips__row rating-score-chips__row--int" role="group" aria-label="Score from 1 to 10">
+        {ints.map((n) => (
+          <button
+            key={`int-${n}`}
+            type="button"
+            className={`rating-score-chips__chip${intChipActive(n) ? " rating-score-chips__chip--active" : ""}`}
+            aria-pressed={intChipActive(n)}
+            onClick={() => onPick(n)}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <div className="rating-score-chips__row rating-score-chips__row--half-single">
+        <button
+          type="button"
+          className={`rating-score-chips__chip rating-score-chips__chip--half${halfActive ? " rating-score-chips__chip--active" : ""}`}
+          aria-label="Add or remove half point"
+          aria-pressed={halfActive}
+          disabled={!halfUsable}
+          onClick={onHalfChipClick}
+        >
+          .5
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** v3.1.0: Map value is `{ avgScore, ratingCount }` (legacy session may still have a bare number for avg only). */
 function cinemastroEntryAvg(entry) {
   if (entry == null) return undefined;
@@ -2946,9 +3013,11 @@ export default function App() {
   const [watchlistRowMenuId, setWatchlistRowMenuId] = useState(null);
   const [selectedToWatch, setSelectedToWatch] = useState({});
   const [selectedMovie, setSelected] = useState(null);
-  const [detailRating, setDetailRating] = useState(5);
+  const [detailRating, setDetailRating] = useState(7);
   const [detailTouched, setDetailTouched] = useState(false);
   const [detailEditRating, setDetailEditRating] = useState(false);
+  /** `openDetail` snapshot: **circle** vs **discover** vs **other** — gates **Rate this** / **Rate more** (6.1.0). */
+  const [detailRateEntry, setDetailRateEntry] = useState(null);
   const [rateMoreMovies, setRateMoreMovies] = useState([]);
   const [rateMoreContextMovieId, setRateMoreContextMovieId] = useState(null);
   const [rateSimilarLoading, setRateSimilarLoading] = useState(false);
@@ -6316,11 +6385,21 @@ export default function App() {
   function openDetail(movie, prediction, opts = {}) {
     const pred = prediction ?? null;
     const s = screenRef.current;
+    let detailRateEntryNext = "other";
     if (s === "discover" && rateTitleReturnCircleIdRef.current != null) {
       detailReturnScreenRef.current = "circle-detail";
+      detailRateEntryNext = "circle";
+    } else if (s === "discover") {
+      detailReturnScreenRef.current = s;
+      detailRateEntryNext = "discover";
+    } else if (s === "circle-detail") {
+      detailReturnScreenRef.current = "circle-detail";
+      detailRateEntryNext = "circle";
     } else {
       detailReturnScreenRef.current = s;
+      detailRateEntryNext = "other";
     }
+    setDetailRateEntry(detailRateEntryNext);
     // Distinct URL per detail step so iOS edge-swipe / Mac trackpad back can popstate (v2.1.0). Community avg on detail from v3.0.0 RPC.
     if (opts.skipHistoryPush) {
       detailHistoryPushedRef.current = false;
@@ -6337,9 +6416,9 @@ export default function App() {
       setDetailTouched(true);
     } else {
       setDetailEditRating(false);
-      setDetailRating(5);
-      /** Default 5 is a deliberate starting point — allow submit without forcing a slider wiggle. */
-      setDetailTouched(userRatings[movie.id] == null);
+      setDetailRating(7);
+      /** Chips: require an explicit pick; show **—** until then (6.1.0). */
+      setDetailTouched(userRatings[movie.id] != null);
     }
     setScreen("detail");
     const movieId = movie.id;
@@ -6393,6 +6472,7 @@ export default function App() {
     }
     history.replaceState(null, "", spaUrlWithoutOverlays());
     setDetailEditRating(false);
+    setDetailRateEntry(null);
     setSelected(null);
     // navTab === "home" is the idle bottom-nav sentinel; the landing screen is now "circles".
     setScreen(
@@ -6437,6 +6517,7 @@ export default function App() {
     setScreen("circles");
     setSelected(null);
     setDetailEditRating(false);
+    setDetailRateEntry(null);
     setShowAvatarMenu(false);
   }
 
@@ -7520,6 +7601,7 @@ export default function App() {
     detailReturnScreenRef.current = null;
     setSelected(null);
     setDetailEditRating(false);
+    setDetailRateEntry(null);
   }
 
   /** Discover → pick a title → rate; `goBack` / after submit returns to this circle. */
@@ -7615,6 +7697,7 @@ export default function App() {
         const ret = detailReturnScreenRef.current;
         detailReturnScreenRef.current = null;
         setDetailEditRating(false);
+        setDetailRateEntry(null);
         setSelected(null);
         if (ret != null) setScreen(ret);
         return;
@@ -8530,10 +8613,12 @@ export default function App() {
           <div className="rating-area">
             <div className="rating-row">
               <div className="rating-q">Your rating</div>
-              <div className={`rating-val ${sliderTouched ? "" : "unset"}`}>{sliderTouched ? sliderVal : "—"}</div>
             </div>
-            <input className="slider" type="range" min="1" max="10" step="0.5" value={sliderVal}
-              onChange={e => { setSliderVal(parseFloat(e.target.value)); setSliderTouched(true); }} />
+            <RatingScoreChips
+              value={sliderVal}
+              touched={sliderTouched}
+              onPick={(v) => { setSliderVal(v); setSliderTouched(true); }}
+            />
             <div className="ob-actions">
               <button className="btn-confirm" onClick={confirmRating} disabled={!sliderTouched}>Confirm Rating</button>
               <button className="btn-skip" onClick={advanceOb}>Haven't seen it</button>
@@ -10656,10 +10741,12 @@ export default function App() {
           <div className="rating-area">
             <div className="rating-row">
               <div className="rating-q">Your rating</div>
-              <div className={`rating-val ${sliderTouched ? "" : "unset"}`}>{sliderTouched ? sliderVal : "—"}</div>
             </div>
-            <input className="slider" type="range" min="1" max="10" step="0.5" value={sliderVal}
-              onChange={e => { setSliderVal(parseFloat(e.target.value)); setSliderTouched(true); }} />
+            <RatingScoreChips
+              value={sliderVal}
+              touched={sliderTouched}
+              onPick={(v) => { setSliderVal(v); setSliderTouched(true); }}
+            />
             <div className="ob-actions">
               <button className="btn-confirm" onClick={() => { confirmRating(); setSliderVal(7); setSliderTouched(false); }} disabled={!sliderTouched}>Confirm Rating</button>
               <button className="btn-skip" onClick={() => advanceOb()}>Skip</button>
@@ -11276,7 +11363,11 @@ export default function App() {
         const detailHasCinemastro = typeof detailCinemastroAvg === "number" && Number.isFinite(detailCinemastroAvg);
         const detailTmdbNum = movie.tmdbRating != null && Number.isFinite(Number(movie.tmdbRating)) ? Number(movie.tmdbRating) : null;
         const heroBackdropSrc = movie.backdrop || movie.poster || null;
-        const showRatePill = !myRating && hasPersonalPrediction(prediction) && !showPredSkeleton;
+        const showRateMorePill =
+          detailRateEntry === "discover" &&
+          !myRating &&
+          hasPersonalPrediction(prediction) &&
+          !showPredSkeleton;
         const hasFactsBar = Boolean(
           detailMeta.certification ||
             detailMeta.releaseLabel ||
@@ -11284,12 +11375,8 @@ export default function App() {
             detailMeta.genresLine ||
             detailMeta.languageLabel,
         );
-        const sliderBubbleLeftPct = (v) => {
-          const x = Number(v);
-          if (!Number.isFinite(x)) return 50;
-          const clamped = Math.min(10, Math.max(1, x));
-          return ((clamped - 1) / 9) * 100;
-        };
+        const detailRatePrimaryLabel =
+          detailRateEntry === "circle" ? "Rate this title" : "Select your rating and submit";
         const confInlineClass =
           prediction?.confidence === "high"
             ? "detail-score-conf-inline--high"
@@ -11301,6 +11388,36 @@ export default function App() {
           movie.tmdbId != null &&
           (inTheaters.some((m) => m.tmdbId === movie.tmdbId) ||
             inTheatersPopularRanked.some((m) => m.tmdbId === movie.tmdbId));
+        const unratedDetailRateInner = (
+          <>
+            <div className="d-rate-label d-rate-label--sentence">{detailRatePrimaryLabel}</div>
+            <RatingScoreChips
+              variant="detail"
+              value={detailRating}
+              touched={detailTouched}
+              onPick={(v) => { setDetailRating(v); setDetailTouched(true); }}
+            />
+            <div className="d-actions">
+              <button className="btn-full btn-full-gold" disabled={!detailTouched}
+                onClick={() => { void addRating(movie.id, detailRating, { pendingNavigate: "back", navigateDelayMs: 800 }); }}>
+                Submit Rating
+              </button>
+              <button
+                type="button"
+                className={`btn-full btn-full-dark ${inWatchlist(movie.id) ? "saved-style" : ""}`}
+                disabled={!inWatchlist(movie.id) && watchlist.length >= WATCHLIST_MAX}
+                title={
+                  !inWatchlist(movie.id) && watchlist.length >= WATCHLIST_MAX
+                    ? `Watchlist full (${WATCHLIST_MAX}). Remove a title first.`
+                    : undefined
+                }
+                onClick={() => toggleWatchlist(movie)}
+              >
+                {inWatchlist(movie.id) ? "✓ Saved" : "+ Watchlist"}
+              </button>
+            </div>
+          </>
+        );
         return (
           <div className="detail">
             {!showPrimaryNav ? (
@@ -11410,23 +11527,6 @@ export default function App() {
                       );
                     })()
                   : null}
-                {showRatePill ? (
-                  <div className="detail-rate-pill-wrap">
-                    <button
-                      type="button"
-                      className="d-rate-now-btn d-rate-now-btn--center"
-                      disabled={rateSimilarLoading}
-                      onClick={() => { void handleRateNowForPrediction(movie); }}
-                    >
-                      {rateSimilarLoading
-                        ? "Loading..."
-                        : prediction.confidence === "high"
-                          ? "Rate more"
-                          : "Rate to refine"}
-                    </button>
-                    {rateSimilarError ? <div className="d-pred-improve-err">{rateSimilarError}</div> : null}
-                  </div>
-                ) : null}
                 {hasFactsBar ? (
                   <div className="detail-facts-bar">
                     {detailMeta.certification ||
@@ -11460,18 +11560,23 @@ export default function App() {
                     {detailMeta.genresLine ? <div className="detail-facts-genres">{detailMeta.genresLine}</div> : null}
                   </div>
                 ) : null}
-                {detailMeta.tagline ? <p className="d-tagline">{detailMeta.tagline}</p> : null}
-                <h2 className="d-overview-heading">Overview</h2>
-                <div className="d-synopsis">{movie.synopsis}</div>
-                <div className="detail-wtw-wrap">
-                  <WhereToWatch
-                    tmdbId={movie.tmdbId}
-                    type={movie.type}
-                    movieTitle={movie.title}
-                    movieYear={movie.year}
-                    showTheatricalShowtimesFallback={detailInTheatersPool}
-                  />
-                </div>
+                {showRateMorePill ? (
+                  <div className="detail-rate-pill-wrap">
+                    <button
+                      type="button"
+                      className="d-rate-now-btn d-rate-now-btn--center"
+                      disabled={rateSimilarLoading}
+                      onClick={() => { void handleRateNowForPrediction(movie); }}
+                    >
+                      {rateSimilarLoading
+                        ? "Loading..."
+                        : prediction.confidence === "high"
+                          ? "Rate more"
+                          : "Rate to refine"}
+                    </button>
+                    {rateSimilarError ? <div className="d-pred-improve-err">{rateSimilarError}</div> : null}
+                  </div>
+                ) : null}
                 <div className="detail-rate-section">
                   {myRating && !detailEditRating ? (
                     <div className="rated-box rated-box--compact" style={{ marginTop: 20 }}>
@@ -11502,27 +11607,12 @@ export default function App() {
                   ) : myRating && detailEditRating ? (
                     <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
                       <div className="d-rate-label">Update your rating</div>
-                      <div className="d-rate-row">
-                        <div className="d-rate-slider-col">
-                          <div className="d-rate-slider-wrap">
-                            <output
-                              className="d-rate-slider-bubble"
-                              style={{ left: `${sliderBubbleLeftPct(detailRating)}%` }}
-                            >
-                              {detailRating}
-                            </output>
-                            <input
-                              className="slider d-rate-slider"
-                              type="range"
-                              min="1"
-                              max="10"
-                              step="0.5"
-                              value={detailRating}
-                              onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                      <RatingScoreChips
+                        variant="detail"
+                        value={detailRating}
+                        touched={detailTouched}
+                        onPick={(v) => { setDetailRating(v); setDetailTouched(true); }}
+                      />
                       <div className="d-actions" style={{ marginTop: 14 }}>
                         <button className="btn-full btn-full-gold" disabled={!detailTouched}
                           onClick={() => { void addRating(movie.id, detailRating, { skipPublishModal: true }); setDetailEditRating(false); }}>
@@ -11536,49 +11626,25 @@ export default function App() {
                     </div>
                   ) : !myRating ? (
                     <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
-                      <div className="d-rate-label d-rate-label--sentence">Select your rating and submit</div>
-                      <div className="d-rate-row">
-                        <div className="d-rate-slider-col">
-                          <div className="d-rate-slider-wrap">
-                            <output
-                              className="d-rate-slider-bubble"
-                              style={{ left: `${sliderBubbleLeftPct(detailRating)}%`, color: "#e8c96a" }}
-                            >
-                              {detailRating}
-                            </output>
-                            <input
-                              className="slider d-rate-slider"
-                              type="range"
-                              min="1"
-                              max="10"
-                              step="0.5"
-                              value={detailRating}
-                              onChange={e => { setDetailRating(parseFloat(e.target.value)); setDetailTouched(true); }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="d-actions">
-                        <button className="btn-full btn-full-gold" disabled={!detailTouched}
-                          onClick={() => { void addRating(movie.id, detailRating, { pendingNavigate: "back", navigateDelayMs: 800 }); }}>
-                          Submit Rating
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn-full btn-full-dark ${inWatchlist(movie.id) ? "saved-style" : ""}`}
-                          disabled={!inWatchlist(movie.id) && watchlist.length >= WATCHLIST_MAX}
-                          title={
-                            !inWatchlist(movie.id) && watchlist.length >= WATCHLIST_MAX
-                              ? `Watchlist full (${WATCHLIST_MAX}). Remove a title first.`
-                              : undefined
-                          }
-                          onClick={() => toggleWatchlist(movie)}
-                        >
-                          {inWatchlist(movie.id) ? "✓ Saved" : "+ Watchlist"}
-                        </button>
-                      </div>
+                      {detailRateEntry === "circle" ? (
+                        <div className="d-rate-title-strip">{unratedDetailRateInner}</div>
+                      ) : (
+                        unratedDetailRateInner
+                      )}
                     </div>
                   ) : null}
+                </div>
+                {detailMeta.tagline ? <p className="d-tagline">{detailMeta.tagline}</p> : null}
+                <h2 className="d-overview-heading">Overview</h2>
+                <div className="d-synopsis">{movie.synopsis}</div>
+                <div className="detail-wtw-wrap">
+                  <WhereToWatch
+                    tmdbId={movie.tmdbId}
+                    type={movie.type}
+                    movieTitle={movie.title}
+                    movieYear={movie.year}
+                    showTheatricalShowtimesFallback={detailInTheatersPool}
+                  />
                 </div>
               </div>
             </div>

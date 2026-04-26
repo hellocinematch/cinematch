@@ -1,5 +1,23 @@
 # Changelog
 
+## 6.1.3
+
+- **Detail (circle path):** The faint orange **Rate this title** container now wraps the **whole** first-rating block — heading, score chips, **Submit Rating**, and **+ Watchlist** / saved state.
+
+## 6.1.2
+
+- **Score chips:** Second row is a **single** **.5** chip. Pick a **whole** score **1–10**, then **.5** adds a half for **1–9** only (**7** → **7.5**; **10** cannot use **.5**). Tap **.5** again to return to the integer. **.5** stays disabled until a whole score is selected.
+
+## 6.1.1
+
+- **Score chips:** Second row shows **.5** only (nine chips aligned under **1–9**); values **1.5–9.5** unchanged, with full score in **`aria-label`**. Integer row stays **1–10** on a matching **10-column** grid.
+- **Detail (circle path):** **Rate this title** sits in a **faint orange** inset strip (circle accent).
+
+## 6.1.0
+
+- **Rating input — score chips (backlog §5):** Replace the **1–10 / 0.5** range slider with two rows — integers **1–10**, then half steps **1.5–9.5** only (**no** 10.5). Composed score above the rows; **—** until the user taps a chip. Used on **onboarding**, **Rate similar titles**, and **title detail** (new rating + change rating).
+- **Detail — Rate this / Rate more (backlog §4):** **Rate this title** label and rating block sit **after** the **facts** row and **before** **Overview** / tagline. **Rate more** / **Rate to refine** (prediction refine flow) shows **only** when detail was opened from **Discover** without the circle-return path; **circle** entry (circle detail or Discover via **+** / return-to-circle) no longer shows that pill on the same visit. Other entry paths keep rating chips but no refine pill.
+
 ## 6.0.34
 
 - **Circles — rated in group modal:** **Close** uses a **gold fill** (`#e8c96a` on dark text); header **×** uses **gold** instead of gray.
