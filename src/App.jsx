@@ -25,6 +25,7 @@ import {
   fetchRatingCircleShareIds,
   syncRatingCircleShares,
   addRatingCircleShares,
+  fetchCircleTitlePublishers,
   fetchCircleRatedTitles,
   CIRCLE_STRIP_INITIAL,
   CIRCLE_STRIP_PAGE,
@@ -2662,8 +2663,9 @@ function CircleGroupScoreIcon({ variant = "strip" }) {
 /**
  * Circles — Recent strip: under the title — orange star (SVG)+circle score · gold ⭐+Cinemastro (row fields).
  * Omits if both scores are missing.
+ * When `onWhoPublished` is set, the row is tappable to open who-published overlay (3b).
  */
-function CircleStripRingCineBelowTitle({ groupRating, siteRating }) {
+function CircleStripRingCineBelowTitle({ groupRating, siteRating, onWhoPublished }) {
   const hasGr = groupRating != null && Number.isFinite(Number(groupRating));
   const hasSr = siteRating != null && Number.isFinite(Number(siteRating));
   if (!hasGr && !hasSr) return null;
@@ -2673,8 +2675,10 @@ function CircleStripRingCineBelowTitle({ groupRating, siteRating }) {
   ]
     .filter(Boolean)
     .join(", ");
-  return (
-    <div className="circle-strip-below-title-scores" title={a11y} aria-label={a11y}>
+  const tappable = typeof onWhoPublished === "function";
+  const a11yTap = tappable ? `${a11y}. Open who published.` : a11y;
+  const inner = (
+    <>
       {hasGr ? (
         <span className="circle-strip-below-title-scores__seg circle-strip-below-title-scores__seg--circle">
           <CircleGroupScoreIcon />
@@ -2692,12 +2696,34 @@ function CircleStripRingCineBelowTitle({ groupRating, siteRating }) {
           <span className="circle-strip-below-title-scores__num">{formatScore(Number(siteRating))}</span>
         </span>
       ) : null}
+    </>
+  );
+  if (tappable) {
+    return (
+      <button
+        type="button"
+        className="circle-strip-below-title-scores circle-strip-below-title-scores--tappable"
+        title={a11yTap}
+        aria-label={a11yTap}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onWhoPublished();
+        }}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <div className="circle-strip-below-title-scores" title={a11y} aria-label={a11y}>
+      {inner}
     </div>
   );
 }
 
 /** Circle All/Top list row: orange ⭐+Circle score · gold ⭐+Cinemastro · “You”+score (order; omit when missing). */
-function CircleAllTopRatingsLine({ row, showRaterParen }) {
+function CircleAllTopRatingsLine({ row, showRaterParen, onWhoPublished }) {
   const gr = row.group_rating;
   const vs = row.viewer_score;
   const sr = row.site_rating;
@@ -2706,6 +2732,80 @@ function CircleAllTopRatingsLine({ row, showRaterParen }) {
   const hasYou = vs != null && Number.isFinite(Number(vs));
   const hasCine = sr != null && Number.isFinite(Number(sr));
   const showParen = Boolean(showRaterParen) && hasCircle && distinctRaters > 0;
+  const canWhoPub =
+    (hasCircle || hasCine) && typeof onWhoPublished === "function";
+  const circleCineA11y = [
+    hasCircle
+      ? showParen
+        ? `Circle ${formatScore(Number(gr))}, ${distinctRaters} rated in this circle`
+        : `Circle ${formatScore(Number(gr))}`
+      : null,
+    hasCine ? `Cinemastro ${formatScore(Number(sr))}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  if (!hasCircle && !hasCine && !hasYou) {
+    return <div className="circle-rated-list-ratings circle-rated-list-ratings--empty">—</div>;
+  }
+
+  const youBlock = hasYou ? (
+    <span className="circle-list-rating circle-list-rating--you">
+      <span className="circle-list-rating__lbl">You</span>
+      <span className="circle-list-rating__num">{formatScore(Number(vs))}</span>
+    </span>
+  ) : null;
+
+  if (canWhoPub) {
+    const a11yBtn = `Who published. ${circleCineA11y}`;
+    return (
+      <div className="circle-rated-list-ratings">
+        <button
+          type="button"
+          className="circle-who-published-hit"
+          aria-label={a11yBtn}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onWhoPublished();
+          }}
+        >
+          {hasCircle ? (
+            <span
+              className="circle-list-rating circle-list-rating--circle"
+              aria-hidden={true}
+            >
+              <CircleGroupScoreIcon variant="list" />
+              <span className="circle-list-rating__num">{formatScore(Number(gr))}</span>
+              {showParen ? (
+                <span className="circle-list-rating__paren" aria-hidden="true">
+                  ({distinctRaters})
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+          {hasCircle && hasCine ? (
+            <span className="circle-rated-list-ratings-sep" aria-hidden="true">
+              ·
+            </span>
+          ) : null}
+          {hasCine ? (
+            <span className="circle-list-rating circle-list-rating--cine" aria-hidden="true">
+              <CirclePillStarGlyph variant="list" />
+              <span className="circle-list-rating__num">{formatScore(Number(sr))}</span>
+            </span>
+          ) : null}
+        </button>
+        {hasYou && (hasCircle || hasCine) ? (
+          <span className="circle-rated-list-ratings-sep" aria-hidden="true">
+            ·
+          </span>
+        ) : null}
+        {youBlock}
+      </div>
+    );
+  }
+
   const nodes = [];
   if (hasCircle) {
     nodes.push(
@@ -2960,6 +3060,8 @@ export default function App() {
   const circleRecentStripSuppressClickRef = useRef(false);
   const [circleStripUnpublishBusy, setCircleStripUnpublishBusy] = useState(false);
   const [showCircleInfoSheet, setShowCircleInfoSheet] = useState(false);
+  /** Who published (3b): null | { status: "loading" } | { status: "ok", rows } | { status: "err", message } */
+  const [whoPublishedModal, setWhoPublishedModal] = useState(null);
   /** `user_id` → display name for Circle info sheet (`get_circle_member_names` RPC + profiles fallback). */
   const [circleInfoNamesById, setCircleInfoNamesById] = useState({});
   // v5.1.0: Circles Phase B — invites.
@@ -6895,6 +6997,29 @@ export default function App() {
     setCircleRecentLeftScrollHint(canScrollX && scrollLeft > 4);
   }, []);
 
+  const openWhoPublishedForCircleRow = useCallback(
+    (row) => {
+      if (!row || !selectedCircleId) return;
+      setWhoPublishedModal({ status: "loading" });
+      void (async () => {
+        try {
+          const pubRows = await fetchCircleTitlePublishers({
+            circleId: selectedCircleId,
+            tmdbId: row.tmdb_id,
+            mediaType: row.media_type,
+          });
+          setWhoPublishedModal({ status: "ok", rows: pubRows || [] });
+        } catch (e) {
+          setWhoPublishedModal({
+            status: "err",
+            message: e?.message || "Couldn’t load who published.",
+          });
+        }
+      })();
+    },
+    [selectedCircleId],
+  );
+
   // Circle Recent: on first load / circle change, scroll so newest title is ~centered; skip re-center after “Load earlier”.
   useLayoutEffect(() => {
     if (screen !== "circle-detail" || circleRatingsView !== "recent" || !circleStripPayload) return;
@@ -8903,8 +9028,9 @@ export default function App() {
                         className="strip-card strip-card--circle-recent"
                         key={rowKey}
                         ref={isNewest ? circleRecentNewestRef : null}
-                        role="button"
                         tabIndex={0}
+                        role="group"
+                        aria-label={`${movie?.title || "Title"}. Open details, or use the score row to see who published in this circle.`}
                         onPointerDown={onStripCardPointerDown}
                         onPointerMove={onStripCardPointerMove}
                         onPointerUp={onStripCardPointerEnd}
@@ -8914,6 +9040,7 @@ export default function App() {
                           const el = e.target;
                           if (el.closest?.(".strip-card__menu-btn")) return;
                           if (el.closest?.(".circle-recent-strip-menu")) return;
+                          if (el.closest?.(".circle-strip-below-title-scores--tappable")) return;
                           if (circleRecentStripSuppressClickRef.current) {
                             circleRecentStripSuppressClickRef.current = false;
                             return;
@@ -8923,6 +9050,7 @@ export default function App() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
+                            if (e.target !== e.currentTarget) return;
                             openDetail(movie, predDetail);
                           }
                         }}
@@ -9043,6 +9171,7 @@ export default function App() {
                         <CircleStripRingCineBelowTitle
                           groupRating={row.group_rating}
                           siteRating={row.site_rating}
+                          onWhoPublished={() => openWhoPublishedForCircleRow(row)}
                         />
                       </div>
                     );
@@ -9078,11 +9207,23 @@ export default function App() {
                     const kind = movie.type === "tv" ? "TV" : "Movie";
                     const titleLineFull = `${movie.title} · ${kind} · ${year}`;
                     return (
-                      <button
+                      <div
                         key={rowKey}
-                        type="button"
+                        role="group"
+                        tabIndex={0}
                         className="circle-rated-list-row"
-                        onClick={() => openDetail(movie, predDetail)}
+                        aria-label={`${movie?.title || "Title"}. Open details, or use circle and Cinemastro scores to see who published.`}
+                        onClick={(e) => {
+                          if (e.target?.closest?.(".circle-who-published-hit")) return;
+                          openDetail(movie, predDetail);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            if (e.target !== e.currentTarget) return;
+                            openDetail(movie, predDetail);
+                          }
+                        }}
                       >
                         <div className="wl-list-thumb">
                           {movie.poster ? (
@@ -9108,9 +9249,13 @@ export default function App() {
                           <div className="circle-list-all-top__type-year" aria-label="Type and year">
                             {kind} · {year}
                           </div>
-                          <CircleAllTopRatingsLine row={row} showRaterParen={showStripRaterCounts} />
+                          <CircleAllTopRatingsLine
+                            row={row}
+                            showRaterParen={showStripRaterCounts}
+                            onWhoPublished={() => openWhoPublishedForCircleRow(row)}
+                          />
                         </div>
-                      </button>
+                      </div>
                     );
                   };
                   const showLoadMore =
@@ -9442,6 +9587,61 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {whoPublishedModal ? (
+        <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Who published">
+          <button
+            type="button"
+            className="circles-modal-backdrop"
+            aria-label="Close"
+            onClick={() => setWhoPublishedModal(null)}
+          />
+          <div className="circles-modal-panel who-published-modal-panel">
+            <div className="circles-modal-header">
+              <h2 className="circles-modal-title">Who published</h2>
+              <button
+                type="button"
+                className="circles-modal-close"
+                aria-label="Close"
+                onClick={() => setWhoPublishedModal(null)}
+              >
+                ×
+              </button>
+            </div>
+            {whoPublishedModal.status === "loading" ? (
+              <div className="who-published-modal-body who-published-modal-body--loading">Loading…</div>
+            ) : whoPublishedModal.status === "err" ? (
+              <div className="who-published-modal-body who-published-modal-error" role="alert">
+                {whoPublishedModal.message}
+              </div>
+            ) : (whoPublishedModal.rows || []).length === 0 ? (
+              <p className="who-published-modal-empty">No one has published this title in this group.</p>
+            ) : (
+              <ul className="who-published-modal-list" aria-label="Member scores in this circle">
+                {(whoPublishedModal.rows || []).map((r) => {
+                  const isYou = r.user_id && user?.id && r.user_id === user.id;
+                  const name = isYou
+                    ? "You"
+                    : (r.member_name || "").trim() || "Member";
+                  return (
+                    <li key={r.user_id} className="who-published-modal-row">
+                      <span className="who-published-modal-name">{name}</span>
+                      <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <button
+              type="button"
+              className="circle-invite-btn circle-invite-btn--modal"
+              onClick={() => setWhoPublishedModal(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Create Circle bottom sheet */}
       {showCreateCircleSheet && (

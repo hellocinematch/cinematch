@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.0.29
+
+- **Circles — who published (3b):** On **Recent / All / Top** circle surfaces, tap the under-title **Circle + Cinemastro** score row (or the same pair on **All/Top** list rows) to open a **centered** modal: **names and scores** for members who **published** this title to the group (from **`rating_circle_shares`** + global ratings), **Close** and backdrop. No title line in the dialog (context is the row you tapped). **Apply** migration **`20260602120000_get_circle_title_publishers.sql`** on the hosted project (RPC **`get_circle_title_publishers`**).
+
 ## 6.0.28
 
 - **Circles — hosts (4a / backlog):** The **2nd and 3rd** members to join a circle (by `joined_at`) are **`admin`**, with the **same** privileges as the **creator** for **editing** the circle, **+ Invite more**, and **send** via `send-circle-invite`. **`circles.creator_id`** remains the only **owner** for **delete circle** and **`creator_leave_circle`**. RLS: **`is_circle_moderator()`** and **`is_active_circle_moderator()`**; circles **UPDATE** and **circle_invites** read/insert allow **creator + admin**. **Circle info** lists **“Member”** for admins with a **gold ★** (Host). **Edge:** `send-circle-invite` and `accept-circle-invite` **1.0.1** (hosts can invite; self-invite error text). **Apply** migration **`20260601120000_circle_members_admins_moderator_rls.sql`** on the hosted project, then **redeploy** those two Edge functions.

@@ -555,6 +555,27 @@ export async function getCircleOthersActivityWatermark(circleId) {
   return String(data);
 }
 
+/**
+ * Who published (Circles 3b): members who published this title to the circle, with scores.
+ * @param {{ circleId: string, tmdbId: number, mediaType: string }} args
+ * @returns {Promise<Array<{ user_id: string, member_name: string, score: number }>>}
+ */
+export async function fetchCircleTitlePublishers({ circleId, tmdbId, mediaType }) {
+  const cid = (circleId || "").trim();
+  if (!cid) throw new Error("Missing circle.");
+  const tid = Number(tmdbId);
+  if (!Number.isFinite(tid)) throw new Error("Missing title.");
+  const mt = mediaType === "tv" ? "tv" : "movie";
+  const { data, error } = await supabase.rpc("get_circle_title_publishers", {
+    p_circle_id: cid,
+    p_tmdb_id: Math.floor(tid),
+    p_media_type: mt,
+  });
+  if (error) throw new Error(error.message || "Could not load who published.");
+  if (data == null) return [];
+  return Array.isArray(data) ? data : [];
+}
+
 export async function fetchCircleRatedTitles({ circleId, limit, offset, view = "recent" }) {
   const id = (circleId || "").trim();
   if (!id) throw new Error("Missing circle.");
