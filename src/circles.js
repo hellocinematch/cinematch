@@ -408,6 +408,59 @@ export async function sendCircleInvite({ circleId, invitedEmail }) {
   });
 }
 
+// -------------------------------------------------------------------------------------------------
+// Copy-to-mail — non-user circle invite (master backlog item 2; no server-sent email in this path).
+// -------------------------------------------------------------------------------------------------
+
+/** App URL for the prefilled “download Cinemastro” line (production web; swap if deploy host changes). */
+export const COPY_TO_MAIL_CINEMASTRO_URL = "https://cinematch-nine-sigma.vercel.app/";
+
+/** `send-circle-invite` 404 when `resolve_profile_id_by_email` is empty; UI offers copy-to-mail. */
+export const INVITE_NO_CINEMASTRO_ACCOUNT_ERR_PREFIX = "No Cinemastro account found for that email";
+
+/**
+ * @param {{ inviterDisplayName: string }} args — inviter from `profiles.name` with auth fallbacks in the client.
+ * @returns {{ subject: string, body: string, fullText: string }} — `fullText` = Subject line + body for clipboard.
+ */
+export function buildCopyToMailCircleInviteText({ inviterDisplayName }) {
+  const friend = (inviterDisplayName || "").trim() || "A friend";
+  const subject = `You've been invited to join ${friend}'s circle (don't worry, it's about movies)`;
+  const body = `Plot twist: ${friend} thinks your movie taste is so good, they invited you to join Cinemastro.
+
+Cinemastro is what happens when a recommendation app stops guessing and starts knowing. It learns what you love and predicts your rating before you watch. No trending lists, no algorithm confusion. Just movies made for you.
+
+Your circle gets:
+
+  • Personalized predictions (scary accurate)
+  • A group pick that actually works for everyone
+  • Zero judgment about your guilty pleasure watches
+
+Start with a few ratings of movies you actually love. That's it. The magic happens from there.
+
+DOWNLOAD CINEMASTRO
+${COPY_TO_MAIL_CINEMASTRO_URL}
+
+Great taste is better shared — especially when it's this easy.`;
+  const fullText = `Subject: ${subject}\n\n${body}`;
+  return { subject, body, fullText };
+}
+
+const MAILTO_INVITE_EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * `mailto:` for prefilled To / Subject / Body. Uses `encodeURIComponent` (spaces → `%20`), not
+ * `URLSearchParams` / `+` — Apple Mail and others show literal `+` in the compose fields otherwise.
+ * Length can be large — some clients truncate; copy remains the fallback.
+ * @param {{ inviterDisplayName: string, recipientEmail: string }} args
+ * @returns {string} `mailto:…` or `""` if the address is empty / invalid
+ */
+export function buildCopyToMailCircleInviteMailto({ inviterDisplayName, recipientEmail }) {
+  const to = (recipientEmail || "").trim();
+  if (!to || !MAILTO_INVITE_EMAIL_OK.test(to)) return "";
+  const { subject, body } = buildCopyToMailCircleInviteText({ inviterDisplayName });
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 /** Accepts a pending invite. Returns the full circle row (with members[]) so the caller can
  *  prepend it to the list without a refetch. */
 export async function acceptCircleInvite({ inviteId }) {

@@ -33,6 +33,9 @@ import {
   fetchMyCircleUnseenActivity,
   markCircleLastSeen,
   getCircleOthersActivityWatermark,
+  buildCopyToMailCircleInviteText,
+  buildCopyToMailCircleInviteMailto,
+  INVITE_NO_CINEMASTRO_ACCOUNT_ERR_PREFIX,
 } from "./circles";
 import "./App.css";
 
@@ -2972,6 +2975,11 @@ export default function App() {
   const [inviteEmailDraft, setInviteEmailDraft] = useState("");
   const [inviteSheetSubmitting, setInviteSheetSubmitting] = useState(false);
   const [inviteSheetError, setInviteSheetError] = useState("");
+  /** After send fails with no matching account: show prefilled copy-to-mail (Circles item 2). */
+  const [inviteSheetNoAccountCopy, setInviteSheetNoAccountCopy] = useState(false);
+  const [inviteCopyMailStatus, setInviteCopyMailStatus] = useState("");
+  /** `profiles.name` from `loadUserData` — for copy-to-mail “friend” name. */
+  const [profileName, setProfileName] = useState("");
   const [inviteToast, setInviteToast] = useState(null);
   const [profileSettingsError, setProfileSettingsError] = useState("");
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
@@ -4755,6 +4763,10 @@ export default function App() {
     setSecondaryRegionKey(
       typeof sk === "string" && V130_SECONDARY_REGION_IDS.includes(sk) ? sk : null,
     );
+    const profName = profileRow?.name;
+    setProfileName(
+      typeof profName === "string" && profName.trim() ? profName.trim() : "",
+    );
     return { ratingCount: ratingsData?.length ?? 0 };
   }
 
@@ -4956,6 +4968,7 @@ export default function App() {
   async function handleSignOut() {
     await supabase.auth.signOut();
     setUser(null);
+    setProfileName("");
     setUserRatings({}); setWatchlist([]);
     setMatchData(null);
     setSelectedStreamingProviderIds([]);
@@ -7146,6 +7159,29 @@ export default function App() {
 
   const pendingInvitesCount = pendingInvites.length;
 
+  const inviterDisplayNameForCopy = useMemo(() => {
+    if (profileName && profileName.trim()) return profileName.trim();
+    const meta = user?.user_metadata?.name;
+    if (typeof meta === "string" && meta.trim()) return meta.trim();
+    const local = user?.email?.split("@")[0];
+    if (local) return local;
+    return "A friend";
+  }, [profileName, user]);
+
+  const copyToMailFullText = useMemo(
+    () => buildCopyToMailCircleInviteText({ inviterDisplayName: inviterDisplayNameForCopy }).fullText,
+    [inviterDisplayNameForCopy],
+  );
+
+  const copyToMailMailtoHref = useMemo(
+    () =>
+      buildCopyToMailCircleInviteMailto({
+        inviterDisplayName: inviterDisplayNameForCopy,
+        recipientEmail: inviteEmailDraft.trim(),
+      }),
+    [inviterDisplayNameForCopy, inviteEmailDraft],
+  );
+
   function openInvitesPanel() {
     setInviteActionError("");
     if (user && !pendingInvitesLoading) void reloadPendingInvites();
@@ -7234,6 +7270,8 @@ export default function App() {
     setShowCircleInfoSheet(false);
     setInviteEmailDraft("");
     setInviteSheetError("");
+    setInviteSheetNoAccountCopy(false);
+    setInviteCopyMailStatus("");
     setShowInviteSheet(true);
   }
 
@@ -7241,6 +7279,22 @@ export default function App() {
     if (inviteSheetSubmitting) return;
     setShowInviteSheet(false);
     setInviteSheetError("");
+    setInviteSheetNoAccountCopy(false);
+    setInviteCopyMailStatus("");
+  }
+
+  async function copyInviteMailToClipboard() {
+    const text = copyToMailFullText;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setInviteCopyMailStatus("copied");
+      window.setTimeout(() => setInviteCopyMailStatus(""), 2200);
+    } catch (e) {
+      console.warn("Cinemastro: copy invite message failed", e);
+      setInviteCopyMailStatus("failed");
+      window.setTimeout(() => setInviteCopyMailStatus(""), 2200);
+    }
   }
 
   async function submitInviteByEmail() {
@@ -7253,6 +7307,7 @@ export default function App() {
     }
     setInviteSheetSubmitting(true);
     setInviteSheetError("");
+    setInviteSheetNoAccountCopy(false);
     try {
       const res = await sendCircleInvite({
         circleId: circleDetailData.id,
@@ -7274,7 +7329,13 @@ export default function App() {
       setInviteEmailDraft("");
     } catch (e) {
       console.error("Circles: sendCircleInvite failed", e);
-      setInviteSheetError(e?.message || "Could not send the invite.");
+      const msg = e?.message || "Could not send the invite.";
+      if (String(msg).includes(INVITE_NO_CINEMASTRO_ACCOUNT_ERR_PREFIX)) {
+        setInviteSheetNoAccountCopy(true);
+        setInviteSheetError("");
+      } else {
+        setInviteSheetError(msg);
+      }
     } finally {
       setInviteSheetSubmitting(false);
     }
@@ -9555,7 +9616,8 @@ export default function App() {
             <div className="circles-sheet-handle" aria-hidden="true" />
             <div className="circles-sheet-title">Invite a member</div>
             <div className="circles-sheet-sub">
-              They'll need an existing Cinemastro account for the invite to show in their Circles list.
+              If they already use Cinemastro with this email, we&apos;ll send an in-app invite. If not, try
+              Send — then copy the message below and paste it into your own email app.
             </div>
 
             <div className="circles-field">
@@ -9566,13 +9628,75 @@ export default function App() {
                 autoComplete="email"
                 placeholder="friend@example.com"
                 value={inviteEmailDraft}
-                onChange={(e) => setInviteEmailDraft(e.target.value)}
+                onChange={(e) => {
+                  setInviteEmailDraft(e.target.value);
+                  setInviteSheetNoAccountCopy(false);
+                  setInviteCopyMailStatus("");
+                }}
                 disabled={inviteSheetSubmitting}
                 autoFocus
               />
             </div>
 
             {inviteSheetError && <div className="circles-error-banner">{inviteSheetError}</div>}
+
+            {inviteSheetNoAccountCopy && (
+              <div className="circles-copy-mail-block">
+                <div className="circles-info-banner">
+                  No Cinemastro account for that address yet. Your friend can sign up, then you can share the circle from the app. For now, copy the text below and send it from your email.
+                </div>
+                <div className="circles-field">
+                  <label className="circles-field-label" id="copy-mail-invite-label">
+                    Message to copy (subject + body)
+                  </label>
+                  <textarea
+                    className="circles-textarea circles-copy-mail-textarea"
+                    readOnly
+                    value={copyToMailFullText}
+                    rows={20}
+                    aria-labelledby="copy-mail-invite-label"
+                  />
+                </div>
+                <p className="circles-copy-mail-instructions">
+                  Copy the text, open your email app, start a new message, set the subject / paste the body, and
+                  send to <strong>{inviteEmailDraft.trim() || "—"}</strong>.
+                </p>
+                {inviteCopyMailStatus === "failed" && (
+                  <p className="circles-error-banner" role="status">
+                    Copy failed — select the text in the box and copy manually.
+                  </p>
+                )}
+                <div className="circles-copy-mail-actions">
+                  {copyToMailMailtoHref ? (
+                    <a
+                      className="circles-btn-mailto circles-copy-mail-mailto"
+                      href={copyToMailMailtoHref}
+                    >
+                      Open in email app
+                    </a>
+                  ) : (
+                    <span
+                      className="circles-btn-mailto circles-copy-mail-mailto"
+                      aria-disabled="true"
+                    >
+                      Open in email app
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="circles-btn-primary"
+                    onClick={() => void copyInviteMailToClipboard()}
+                    disabled={!copyToMailFullText}
+                  >
+                    {inviteCopyMailStatus === "copied"
+                      ? "Copied"
+                      : inviteCopyMailStatus === "failed"
+                        ? "Try copy again"
+                        : "Copy for email"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="circles-sheet-actions">
               <button

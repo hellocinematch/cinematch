@@ -1787,6 +1787,44 @@
   .circles-textarea:disabled { opacity:0.6; }
   .circles-field-count { position:absolute; top:0; right:0; font-size:11px; color:#555; font-family:'DM Sans',sans-serif; }
   .circles-sheet-actions { display:flex; gap:10px; margin-top:8px; }
+  .circles-info-banner { margin-top:4px; padding:10px 14px; background:#1a1a10; border:1px solid #3a3a2a; color:#c8c4bc; border-radius:10px; font-size:13px; line-height:1.45; }
+  .circles-copy-mail-block { display:flex; flex-direction:column; gap:8px; margin-top:4px; }
+  .circles-copy-mail-textarea { min-height:200px; font-size:13px; line-height:1.45; resize:vertical; }
+  .circles-copy-mail-instructions { font-size:13px; color:#888; line-height:1.5; margin:0; }
+  .circles-copy-mail-instructions strong { color:#c8c4bc; font-weight:600; }
+  .circles-copy-mail-actions { display:flex; flex-direction:column; gap:10px; margin-top:2px; }
+  .circles-copy-mail-actions .circles-btn-primary { width:100%; flex:1; }
+  /* Blue pill — “Open in email app” (contrast with gold primary + gray ghost) */
+  a.circles-copy-mail-mailto[href].circles-btn-mailto,
+  span.circles-copy-mail-mailto.circles-btn-mailto {
+    text-decoration: none;
+    text-align: center;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 14px;
+    font-family: "DM Sans", sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 10px;
+    border: 1px solid #355f8a;
+    background: #0f1c28;
+    color: #8ec4f0;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  a.circles-copy-mail-mailto[href].circles-btn-mailto:hover {
+    border-color: #4a7ab8;
+    background: #132536;
+    color: #b8ddf8;
+  }
+  span.circles-copy-mail-mailto.circles-btn-mailto[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: default;
+    pointer-events: none;
+    border-color: #2a3a4a;
+    color: #5a7a9a;
+    background: #0c141c;
+  }
   .circles-btn-primary { flex:2; background:#e8c96a; color:#0a0a0a; border:none; padding:14px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; border-radius:10px; cursor:pointer; transition:background 0.15s; }
   .circles-btn-primary:hover:not(:disabled) { background:#f0d880; }
   .circles-btn-primary:disabled { opacity:0.4; cursor:default; }

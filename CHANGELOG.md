@@ -1,5 +1,25 @@
 # Changelog
 
+## 6.0.27
+
+- **Circles — copy-to-mail:** **Open in email app** uses a **blue** pill (dark blue fill, light blue label, blue border) instead of the neutral ghost style.
+
+## 6.0.26
+
+- **Circles — copy-to-mail body:** Under **Your circle gets:**, the three lines are now a **bulleted list** with a **slight indent** (plain text: two spaces + `•`) for both **Copy for email** and **Open in email app**.
+
+## 6.0.25
+
+- **Circles — copy-to-mail `mailto:`:** Encode **subject** and **body** with `encodeURIComponent` (spaces as **`%20`**) instead of `URLSearchParams` (spaces as **`+`**), so **Apple Mail** and similar clients show normal spaces in the draft, not plus signs.
+
+## 6.0.24
+
+- **Circles — copy-to-mail (non-user invite):** Add **Open in email app** using a `mailto:` link that prefills **To** (typed address), **Subject**, and **Body** (same as the copyable block). **Copy for email** unchanged. Some mail clients may truncate very long `mailto` bodies; copy remains the reliable full-message path.
+
+## 6.0.23
+
+- **Circles — copy-to-mail invite (master backlog item 2):** When **invite by email** finds **no Cinemastro account** for that address, the **Invite** sheet offers a **read-only prefilled** subject + message (inviter name from **`profiles.name`**, with sign-in **metadata / email** fallbacks), **Copy for email** to clipboard, and short **paste in your mail app** instructions including **send to** the address they entered. **In-app invite** still runs when a matching account exists. **Download** line points to the web app: **https://cinematch-nine-sigma.vercel.app/**. Copy uses **“invited”** / **“join”** wording (not “added”).
+
 ## 6.0.22
 
 - **Circles — invite list & activity chrome (master backlog item 1):** **Pending invites** are **in the main Circles list** (no separate slide-down panel): **sort** = invite rows **first**, then your circles — one list, **no** “Invites / Your circles” section headers. **Invite** rows use a **solid, distinct** surface (`.invite-card--list`) with **Decline** and **Accept** on the row. **Header bell** stays a **summary**; tap **scrolls** to the first pending invite (or to a **hint** when you’re **at the circle cap** but still have pending invites — rows are **hidden** at cap until you free a slot). **Unseen** activity on **joined** circle rows is a **number in a circle** (no bell icon). Invite / pending errors show in the Circles header area.
