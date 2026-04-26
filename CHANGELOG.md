@@ -1,5 +1,20 @@
 # Changelog
 
+## 6.1.6
+
+- **Circles — Circle info modal:** Smaller centered **Circle info** title; larger centered circle name; close control top-right. Roster (members + pending invites) ends with a **divider**; **+ Invite more** first as **gold fill** CTA, then a line, then **Edit name & description**; **Leave circle** last, red, centered with other actions.
+
+## 6.1.5
+
+- **Circles — Circle info (hosts):** While the circle is **active**, **hosts** see an **Invites pending** section: **one line per** in-app **`pending`** invite, with **display name** from **`profiles.name`** or **email** from **`auth.users`** when the name is empty. No inviter shown. **DB:** apply **`20260604120000_get_circle_pending_invite_labels.sql`** (RPC **`get_circle_pending_invite_labels`**).
+
+## 6.1.4
+
+- **Circles — admin-only hosts & leave (4d):** Membership roles are **`admin`** (host) and **`member`** only; the **`creator`** role is removed. **Hosts** are the **three most senior** members by **`joined_at`**, or **everyone** if the circle has **fewer than three** members. **`circles.creator_id`** stays set when the circle is created (RLS / inserts) and is **not** updated when people leave.
+- **Leave:** All members use RPC **`leave_circle`**. If **more than one** member remains, the leaver’s row is removed (their **`rating_circle_shares`** for that circle are cleared as today). If the leaver is the **last member**, the **circle row is deleted** (**CASCADE**: invites, all shares for that circle, members, last-seen rows). **Pending invites** and **group** shares are removed with the circle.
+- **UI:** No crown / “creator” star; circle info lists **Host** (with ★) vs **Member**. Leave confirmation copy matches delete-vs-stay behavior.
+- **DB:** Apply **`20260603120000_leave_circle_admin_only.sql`**. **`creator_leave_circle`** is dropped — clients must call **`leave_circle`**. **Edge:** `send-circle-invite` / `accept-circle-invite` **1.0.2** (host = **`admin`** only); redeploy after migration.
+
 ## 6.1.3
 
 - **Detail (circle path):** The faint orange **Rate this title** container now wraps the **whole** first-rating block — heading, score chips, **Submit Rating**, and **+ Watchlist** / saved state.

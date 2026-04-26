@@ -6,14 +6,14 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 // ------------------------------------------------------------------------------------------------
 //
 // Body: { circle_id: string, invited_email: string }
-// Auth: caller's JWT — must be the creator of an active circle.
+// Auth: caller's JWT — must be an admin (host) of an active circle.
 //
 // Logic:
 //   1. Resolve caller (user) via JWT.
-//   2. Verify (creator + active) using service role.
+//   2. Verify (host/admin + active) using service role.
 //   3. Resolve invited_email -> profiles.id via service role (auth.users).
 //      - No match -> 404 "no account found for that email".
-//      - Match == caller -> 400 "you're already the creator".
+//      - Match == caller -> 400 self-invite.
 //   4. Reject if recipient is already a member of the circle.
 //   5. Reject if member cap would be breached (25/25).
 //   6. If recipient is at the 10-active-circle cap, write the invite with status='auto_declined'
@@ -34,7 +34,7 @@ const corsHeaders: Record<string, string> = {
 
 /** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
 const EDGE_FUNCTION_SLUG = "send-circle-invite";
-const EDGE_FUNCTION_VERSION = "1.0.1";
+const EDGE_FUNCTION_VERSION = "1.0.2";
 
 const CIRCLE_MEMBER_CAP = 25;
 const CIRCLE_USER_ACTIVE_CAP = 10;
@@ -120,7 +120,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "That doesn't look like a valid email address." }, 400);
     }
 
-    // --- 1. Verify circle exists, is active, and caller is creator. -----------------------------
+    // --- 1. Verify circle exists, is active, and caller is a host. ------------------------------
     const { data: circleRow, error: circleErr } = await admin
       .from("circles")
       .select("id, name, vibe, status, creator_id")
@@ -143,7 +143,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Could not verify your membership." }, 500);
     }
     const r = typeof callerMembership?.role === "string" ? callerMembership.role : "";
-    if (r !== "creator" && r !== "admin") {
+    if (r !== "admin") {
       return jsonResponse({ error: "Only a circle host can send invites." }, 403);
     }
     if (circleRow.status !== "active") {

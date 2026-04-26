@@ -16,7 +16,6 @@ import {
   createCircle,
   updateCircle,
   leaveCircle,
-  currentUserRole,
   isCircleModerator,
   fetchPendingInvites,
   sendCircleInvite,
@@ -26,6 +25,7 @@ import {
   syncRatingCircleShares,
   addRatingCircleShares,
   fetchCircleTitlePublishers,
+  fetchCirclePendingInviteLabels,
   fetchCircleRatedTitles,
   CIRCLE_STRIP_INITIAL,
   CIRCLE_STRIP_PAGE,
@@ -3131,6 +3131,10 @@ export default function App() {
   const [showCircleInfoSheet, setShowCircleInfoSheet] = useState(false);
   /** Rated-by modal (3b): null | { status, displayTitle?, rows?, message? } */
   const [whoPublishedModal, setWhoPublishedModal] = useState(null);
+  /** Pending in-app invites (moderators) for Circle info — refetched when sheet opens. */
+  const [circleInfoPendingInvites, setCircleInfoPendingInvites] = useState([]);
+  const [circleInfoPendingInvitesLoading, setCircleInfoPendingInvitesLoading] = useState(false);
+
   /** `user_id` → display name for Circle info sheet (`get_circle_member_names` RPC + profiles fallback). */
   const [circleInfoNamesById, setCircleInfoNamesById] = useState({});
   // v5.1.0: Circles Phase B — invites.
@@ -7284,6 +7288,36 @@ export default function App() {
   }, [showCircleInfoSheet, circleDetailData?.id]);
 
   useEffect(() => {
+    if (!showCircleInfoSheet || !circleDetailData?.id) {
+      setCircleInfoPendingInvites([]);
+      setCircleInfoPendingInvitesLoading(false);
+      return;
+    }
+    if (!isCircleModerator(circleDetailData, user?.id) || circleDetailData.status !== "active") {
+      setCircleInfoPendingInvites([]);
+      setCircleInfoPendingInvitesLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const circleId = circleDetailData.id;
+    setCircleInfoPendingInvitesLoading(true);
+    (async () => {
+      try {
+        const rows = await fetchCirclePendingInviteLabels(circleId);
+        if (!cancelled) setCircleInfoPendingInvites(rows);
+      } catch (e) {
+        console.warn("Circles: pending invite labels failed", e);
+        if (!cancelled) setCircleInfoPendingInvites([]);
+      } finally {
+        if (!cancelled) setCircleInfoPendingInvitesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showCircleInfoSheet, circleDetailData, user?.id]);
+
+  useEffect(() => {
     setShowCircleInfoSheet(false);
   }, [selectedCircleId]);
 
@@ -7306,14 +7340,11 @@ export default function App() {
   async function confirmLeaveCircle() {
     if (!user || !leaveConfirmCircle || leaveCircleBusy) return;
     const target = leaveConfirmCircle;
-    const role = currentUserRole(target, user.id);
     setLeaveCircleBusy(true);
     setLeaveCircleError("");
     try {
       await leaveCircle({
         circleId: target.id,
-        userId: user.id,
-        isCreator: role === "creator",
       });
       setCirclesList((prev) => prev.filter((c) => c.id !== target.id));
       setLeaveConfirmCircle(null);
@@ -7533,6 +7564,14 @@ export default function App() {
           tone: "ok",
           text: `Invite sent to ${recipientName}.`,
         });
+        if (showCircleInfoSheet && circleDetailData?.id) {
+          try {
+            const rows = await fetchCirclePendingInviteLabels(circleDetailData.id);
+            setCircleInfoPendingInvites(rows);
+          } catch {
+            /* list refreshes when Circle info reopens */
+          }
+        }
       }
       setShowInviteSheet(false);
       setInviteEmailDraft("");
@@ -8783,7 +8822,6 @@ export default function App() {
                 })}
                 {circlesList.map((circle) => {
                   const meta = vibeMeta(circle.vibe);
-                  const isCreator = currentUserRole(circle, user?.id) === "creator";
                   const isModerator = isCircleModerator(circle, user?.id);
                   const unseenN = Math.max(0, Number(circleUnseenById[circle.id]?.unseenOthers) || 0);
                   const cardAria =
@@ -8811,9 +8849,6 @@ export default function App() {
                             <div className="circle-card__top">
                               <div className="circle-card__name">{circle.name}</div>
                               <div className="circle-card__top-badges">
-                                {isCreator && (
-                                  <div className="circle-card__crown" title="You're the creator">👑</div>
-                                )}
                                 {unseenN > 0 ? (
                                   <div
                                     className="circle-card__unseen"
@@ -8908,7 +8943,6 @@ export default function App() {
               ) : circleDetailData ? (
                 (() => {
                   const meta = vibeMeta(circleDetailData.vibe);
-                  const isCreator = currentUserRole(circleDetailData, user?.id) === "creator";
                   const mc = circleDetailData.memberCount;
                   const initials = circleAvatarInitials(circleDetailData.name);
                   return (
@@ -8938,15 +8972,6 @@ export default function App() {
                             </div>
                             <div className="circle-hero__identity-text">
                               <div className="circle-hero__title-line">
-                                {isCreator ? (
-                                  <span
-                                    className="circle-hero__creator-star"
-                                    title="You're the creator"
-                                    aria-hidden="true"
-                                  >
-                                    ★
-                                  </span>
-                                ) : null}
                                 <span className="circle-hero__name circle-hero__name--top-bar">{circleDetailData.name}</span>
                               </div>
                               <div className="circle-hero__subtitle-members">
@@ -9587,23 +9612,24 @@ export default function App() {
             aria-label="Close"
             onClick={() => setShowCircleInfoSheet(false)}
           />
-          <div className="circles-modal-panel">
-            <div className="circles-modal-header">
-              <h2 className="circles-modal-title">Circle info</h2>
-              <button
-                type="button"
-                className="circles-modal-close"
-                aria-label="Close"
-                onClick={() => setShowCircleInfoSheet(false)}
-              >
-                ×
-              </button>
+          <div className="circles-modal-panel circles-modal-panel--circle-info">
+            <button
+              type="button"
+              className="circles-modal-close circles-modal-close--circle-info"
+              aria-label="Close"
+              onClick={() => setShowCircleInfoSheet(false)}
+            >
+              ×
+            </button>
+            <div className="circles-modal-head-centered">
+              <h2 className="circles-modal-title circles-modal-title--circle-info">Circle info</h2>
+              <div className="circles-modal-sub circles-modal-sub--circle-info-name">{circleDetailData.name}</div>
             </div>
-            <div className="circles-modal-sub">{circleDetailData.name}</div>
+            <div className="circle-info-roster">
             <div className="circle-info-member-list">
               {[...(circleDetailData.members || [])]
                 .sort((a, b) => {
-                  const rank = (r) => (r === "creator" ? 0 : r === "admin" ? 1 : 2);
+                  const rank = (r) => (r === "admin" ? 0 : 1);
                   const dr = rank(a.role) - rank(b.role);
                   if (dr !== 0) return dr;
                   const na = (circleInfoNamesById[a.user_id] || "").trim() || String(a.user_id);
@@ -9616,15 +9642,15 @@ export default function App() {
                   const label = isYou
                     ? "You"
                     : rawName || `…${String(m.user_id).slice(0, 8)}`;
-                  const roleLabel = m.role === "creator" ? "Creator" : "Member";
                   const isAdminMember = m.role === "admin";
+                  const roleLabel = isAdminMember ? "Host" : "Member";
                   return (
                     <div className="circle-info-member-row" key={m.id || `${m.user_id}`}>
                       <span className="circle-info-member-name">{label}</span>
                       <span
-                        className={`circle-info-member-badge ${
-                          m.role === "creator" ? "circle-info-member-badge--creator" : ""
-                        }${isAdminMember ? " circle-info-member-badge--with-star" : ""}`}
+                        className={`circle-info-member-badge${
+                          isAdminMember ? " circle-info-member-badge--with-star" : ""
+                        }`}
                       >
                         <span className="circle-info-member-badge-text">{roleLabel}</span>
                         {isAdminMember ? (
@@ -9641,18 +9667,35 @@ export default function App() {
                   );
                 })}
             </div>
+            {isCircleModerator(circleDetailData, user?.id) &&
+              circleDetailData.status === "active" &&
+              (circleInfoPendingInvitesLoading || circleInfoPendingInvites.length > 0) && (
+                <div className="circle-info-pending-invites" aria-label="Pending invites">
+                  <div className="circle-info-pending-invites-heading">Invites pending</div>
+                  {circleInfoPendingInvitesLoading ? (
+                    <div className="circle-info-pending-invites-loading">Loading…</div>
+                  ) : (
+                    <div className="circle-info-pending-invites-list">
+                      {circleInfoPendingInvites.map((row) => (
+                        <div
+                          className="circle-info-pending-invite-row"
+                          key={row.inviteId || row.invitedUserId}
+                        >
+                          <span className="circle-info-pending-invite-name">{row.displayLabel}</span>
+                          <span className="circle-info-pending-invite-status">Pending</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="circle-info-actions">
             {isCircleModerator(circleDetailData, user?.id) && circleDetailData.status === "active" && (
               <div className="circle-info-invite-block">
                 <button
                   type="button"
-                  className="circle-invite-btn circle-invite-btn--modal"
-                  onClick={() => openEditCircleSheet(circleDetailData, { closeInfo: true })}
-                >
-                  Edit name & description
-                </button>
-                <button
-                  type="button"
-                  className="circle-invite-btn circle-invite-btn--modal"
+                  className="circle-invite-btn circle-invite-btn--modal circle-invite-btn--primary-fill"
                   onClick={openInviteSheet}
                   disabled={circleDetailData.memberCount >= CIRCLE_MEMBER_CAP}
                 >
@@ -9661,6 +9704,14 @@ export default function App() {
                 {circleDetailData.memberCount >= CIRCLE_MEMBER_CAP && (
                   <p className="circle-info-invite-cap">This circle is full ({CIRCLE_MEMBER_CAP}/{CIRCLE_MEMBER_CAP}).</p>
                 )}
+                <div className="circle-info-actions-divider" aria-hidden="true" />
+                <button
+                  type="button"
+                  className="circle-invite-btn circle-invite-btn--modal"
+                  onClick={() => openEditCircleSheet(circleDetailData, { closeInfo: true })}
+                >
+                  Edit name & description
+                </button>
               </div>
             )}
             <button
@@ -9671,6 +9722,7 @@ export default function App() {
             >
               Leave circle
             </button>
+            </div>
           </div>
         </div>
       )}
@@ -9914,7 +9966,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Phase B: invite-by-email composer sheet (host = creator or admin, circle-detail). */}
+      {/* Phase B: invite-by-email composer sheet (host = admin, circle-detail). */}
       {showInviteSheet && circleDetailData && (
         <div className="circles-sheet-root" role="dialog" aria-modal="true" aria-label="Invite a member">
           <button
@@ -10054,11 +10106,9 @@ export default function App() {
           <div className="circles-confirm">
             <div className="circles-confirm-title">Leave this circle?</div>
             <div className="circles-confirm-text">
-              {currentUserRole(leaveConfirmCircle, user?.id) === "creator"
-                ? (leaveConfirmCircle.memberCount ?? 0) > 1
-                  ? "You're the creator. Another member will become the owner and the circle stays active. You'll leave; picks you published only in this group are removed here. Your ratings on your account stay the same."
-                  : "You're the only member. Leaving will archive the circle. No new invites. Picks published in this group stop showing in its feeds; members can still view the archived circle."
-                : "Picks you published in this group will be removed from this circle. Your personal ratings on your account stay the same."}
+              {(leaveConfirmCircle.memberCount ?? 0) > 1
+                ? "You'll leave this circle. Picks you published only in this group are removed here. Your ratings on your account stay the same. Hosts stay; up to three longest-joined members can manage invites and circle details."
+                : "You're the only member. Leaving deletes this circle for everyone — pending invites and shared picks for the group go away."}
             </div>
             {leaveCircleError && <div className="circles-error-banner">{leaveCircleError}</div>}
             <div className="circles-sheet-actions">

@@ -30,7 +30,7 @@ const corsHeaders: Record<string, string> = {
 
 /** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
 const EDGE_FUNCTION_SLUG = "accept-circle-invite";
-const EDGE_FUNCTION_VERSION = "1.0.1";
+const EDGE_FUNCTION_VERSION = "1.0.2";
 
 const CIRCLE_MEMBER_CAP = 25;
 const CIRCLE_USER_ACTIVE_CAP = 10;

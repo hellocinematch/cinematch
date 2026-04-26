@@ -92,7 +92,7 @@ export function circleAvatarInitials(name) {
 
 /** RLS on `circles` restricts selects to circles the current user belongs to, so the scope is
  *  naturally correct without a `where user_id = auth.uid()` clause. We embed circle_members so we
- *  can derive member_count and the current user's role (creator vs member) in one trip. */
+ *  can derive member_count and the current user's role (admin vs member) in one trip. */
 export async function fetchMyCircles() {
   const { data, error } = await supabase
     .from("circles")
@@ -150,8 +150,8 @@ function normalizeCircleRow(row) {
   };
 }
 
-/** Two sequential inserts. The "creator can seed own membership" RLS policy lets the second one
- *  pass. If it fails we best-effort roll the circle row back so we don't leave orphan circles. */
+/** Two sequential inserts. The seed membership RLS policy lets the second insert pass. If it fails
+ *  we best-effort roll the circle row back so we don't leave orphan circles. */
 export async function createCircle({ name, description, vibe, creatorId }) {
   const validation = validateCircleName(name);
   if (!validation.ok) throw new Error(validation.error);
@@ -179,7 +179,7 @@ export async function createCircle({ name, description, vibe, creatorId }) {
     .insert({
       circle_id: inserted.id,
       user_id: creatorId,
-      role: "creator",
+      role: "admin",
     });
   if (memberErr) {
     await supabase.from("circles").delete().eq("id", inserted.id);
@@ -188,11 +188,11 @@ export async function createCircle({ name, description, vibe, creatorId }) {
 
   return normalizeCircleRow({
     ...inserted,
-    circle_members: [{ user_id: creatorId, role: "creator" }],
+    circle_members: [{ user_id: creatorId, role: "admin" }],
   });
 }
 
-/** Active circle only; RLS: current creator (`is_circle_creator`). */
+/** Active circle only; RLS: circle moderator (`is_circle_moderator`). */
 export async function updateCircle({ circleId, name, description, vibe }) {
   const validation = validateCircleName(name);
   if (!validation.ok) throw new Error(validation.error);
@@ -217,25 +217,11 @@ export async function updateCircle({ circleId, name, description, vibe }) {
   return data;
 }
 
-/** Leave flow.
- *  - Member (non-creator): delete the membership row.
- *  - Creator: RPC `creator_leave_circle` — if other members exist, **transfer** `circles.creator_id`
- *    to the **earliest** `joined_at` among remaining members, promote their role, then remove the
- *    leaver; if the creator is **solo**, **archive** the circle and delete membership (unchanged).
- */
-export async function leaveCircle({ circleId, userId, isCreator }) {
-  if (isCreator) {
-    const { data, error: rpcErr } = await supabase.rpc("creator_leave_circle", { p_circle_id: circleId });
-    if (rpcErr) throw new Error(rpcErr.message || "Could not leave circle.");
-    return data;
-  }
-  const { error: deleteErr } = await supabase
-    .from("circle_members")
-    .delete()
-    .eq("circle_id", circleId)
-    .eq("user_id", userId);
-  if (deleteErr) throw deleteErr;
-  return { outcome: "left" };
+/** Leave flow — RPC `leave_circle`: last member deletes the circle (cascade); else membership removed and roles resynced. */
+export async function leaveCircle({ circleId }) {
+  const { data, error: rpcErr } = await supabase.rpc("leave_circle", { p_circle_id: circleId });
+  if (rpcErr) throw new Error(rpcErr.message || "Could not leave circle.");
+  return data;
 }
 
 function parseMovieIdForShare(movieId) {
@@ -346,10 +332,9 @@ export function currentUserRole(circle, userId) {
   return row?.role ?? null;
 }
 
-/** True if the user is the circle **creator** (`role` in data) or an **admin** (2nd/3rd joiner). */
+/** True if the user is a circle **admin** (host). */
 export function isCircleModerator(circle, userId) {
-  const r = currentUserRole(circle, userId);
-  return r === "creator" || r === "admin";
+  return currentUserRole(circle, userId) === "admin";
 }
 
 // =================================================================================================
@@ -360,6 +345,23 @@ export function isCircleModerator(circle, userId) {
 
 /** Ordered by newest first. Backed by the `get_my_pending_invites()` SECURITY DEFINER RPC so
  *  we can pre-join circles + profiles without fighting their SELECT RLS. */
+/** Pending in-app invites for a circle (moderators only). One row per invite; label = name or email. */
+export async function fetchCirclePendingInviteLabels(circleId) {
+  if (!circleId) return [];
+  const { data, error } = await supabase.rpc("get_circle_pending_invite_labels", {
+    p_circle_id: circleId,
+  });
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    inviteId: row.invite_id,
+    invitedUserId: row.invited_user_id,
+    displayLabel:
+      typeof row.display_label === "string" && row.display_label.trim()
+        ? row.display_label.trim()
+        : "Invite pending",
+  }));
+}
+
 export async function fetchPendingInvites() {
   const { data, error } = await supabase.rpc("get_my_pending_invites");
   if (error) throw error;
