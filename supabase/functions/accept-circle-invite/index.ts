@@ -30,10 +30,25 @@ const corsHeaders: Record<string, string> = {
 
 /** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
 const EDGE_FUNCTION_SLUG = "accept-circle-invite";
-const EDGE_FUNCTION_VERSION = "1.0.0";
+const EDGE_FUNCTION_VERSION = "1.0.1";
 
 const CIRCLE_MEMBER_CAP = 25;
 const CIRCLE_USER_ACTIVE_CAP = 10;
+
+function memberRoleInCircle(
+  fresh: Record<string, unknown> | null,
+  userId: string,
+): string {
+  const members = fresh?.["circle_members"];
+  if (!Array.isArray(members)) return "member";
+  for (const m of members) {
+    if (m && typeof m === "object" && (m as { user_id?: string }).user_id === userId) {
+      const r = (m as { role?: string }).role;
+      if (typeof r === "string") return r;
+    }
+  }
+  return "member";
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   const payload =
@@ -148,7 +163,12 @@ Deno.serve(async (req: Request) => {
         .update({ status: "accepted", responded_at: new Date().toISOString() })
         .eq("id", invite.id);
       const fresh = await fetchCircleWithMembers(admin, circle.id);
-      return jsonResponse({ ok: true, circle: fresh, role: "member", already_member: true });
+      return jsonResponse({
+        ok: true,
+        circle: fresh,
+        role: memberRoleInCircle(fresh, callerId),
+        already_member: true,
+      });
     }
 
     // --- 4. Accept-time user-cap race. Error + LEAVE pending. -----------------------------------
@@ -220,7 +240,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const fresh = await fetchCircleWithMembers(admin, circle.id);
-    return jsonResponse({ ok: true, circle: fresh, role: "member" });
+    return jsonResponse({
+      ok: true,
+      circle: fresh,
+      role: memberRoleInCircle(fresh, callerId),
+    });
   } catch (e) {
     console.error("accept-circle-invite: unhandled", e);
     return jsonResponse({ error: "Unexpected error." }, 500);

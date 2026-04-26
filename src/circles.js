@@ -346,6 +346,12 @@ export function currentUserRole(circle, userId) {
   return row?.role ?? null;
 }
 
+/** True if the user is the circle **creator** (`role` in data) or an **admin** (2nd/3rd joiner). */
+export function isCircleModerator(circle, userId) {
+  const r = currentUserRole(circle, userId);
+  return r === "creator" || r === "admin";
+}
+
 // =================================================================================================
 // Phase B (v5.1.0) — invites. Sending and accepting go through Edge functions because they need
 // service-role writes into other users' circle_members rows and/or auth.users lookups. Declining

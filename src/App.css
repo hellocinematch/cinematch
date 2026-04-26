@@ -1481,6 +1481,8 @@
   .circle-info-member-name { min-width:0; overflow-wrap:anywhere; }
   .circle-info-member-badge { flex-shrink:0; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#888; }
   .circle-info-member-badge--creator { color:#e8c96a; }
+  .circle-info-member-badge--with-star { display:inline-flex; align-items:center; gap:5px; }
+  .circle-info-member-star { color:#e8c96a; font-size:12px; line-height:1; }
   .circle-info-modal-leave { align-self:stretch; margin-top:4px; }
 
   .circle-detail-body { padding:12px 24px 40px; display:flex; flex-direction:column; gap:20px; }

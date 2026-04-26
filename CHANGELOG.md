@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.0.28
+
+- **Circles — hosts (4a / backlog):** The **2nd and 3rd** members to join a circle (by `joined_at`) are **`admin`**, with the **same** privileges as the **creator** for **editing** the circle, **+ Invite more**, and **send** via `send-circle-invite`. **`circles.creator_id`** remains the only **owner** for **delete circle** and **`creator_leave_circle`**. RLS: **`is_circle_moderator()`** and **`is_active_circle_moderator()`**; circles **UPDATE** and **circle_invites** read/insert allow **creator + admin**. **Circle info** lists **“Member”** for admins with a **gold ★** (Host). **Edge:** `send-circle-invite` and `accept-circle-invite` **1.0.1** (hosts can invite; self-invite error text). **Apply** migration **`20260601120000_circle_members_admins_moderator_rls.sql`** on the hosted project, then **redeploy** those two Edge functions.
+
 ## 6.0.27
 
 - **Circles — copy-to-mail:** **Open in email app** uses a **blue** pill (dark blue fill, light blue label, blue border) instead of the neutral ghost style.

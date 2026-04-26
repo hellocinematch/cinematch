@@ -34,7 +34,7 @@ const corsHeaders: Record<string, string> = {
 
 /** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
 const EDGE_FUNCTION_SLUG = "send-circle-invite";
-const EDGE_FUNCTION_VERSION = "1.0.0";
+const EDGE_FUNCTION_VERSION = "1.0.1";
 
 const CIRCLE_MEMBER_CAP = 25;
 const CIRCLE_USER_ACTIVE_CAP = 10;
@@ -131,8 +131,20 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Could not load circle." }, 500);
     }
     if (!circleRow) return jsonResponse({ error: "Circle not found." }, 404);
-    if (circleRow.creator_id !== callerId) {
-      return jsonResponse({ error: "Only the circle creator can send invites." }, 403);
+
+    const { data: callerMembership, error: callerMemErr } = await admin
+      .from("circle_members")
+      .select("role")
+      .eq("circle_id", circleId)
+      .eq("user_id", callerId)
+      .maybeSingle();
+    if (callerMemErr) {
+      console.error("send-circle-invite: caller membership failed", callerMemErr.message);
+      return jsonResponse({ error: "Could not verify your membership." }, 500);
+    }
+    const r = typeof callerMembership?.role === "string" ? callerMembership.role : "";
+    if (r !== "creator" && r !== "admin") {
+      return jsonResponse({ error: "Only a circle host can send invites." }, 403);
     }
     if (circleRow.status !== "active") {
       return jsonResponse({ error: "This circle has been archived — new invites aren't allowed." }, 409);
@@ -157,7 +169,7 @@ Deno.serve(async (req: Request) => {
     }
     const invitedUserId = resolved.userId;
     if (invitedUserId === callerId) {
-      return jsonResponse({ error: "You're already the creator of this circle." }, 400);
+      return jsonResponse({ error: "You can't invite yourself." }, 400);
     }
 
     // --- 3. Already a member? -------------------------------------------------------------------

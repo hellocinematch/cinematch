@@ -17,6 +17,7 @@ import {
   updateCircle,
   leaveCircle,
   currentUserRole,
+  isCircleModerator,
   fetchPendingInvites,
   sendCircleInvite,
   acceptCircleInvite,
@@ -6575,7 +6576,7 @@ export default function App() {
 
   function openEditCircleSheet(circle, { closeInfo = false } = {}) {
     if (!circle?.id) return;
-    if (currentUserRole(circle, user?.id) !== "creator" || circle.status !== "active") return;
+    if (!isCircleModerator(circle, user?.id) || circle.status !== "active") return;
     if (closeInfo) setShowCircleInfoSheet(false);
     setEditCircleId(circle.id);
     setEditCircleName(circle.name || "");
@@ -8571,6 +8572,7 @@ export default function App() {
                 {circlesList.map((circle) => {
                   const meta = vibeMeta(circle.vibe);
                   const isCreator = currentUserRole(circle, user?.id) === "creator";
+                  const isModerator = isCircleModerator(circle, user?.id);
                   const unseenN = Math.max(0, Number(circleUnseenById[circle.id]?.unseenOthers) || 0);
                   const cardAria =
                     unseenN > 0
@@ -8624,7 +8626,7 @@ export default function App() {
                             </div>
                           </div>
                         </button>
-                        {isCreator ? (
+                        {isModerator ? (
                           <button
                             type="button"
                             className="circle-card__edit-pill"
@@ -9369,8 +9371,9 @@ export default function App() {
             <div className="circle-info-member-list">
               {[...(circleDetailData.members || [])]
                 .sort((a, b) => {
-                  if (a.role === "creator" && b.role !== "creator") return -1;
-                  if (b.role === "creator" && a.role !== "creator") return 1;
+                  const rank = (r) => (r === "creator" ? 0 : r === "admin" ? 1 : 2);
+                  const dr = rank(a.role) - rank(b.role);
+                  if (dr !== 0) return dr;
                   const na = (circleInfoNamesById[a.user_id] || "").trim() || String(a.user_id);
                   const nb = (circleInfoNamesById[b.user_id] || "").trim() || String(b.user_id);
                   return na.localeCompare(nb);
@@ -9382,21 +9385,31 @@ export default function App() {
                     ? "You"
                     : rawName || `…${String(m.user_id).slice(0, 8)}`;
                   const roleLabel = m.role === "creator" ? "Creator" : "Member";
+                  const isAdminMember = m.role === "admin";
                   return (
                     <div className="circle-info-member-row" key={m.id || `${m.user_id}`}>
                       <span className="circle-info-member-name">{label}</span>
                       <span
                         className={`circle-info-member-badge ${
                           m.role === "creator" ? "circle-info-member-badge--creator" : ""
-                        }`}
+                        }${isAdminMember ? " circle-info-member-badge--with-star" : ""}`}
                       >
-                        {roleLabel}
+                        <span className="circle-info-member-badge-text">{roleLabel}</span>
+                        {isAdminMember ? (
+                          <span
+                            className="circle-info-member-star"
+                            aria-label="Host"
+                            title="Host"
+                          >
+                            ★
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                   );
                 })}
             </div>
-            {currentUserRole(circleDetailData, user?.id) === "creator" && circleDetailData.status === "active" && (
+            {isCircleModerator(circleDetailData, user?.id) && circleDetailData.status === "active" && (
               <div className="circle-info-invite-block">
                 <button
                   type="button"
@@ -9603,7 +9616,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Phase B: invite-by-email composer sheet (creator only, circle-detail). */}
+      {/* Phase B: invite-by-email composer sheet (host = creator or admin, circle-detail). */}
       {showInviteSheet && circleDetailData && (
         <div className="circles-sheet-root" role="dialog" aria-modal="true" aria-label="Invite a member">
           <button
