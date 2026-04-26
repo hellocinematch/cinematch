@@ -1,5 +1,25 @@
 # Changelog
 
+## 6.0.34
+
+- **Circles — rated in group modal:** **Close** uses a **gold fill** (`#e8c96a` on dark text); header **×** uses **gold** instead of gray.
+
+## 6.0.33
+
+- **Circles — rated in group list:** A **top rule** on the list (line above the first rater) and a **bottom rule** on the last row (line under the last rater), in addition to **between-row** lines.
+
+## 6.0.32
+
+- **Circles — rated in group modal:** Multiple raters use **row dividers** (horizontal lines) between **name** and **score** rows.
+
+## 6.0.31
+
+- **Circles — rated in group modal:** **Title** is the **top** line; **“Rated by”** is the **next** line in smaller type (**13px**), **circle orange** (`#f97316`).
+
+## 6.0.30
+
+- **Circles — rated in group:** The members modal uses the heading **Rated by** (centered), a **second line** with the **title name only**, and a **top-right** close control; a11y and empty state copy updated to match.
+
 ## 6.0.29
 
 - **Circles — who published (3b):** On **Recent / All / Top** circle surfaces, tap the under-title **Circle + Cinemastro** score row (or the same pair on **All/Top** list rows) to open a **centered** modal: **names and scores** for members who **published** this title to the group (from **`rating_circle_shares`** + global ratings), **Close** and backdrop. No title line in the dialog (context is the row you tapped). **Apply** migration **`20260602120000_get_circle_title_publishers.sql`** on the hosted project (RPC **`get_circle_title_publishers`**).

@@ -1698,13 +1698,76 @@
   .circle-who-published-hit:hover { background:rgba(255,255,255,0.06); }
   .circle-who-published-hit:focus-visible { outline:2px solid #e8c96a; outline-offset:1px; }
   .who-published-modal-panel { max-height:min(70vh, 420px); }
+  .who-published-modal-header {
+    position:relative;
+    flex-shrink:0;
+    text-align:center;
+    padding:0 40px 4px;
+    box-sizing:border-box;
+  }
+  .who-published-modal-header .who-published-modal-close {
+    position:absolute;
+    right:-6px;
+    top:-8px;
+    margin:0;
+    color:#e8c96a;
+  }
+  .who-published-modal-header .who-published-modal-close:hover {
+    color:#f5edd0;
+    background:rgba(232,201,106,0.12);
+  }
+  /* Top: film title. Next line: “Rated by” (smaller, circle orange). */
+  .who-published-modal-film-title {
+    font-family:'DM Serif Display',serif;
+    font-size:22px;
+    color:#f0ebe0;
+    line-height:1.2;
+    margin:0;
+    padding:0 4px;
+    text-align:center;
+    max-width:100%;
+    overflow-wrap:anywhere;
+    display:-webkit-box;
+    -webkit-line-clamp:3;
+    line-clamp:3;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .who-published-modal-byline {
+    margin:0;
+    font-family:'DM Sans',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:0.02em;
+    color:#f97316;
+    line-height:1.35;
+    text-align:center;
+  }
+  .who-published-modal-film-title + .who-published-modal-byline {
+    margin-top:5px;
+  }
+  .who-published-modal-header > .who-published-modal-close + .who-published-modal-byline {
+    margin-top:0;
+  }
   .who-published-modal-body--loading, .who-published-modal-empty { font-size:14px; color:#a8a4a0; line-height:1.45; margin:0; }
   .who-published-modal-error { font-size:14px; color:#e86a6a; line-height:1.45; }
-  .who-published-modal-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; max-height:min(50vh, 320px); overflow-y:auto; }
-  .who-published-modal-row { display:flex; align-items:baseline; justify-content:space-between; gap:12px; font-size:14px; }
+  .who-published-modal-list {
+    list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:0; max-height:min(50vh, 320px); overflow-y:auto;
+    border-top:1px solid #252525; /* line above first name */
+  }
+  .who-published-modal-row {
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px; font-size:14px;
+    padding:10px 0; border-bottom:1px solid #252525; width:100%; box-sizing:border-box; /* line below each row, including last */
+  }
   .who-published-modal-name { color:#e8e4dc; min-width:0; }
   .who-published-modal-score { color:#e8c96a; font-weight:600; font-variant-numeric:tabular-nums; flex-shrink:0; }
-  .who-published-modal-panel .circle-invite-btn--modal { width:100%; box-sizing:border-box; margin-top:4px; }
+  .who-published-modal-panel .who-published-modal-close-cta {
+    width:100%; box-sizing:border-box; margin-top:4px;
+    background:#e8c96a; color:#0a0a0a; border-color:#e8c96a; font-weight:600;
+  }
+  .who-published-modal-panel .who-published-modal-close-cta:hover:not(:disabled) {
+    background:#edd585; border-color:#edd585; color:#0a0a0a;
+  }
   .circle-strip-rater-count { font-size:11px; color:#666; margin-top:2px; letter-spacing:0.2px; text-align:center; }
   .circle-strip-comm-line { font-size:11px; color:#888; margin-top:4px; letter-spacing:0.2px; }
   .circle-strip-comm-line--muted { color:#555; }

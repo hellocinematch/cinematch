@@ -2676,7 +2676,7 @@ function CircleStripRingCineBelowTitle({ groupRating, siteRating, onWhoPublished
     .filter(Boolean)
     .join(", ");
   const tappable = typeof onWhoPublished === "function";
-  const a11yTap = tappable ? `${a11y}. Open who published.` : a11y;
+  const a11yTap = tappable ? `${a11y}. Open who rated in this circle.` : a11y;
   const inner = (
     <>
       {hasGr ? (
@@ -2757,7 +2757,7 @@ function CircleAllTopRatingsLine({ row, showRaterParen, onWhoPublished }) {
   ) : null;
 
   if (canWhoPub) {
-    const a11yBtn = `Who published. ${circleCineA11y}`;
+    const a11yBtn = `Rated by. ${circleCineA11y}`;
     return (
       <div className="circle-rated-list-ratings">
         <button
@@ -3060,7 +3060,7 @@ export default function App() {
   const circleRecentStripSuppressClickRef = useRef(false);
   const [circleStripUnpublishBusy, setCircleStripUnpublishBusy] = useState(false);
   const [showCircleInfoSheet, setShowCircleInfoSheet] = useState(false);
-  /** Who published (3b): null | { status: "loading" } | { status: "ok", rows } | { status: "err", message } */
+  /** Rated-by modal (3b): null | { status, displayTitle?, rows?, message? } */
   const [whoPublishedModal, setWhoPublishedModal] = useState(null);
   /** `user_id` → display name for Circle info sheet (`get_circle_member_names` RPC + profiles fallback). */
   const [circleInfoNamesById, setCircleInfoNamesById] = useState({});
@@ -6998,9 +6998,10 @@ export default function App() {
   }, []);
 
   const openWhoPublishedForCircleRow = useCallback(
-    (row) => {
+    (row, titleText) => {
       if (!row || !selectedCircleId) return;
-      setWhoPublishedModal({ status: "loading" });
+      const displayTitle = typeof titleText === "string" ? titleText.trim() : "";
+      setWhoPublishedModal({ status: "loading", displayTitle });
       void (async () => {
         try {
           const pubRows = await fetchCircleTitlePublishers({
@@ -7008,11 +7009,12 @@ export default function App() {
             tmdbId: row.tmdb_id,
             mediaType: row.media_type,
           });
-          setWhoPublishedModal({ status: "ok", rows: pubRows || [] });
+          setWhoPublishedModal({ status: "ok", rows: pubRows || [], displayTitle });
         } catch (e) {
           setWhoPublishedModal({
             status: "err",
-            message: e?.message || "Couldn’t load who published.",
+            displayTitle,
+            message: e?.message || "Couldn’t load list.",
           });
         }
       })();
@@ -9030,7 +9032,7 @@ export default function App() {
                         ref={isNewest ? circleRecentNewestRef : null}
                         tabIndex={0}
                         role="group"
-                        aria-label={`${movie?.title || "Title"}. Open details, or use the score row to see who published in this circle.`}
+                        aria-label={`${movie?.title || "Title"}. Open details, or use the score row for who rated in this circle.`}
                         onPointerDown={onStripCardPointerDown}
                         onPointerMove={onStripCardPointerMove}
                         onPointerUp={onStripCardPointerEnd}
@@ -9171,7 +9173,7 @@ export default function App() {
                         <CircleStripRingCineBelowTitle
                           groupRating={row.group_rating}
                           siteRating={row.site_rating}
-                          onWhoPublished={() => openWhoPublishedForCircleRow(row)}
+                          onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title)}
                         />
                       </div>
                     );
@@ -9212,7 +9214,7 @@ export default function App() {
                         role="group"
                         tabIndex={0}
                         className="circle-rated-list-row"
-                        aria-label={`${movie?.title || "Title"}. Open details, or use circle and Cinemastro scores to see who published.`}
+                        aria-label={`${movie?.title || "Title"}. Open details, or use circle and Cinemastro scores to see who rated in this group.`}
                         onClick={(e) => {
                           if (e.target?.closest?.(".circle-who-published-hit")) return;
                           openDetail(movie, predDetail);
@@ -9252,7 +9254,7 @@ export default function App() {
                           <CircleAllTopRatingsLine
                             row={row}
                             showRaterParen={showStripRaterCounts}
-                            onWhoPublished={() => openWhoPublishedForCircleRow(row)}
+                            onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title)}
                           />
                         </div>
                       </div>
@@ -9589,7 +9591,13 @@ export default function App() {
       )}
 
       {whoPublishedModal ? (
-        <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Who published">
+        <div
+          className="circles-modal-root"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={whoPublishedModal.displayTitle ? "who-published-film-title" : undefined}
+          aria-label={whoPublishedModal.displayTitle ? undefined : "Rated by in this circle"}
+        >
           <button
             type="button"
             className="circles-modal-backdrop"
@@ -9597,16 +9605,21 @@ export default function App() {
             onClick={() => setWhoPublishedModal(null)}
           />
           <div className="circles-modal-panel who-published-modal-panel">
-            <div className="circles-modal-header">
-              <h2 className="circles-modal-title">Who published</h2>
+            <div className="who-published-modal-header">
               <button
                 type="button"
-                className="circles-modal-close"
+                className="circles-modal-close who-published-modal-close"
                 aria-label="Close"
                 onClick={() => setWhoPublishedModal(null)}
               >
                 ×
               </button>
+              {whoPublishedModal.displayTitle ? (
+                <h2 className="who-published-modal-film-title" id="who-published-film-title">
+                  {whoPublishedModal.displayTitle}
+                </h2>
+              ) : null}
+              <p className="who-published-modal-byline">Rated by</p>
             </div>
             {whoPublishedModal.status === "loading" ? (
               <div className="who-published-modal-body who-published-modal-body--loading">Loading…</div>
@@ -9615,7 +9628,7 @@ export default function App() {
                 {whoPublishedModal.message}
               </div>
             ) : (whoPublishedModal.rows || []).length === 0 ? (
-              <p className="who-published-modal-empty">No one has published this title in this group.</p>
+              <p className="who-published-modal-empty">No one in this group has a published rating for this title yet.</p>
             ) : (
               <ul className="who-published-modal-list" aria-label="Member scores in this circle">
                 {(whoPublishedModal.rows || []).map((r) => {
@@ -9634,7 +9647,7 @@ export default function App() {
             )}
             <button
               type="button"
-              className="circle-invite-btn circle-invite-btn--modal"
+              className="circle-invite-btn circle-invite-btn--modal who-published-modal-close-cta"
               onClick={() => setWhoPublishedModal(null)}
             >
               Close
