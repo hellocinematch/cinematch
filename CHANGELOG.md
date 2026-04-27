@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.1.13
+
+- **Secondary Region (Indian) → Streaming:** Per-service discover and All-services shallow widen use **US** `watch_region` for **Netflix, Prime Video, and Hulu** (restores Hulu and US-catalog density); **IN** remains for JioHotstar, Sony Liv, Zee5, Sun Nxt, and Eros Now.
+
+## 6.1.12
+
+- **Secondary Region (Indian) → Streaming:** Service picker replaces Disney+–AMC+ with **JioHotstar**, **Sony Liv**, **Zee5**, **Sun Nxt**, and **Eros Now** (keeps Netflix, Prime Video, Hulu). Per-service and shallow widen discover use TMDB **`watch_region=IN`** for those catalogs. Primary Streaming and profile “Where you watch” unchanged.
+
 ## 6.1.11
 
 - **Detail — Where to Watch:** **Find showtimes near you (Google)** also appears for titles that appear in the **secondary region → In Theaters** strip (same behavior as primary US theaters).

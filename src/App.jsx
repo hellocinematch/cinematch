@@ -120,6 +120,29 @@ const STREAMING_SERVICES = [
 ];
 
 /**
+ * Secondary Region → **Streaming** when profile secondary is **Indian**: same top three majors, then India-catalog SVOD.
+ * Per-provider discover uses **US** `watch_region` for Netflix / Prime / Hulu (dense TMDB data) and **IN** for JioHotstar, Sony Liv, etc.
+ * Primary Streaming page and profile “Where you watch” still use {@link STREAMING_SERVICES}.
+ */
+const SECONDARY_INDIAN_STREAMING_SERVICES = [
+  { id: 8, label: "Netflix" },
+  { id: 9, label: "Prime Video" },
+  { id: 15, label: "Hulu" },
+  { id: 2336, label: "JioHotstar" },
+  { id: 237, label: "Sony Liv" },
+  { id: 232, label: "Zee5" },
+  { id: 309, label: "Sun Nxt" },
+  { id: 2059, label: "Eros Now" },
+];
+
+/** TMDB `watch_region` for Indian secondary per-provider / shallow-provider discover (JustWatch India rows). */
+const SECONDARY_INDIAN_STREAMING_WATCH_REGION = "IN";
+
+function streamingServicesForSecondaryBlock(secondaryRegionKey) {
+  return secondaryRegionKey === "indian" ? SECONDARY_INDIAN_STREAMING_SERVICES : STREAMING_SERVICES;
+}
+
+/**
  * Indian secondary **TV** service discover: `with_origin_country=IN` helps **Netflix** US strip density.
  * **Prime** / **Hulu** Indian catalog in TMDB is often not `IN` origin on discover — use broad US+provider + client filter only.
  */
@@ -1034,6 +1057,21 @@ const V130_SECONDARY_REGION_IDS = ["indian", "asian", "latam", "european"];
  */
 const SECONDARY_AVAILABILITY_TMDB_REGION = "US";
 
+/** Indian secondary: TMDB US-catalog majors; taste filter still applies (Hulu has almost no IN JustWatch rows). */
+const SECONDARY_INDIAN_STREAMING_US_MAJOR_PROVIDER_IDS = new Set([8, 9, 15]);
+
+function watchRegionForIndianSecondaryProvider(providerId) {
+  const id = Number(providerId);
+  return SECONDARY_INDIAN_STREAMING_US_MAJOR_PROVIDER_IDS.has(id)
+    ? SECONDARY_AVAILABILITY_TMDB_REGION
+    : SECONDARY_INDIAN_STREAMING_WATCH_REGION;
+}
+
+function secondaryRegionPerServiceWatchRegion(secondaryRegionKey, providerId) {
+  if (secondaryRegionKey !== "indian") return SECONDARY_AVAILABILITY_TMDB_REGION;
+  return watchRegionForIndianSecondaryProvider(providerId);
+}
+
 /** V1.3.0: Home section title — plain region words (friend-testing copy). */
 const V130_SECONDARY_HOME_TITLE = {
   indian: "Indian",
@@ -1179,8 +1217,10 @@ async function fetchDiscoverSecondaryMovieShallowFromTopProviders(
   clientLangs,
   originalLanguageQuery = "",
 ) {
-  const slice = STREAMING_SERVICES.slice(0, SECONDARY_INDIAN_BROAD_PROVIDERS_TAKE);
   const isIndian = Array.isArray(clientLangs) && clientLangs.length > 0;
+  const slice = isIndian
+    ? SECONDARY_INDIAN_STREAMING_SERVICES
+    : STREAMING_SERVICES.slice(0, SECONDARY_INDIAN_BROAD_PROVIDERS_TAKE);
   const q = typeof originalLanguageQuery === "string" ? originalLanguageQuery : "";
   const pools = await Promise.all(
     slice.map((s) =>
@@ -1188,7 +1228,7 @@ async function fetchDiscoverSecondaryMovieShallowFromTopProviders(
         "movie",
         s.id,
         noopStreamingRefill,
-        tmdbRegionIso,
+        isIndian ? watchRegionForIndianSecondaryProvider(s.id) : tmdbRegionIso,
         isIndian ? "" : q,
         isIndian ? clientLangs : null,
         { maxPage: 1, cap: 8 },
@@ -1283,18 +1323,18 @@ async function fetchDiscoverTvUsSubscriptionFlatrateBroad(
  * Shallow per-provider US `discover` (same as service strip) — used only to widen the Indian **All services** TV pool.
  */
 async function fetchDiscoverIndianSecondaryTvShallowFromTopProviders(
-  tmdbRegionIso,
+  _tmdbRegionIso,
   clientLangs,
 ) {
   if (!Array.isArray(clientLangs) || clientLangs.length < 1) return [];
-  const slice = STREAMING_SERVICES.slice(0, SECONDARY_INDIAN_BROAD_PROVIDERS_TAKE);
+  const slice = SECONDARY_INDIAN_STREAMING_SERVICES;
   const pools = await Promise.all(
     slice.map((s) =>
       fetchStreamingPageProviderRefillPool(
         "tv",
         s.id,
         noopStreamingRefill,
-        tmdbRegionIso,
+        watchRegionForIndianSecondaryProvider(s.id),
         "",
         clientLangs,
         { maxPage: 1, cap: 8 },
@@ -4197,7 +4237,7 @@ export default function App() {
           if (media === "movie") setSecondaryRegionRefillMovies(next);
           else setSecondaryRegionRefillTv(next);
         },
-        SECONDARY_AVAILABILITY_TMDB_REGION,
+        secondaryRegionPerServiceWatchRegion(secondaryRegionKey, secondaryRegionStreamingProviderId),
         secondaryRefillLangQuery,
         secondaryRefillLangAllow,
       );
@@ -4354,7 +4394,7 @@ export default function App() {
     return inTheatersPagePopularForRecs.map((m) => tmdbOnlyRec(m));
   }, [matchData?.inTheatersPagePopularRecs, inTheatersPagePopularForRecs]);
 
-  /** V1.3.2: Union of secondary strip rows (US availability + taste). Service refill uses same `watch_region` as {@link SECONDARY_AVAILABILITY_TMDB_REGION}. */
+  /** V1.3.2: Union of secondary strip rows. **Indian** per-service streaming uses US majors + {@link SECONDARY_INDIAN_STREAMING_WATCH_REGION} for Indian OTT ids; other secondaries use {@link SECONDARY_AVAILABILITY_TMDB_REGION}. */
   const secondaryStripCatalogRows = useMemo(() => {
     if (secondaryRegionStreamingProviderId != null) {
       return dedupeMediaRowsById([
@@ -10689,7 +10729,11 @@ export default function App() {
         <div className="home">
           <PageShell
             title={V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region"}
-            subtitle="US theaters &amp; streaming for this taste — scored for you"
+            subtitle={
+              secondaryRegionKey === "indian"
+                ? "US theaters and India (TMDB) streaming for this taste — scored for you"
+                : "US theaters & streaming for this taste — scored for you"
+            }
           >
             {!secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey) ? (
               <div className="disc-empty">
@@ -10729,7 +10773,7 @@ export default function App() {
                         }}
                       >
                         <option value="">All services</option>
-                        {STREAMING_SERVICES.map((s) => (
+                        {streamingServicesForSecondaryBlock(secondaryRegionKey).map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.label}
                           </option>
@@ -10763,7 +10807,9 @@ export default function App() {
                     <div className="section-meta">
                       {secondaryBlockSegment === SECONDARY_BLOCK_THEATERS
                         ? "US theaters for this taste"
-                        : "US streaming for this taste"}
+                        : secondaryRegionKey === "indian"
+                          ? "India (TMDB) streaming for this taste; theaters still US"
+                          : "US streaming for this taste"}
                     </div>
                   </div>
                   {!secondaryStripReady || showSecondaryRefillEmptySkeleton ? (
@@ -10774,10 +10820,16 @@ export default function App() {
                         {secondaryBlockSegment === SECONDARY_BLOCK_THEATERS
                           ? "No matching theatrical releases in the US right now"
                           : secondaryRegionStreamingProviderId != null
-                            ? `No ${secondaryBlockStreamingTab === "movie" ? "movies" : "series"} in this US discover view for that service — try All services or another.`
+                            ? secondaryRegionKey === "indian"
+                              ? `No ${secondaryBlockStreamingTab === "movie" ? "movies" : "series"} for that service in India (TMDB) — try All services or another.`
+                              : `No ${secondaryBlockStreamingTab === "movie" ? "movies" : "series"} in this US discover view for that service — try All services or another.`
                             : secondaryBlockStreamingTab === "movie"
-                              ? "No matching streaming movies in the US right now"
-                              : "No matching streaming series in the US right now"}
+                              ? secondaryRegionKey === "indian"
+                                ? "No matching streaming movies for this taste right now"
+                                : "No matching streaming movies in the US right now"
+                              : secondaryRegionKey === "indian"
+                                ? "No matching streaming series for this taste right now"
+                                : "No matching streaming series in the US right now"}
                       </div>
                     </div>
                   ) : (
