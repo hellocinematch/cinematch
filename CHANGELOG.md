@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.1
+
+- **Refactor:** Pulse screen markup moved to **`src/pages/PulsePage.jsx`** (behavior unchanged).
+
+## 7.0.0
+
+- **Semver:** Major bump to **7.0.0** (7.x release line).
+
 ## 6.1.13
 
 - **Secondary Region (Indian) → Streaming:** Per-service discover and All-services shallow widen use **US** `watch_region` for **Netflix, Prime Video, and Hulu** (restores Hulu and US-catalog density); **IN** remains for JioHotstar, Sony Liv, Zee5, Sun Nxt, and Eros Now.
