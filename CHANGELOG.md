@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.3
+
+- **Refactor:** Secondary Region screen markup moved to **`src/pages/SecondaryRegionPage.jsx`** (behavior unchanged; fetch, refill, stagger, and match stay in `App.jsx`).
+
 ## 7.0.2
 
 - **Refactor:** In Theaters screen markup moved to **`src/pages/InTheatersPage.jsx`** (behavior unchanged).
