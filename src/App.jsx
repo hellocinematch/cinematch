@@ -10486,13 +10486,14 @@ export default function App() {
                 <div className="section-header">
                   <div className="section-title">🔥 For you</div>
                   {hasYourPicksStripSource && (
-                    <div
-                      className="section-meta"
-                      style={{ cursor: "pointer" }}
+                    <button
+                      type="button"
+                      className="section-meta your-picks-refresh"
+                      aria-label="Refresh Your Picks list"
                       onClick={() => setTopPickOffset((p) => p + 1)}
                     >
-                      {"↻ Refresh"}
-                    </div>
+                      ↻ Refresh
+                    </button>
                   )}
                 </div>
                 {moreForYouStrip.length > 0 ? (

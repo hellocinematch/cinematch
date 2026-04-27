@@ -414,6 +414,22 @@
   .section-header { padding:0 24px; display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px; min-width:0; }
   .section-title { font-family:'DM Serif Display',serif; font-size:22px; color:#ddd7cd; min-width:0; flex:1 1 auto; }
   .section-meta { font-size:12px; color:#555; letter-spacing:1px; text-transform:uppercase; min-width:0; flex:0 1 auto; overflow-wrap:anywhere; text-align:right; }
+  /** Your Picks — header refresh: gold accent (was same gray as passive `.section-meta`). */
+  /** Only color + button reset; explicit 12px so UA `button` font cannot override `.section-meta`. */
+  button.your-picks-refresh.section-meta {
+    color:#e8c96a;
+    background:transparent;
+    border:none;
+    padding:0;
+    margin:0;
+    font-size:12px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    cursor:pointer;
+    text-align:right;
+  }
+  button.your-picks-refresh.section-meta:hover { color:#f0d78a; }
+  button.your-picks-refresh.section-meta:focus-visible { outline:2px solid #e8c96a; outline-offset:2px; }
   .top-picks-block { margin-top:24px; min-width:0; max-width:100%; }
   .top-picks-block:first-of-type { margin-top:0; }
   .top-picks-block .section-header { margin-bottom:10px; }

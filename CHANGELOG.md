@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.4
+
+- **Your Picks:** **Refresh** in the **For you** header uses **gold** (`#e8c96a`), stays **12px** uppercase like other **`.section-meta`** lines, and is a proper **button** (keyboard + `aria-label`).
+
 ## 7.0.3
 
 - **Refactor:** Secondary Region screen markup moved to **`src/pages/SecondaryRegionPage.jsx`** (behavior unchanged; fetch, refill, stagger, and match stay in `App.jsx`).
