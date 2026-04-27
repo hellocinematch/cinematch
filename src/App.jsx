@@ -600,6 +600,29 @@ function filterDefaultExcludedGenres(items, allowAnimation = false) {
   return (items || []).filter((item) => !hasExcludedGenre(item));
 }
 
+/** Main **Streaming** page only: hidden by default unless user includes them via the Genres control. Family (10751) is not excluded. */
+const STREAMING_PAGE_HIDABLE_GENRE_IDS = Object.freeze([16, 99, 10764, 10762]); // Animation, Documentary, Reality, Kids
+
+/** Labels for {@link STREAMING_PAGE_HIDABLE_GENRE_IDS} (UI toggles). */
+const STREAMING_PAGE_GENRE_TOGGLE_OPTIONS = Object.freeze([
+  { id: 16, label: "Animation" },
+  { id: 99, label: "Documentary" },
+  { id: 10764, label: "Reality" },
+  { id: 10762, label: "Kids" },
+]);
+
+function streamingPageExcludedGenreIds(includedHidableIds) {
+  const inc = new Set(
+    (includedHidableIds || []).map((n) => Number(n)).filter((n) => Number.isFinite(n)),
+  );
+  return STREAMING_PAGE_HIDABLE_GENRE_IDS.filter((id) => !inc.has(id));
+}
+
+function filterStreamingPageExcludedGenres(items, includedHidableIds) {
+  const excluded = streamingPageExcludedGenreIds(includedHidableIds);
+  return (items || []).filter((item) => !hasExcludedGenre(item, excluded));
+}
+
 function formatIsoDate(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -899,7 +922,7 @@ function filterRowsByProfileLanguageCodes(rows, langCodes) {
 }
 
 /** Main **Streaming** page — All services: movies **now** = US `flatrate`, **90d** release window, newest date first (B). */
-async function fetchStreamingPageMoviesNowAllServices(regionKeys) {
+async function fetchStreamingPageMoviesNowAllServices(regionKeys, includedHidableGenreIds = []) {
   const fill = async (langSuffix) => {
     const gte = dateDaysAgo(90);
     const lte = formatIsoDate(new Date());
@@ -909,7 +932,7 @@ async function fetchStreamingPageMoviesNowAllServices(regionKeys) {
       const path = `/discover/movie?language=en-US&sort_by=primary_release_date.desc&page=${page}&region=US&watch_region=US&with_watch_monetization_types=flatrate&primary_release_date.gte=${gte}&primary_release_date.lte=${lte}${langSuffix}`;
       const data = await fetchTMDB(path);
       if (isTmdbApiErrorPayload(data)) break;
-      for (const item of filterDefaultExcludedGenres(data?.results || [])) {
+      for (const item of filterStreamingPageExcludedGenres(data?.results || [], includedHidableGenreIds)) {
         if (out.length >= STREAMING_PAGE_STRIP_CAP) break;
         if (seen.has(item.id)) continue;
         seen.add(item.id);
@@ -931,12 +954,12 @@ async function fetchStreamingPageMoviesNowAllServices(regionKeys) {
 }
 
 /** All services: movies **popular** = TMDB **trending** week (D). */
-async function fetchStreamingPageMoviesPopularAllServices(regionKeys) {
+async function fetchStreamingPageMoviesPopularAllServices(regionKeys, includedHidableGenreIds = []) {
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
     const pages = await Promise.all([1, 2].map((p) => fetchTMDB(`/trending/movie/week?language=en-US&page=${p}`)));
     if (pages.some(isTmdbApiErrorPayload)) return [];
-    const merged = filterDefaultExcludedGenres(pages.flatMap((p) => p.results || []));
+    const merged = filterStreamingPageExcludedGenres(pages.flatMap((p) => p.results || []), includedHidableGenreIds);
     const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
     const normalized = deduped.slice(0, STREAMING_PAGE_STRIP_CAP).map((m) => normalizeTMDBItem(m, "movie"));
     return filterRowsByProfileLanguageCodes(normalized, langCodes);
@@ -946,7 +969,7 @@ async function fetchStreamingPageMoviesPopularAllServices(regionKeys) {
 }
 
 /** All services: TV **now** = US `flatrate`, `first_air_date` desc (new to SVOD; no 90d). */
-async function fetchStreamingPageTvNowAllServices(regionKeys) {
+async function fetchStreamingPageTvNowAllServices(regionKeys, includedHidableGenreIds = []) {
   const fill = async (langSuffix) => {
     const out = [];
     const seen = new Set();
@@ -954,7 +977,7 @@ async function fetchStreamingPageTvNowAllServices(regionKeys) {
       const path = `/discover/tv?language=en-US&sort_by=first_air_date.desc&page=${page}&watch_region=US&with_watch_monetization_types=flatrate${langSuffix}`;
       const data = await fetchTMDB(path);
       if (isTmdbApiErrorPayload(data)) break;
-      for (const item of filterDefaultExcludedGenres(data?.results || [])) {
+      for (const item of filterStreamingPageExcludedGenres(data?.results || [], includedHidableGenreIds)) {
         if (out.length >= STREAMING_PAGE_STRIP_CAP) break;
         if (seen.has(item.id)) continue;
         seen.add(item.id);
@@ -976,17 +999,18 @@ async function fetchStreamingPageTvNowAllServices(regionKeys) {
 }
 
 /** All services: TV **popular** = `trending/tv/week` (excl. talk/news like elsewhere). */
-async function fetchStreamingPageTvPopularAllServices(regionKeys) {
+async function fetchStreamingPageTvPopularAllServices(regionKeys, includedHidableGenreIds = []) {
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
     const excludedTrendingGenres = new Set([10767, 10763]);
     const pages = await Promise.all([1, 2].map((p) => fetchTMDB(`/trending/tv/week?language=en-US&page=${p}`)));
     if (pages.some(isTmdbApiErrorPayload)) return [];
-    const merged = filterDefaultExcludedGenres(
+    const merged = filterStreamingPageExcludedGenres(
       pages.flatMap((p) => p.results || []).filter((item) => {
         const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
         return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
       }),
+      includedHidableGenreIds,
     );
     const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
     const normalized = deduped.slice(0, STREAMING_PAGE_STRIP_CAP).map((m) => normalizeTMDBItem(m, "tv"));
@@ -1627,6 +1651,7 @@ const SECONDARY_REGION_STREAM_REVEAL_STEPS = [5, 9, 14, 19, 20];
  * `originalLanguageAllowlist` = e.g. Indian codes: broad US+provider discover, then keep rows that match **Indian** taste (see {@link filterNormalizedRowsByIndianSecondaryTaste}).
  * **Indian + TV + Netflix only:** `with_origin_country=IN` on discover (list payloads omit `IN` often; need dense India slice). **Prime / Hulu** omit that param so licensed Indian shows (non-`IN` origin in TMDB) still surface.
  * `options.discoverSort`: **`date`** (default) = newest US release or first air; **`popularity`** = in-service TMDB popularity (main Streaming “What’s popular” with a service selected). Movies + **date** use a **90-day** `primary_release_date` window.
+ * `options.excludedGenreIds`: TMDB `genre_ids` to drop (default **animation-only**); main Streaming page passes **`streamingPageExcludedGenreIds(…)`**.
  */
 async function fetchStreamingPageProviderRefillPool(
   mediaType,
@@ -1641,6 +1666,7 @@ async function fetchStreamingPageProviderRefillPool(
     maxPage: maxPageLimit = 5,
     cap: resultCap = STREAMING_PAGE_STRIP_CAP,
     discoverSort = "date",
+    excludedGenreIds = DEFAULT_EXCLUDED_GENRE_IDS,
   } = options;
   const type = mediaType === "movie" ? "movie" : "tv";
   const reg = encodeURIComponent(String(watchRegion || "US").toUpperCase());
@@ -1675,7 +1701,7 @@ async function fetchStreamingPageProviderRefillPool(
     for (const item of results) {
       if (all.length >= resultCap) break;
       if (seen.has(item.id)) continue;
-      if (hasExcludedGenre(item)) continue;
+      if (hasExcludedGenre(item, excludedGenreIds)) continue;
       const norm = normalizeTMDBItem(item, type);
       if (allow) {
         const okLang = allow.has(String(norm.language || "").toLowerCase());
@@ -3059,6 +3085,14 @@ export default function App() {
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
   /** Streaming page only — optional one service; refill via discover (not profile). */
   const [streamingPageProviderId, setStreamingPageProviderId] = useState(null);
+  /** TMDB genre ids from {@link STREAMING_PAGE_HIDABLE_GENRE_IDS} the user chose to **include** (show); default [] = hide all four. */
+  const [streamingPageIncludedHidableGenreIds, setStreamingPageIncludedHidableGenreIds] = useState([]);
+  const toggleStreamingPageIncludedGenre = useCallback((genreId) => {
+    setStreamingPageIncludedHidableGenreIds((prev) => {
+      if (prev.includes(genreId)) return prev.filter((x) => x !== genreId);
+      return [...prev, genreId].sort((a, b) => a - b);
+    });
+  }, []);
   const [streamingPageRefillLoading, setStreamingPageRefillLoading] = useState(false);
   const [streamingPageRefillMoviesNow, setStreamingPageRefillMoviesNow] = useState([]);
   const [streamingPageRefillMoviesPopular, setStreamingPageRefillMoviesPopular] = useState([]);
@@ -3578,8 +3612,8 @@ export default function App() {
         let tPop = [];
         try {
           [mNow, mPop] = await Promise.all([
-            fetchStreamingPageMoviesNowAllServices(showRegionKeys),
-            fetchStreamingPageMoviesPopularAllServices(showRegionKeys),
+            fetchStreamingPageMoviesNowAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds),
+            fetchStreamingPageMoviesPopularAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds),
           ]);
         } catch (e) {
           console.error(e);
@@ -3599,8 +3633,8 @@ export default function App() {
 
         try {
           [tNow, tPop] = await Promise.all([
-            fetchStreamingPageTvNowAllServices(showRegionKeys),
-            fetchStreamingPageTvPopularAllServices(showRegionKeys),
+            fetchStreamingPageTvNowAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds),
+            fetchStreamingPageTvPopularAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds),
           ]);
         } catch (e) {
           console.error(e);
@@ -3623,7 +3657,7 @@ export default function App() {
       cancelled = true;
       clearTimeout(defer);
     };
-  }, [user, showRegionKeys, screen]);
+  }, [user, showRegionKeys, screen, streamingPageIncludedHidableGenreIds]);
 
   useEffect(() => {
     if (!user) {
@@ -3875,6 +3909,9 @@ export default function App() {
       setStreamingPageRefillTvPopular([]);
       setStreamingPageNowDisplayLen(0);
       setStreamingPagePopularDisplayLen(0);
+      // All-services stagger dedupes by sig; clear when leaving or on All services so return-from-detail can reveal again.
+      streamingPageNowRevealSigRef.current = "";
+      streamingPagePopularRevealSigRef.current = "";
       return;
     }
     const media = streamingTab === "movie" ? "movie" : "tv";
@@ -3886,6 +3923,7 @@ export default function App() {
     setStreamingPageRefillLoading(true);
     setStreamingPageNowDisplayLen(0);
     setStreamingPagePopularDisplayLen(0);
+    const streamingExcludedIds = streamingPageExcludedGenreIds(streamingPageIncludedHidableGenreIds);
     if (media === "movie") {
       setStreamingPageRefillMoviesNow([]);
       setStreamingPageRefillMoviesPopular([]);
@@ -3907,7 +3945,7 @@ export default function App() {
             "US",
             langQuery,
             null,
-            { discoverSort: "date" },
+            { discoverSort: "date", excludedGenreIds: streamingExcludedIds },
           ),
           fetchStreamingPageProviderRefillPool(
             "movie",
@@ -3919,7 +3957,7 @@ export default function App() {
             "US",
             langQuery,
             null,
-            { discoverSort: "popularity" },
+            { discoverSort: "popularity", excludedGenreIds: streamingExcludedIds },
           ),
         ]);
         if (cancelled) return;
@@ -3937,7 +3975,7 @@ export default function App() {
             "US",
             langQuery,
             null,
-            { discoverSort: "date" },
+            { discoverSort: "date", excludedGenreIds: streamingExcludedIds },
           ),
           fetchStreamingPageProviderRefillPool(
             "tv",
@@ -3949,7 +3987,7 @@ export default function App() {
             "US",
             langQuery,
             null,
-            { discoverSort: "popularity" },
+            { discoverSort: "popularity", excludedGenreIds: streamingExcludedIds },
           ),
         ]);
         if (cancelled) return;
@@ -3962,7 +4000,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [screen, streamingPageProviderId, streamingTab, showRegionKeys]);
+  }, [screen, streamingPageProviderId, streamingTab, showRegionKeys, streamingPageIncludedHidableGenreIds]);
 
   useEffect(() => {
     if (screen !== "streaming-page" || streamingPageProviderId == null) return;
@@ -4039,17 +4077,19 @@ export default function App() {
     streamingPageRefillTvPopularFiltered,
   ]);
 
+  /** Movies and TV hydrate at different times; only the active tab’s ready flag should retrigger All-services stagger. */
+  const streamingPageAllServicesStaggerReady = useMemo(
+    () => (streamingTab === "movie" ? streamingMoviesReady : streamingTvReady),
+    [streamingTab, streamingMoviesReady, streamingTvReady],
+  );
+
   useEffect(() => {
     if (screen !== "streaming-page") {
       setStreamingPageNowDisplayLen(0);
       return;
     }
     if (streamingPageProviderId != null) return;
-    if (streamingTab === "movie") {
-      if (!streamingMoviesReady) return;
-    } else if (!streamingTvReady) {
-      return;
-    }
+    if (!streamingPageAllServicesStaggerReady) return;
     const nNow =
       streamingTab === "movie"
         ? streamingMoviesNowForRecs.length
@@ -4077,8 +4117,7 @@ export default function App() {
     screen,
     streamingPageProviderId,
     streamingTab,
-    streamingMoviesReady,
-    streamingTvReady,
+    streamingPageAllServicesStaggerReady,
     streamingMoviesNowForRecs,
     streamingTVNowForRecs,
     showRegionKeys,
@@ -4090,11 +4129,7 @@ export default function App() {
       return;
     }
     if (streamingPageProviderId != null) return;
-    if (streamingTab === "movie") {
-      if (!streamingMoviesReady) return;
-    } else if (!streamingTvReady) {
-      return;
-    }
+    if (!streamingPageAllServicesStaggerReady) return;
     const nPop =
       streamingTab === "movie"
         ? streamingMoviesPopularForRecs.length
@@ -4122,8 +4157,7 @@ export default function App() {
     screen,
     streamingPageProviderId,
     streamingTab,
-    streamingMoviesReady,
-    streamingTvReady,
+    streamingPageAllServicesStaggerReady,
     streamingMoviesPopularForRecs,
     streamingTVPopularForRecs,
     showRegionKeys,
@@ -10394,31 +10428,55 @@ export default function App() {
             subtitle="New & popular — optional service filter (profile picks apply only in Your Picks). Scored for your taste."
           >
             <div className="section" style={{ paddingTop: 0 }}>
-              <div className="filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
-                <select
-                  id="streaming-page-service"
-                  className={`streaming-page-service-select${streamingPageProviderId != null ? " streaming-page-service-select--active" : ""}`}
-                  aria-label="Filter by streaming service"
-                  value={streamingPageProviderId == null ? "" : String(streamingPageProviderId)}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setStreamingPageProviderId(v === "" ? null : Number(v));
-                  }}
-                >
-                  <option value="">All services</option>
-                  {STREAMING_SERVICES.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="filter-row streaming-page-filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
+                <div className="streaming-page-filter-scroll">
+                  <select
+                    id="streaming-page-service"
+                    className={`streaming-page-service-select${streamingPageProviderId != null ? " streaming-page-service-select--active" : ""}`}
+                    aria-label="Filter by streaming service"
+                    value={streamingPageProviderId == null ? "" : String(streamingPageProviderId)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setStreamingPageProviderId(v === "" ? null : Number(v));
+                    }}
+                  >
+                    <option value="">All services</option>
+                    {STREAMING_SERVICES.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="streaming-page-service-pill-divider" aria-hidden />
+                  <button type="button" className={`filter-pill ${streamingTab === "tv" ? "active" : ""}`} onClick={() => setStreamingTab("tv")}>
+                    Series
+                  </button>
+                  <button type="button" className={`filter-pill ${streamingTab === "movie" ? "active" : ""}`} onClick={() => setStreamingTab("movie")}>
+                    Movies
+                  </button>
+                </div>
                 <span className="streaming-page-service-pill-divider" aria-hidden />
-                <button type="button" className={`filter-pill ${streamingTab === "tv" ? "active" : ""}`} onClick={() => setStreamingTab("tv")}>
-                  Series
-                </button>
-                <button type="button" className={`filter-pill ${streamingTab === "movie" ? "active" : ""}`} onClick={() => setStreamingTab("movie")}>
-                  Movies
-                </button>
+                <details className="streaming-page-genre-details">
+                  <summary className={`streaming-page-genre-summary${streamingPageIncludedHidableGenreIds.length > 0 ? " streaming-page-genre-summary--active" : ""}`}>
+                    Genres
+                    {streamingPageIncludedHidableGenreIds.length > 0 ? ` · ${streamingPageIncludedHidableGenreIds.length}` : ""}
+                  </summary>
+                  <div className="streaming-page-genre-panel">
+                    <div className="streaming-page-genre-hint">
+                      Animation, documentary, reality &amp; kids are hidden by default (family stays). Check to include.
+                    </div>
+                    {STREAMING_PAGE_GENRE_TOGGLE_OPTIONS.map((opt) => (
+                      <label key={opt.id} className="streaming-page-genre-option">
+                        <input
+                          type="checkbox"
+                          checked={streamingPageIncludedHidableGenreIds.includes(opt.id)}
+                          onChange={() => toggleStreamingPageIncludedGenre(opt.id)}
+                        />
+                        <span>{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </details>
               </div>
               <div className="section-header">
                 <div className="section-title">Now Streaming</div>

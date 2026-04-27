@@ -1,5 +1,21 @@
 # Changelog
 
+## 6.1.10
+
+- **Streaming page (All services):** **Now** / **Popular** stagger completes to the full cap after **detail → back** (stagger effect no longer re-runs when the *other* of movies vs TV finishes loading).
+
+## 6.1.9
+
+- **Streaming page (All services):** After opening a title and going back, **Now** / **Popular** strips show again (reset stagger dedupe when not on per-service refill).
+
+## 6.1.8
+
+- **Streaming page:** **Genres** is back on the same row as **Series** / **Movies**, separated by the usual vertical rule; only the **All services + Series + Movies** segment scrolls horizontally so the genre panel still opens fully.
+
+## 6.1.7
+
+- **Streaming page — genre filter:** By default, strips hide **animation**, **documentary**, **reality**, and **kids** (TMDB genre ids **16**, **99**, **10764**, **10762**); **family** titles are **not** excluded. A **Genres** pill opens a panel with checkboxes to **include** any of those types. Applies to **All services** and **per-service** discover on the main Streaming page only (other screens keep the previous animation-only rule unless they use the shared provider refill with default options).
+
 ## 6.1.6
 
 - **Circles — Circle info modal:** Smaller centered **Circle info** title; larger centered circle name; close control top-right. Roster (members + pending invites) ends with a **divider**; **+ Invite more** first as **gold fill** CTA, then a line, then **Edit name & description**; **Leave circle** last, red, centered with other actions.

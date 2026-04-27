@@ -612,6 +612,22 @@
   .streaming-page-service-select:focus { outline:none; border-color:#e8c96a; }
   .streaming-page-service-select--active:focus { border-color:#e8c96a; }
   .streaming-page-service-pill-divider { flex-shrink:0; align-self:center; width:1px; height:20px; background:#2a2a2a; margin:0 2px 0 0; }
+  /* Outer row: no vertical clip so Genres dropdown can open. Inner strip scrolls horizontally (service + Series + Movies). */
+  .filter-row.streaming-page-filter-row { overflow:visible; align-items:center; touch-action:manipulation; }
+  .streaming-page-filter-scroll {
+    display:flex; align-items:center; gap:8px; flex:1; min-width:0;
+    overflow-x:auto; overflow-y:visible; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+    overscroll-behavior-x:contain; touch-action:pan-x;
+  }
+  .streaming-page-filter-scroll::-webkit-scrollbar { display:none; }
+  .streaming-page-genre-details { position:relative; flex-shrink:0; }
+  .streaming-page-genre-details > summary { list-style:none; cursor:pointer; padding:7px 14px; border-radius:20px; font-size:12px; font-family:'DM Sans',sans-serif; border:1px solid #2a2a2a; background-color:#0a0a0a; color:#e8e8e8; transition:background-color 0.2s,border-color 0.2s,color 0.2s; }
+  .streaming-page-genre-details > summary::-webkit-details-marker { display:none; }
+  .streaming-page-genre-summary--active { background-color:#2a2418; border-color:#5c4f2a; color:#e8c96a; }
+  .streaming-page-genre-panel { position:absolute; z-index:25; top:calc(100% + 6px); right:0; min-width:220px; padding:10px 12px 12px; background:#121212; border:1px solid #2a2a2a; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.45); }
+  .streaming-page-genre-hint { font-size:11px; line-height:1.35; color:#9a9a9a; margin-bottom:10px; }
+  .streaming-page-genre-option { display:flex; align-items:center; gap:10px; font-size:13px; color:#e8e8e8; padding:6px 0; cursor:pointer; user-select:none; }
+  .streaming-page-genre-option input { width:16px; height:16px; accent-color:#e8c96a; cursor:pointer; flex-shrink:0; }
   .search-status { padding:8px 24px; font-size:12px; color:#666; overflow-wrap:anywhere; word-break:break-word; }
   .disc-grid { padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
   .disc-card { cursor:pointer; transition:transform 0.2s; min-width:0; }
