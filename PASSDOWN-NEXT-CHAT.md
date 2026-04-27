@@ -1,17 +1,17 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-26 — **`main` at 6.1.6** (`package.json` / **`CHANGELOG.md`**; e.g. **`05262eb`** — **`git pull`**). **Deep history / long changelog trail / old session notes:** **`PASSDOWN-ARCHIVE.md`**. **PWA, watchlist, circle caps, activity assumptions, strip colors:** **`HANDOFF.md`** § **Stable product reference**.
+**Last updated:** 2026-04-26 — **`package.json` at 6.1.13**. **`origin/main`:** **`41870e9`** (Indian secondary streaming). **`git pull`** / **`git status`** for drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`** § **Stable product reference**.
 
-**6.1.4–6.1.6 (high level):** **`leave_circle`** / **admin-only** hosts; **last member** deletes circle; **pending invite labels** in Circle info (**RPC `get_circle_pending_invite_labels`**); Circle info **layout** (centered header, gold **+ Invite more**, etc.). **6.1.0–6.1.3:** **Rate this / Rate more**, **`RatingScoreChips`**, **`d-rate-title-strip`**. Older Circles: **3b** Rated by, **4a** hosts, invites + copy-mail — see **`CHANGELOG`**.
+**Recent releases (high level):** **6.1.12–6.1.13** — Secondary Region **Indian** → Streaming: service list **JioHotstar, Sony Liv, Zee5, Sun Nxt, Eros Now** (replaces Disney+–AMC+); **hybrid `watch_region`**: **US** for Netflix / Prime / Hulu, **`IN`** for Indian OTT (fixes empty Hulu + All-services widen). **6.1.11** — Detail **Google showtimes** when title is in **secondary → In Theaters**. **6.1.9–6.1.10** — Main **Streaming** All services: stagger **sig reset** after detail; tab-scoped **ready** for stagger (user reported “stuck at 5” may still occur — revisit if needed). **6.1.7–6.1.8** — Main Streaming **genre filter** + **Genres** pill + split filter row — see **`CHANGELOG`**. **Secondary Region → Streaming** (non-Indian): still **animation-only** on provider refill default, not the four hidden genres.
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch is on **`main` at 6.1.6** (see `package.json` / **`CHANGELOG.md`**; client e.g. **`05262eb`** — **`git pull`**). Read **`@PASSDOWN-NEXT-CHAT.md`** and follow **`.cursor/rules/cinematch-discussion-first.mdc`** and **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t implement or change app code** unless I say *code now* / *implement* / *fix* / *do it* (or clearly ask for code in the same message). **Passdown edits** when I ask for handoff/updates are fine. After passdown updates, give a **“What to tell the next chat”** paste block. **This file** is local until **commit + push**. On handoff updates, include this session’s **last note** in **Open / follow-ups — Last session**.  
-> **Shipped (high level):** **6.1.4–6.1.6** — **leave_circle**, admin-only roles, last member **deletes** circle; **pending invite labels** (**`get_circle_pending_invite_labels`**); Circle info **layout**. **6.1.0–6.1.3** — detail **Rate this / Rate more**, **RatingScoreChips**, **d-rate-title-strip**. Older: **3b**, **4a**, invites — **`CHANGELOG`**.  
-> **Backlog:** **§ Prioritized backlog** = **§8**, **§9 / 4b**, **§17–20**, **§21–30**, **§36**. **§ To be decided later** = the rest (Phase B, **§6b**, **§10 / 4c**, **§12 / 4e**, **§13–16**, **§31–35**, etc.).  
-> **Ops:** **Prod Supabase** — apply **`20260603120000_leave_circle_admin_only.sql`**, **`20260604120000_get_circle_pending_invite_labels.sql`**, and earlier Circles migrations if missing (§ checklist below). **Edge** **`send-circle-invite` / `accept-circle-invite`** **1.0.2**. **Vercel** = **`main`**. **cron/MAU** → **`COMPUTE-NEIGHBORS-CRON.md`**.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**6.1.13** on **`main`** **`41870e9`**). **`git pull`**; **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless I say *code now* / *implement* / *fix* / *do it* (or clearly ask for code). **Passdown edits** on request; after those, give **“What to tell the next chat”**.  
+> **Shipped (high level):** **6.1.12–6.1.13** Indian secondary streaming list + US/IN hybrid discover; **6.1.11** secondary theatrical Google link; **6.1.9–6.1.10** main Streaming stagger; **6.1.7–6.1.8** main Streaming genres — **`CHANGELOG`**.  
+> **Backlog:** **§ Prioritized** = **§8**, **§9 / 4b**, **§17–20**, **§21–30**, **§36**. **§ To be decided later** = rest (**§6b**, **§10 / 4c**, **§12 / 4e**, **§13–16**, **§31–35**, …).  
+> **Ops:** Prod migrations if missing (**`20260603`**, **`20260604`**, … — § checklist). **Edge** invite fns **1.0.2**. **Vercel** = **`main`**. **cron/MAU** → **`COMPUTE-NEIGHBORS-CRON.md`**.
 
 (Adjust or shorten if the next task is something else.)
 
@@ -21,13 +21,13 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **6.1.6** — trust **`package.json`** / **`CHANGELOG.md`**; **Cinemastro** label = **`APP_VERSION`**. |
-| **Git** | **`main`** @ **6.1.6** (e.g. **`05262eb`**). |
-| **Supabase — apply if missing** | See **migrations checklist** below (**`20260603`**, **`20260604`**, **`20260602`**, **`20260601`**, …). |
-| **Edge** | Invite fns **1.0.2** (**6.1.4+** host = **`admin`** only). Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy. Same pattern for **`get-circle-rated-titles`**, **`compute-neighbors`**, **`match`**. |
+| **App version** | **6.1.13**; **Cinemastro** = **`APP_VERSION`**. Confirm **`CHANGELOG`**. |
+| **Git** | **`origin/main`** ≈ **`41870e9`** (Apr 2026). |
+| **Supabase — apply if missing** | See **migrations checklist** below. |
+| **Edge** | Invite fns **1.0.2** (**6.1.4+** host = **`admin`** only). Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy. |
 | **Client deploy** | **Vercel** on **`main`** push; SQL migrations **not** auto-applied. |
 
-**Where detail lives:** **`HANDOFF.md`** (architecture, PWA, watchlist, caps, circle activity, strip colors, neighbor summary). **`CHANGELOG.md`** (full release notes). **`PASSDOWN-ARCHIVE.md`** (legacy changelog trail + long **App.jsx** / **circles.js** narrative + archived **Open / follow-ups**).
+**Where detail lives:** **`HANDOFF.md`**, **`CHANGELOG.md`**, **`PASSDOWN-ARCHIVE.md`**.
 
 ---
 
@@ -37,17 +37,17 @@
 
 **When you ship product code:** bump **`package.json`** + **`CHANGELOG.md`** in the same release. **Edge:** bump **`EDGE_FUNCTION_VERSION`** + redeploy.
 
-**HANDOFF.md** — roadmap and stable reference; may lag version — trust **`package.json`** for release.
+**HANDOFF.md** — may lag version — trust **`package.json`** for release.
 
 ---
 
 ## For the assistant (every Cinematch session)
 
 1. Read **this file** early for workflow, **backlog**, **ops checklist**, **last session**.
-2. **Neighbors / MAU:** expand **`compute-neighbors`** cron coverage as users grow — **`COMPUTE-NEIGHBORS-CRON.md`**. Audit:  
+2. **Neighbors / MAU:** **`COMPUTE-NEIGHBORS-CRON.md`**. Audit:  
    `select jobname, schedule from cron.job where jobname like 'compute-neighbors-w%';`
 3. **Passdown updates:** edit **this file**; **commit + push** for remote. On **“update passdown”** / handoff: same reply must include **“What to tell the next chat”** (see **`.cursor/rules/cinematch-handoff.mdc`**).
-4. **Last note:** any handoff must merge the session’s **final** user note into **Open / follow-ups** — not only a version bump.
+4. **Last note:** merge the session’s **final** user note into **Open / follow-ups** — not only a version bump.
 5. **Backlog:** **§ Prioritized** vs **§ To be decided later** — keep them consistent when priorities shift.
 
 ---
@@ -137,7 +137,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 - **§3 / 4a — Admin hosts — *shipped 6.0.28*.** Superseded in part by **6.1.4+** **`leave_circle`**.
 - **§3b — Rated by — *shipped 6.0.29+*.**
 - **§4 — Detail Rate this / Rate more — *shipped 6.1.0+*.**
-- **§5 — Score chips — *shipped 6.1.0+*.**
+- **§5 — Score chips — *shipped 6.1.1+*.**
 - **§6 — Circle activity Phase B:** push, Realtime, Web Push.
 - **§6b — Strip `predict_cached` without detail** — deferred post-beta.
 - **§7 — Unseen activity polish.**
@@ -166,15 +166,12 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 ## Open / follow-ups
 
-**Handoff rule:** merge the prior session’s **last user note** here under **Last session** when you update this file. **Shipped truth:** **`CHANGELOG`** / **`package.json`**. Older narrative: **`PASSDOWN-ARCHIVE.md`**.
+**Handoff rule:** merge the prior session’s **last user note** here under **Last session** when you update this file. **Shipped truth:** **`CHANGELOG`** / **`package.json`**.
 
-**Last session (2026-04-26) — slim passdown**
+**Last session (2026-04-26)**
 
-- **Last note:** User asked to **implement** shrinking **`PASSDOWN-NEXT-CHAT.md`**: keep backlog + workflow + ops + last notes here; move stable product depth to **`HANDOFF.md`** § **Stable product reference**; move long changelog trail + **App.jsx**/**circles.js** narrative + archived **Open / follow-ups** to **`PASSDOWN-ARCHIVE.md`**.
-
-**Last session (2026-04-29) — backlog reorg**
-
-- User **kept** **§8, §9, §17–§20, §21–§30, §36** in **Prioritized backlog**; **moved** other former master items to **To be decided later**; **§31–§35** parked there too.
+- **Last note:** User asked to **update passdown for next chat** after **deploy** of **6.1.12–6.1.13** (**`41870e9`**). Indian secondary streaming: **`SECONDARY_INDIAN_STREAMING_SERVICES`**, **`watchRegionForIndianSecondaryProvider`** (US **8/9/15**, else **IN**), **`secondaryRegionPerServiceWatchRegion`**, copy updates (India TMDB / US theaters). Earlier same arc: **6.1.11** detail showtimes for **secondaryTheaterRows**; main Streaming stagger **6.1.9–6.1.10** (optional follow-up if “5 tiles only” persists).
+- **Passdown:** commit + push this file so **`main`** includes handoff.
 
 ---
 
