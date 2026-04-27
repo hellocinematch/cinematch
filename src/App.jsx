@@ -11495,7 +11495,8 @@ export default function App() {
           movie.type === "movie" &&
           movie.tmdbId != null &&
           (inTheaters.some((m) => m.tmdbId === movie.tmdbId) ||
-            inTheatersPopularRanked.some((m) => m.tmdbId === movie.tmdbId));
+            inTheatersPopularRanked.some((m) => m.tmdbId === movie.tmdbId) ||
+            secondaryTheaterRows.some((m) => m.tmdbId === movie.tmdbId));
         const unratedDetailRateInner = (
           <>
             <div className="d-rate-label d-rate-label--sentence">{detailRatePrimaryLabel}</div>

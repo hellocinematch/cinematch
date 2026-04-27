@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.1.11
+
+- **Detail — Where to Watch:** **Find showtimes near you (Google)** also appears for titles that appear in the **secondary region → In Theaters** strip (same behavior as primary US theaters).
+
 ## 6.1.10
 
 - **Streaming page (All services):** **Now** / **Popular** stagger completes to the full cap after **detail → back** (stagger effect no longer re-runs when the *other* of movies vs TV finishes loading).
