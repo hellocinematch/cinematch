@@ -1,5 +1,17 @@
 # Changelog
 
+## 7.0.7
+
+- **Circles list:** Same row as the circle name, show **latest other-member share** time: **today** → local time; **yesterday** → `Yesterday`; **2–6 days ago** → weekday (`Monday`, …); **older** → short date with weekday (adds year when not this year). Uses existing `latest_others_share_at` from **`get_my_circle_unseen_counts`**.
+
+## 7.0.6
+
+- **Circles list:** **New activity** badge is a solid **WhatsApp-style green** disc (`#25d366`) with **black** count text, centered in the trailing column.
+
+## 7.0.5
+
+- **Circles list:** Removed **Edit** on each card (edit stays under **Circle info**). **New activity** count moves to the **right** (former Edit slot) with a **green** pill (`#4ade80` on a green-tinted background).
+
 ## 7.0.4
 
 - **Your Picks:** **Refresh** in the **For you** header uses **gold** (`#e8c96a`), stays **12px** uppercase like other **`.section-meta`** lines, and is a proper **button** (keyboard + `aria-label`).

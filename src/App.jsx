@@ -667,6 +667,31 @@ function withinPastDays(dateString, days) {
   return ageMs >= 0 && ageMs <= days * 24 * 60 * 60 * 1000;
 }
 
+/** Circles list: “last others’ activity” line from `latest_others_share_at` (local calendar). */
+function formatCircleListLastActivity(isoOrString) {
+  if (isoOrString == null || isoOrString === "") return null;
+  const d = new Date(isoOrString);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startThat = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round((startToday - startThat) / (24 * 60 * 60 * 1000));
+  if (diffDays < 0) {
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  }
+  if (diffDays === 0) {
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  }
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays >= 2 && diffDays < 7) {
+    return d.toLocaleDateString("en-US", { weekday: "long" });
+  }
+  if (d.getFullYear() === now.getFullYear()) {
+    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+}
+
 /** US limited theatrical (TMDB release type 2): newest type-2 date within `maxDays`, or pass if no US type-2 row. */
 function passesUsTheatricalLimitedWindow(releasePayload, maxDays) {
   const usDates = Array.isArray(releasePayload?.results)
@@ -8899,12 +8924,13 @@ export default function App() {
                 })}
                 {circlesList.map((circle) => {
                   const meta = vibeMeta(circle.vibe);
-                  const isModerator = isCircleModerator(circle, user?.id);
                   const unseenN = Math.max(0, Number(circleUnseenById[circle.id]?.unseenOthers) || 0);
-                  const cardAria =
-                    unseenN > 0
-                      ? `${circle.name}, ${unseenN === 1 ? "1 new" : `${unseenN} new`} from your circle`
-                      : undefined;
+                  const lastActivityLabel = formatCircleListLastActivity(circleUnseenById[circle.id]?.latest);
+                  let cardAria = `Open ${circle.name}`;
+                  if (lastActivityLabel) cardAria += `. Last activity ${lastActivityLabel}`;
+                  if (unseenN > 0) {
+                    cardAria += `. ${unseenN === 1 ? "1 new" : `${unseenN} new`} from your circle`;
+                  }
                   return (
                     <div
                       key={circle.id}
@@ -8919,25 +8945,17 @@ export default function App() {
                         <button
                           type="button"
                           className="circle-card__open"
-                          aria-label={cardAria || `Open ${circle.name}`}
+                          aria-label={cardAria}
                           onClick={() => openCircleDetail(circle.id)}
                         >
                           <div className="circle-card__body">
                             <div className="circle-card__top">
                               <div className="circle-card__name">{circle.name}</div>
-                              <div className="circle-card__top-badges">
-                                {unseenN > 0 ? (
-                                  <div
-                                    className="circle-card__unseen"
-                                    title="New from other members"
-                                    aria-hidden="true"
-                                  >
-                                    <span className="circle-card__unseen-num">
-                                      {unseenN > 99 ? "99+" : unseenN}
-                                    </span>
-                                  </div>
-                                ) : null}
-                              </div>
+                              {lastActivityLabel ? (
+                                <span className="circle-card__last-activity" title="Latest rating shared by another member">
+                                  {lastActivityLabel}
+                                </span>
+                              ) : null}
                             </div>
                             {circle.description && (
                               <div className="circle-card__desc">{circle.description}</div>
@@ -8950,15 +8968,16 @@ export default function App() {
                             </div>
                           </div>
                         </button>
-                        {isModerator ? (
-                          <button
-                            type="button"
-                            className="circle-card__edit-pill"
-                            onClick={() => openEditCircleSheet(circle)}
-                            aria-label={`Edit ${circle.name}`}
+                        {unseenN > 0 ? (
+                          <div
+                            className="circle-card__unseen circle-card__unseen--row-trail"
+                            title="New from other members"
+                            aria-hidden="true"
                           >
-                            Edit
-                          </button>
+                            <span className="circle-card__unseen-num">
+                              {unseenN > 99 ? "99+" : unseenN}
+                            </span>
+                          </div>
                         ) : null}
                       </div>
                     </div>
