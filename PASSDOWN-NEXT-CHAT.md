@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-28 — **`package.json` at 7.0.10**. **`git pull`** **`main`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`** § stable product reference.
+**Last updated:** 2026-04-28 — **`package.json` at 7.0.10**. **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`** § stable product reference.
 
 **Recent releases (high level):** **7.x:** **`src/pages/`** extracts (**`PulsePage`**, **`InTheatersPage`**, **`SecondaryRegionPage`**); Circles stay in **`App.jsx`** for now. **7.0.4** — Your Picks **Refresh**. **7.0.5–7.0.10** — Circles list UX (**trail**, unseen badge **gold**, **DD/MM/YY** dates); **7.0.10** — **`latest_share_at`** (anyone’s share time), unseen still others-only (**RPC** **`get_my_circle_unseen_counts`** + migration **`20260605120000`**). Earlier **6.1.x** streaming / regions — **`CHANGELOG`**.
 
@@ -14,7 +14,7 @@
 >
 > **Shipped (high level):** **7.0.0–7.0.10** — **`pages/`**; Circles list (**trail**, gold unseen, **latest_share_at**, DD/MM/YY); Your Picks refresh. **Analytics DB:** **`analytics_events`**, **`watch_chain_events`**, RPCs **`log_analytics_event`** / **`log_watch_chain_event`** (migrations **`20260606120000`**, **`20260607120000`**); admin SQL under **`scripts/sql/analytics-admin/`**. Prior **6.1.x** — **`CHANGELOG`**.
 >
-> **Master list:** **`PASSDOWN-NEXT-CHAT.md`** → section **Master list (maintained)** (prioritized backlog + ops + analytics wiring + parked).
+> **Master list:** **`PASSDOWN-NEXT-CHAT.md`** → **Priority 1** = **US geo banner / residency notice**; then ops + analytics + remaining § backlog + parked.
 >
 > **Ops:** Prod migrations if missing (checklist in same file). **Edge** invite fns **1.0.2**. **Vercel** = **`main`**. **cron/MAU** → **`COMPUTE-NEIGHBORS-CRON.md`**.
 
@@ -38,6 +38,10 @@
 ## Master list (maintained)
 
 *One checklist — product, ops, analytics. § numbers reference legacy HANDOFF/passdown numbering.*
+
+### Priority 1 — US geo / availability (product)
+
+- [ ] **Geo-blocking banner or notice:** Infer location (**IP / Edge / CDN**, optional **user confirms US residency**) and show non-US users: **"Cinemastro is currently available to US users only."** Choose **warn-only (proceed at own risk)** vs **hard block** — **TBD** with Terms/privacy. *(Not implemented — discussion in chat.)*
 
 ### Repo / ops / parity
 
@@ -110,7 +114,7 @@
 
 ## For the assistant (every Cinematch session)
 
-1. Read **this file** early — prioritize **Master list (maintained)**.
+1. Read **this file** early — prioritize **Priority 1** (US geo banner) then **Master list** rest.
 2. **Neighbors / MAU:** **`COMPUTE-NEIGHBORS-CRON.md`**. Audit:  
    `select jobname, schedule from cron.job where jobname like 'compute-neighbors-w%';`
 3. **Passdown updates:** edit **this file**; **commit + push** for remote. On **“update passdown”** / handoff: same reply must include **“What to tell the next chat”** (see **`.cursor/rules/cinematch-handoff.mdc`**).
@@ -161,7 +165,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Last session (2026-04-28)**
 
-- **Last note:** User asked for a **single maintained list** in **`PASSDOWN-NEXT-CHAT.md`** — consolidated **prioritized backlog**, **ops**, **analytics DB/RPC/instrumentation**, **parked** § references, **locked** invite-email decision into **§ Master list (maintained)**; bumped snapshot to **7.0.10** and analytics migrations checklist.
+- **Last note:** User added **Priority 1:** **US geo banner / residency notice** (IP or confirm US; warn vs block TBD) at top of **Master list** — highest product priority ahead of §8 and other backlog items.
 
 ---
 
