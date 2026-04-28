@@ -8951,11 +8951,6 @@ export default function App() {
                           <div className="circle-card__body">
                             <div className="circle-card__top">
                               <div className="circle-card__name">{circle.name}</div>
-                              {lastActivityLabel ? (
-                                <span className="circle-card__last-activity" title="Latest rating shared by another member">
-                                  {lastActivityLabel}
-                                </span>
-                              ) : null}
                             </div>
                             {circle.description && (
                               <div className="circle-card__desc">{circle.description}</div>
@@ -8968,15 +8963,24 @@ export default function App() {
                             </div>
                           </div>
                         </button>
-                        {unseenN > 0 ? (
-                          <div
-                            className="circle-card__unseen circle-card__unseen--row-trail"
-                            title="New from other members"
-                            aria-hidden="true"
-                          >
-                            <span className="circle-card__unseen-num">
-                              {unseenN > 99 ? "99+" : unseenN}
-                            </span>
+                        {lastActivityLabel || unseenN > 0 ? (
+                          <div className="circle-card__trail">
+                            {lastActivityLabel ? (
+                              <span className="circle-card__last-activity" title="Latest rating shared by another member">
+                                {lastActivityLabel}
+                              </span>
+                            ) : null}
+                            {unseenN > 0 ? (
+                              <div
+                                className="circle-card__unseen"
+                                title="New from other members"
+                                aria-hidden="true"
+                              >
+                                <span className="circle-card__unseen-num">
+                                  {unseenN > 99 ? "99+" : unseenN}
+                                </span>
+                              </div>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>

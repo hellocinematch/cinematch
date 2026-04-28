@@ -1347,28 +1347,31 @@
   .circle-card__open:focus-visible { outline:2px solid var(--vibe-accent); outline-offset:3px; border-radius:8px; }
   .circle-card__tint { position:absolute; inset:0; background:radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--vibe-tint) 75%, transparent) 0%, transparent 65%); pointer-events:none; opacity:0.85; }
   .circle-card__body { position:relative; z-index:1; display:flex; flex-direction:column; gap:6px; }
-  .circle-card__top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .circle-card__top { display:flex; align-items:flex-start; justify-content:flex-start; gap:10px; }
   .circle-card__name { font-family:'DM Serif Display',serif; font-size:22px; color:#f0ebe0; line-height:1.1; flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
-  .circle-card__last-activity {
+  /** Right column: time + unseen badge — keeps timestamp aligned to card edge whether or not badge shows. */
+  .circle-card__trail {
     flex-shrink:0;
-    align-self:flex-start;
-    margin-left:10px;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:8px;
     padding-top:4px;
+  }
+  .circle-card__last-activity {
     font-family:'DM Sans',sans-serif;
     font-size:11px;
     font-weight:600;
     letter-spacing:0.04em;
     color:#8a8580;
     white-space:nowrap;
+    text-align:right;
   }
   .circle-card__crown { font-size:16px; flex-shrink:0; }
   .circle-card__activity { position:relative; display:inline-flex; align-items:center; gap:3px; padding:4px 8px 4px 6px; border-radius:999px; border:1px solid #3a3020; background:#1a1510; font-size:13px; line-height:1; }
   .circle-card__activity-ico { font-size:14px; line-height:1; }
   .circle-card__activity-count { font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; color:#e8c96a; min-width:1.1em; text-align:center; }
-  /**
-   * Circles list — unseen count: solid “chat app” style disc (WhatsApp-like green, black digit).
-   * `.circle-card__unseen--row-trail` sits in the trailing column next to the card body.
-   */
+  /** Circles list — unseen count: solid “chat app” style disc (WhatsApp-like green, black digit). Lives in `.circle-card__trail`. */
   .circle-card__unseen {
     flex-shrink:0;
     display:inline-flex;
@@ -1383,7 +1386,6 @@
     background:#25d366;
     box-shadow:0 1px 2px rgba(0,0,0,0.35);
   }
-  .circle-card__unseen--row-trail { align-self:center; margin-top:0; }
   .circle-card__unseen-num {
     font-family:'DM Sans',sans-serif;
     font-size:11px;

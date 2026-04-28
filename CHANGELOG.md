@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.8
+
+- **Circles list:** **Last activity** time sits in a **right trail column** with the **unseen** badge below it so the timestamp stays **right-aligned** with other cards (no left shift when the green badge is present).
+
 ## 7.0.7
 
 - **Circles list:** Same row as the circle name, show **latest other-member share** time: **today** → local time; **yesterday** → `Yesterday`; **2–6 days ago** → weekday (`Monday`, …); **older** → short date with weekday (adds year when not this year). Uses existing `latest_others_share_at` from **`get_my_circle_unseen_counts`**.
