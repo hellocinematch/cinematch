@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-28 — **`package.json` at 7.0.10**. **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`** § stable product reference.
+**Last updated:** 2026-04-29 — **`package.json` at 7.0.12**. **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`** § stable product reference.
 
-**Recent releases (high level):** **7.x:** **`src/pages/`** extracts (**`PulsePage`**, **`InTheatersPage`**, **`SecondaryRegionPage`**); Circles stay in **`App.jsx`** for now. **7.0.4** — Your Picks **Refresh**. **7.0.5–7.0.10** — Circles list UX (**trail**, unseen badge **gold**, **DD/MM/YY** dates); **7.0.10** — **`latest_share_at`** (anyone’s share time), unseen still others-only (**RPC** **`get_my_circle_unseen_counts`** + migration **`20260605120000`**). Earlier **6.1.x** streaming / regions — **`CHANGELOG`**.
+**Recent releases (high level):** **7.x:** **`src/pages/`** extracts (**`PulsePage`**, **`InTheatersPage`**, **`SecondaryRegionPage`**); Circles stay in **`App.jsx`**. **7.0.4** — Your Picks **Refresh**. **7.0.5–7.0.10** — Circles list UX (**trail**, gold unseen, **DD/MM/YY**, **`latest_share_at`** migration **`20260605120000`**). **7.0.11** — Legal routes **`/privacy`**, **`/terms`**, **`/about`** (+ **`vercel.json`**, Vite dev middleware). **7.0.12** — **`Policies/PRIVACY_POLICY.md`** & **`TERMS_OF_SERVICE.md`** rendered in-app (**`markdown-it`** + **`legalMarkdown.js`**). **`main`** pushed to origin (**deploy:** Vercel on **`main`**). Earlier **6.1.x** streaming / regions — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -10,13 +10,13 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.10**). **`git pull`** (latest **`main`**). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless I say *code now* / *implement* / *fix* / *do it* (or clearly ask for code). **Passdown edits** on request; after those, give **“What to tell the next chat”**.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.12**). **`git pull`** (latest **`main`** includes passdown + legal + analytics scripts commits). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless I say *code now* / *implement* / *fix* / *do it* (or clearly ask for code). **Passdown edits** on request; after those, give **“What to tell the next chat”**.
 >
-> **Shipped (high level):** **7.0.0–7.0.10** — **`pages/`**; Circles list (**trail**, gold unseen, **latest_share_at**, DD/MM/YY); Your Picks refresh. **Analytics DB:** **`analytics_events`**, **`watch_chain_events`**, RPCs **`log_analytics_event`** / **`log_watch_chain_event`** (migrations **`20260606120000`**, **`20260607120000`**); admin SQL under **`scripts/sql/analytics-admin/`**. Prior **6.1.x** — **`CHANGELOG`**.
+> **Shipped (high level):** **7.0.11–7.0.12** — Footer/legal **`/privacy`**, **`/terms`**, **`/about`**; Privacy & Terms load **`Policies/*.md`** (**`markdown-it`**). **7.0.0–7.0.10** — **`pages/`**, Circles list UX, **`latest_share_at`**. **`scripts/sql/analytics-admin/`** committed. **Analytics DB migrations** (**`20260606120000`**, **`20260607120000`**) — apply on prod **SQL side** when instrumenting; **commit migration files to repo** if still missing locally (**`git status`** **`supabase/migrations`**).
 >
-> **Master list:** **`PASSDOWN-NEXT-CHAT.md`** → **Priority 1** = **US geo banner / residency notice**; then ops + analytics + remaining § backlog + parked.
+> **Master list:** **`PASSDOWN-NEXT-CHAT.md`** → **Priority 1** = **US geo banner / residency notice**; then ops + analytics client wiring + remaining § backlog + parked.
 >
-> **Ops:** Prod migrations if missing (checklist in same file). **Edge** invite fns **1.0.2**. **Vercel** = **`main`**. **cron/MAU** → **`COMPUTE-NEIGHBORS-CRON.md`**.
+> **Ops:** Prod migrations checklist (same file). **Edge** invite fns **1.0.2**. **Vercel** = **`main`** (recent deploy includes **7.0.12**). **cron/MAU** → **`COMPUTE-NEIGHBORS-CRON.md`**.
 
 ---
 
@@ -24,11 +24,11 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **7.0.10**; **Cinemastro** = **`APP_VERSION`**. Confirm **`CHANGELOG`**. |
-| **Git** | **`main`** includes Circles **7.0.x** + **`scripts/sql/analytics-admin/`**. Ensure **`supabase/migrations/20260606120000_*`** + **`20260607120000_*`** are **committed/pushed** if not already (repo ↔ prod parity). |
-| **Supabase — apply if missing** | See **migrations checklist** below + analytics migrations above. |
-| **Analytics instrumentation** | DB + RPCs can be applied on prod; **client still must call** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** until implemented. |
-| **Edge** | Invite fns **1.0.2** (**6.1.4+** host = **`admin`** only). Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy. **`get-circle-rated-titles`** — **`git push` does not deploy** Edge. |
+| **App version** | **7.0.12**; **Cinemastro** = **`APP_VERSION`**. Confirm **`CHANGELOG`**. |
+| **Git / deploy** | **`main`** on **`origin`** includes legal (**`3991bc3`** area) + prior commits; **`git pull`** to sync. |
+| **Supabase — apply if missing** | See **migrations checklist** below. Analytics **`20260606`**/**`07`** SQL may still need **`git add`**/**commit** if only applied by hand on prod — align repo with reality. |
+| **Analytics instrumentation** | DB + RPCs on prod when migrations applied; **client** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** yet. |
+| **Edge** | Invite fns **1.0.2**. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy. **`get-circle-rated-titles`** — **`git push` does not deploy** Edge. |
 | **Client deploy** | **Vercel** on **`main`** push; SQL migrations **not** auto-applied. |
 
 **Where detail lives:** **`HANDOFF.md`**, **`CHANGELOG.md`**, **`PASSDOWN-ARCHIVE.md`**.
@@ -45,7 +45,7 @@
 
 ### Repo / ops / parity
 
-- [ ] **Git:** Confirm **`main`** has **`20260606120000_analytics_and_watch_chain_events.sql`** and **`20260607120000_log_analytics_watch_chain_rpc.sql`** committed and pushed if prod/local DB already ran them.
+- [ ] **Git:** Ensure **`supabase/migrations/20260606120000_analytics_and_watch_chain_events.sql`** and **`20260607120000_log_analytics_watch_chain_rpc.sql`** are **committed on `main`** if prod (or team) expects them in repo — fix **`git status`** drift.
 - [ ] **Prod migrations:** Apply any checklist rows still missing (below); verify **`20260605`** (**`latest_share_at`**), **`20260606`** (analytics tables), **`20260607`** (analytics RPCs) on prod when instrumenting.
 - [ ] **Neighbors / MAU:** **`COMPUTE-NEIGHBORS-CRON.md`** — audit `compute-neighbors-w*` coverage as users grow.
 
@@ -163,9 +163,9 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Handoff rule:** merge the prior session’s **last user note** here under **Last session** when you update this file. **Shipped truth:** **`CHANGELOG`** / **`package.json`**.
 
-**Last session (2026-04-28)**
+**Last session (2026-04-29)**
 
-- **Last note:** User added **Priority 1:** **US geo banner / residency notice** (IP or confirm US; warn vs block TBD) at top of **Master list** — highest product priority ahead of §8 and other backlog items.
+- **Last note:** User asked to **update passdown for next chat** after **deploy**: **`main`** pushed (**Vercel** picks up **7.0.12** — legal **`/privacy`**/**`/terms`** + **`Policies/*.md`** rendering). Reminder: **analytics** migrations (**`20260606`**/**`07`**) — confirm repo vs prod SQL; **client instrumentation** still open.
 
 ---
 
