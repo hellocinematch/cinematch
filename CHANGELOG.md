@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.12
+
+- **Legal:** **Privacy** and **Terms** screens render **`Policies/PRIVACY_POLICY.md`** and **`Policies/TERMS_OF_SERVICE.md`** via **`markdown-it`** + **`markdown-it-anchor`** (lazy chunk **`legalMarkdown.js`**). About remains inline placeholder copy.
+
 ## 7.0.11
 
 - **Legal URLs:** Footer links use **`/privacy`**, **`/terms`**, **`/about`** (SPA **`history`** matches path); legacy **`?legal=`** deep links still hydrate. **`vercel.json`** rewrites those paths to **`index.html`**; dev server middleware mirrors behavior.
