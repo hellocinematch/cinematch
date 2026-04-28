@@ -1,15 +1,15 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-26 — **`package.json` at 6.1.13**. **`git pull`** **`main`** — passdown + **6.1.12–6.1.13** streaming work shipped; **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`** § **Stable product reference**.
+**Last updated:** 2026-04-28 — **`package.json` at 7.0.8**. **`git pull`** **`main`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`** § **Stable product reference**.
 
-**Recent releases (high level):** **6.1.12–6.1.13** — Secondary Region **Indian** → Streaming: service list **JioHotstar, Sony Liv, Zee5, Sun Nxt, Eros Now** (replaces Disney+–AMC+); **hybrid `watch_region`**: **US** for Netflix / Prime / Hulu, **`IN`** for Indian OTT (fixes empty Hulu + All-services widen). **6.1.11** — Detail **Google showtimes** when title is in **secondary → In Theaters**. **6.1.9–6.1.10** — Main **Streaming** All services: stagger **sig reset** after detail; tab-scoped **ready** for stagger (user reported “stuck at 5” may still occur — revisit if needed). **6.1.7–6.1.8** — Main Streaming **genre filter** + **Genres** pill + split filter row — see **`CHANGELOG`**. **Secondary Region → Streaming** (non-Indian): still **animation-only** on provider refill default, not the four hidden genres.
+**Recent releases (high level):** **7.0.0–7.0.8** — **7.x** line: presentational **`src/pages/`** — **`PulsePage`**, **`InTheatersPage`**, **`SecondaryRegionPage`** (state/effects stay **`App.jsx`**; user preference to **keep Circles** in **`App.jsx`** for now). **7.0.4** — **Your Picks** **For you** **Refresh** = gold **`button`** + **`aria-label`**. **7.0.5–7.0.8** — **Circles list:** removed row **Edit** (edit via **Circle info**); unseen = solid **WhatsApp-style** green disc (**`#25d366`**, black digit); **last activity** from **`get_my_circle_unseen_counts`** **`latest_others_share_at`** (today → local time, **Yesterday** no time, weekday, then short date); **7.0.8** **`.circle-card__trail`** column (time above badge) so timestamp **doesn’t shift left** when unseen shows. Earlier **6.1.x** streaming / secondary Indian / stagger / genres — **`CHANGELOG`**.
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**6.1.13**). **`git pull`** (latest **`main`** includes this passdown). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless I say *code now* / *implement* / *fix* / *do it* (or clearly ask for code). **Passdown edits** on request; after those, give **“What to tell the next chat”**.  
-> **Shipped (high level):** **6.1.12–6.1.13** Indian secondary streaming list + US/IN hybrid discover; **6.1.11** secondary theatrical Google link; **6.1.9–6.1.10** main Streaming stagger; **6.1.7–6.1.8** main Streaming genres — **`CHANGELOG`**.  
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.8**). **`git pull`** (latest **`main`** includes this passdown). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless I say *code now* / *implement* / *fix* / *do it* (or clearly ask for code). **Passdown edits** on request; after those, give **“What to tell the next chat”**.  
+> **Shipped (high level):** **7.0.0–7.0.8** — **`pages/`** extracts (Pulse, In Theaters, Secondary Region); **Your Picks** refresh control; **Circles list** UX (trail + unseen + last activity). Prior **6.1.x** streaming / regions — **`CHANGELOG`**.  
 > **Backlog:** **§ Prioritized** = **§8**, **§9 / 4b**, **§17–20**, **§21–30**, **§36**. **§ To be decided later** = rest (**§6b**, **§10 / 4c**, **§12 / 4e**, **§13–16**, **§31–35**, …).  
 > **Ops:** Prod migrations if missing (**`20260603`**, **`20260604`**, … — § checklist). **Edge** invite fns **1.0.2**. **Vercel** = **`main`**. **cron/MAU** → **`COMPUTE-NEIGHBORS-CRON.md`**.
 
@@ -21,8 +21,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **6.1.13**; **Cinemastro** = **`APP_VERSION`**. Confirm **`CHANGELOG`**. |
-| **Git** | **`main`** includes passdown refresh and **6.1.12–6.1.13** (Indian secondary streaming). |
+| **App version** | **7.0.8**; **Cinemastro** = **`APP_VERSION`**. Confirm **`CHANGELOG`**. |
+| **Git** | **`main`** through **7.0.8** (page extracts, Circles list, Your Picks refresh). |
 | **Supabase — apply if missing** | See **migrations checklist** below. |
 | **Edge** | Invite fns **1.0.2** (**6.1.4+** host = **`admin`** only). Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy. |
 | **Client deploy** | **Vercel** on **`main`** push; SQL migrations **not** auto-applied. |
@@ -109,7 +109,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 21. **Code-splitting:** **`lazy()` + `Suspense`**.  
 22. **Fetch waterfalls:** shell + skeletons first.  
-23. **Split `App.jsx`:** → **`pages/*`** (**`HANDOFF.md`**).  
+23. **Split `App.jsx`:** → **`pages/*`** (**`HANDOFF.md`**). *In progress:* **`PulsePage`**, **`InTheatersPage`**, **`SecondaryRegionPage`**; **Circles** intentionally still in **`App.jsx`**.  
 24. **Caching:** Vercel CDN; optional short TTL.  
 25. **Vercel Image Optimization (optional).**  
 26. **Smaller thumbs (optional):** e.g. **`w185`**.  
@@ -168,10 +168,10 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Handoff rule:** merge the prior session’s **last user note** here under **Last session** when you update this file. **Shipped truth:** **`CHANGELOG`** / **`package.json`**.
 
-**Last session (2026-04-26)**
+**Last session (2026-04-28)**
 
-- **Last note:** User asked to **update passdown for next chat** after **deploy** of **6.1.12–6.1.13** (**`41870e9`**). Indian secondary streaming: **`SECONDARY_INDIAN_STREAMING_SERVICES`**, **`watchRegionForIndianSecondaryProvider`** (US **8/9/15**, else **IN**), **`secondaryRegionPerServiceWatchRegion`**, copy updates (India TMDB / US theaters). Earlier same arc: **6.1.11** detail showtimes for **secondaryTheaterRows**; main Streaming stagger **6.1.9–6.1.10** (optional follow-up if “5 tiles only” persists).
-- **Passdown:** committed and pushed to **`main`** with this update.
+- **Last note:** User asked to **update passdown** after **7.0.8** shipped (**`162fd29`**): Circles list **timestamp alignment** — **`.circle-card__trail`** stacks **last activity** above **unseen** disc so time stays **right-aligned** with cards that have no badge. Prior same arc: **7.0.5–7.0.7** Circles (no list **Edit**, green badge, **`formatCircleListLastActivity`**); **7.0.4** Your Picks **Refresh**; **7.0.1–7.0.3** **`src/pages/`** extracts; **7.0.0** major bump.
+- **Passdown:** this file refresh for next chat; commit + push with passdown.
 
 ---
 
