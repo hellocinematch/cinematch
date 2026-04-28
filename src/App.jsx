@@ -409,18 +409,36 @@ const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about"]);
 /** Only hydrate `?detail=` / `?legal=` after primary nav is up — avoids racing splash/auth/onboarding. */
 const SPA_DEEPLINK_READY_SCREENS = new Set(["circles", "pulse", "in-theaters", "streaming-page", "secondary-region", "your-picks", "discover", "profile", "watchlist", "rated", "mood-results"]);
 
-/** One overlay at a time: title id (`movie-769`) or legal screen id (`privacy`). */
+/** Legal routes use path URLs `/privacy`, `/terms`, `/about` (legacy `?legal=` still read on load). */
+function pathnameLegalSegment(pathname) {
+  const seg = String(pathname || "").replace(/^\/+|\/+$/g, "").split("/")[0];
+  return SPA_LEGAL_SCREENS.has(seg) ? seg : null;
+}
+
+/** One overlay at a time: title id (`movie-769`) or legal screen path `/privacy` etc. */
 function spaUrlForOverlay(overlay) {
   const u = new URL(window.location.href);
-  u.searchParams.delete(SPA_QS_DETAIL);
-  u.searchParams.delete(SPA_QS_LEGAL);
-  if (overlay.detail) u.searchParams.set(SPA_QS_DETAIL, overlay.detail);
-  else if (overlay.legal) u.searchParams.set(SPA_QS_LEGAL, overlay.legal);
+  if (overlay.detail) {
+    u.searchParams.delete(SPA_QS_DETAIL);
+    u.searchParams.delete(SPA_QS_LEGAL);
+    if (pathnameLegalSegment(u.pathname)) {
+      u.pathname = "/";
+    }
+    u.searchParams.set(SPA_QS_DETAIL, overlay.detail);
+    return `${u.pathname}${u.search}${u.hash}`;
+  }
+  if (overlay.legal) {
+    return `/${overlay.legal}${u.hash}`;
+  }
   return `${u.pathname}${u.search}${u.hash}`;
 }
 
 function spaUrlWithoutOverlays() {
   const u = new URL(window.location.href);
+  const legalSeg = pathnameLegalSegment(u.pathname);
+  if (legalSeg) {
+    u.pathname = "/";
+  }
   u.searchParams.delete(SPA_QS_DETAIL);
   u.searchParams.delete(SPA_QS_LEGAL);
   return `${u.pathname}${u.search}${u.hash}`;
@@ -7861,12 +7879,16 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- openDetail omitted (hoisted); single apply gated by ref
   }, [movieLookupById, screen]);
 
-  /** `?legal=privacy` etc. when not showing a detail link. */
+  /** `/privacy`, `/terms`, `/about`, or legacy `?legal=` when not showing a detail link. */
   useEffect(() => {
     const u = new URL(window.location.href);
     if (u.searchParams.get(SPA_QS_DETAIL)) return;
-    const legal = u.searchParams.get(SPA_QS_LEGAL);
-    if (!legal || !SPA_LEGAL_SCREENS.has(legal) || deepLinkLegalAppliedRef.current) return;
+    let legal = pathnameLegalSegment(u.pathname);
+    if (!legal) {
+      const q = u.searchParams.get(SPA_QS_LEGAL);
+      if (q && SPA_LEGAL_SCREENS.has(q)) legal = q;
+    }
+    if (!legal || deepLinkLegalAppliedRef.current) return;
     if (!SPA_DEEPLINK_READY_SCREENS.has(screen)) return;
     deepLinkLegalAppliedRef.current = true;
     legalReturnScreenRef.current = "home";

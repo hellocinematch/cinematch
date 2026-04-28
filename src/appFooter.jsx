@@ -2,24 +2,32 @@ import { LEGAL_PLACEHOLDERS } from "./legalConstants.js";
 
 export function AppFooter({ onPrivacy, onTerms, onAbout }) {
   const { entity, contactEmail, siteUrl } = LEGAL_PLACEHOLDERS;
+
+  function spaNavigate(e, fn) {
+    if (typeof fn !== "function") return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    fn();
+  }
+
   return (
     <footer className="app-footer" aria-label="Site">
       <div className="app-footer-links">
-        <button type="button" className="app-footer-link" onClick={onAbout}>
+        <a href="/about" className="app-footer-link" onClick={(e) => spaNavigate(e, onAbout)}>
           About
-        </button>
+        </a>
         <span className="app-footer-dot" aria-hidden>
           ·
         </span>
-        <button type="button" className="app-footer-link" onClick={onPrivacy}>
+        <a href="/privacy" className="app-footer-link" onClick={(e) => spaNavigate(e, onPrivacy)}>
           Privacy
-        </button>
+        </a>
         <span className="app-footer-dot" aria-hidden>
           ·
         </span>
-        <button type="button" className="app-footer-link" onClick={onTerms}>
+        <a href="/terms" className="app-footer-link" onClick={(e) => spaNavigate(e, onTerms)}>
           Terms
-        </button>
+        </a>
         <span className="app-footer-dot" aria-hidden>
           ·
         </span>

@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.11
+
+- **Legal URLs:** Footer links use **`/privacy`**, **`/terms`**, **`/about`** (SPA **`history`** matches path); legacy **`?legal=`** deep links still hydrate. **`vercel.json`** rewrites those paths to **`index.html`**; dev server middleware mirrors behavior.
+
 ## 7.0.10
 
 - **Circles list:** **Last activity** time is **latest share in the circle by anyone** (including you), WhatsApp-style. **Unseen** count is still **other members only** since **last seen**. **DB:** `get_my_circle_unseen_counts` returns **`latest_share_at`** (apply migration **`20260605120000_get_my_circle_unseen_counts_latest_share_at.sql`** on prod).
