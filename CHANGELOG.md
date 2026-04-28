@@ -1,5 +1,14 @@
 # Changelog
 
+## 7.0.10
+
+- **Circles list:** **Last activity** time is **latest share in the circle by anyone** (including you), WhatsApp-style. **Unseen** count is still **other members only** since **last seen**. **DB:** `get_my_circle_unseen_counts` returns **`latest_share_at`** (apply migration **`20260605120000_get_my_circle_unseen_counts_latest_share_at.sql`** on prod).
+
+## 7.0.9
+
+- **Circles list:** **Unseen** count badge uses **brand gold** (`--vibe-accent` / `#e8c96a`) with a **dark** numeral instead of WhatsApp green.
+- **Circles list:** **Last activity** for days before **Yesterday** is shown as **DD/MM/YY** (e.g. `28/04/26`).
+
 ## 7.0.8
 
 - **Circles list:** **Last activity** time sits in a **right trail column** with the **unseen** badge below it so the timestamp stays **right-aligned** with other cards (no left shift when the green badge is present).

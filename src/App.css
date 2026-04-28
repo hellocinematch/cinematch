@@ -1371,7 +1371,7 @@
   .circle-card__activity { position:relative; display:inline-flex; align-items:center; gap:3px; padding:4px 8px 4px 6px; border-radius:999px; border:1px solid #3a3020; background:#1a1510; font-size:13px; line-height:1; }
   .circle-card__activity-ico { font-size:14px; line-height:1; }
   .circle-card__activity-count { font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; color:#e8c96a; min-width:1.1em; text-align:center; }
-  /** Circles list — unseen count: solid “chat app” style disc (WhatsApp-like green, black digit). Lives in `.circle-card__trail`. */
+  /** Circles list — unseen count: brand gold disc (matches `--vibe-accent`), dark digit. Lives in `.circle-card__trail`. */
   .circle-card__unseen {
     flex-shrink:0;
     display:inline-flex;
@@ -1383,7 +1383,7 @@
     padding:0 5px;
     border-radius:999px;
     border:none;
-    background:#25d366;
+    background:var(--vibe-accent);
     box-shadow:0 1px 2px rgba(0,0,0,0.35);
   }
   .circle-card__unseen-num {

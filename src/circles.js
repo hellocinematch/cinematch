@@ -511,8 +511,14 @@ function normalizeCircleRatedRpcPayload(data, fallbackMsg) {
 // with created_at > last_seen. See supabase/migrations/20260527120000_circle_member_last_seen.sql
 // -------------------------------------------------------------------------------------------------
 
+function jsonRpcTimestamp(v) {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  return String(v);
+}
+
 /**
- * @returns {Promise<Array<{ circle_id: string, unseen_others: number, latest_others_share_at: string | null }>>}
+ * @returns {Promise<Array<{ circleId: string, unseenOthers: number, latestShareAt: string | null }>>}
  */
 export async function fetchMyCircleUnseenActivity() {
   const { data, error } = await supabase.rpc("get_my_circle_unseen_counts");
@@ -521,16 +527,15 @@ export async function fetchMyCircleUnseenActivity() {
   const rows = root?.rows;
   if (!Array.isArray(rows)) return [];
   return rows
-    .map((r) => ({
-      circleId: r?.circle_id,
-      unseenOthers: Number(r?.unseen_others) || 0,
-      latestOthersShareAt:
-        r?.latest_others_share_at == null
-          ? null
-          : typeof r.latest_others_share_at === "string"
-            ? r.latest_others_share_at
-            : String(r.latest_others_share_at),
-    }))
+    .map((r) => {
+      const latestAnyone = jsonRpcTimestamp(r?.latest_share_at);
+      const latestOthers = jsonRpcTimestamp(r?.latest_others_share_at);
+      return {
+        circleId: r?.circle_id,
+        unseenOthers: Number(r?.unseen_others) || 0,
+        latestShareAt: latestAnyone ?? latestOthers,
+      };
+    })
     .filter((r) => r.circleId);
 }
 

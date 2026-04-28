@@ -667,7 +667,7 @@ function withinPastDays(dateString, days) {
   return ageMs >= 0 && ageMs <= days * 24 * 60 * 60 * 1000;
 }
 
-/** Circles list: “last others’ activity” line from `latest_others_share_at` (local calendar). */
+/** Circles list: “last activity in circle” line from `latest_share_at` (any member; local calendar). */
 function formatCircleListLastActivity(isoOrString) {
   if (isoOrString == null || isoOrString === "") return null;
   const d = new Date(isoOrString);
@@ -683,13 +683,7 @@ function formatCircleListLastActivity(isoOrString) {
     return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   }
   if (diffDays === 1) return "Yesterday";
-  if (diffDays >= 2 && diffDays < 7) {
-    return d.toLocaleDateString("en-US", { weekday: "long" });
-  }
-  if (d.getFullYear() === now.getFullYear()) {
-    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  }
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
 /** US limited theatrical (TMDB release type 2): newest type-2 date within `maxDays`, or pass if no US type-2 row. */
@@ -6640,7 +6634,7 @@ export default function App() {
       const rows = await fetchMyCircleUnseenActivity();
       const next = {};
       for (const r of rows) {
-        next[r.circleId] = { unseenOthers: r.unseenOthers, latest: r.latestOthersShareAt };
+        next[r.circleId] = { unseenOthers: r.unseenOthers, latest: r.latestShareAt };
       }
       setCircleUnseenById(next);
     } catch (e) {
@@ -8966,7 +8960,7 @@ export default function App() {
                         {lastActivityLabel || unseenN > 0 ? (
                           <div className="circle-card__trail">
                             {lastActivityLabel ? (
-                              <span className="circle-card__last-activity" title="Latest rating shared by another member">
+                              <span className="circle-card__last-activity" title="Latest rating shared to this circle">
                                 {lastActivityLabel}
                               </span>
                             ) : null}
