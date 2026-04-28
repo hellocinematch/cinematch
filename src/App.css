@@ -588,9 +588,15 @@
   a.app-footer-link { display:inline; }
   .app-footer-dot { color:#444; font-size:12px; }
   .app-footer-line { font-size:11px; color:#555; text-align:center; line-height:1.5; margin-bottom:6px; }
+  .app-footer-us-notice { margin-bottom:8px; }
   .app-footer-muted { color:#444; }
-  .app-footer-tmdb { font-size:10px; color:#444; text-align:center; line-height:1.45; margin-top:10px; max-width:520px; margin-left:auto; margin-right:auto; }
-  .app-footer-tmdb a { color:#6a7a8a; }
+  .app-footer-muted a { color:#6a7a8a; }
+  .app-footer-muted a:hover { color:#8a9aaa; }
+  .app-footer-tmdb-block { margin-top:12px; max-width:520px; margin-left:auto; margin-right:auto; text-align:center; }
+  .app-footer-tmdb-text { font-size:10px; color:#444; line-height:1.45; margin:0 0 10px; }
+  .app-footer-tmdb-logo-link { display:inline-flex; align-items:center; justify-content:center; line-height:0; }
+  .app-footer-tmdb-logo-link:focus-visible { outline:2px solid #6a7a8a; outline-offset:3px; border-radius:4px; }
+  .app-footer-tmdb-logo { height:28px; width:auto; display:block; }
   .legal-shell { height:100%; min-height:0; background:#0a0a0a; padding-bottom:calc(24px + env(safe-area-inset-bottom,0px)); animation:fadeIn 0.3s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
   .legal-topbar { display:grid; grid-template-columns:minmax(0, auto) 1fr auto; align-items:center; gap:12px; padding:14px 20px; padding-top:max(14px, env(safe-area-inset-top,0px)); border-bottom:1px solid #1a1a1a; position:sticky; top:0; background:#0a0a0a; z-index:40; }
   .legal-back { background:none; border:none; color:#888; font-size:14px; cursor:pointer; font-family:'DM Sans',sans-serif; padding:6px 0; }

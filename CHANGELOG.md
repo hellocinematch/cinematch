@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.14
+
+- **Footer:** **Site** URL **`https://cinemastro.com`**; **Contact** → **`mailto:support@cinemastro.com`**. **US-only** availability notice. **TMDB** attribution uses official wordmark (**`/public/tmdb-attribution-logo.svg`**, from TMDB branding assets) linking to **themoviedb.org**; sentence updated to match API attribution wording.
+
+## 7.0.13
+
+- **Footer:** Copyright **©** (current calendar year) **Cinemastro, LLC. All rights reserved.**
+
 ## 7.0.12
 
 - **Legal:** **Privacy** and **Terms** screens render **`Policies/PRIVACY_POLICY.md`** and **`Policies/TERMS_OF_SERVICE.md`** via **`markdown-it`** + **`markdown-it-anchor`** (lazy chunk **`legalMarkdown.js`**). About remains inline placeholder copy.

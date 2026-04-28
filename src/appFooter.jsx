@@ -1,7 +1,9 @@
 import { LEGAL_PLACEHOLDERS } from "./legalConstants.js";
 
+const TMDB_SITE = "https://www.themoviedb.org/";
+
 export function AppFooter({ onPrivacy, onTerms, onAbout }) {
-  const { entity, contactEmail, siteUrl } = LEGAL_PLACEHOLDERS;
+  const { contactEmail, siteUrl } = LEGAL_PLACEHOLDERS;
 
   function spaNavigate(e, fn) {
     if (typeof fn !== "function") return;
@@ -36,26 +38,38 @@ export function AppFooter({ onPrivacy, onTerms, onAbout }) {
         </a>
       </div>
       <p className="app-footer-line">
-        © {new Date().getFullYear()} Cinemastro · {entity}
+        © {new Date().getFullYear()} Cinemastro, LLC. All rights reserved.
+      </p>
+      <p className="app-footer-line app-footer-us-notice">
+        Cinemastro is currently available to US users only.
       </p>
       <p className="app-footer-line app-footer-muted">
         Site:{" "}
         <a href={siteUrl} target="_blank" rel="noopener noreferrer">
           {siteUrl}
-        </a>{" "}
-        (placeholder)
-      </p>
-      <p className="app-footer-tmdb">
-        This product uses the{" "}
-        <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">
-          TMDB
-        </a>{" "}
-        API but is not endorsed or certified by{" "}
-        <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">
-          TMDB
         </a>
-        .
       </p>
+      <div className="app-footer-tmdb-block">
+        <p className="app-footer-tmdb-text">
+          This product uses the TMDB API but is not endorsed or certified by TMDB.
+        </p>
+        <a
+          className="app-footer-tmdb-logo-link"
+          href={TMDB_SITE}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="The Movie Database (TMDB)"
+        >
+          <img
+            className="app-footer-tmdb-logo"
+            src="/tmdb-attribution-logo.svg"
+            alt=""
+            width="74"
+            height="53"
+            decoding="async"
+          />
+        </a>
+      </div>
     </footer>
   );
 }
