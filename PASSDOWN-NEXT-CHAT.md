@@ -10,7 +10,7 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.17**). **`git pull`** — **`main`** tip **`cc8a5a3`** (docs passdown on **`ecd4f15`** app release). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.17**). **`git pull`** **`main`**. Core shipped commit **`ecd4f15`** (About / Terms TMDB / no footer). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
 > **Shipped:** **`/about`** = full **`aboutPage.jsx`** (lazy); **`AppFooter`** deleted — legal/TMDB/US lines live on **About** + Privacy/Terms. Primary nav + drawer include **About**. **Terms** markdown: §23–27 including **TMDB API Usage** (`Policies/TERMS_OF_SERVICE.md`). **`scripts/sql/analytics-admin/`** in repo. Analytics migrations **`20260606`**/**`07`** — **commit** + prod apply when ready (**often still untracked locally** — check **`git status supabase/migrations`**).
 >
@@ -25,7 +25,7 @@
 | Item | State |
 |------|--------|
 | **App version** | **7.0.17**; **Cinemastro** = **`APP_VERSION`**. Confirm **`CHANGELOG`**. |
-| **Git / deploy** | **`main`** tip **`cc8a5a3`** (passdown) / app release **`ecd4f15`** (**About** + Terms §27 + footer removal); **`git pull`** to sync. |
+| **Git / deploy** | **`git pull`** **`origin/main`** — core app release **`ecd4f15`** (**About** hub, Terms §27 TMDB, **`AppFooter`** removed); docs commits may follow on **`main`**. |
 | **Supabase — apply if missing** | See **migrations checklist** below. Analytics **`20260606`**/**`07`** SQL may still need **`git add`**/**commit** if only applied by hand on prod — align repo with reality. |
 | **Analytics instrumentation** | DB + RPCs on prod when migrations applied; **client** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** yet. |
 | **Edge** | Invite fns **1.0.2**. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy. **`get-circle-rated-titles`** — **`git push` does not deploy** Edge. |
