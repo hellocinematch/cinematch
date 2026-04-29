@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-29 — **`package.json` at 7.0.12**. **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`** § stable product reference.
+**Last updated:** 2026-04-29 — trust **`package.json` / `CHANGELOG.md`** (**7.0.17**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.x:** **`src/pages/`** extracts (**`PulsePage`**, **`InTheatersPage`**, **`SecondaryRegionPage`**); Circles stay in **`App.jsx`**. **7.0.4** — Your Picks **Refresh**. **7.0.5–7.0.10** — Circles list UX (**trail**, gold unseen, **DD/MM/YY**, **`latest_share_at`** migration **`20260605120000`**). **7.0.11** — Legal routes **`/privacy`**, **`/terms`**, **`/about`** (+ **`vercel.json`**, Vite dev middleware). **7.0.12** — **`Policies/PRIVACY_POLICY.md`** & **`TERMS_OF_SERVICE.md`** rendered in-app (**`markdown-it`** + **`legalMarkdown.js`**). **`main`** pushed to origin (**deploy:** Vercel on **`main`**). Earlier **6.1.x** streaming / regions — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.16–7.0.17** — **`aboutPage.jsx`** **`/about`** hub (logo, tagline, version, legal links, TMDB credits); **`AppFooter`** removed (single **`About`** via primary nav / hamburger); **`LegalTopBar`** exported from **`legal.jsx`**. **7.0.17** — **`Policies/TERMS_OF_SERVICE.md`** completed §23–26 + **§27 TMDB API Usage**; **Last updated** April 29, 2026. **`main`** includes **`ecd4f15`** (**deploy:** Vercel on **`main`**). **7.0.13–7.0.15** — footer copyright / site / US notice / TMDB logo / footer-vs-nav **`z-index`** (superseded by footer removal). **7.0.11–7.0.12** — **`/privacy`** **`/terms`** **`/about`** SPA + **`Policies/*.md`** via **`markdown-it`**. **7.x** **`pages/`** extracts — Circles stay in **`App.jsx`**. Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -10,13 +10,13 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.12**). **`git pull`** (latest **`main`** includes passdown + legal + analytics scripts commits). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless I say *code now* / *implement* / *fix* / *do it* (or clearly ask for code). **Passdown edits** on request; after those, give **“What to tell the next chat”**.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.17**). **`git pull`** — **`main`** tip **`ecd4f15`** (About hub + Terms TMDB §27 + footer removed). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
-> **Shipped (high level):** **7.0.11–7.0.12** — Footer/legal **`/privacy`**, **`/terms`**, **`/about`**; Privacy & Terms load **`Policies/*.md`** (**`markdown-it`**). **7.0.0–7.0.10** — **`pages/`**, Circles list UX, **`latest_share_at`**. **`scripts/sql/analytics-admin/`** committed. **Analytics DB migrations** (**`20260606120000`**, **`20260607120000`**) — apply on prod **SQL side** when instrumenting; **commit migration files to repo** if still missing locally (**`git status`** **`supabase/migrations`**).
+> **Shipped:** **`/about`** = full **`aboutPage.jsx`** (lazy); **`AppFooter`** deleted — legal/TMDB/US lines live on **About** + Privacy/Terms. Primary nav + drawer include **About**. **Terms** markdown: §23–27 including **TMDB API Usage** (`Policies/TERMS_OF_SERVICE.md`). **`scripts/sql/analytics-admin/`** in repo. Analytics migrations **`20260606`**/**`07`** — **commit** + prod apply when ready (**often still untracked locally** — check **`git status supabase/migrations`**).
 >
-> **Master list:** **`PASSDOWN-NEXT-CHAT.md`** → **Priority 1** = **US geo banner / residency notice**; **Account & data:** delete rating, delete account; then ops + analytics client wiring + remaining § backlog + parked.
+> **Master list:** **P1** US geo banner; **Account & data** — delete rating, delete account; analytics client **`log_analytics_*`**; Circles §8/§9; rest + parked in **`PASSDOWN-NEXT-CHAT.md`**.
 >
-> **Ops:** Prod migrations checklist (same file). **Edge** invite fns **1.0.2**. **Vercel** = **`main`** (recent deploy includes **7.0.12**). **cron/MAU** → **`COMPUTE-NEIGHBORS-CRON.md`**.
+> **Ops:** **`COMPUTE-NEIGHBORS-CRON.md`** when neighbors / MAU scale. **Edge** invite fns **1.0.2**. **Vercel** = **`main`** push (prod should match **`ecd4f15`** area).
 
 ---
 
@@ -24,8 +24,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **7.0.12**; **Cinemastro** = **`APP_VERSION`**. Confirm **`CHANGELOG`**. |
-| **Git / deploy** | **`main`** on **`origin`** includes legal (**`3991bc3`** area) + prior commits; **`git pull`** to sync. |
+| **App version** | **7.0.17**; **Cinemastro** = **`APP_VERSION`**. Confirm **`CHANGELOG`**. |
+| **Git / deploy** | **`main`** ≈ **`ecd4f15`** (**About** + Terms §27 + footer removal); **`git pull`** to sync. |
 | **Supabase — apply if missing** | See **migrations checklist** below. Analytics **`20260606`**/**`07`** SQL may still need **`git add`**/**commit** if only applied by hand on prod — align repo with reality. |
 | **Analytics instrumentation** | DB + RPCs on prod when migrations applied; **client** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** yet. |
 | **Edge** | Invite fns **1.0.2**. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy. **`get-circle-rated-titles`** — **`git push` does not deploy** Edge. |
@@ -170,7 +170,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Last session (2026-04-29)**
 
-- **Last note:** Added **Master list** items: **delete a rating** and **delete account** (self-service). Prior backlog: **analytics** migrations repo parity; **client** **`log_analytics_*`** wiring; **Priority 1** US geo banner.
+- **Last note:** User asked to **update passdown for next chat**. **Shipped / deployed:** **`ecd4f15`** on **`origin/main`** — **`aboutPage.jsx`** **`/about`**, **`AppFooter`** removed, nav **About**, **Terms** §27 TMDB + restored §23–26, **`PASSDOWN`** backlog (**delete rating / account**). **Open:** analytics migrations repo parity + client **`log_analytics_*`**; **P1** US geo banner; neighbors cron coverage per **`COMPUTE-NEIGHBORS-CRON.md`**.
 
 ---
 
