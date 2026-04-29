@@ -1,5 +1,3 @@
-import { AppFooter } from "../appFooter.jsx";
-
 /**
  * Secondary Region — theaters / streaming strip. Presentational only; state and effects stay in `App.jsx`.
  */
@@ -30,9 +28,6 @@ export function SecondaryRegionPage(props) {
     recNeighborCount,
     userRatings,
     startDefaultRateMore,
-    onPrivacy,
-    onTerms,
-    onAbout,
     navProps,
   } = props;
 
@@ -173,7 +168,6 @@ export function SecondaryRegionPage(props) {
           </>
         )}
       </PageShell>
-      <AppFooter onPrivacy={onPrivacy} onTerms={onTerms} onAbout={onAbout} />
       <BottomNav {...navProps} />
     </div>
   );

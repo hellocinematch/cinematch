@@ -1,5 +1,19 @@
 # Changelog
 
+## 7.0.17
+
+- **Legal:** **Terms of Use** — completed truncated sections **23–26** (electronic signatures, California notice, miscellaneous, contact); added **§27 TMDB API Usage** (TMDB obligations, restrictions, rate-limit reference). Markdown source: **`Policies/TERMS_OF_SERVICE.md`** (**Last updated April 29, 2026**).
+
+## 7.0.16
+
+- **About:** Dedicated **`/about`** screen (**`aboutPage.jsx`**) — logo, tagline **Your Personal Film Maestro**, **semver**, intro + site link; **Legal & compliance** (Privacy / Terms buttons, US-only notice, **support@cinemastro.com**); **Credits** (copyright, TMDB sentence + logo). Lazy-loaded beside Privacy/Terms.
+- **Nav:** Primary **hamburger / horizontal nav** includes **About** → opens **`/about`** (existing SPA routing).
+- **Layout:** Removed **`AppFooter`** from all main shells — legal/TMDB/US messaging lives on About; bottom chrome stays the tab bar only.
+
+## 7.0.15
+
+- **Layout:** Footer stays at the **end of page flow** (not fixed). **Bottom nav** `z-index: 50`; **footer** `position: relative` + `z-index: 10` so the bar paints **above** the footer when they overlap — scroll to bring footer links fully **above** the nav (existing scroll shells keep bottom padding for clearance).
+
 ## 7.0.14
 
 - **Footer:** **Site** URL **`https://cinemastro.com`**; **Contact** → **`mailto:support@cinemastro.com`**. **US-only** availability notice. **TMDB** attribution uses official wordmark (**`/public/tmdb-attribution-logo.svg`**, from TMDB branding assets) linking to **themoviedb.org**; sentence updated to match API attribution wording.

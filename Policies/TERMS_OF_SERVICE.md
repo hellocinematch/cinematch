@@ -1,6 +1,6 @@
 # TERMS OF USE
 
-**Last updated April 28, 2026**
+**Last updated April 29, 2026**
 
 ---
 
@@ -48,6 +48,7 @@ We recommend that you print a copy of these Legal Terms for your records.
 24. [CALIFORNIA USERS AND RESIDENTS](#24-california-users-and-residents)
 25. [MISCELLANEOUS](#25-miscellaneous)
 26. [CONTACT US](#26-contact-us)
+27. [TMDB API USAGE](#27-tmdb-api-usage)
 
 ---
 
@@ -275,4 +276,38 @@ We will maintain certain data that you transmit to the Services for the purpose 
 
 ## 23. ELECTRONIC COMMUNICATIONS, TRANSACTIONS, AND SIGNATURES
 
-Visiting the Services, sending us emails, and completing online forms constitute electronic communications. You consent to receive electronic communications, and you agree that all agreements, notices, disclosures, and other communications we provide to you electronically, via email and on the Services, satisfy any legal requirement that such communication be in writing. **YOU HEREBY AGREE TO THE USE OF ELECTRONIC SIGNATURES, CONTRACTS,
+Visiting the Services, sending us emails, and completing online forms constitute electronic communications. You consent to receive electronic communications, and you agree that all agreements, notices, disclosures, and other communications we provide to you electronically, via email and on the Services, satisfy any legal requirement that such communication be in writing. **YOU HEREBY AGREE TO THE USE OF ELECTRONIC SIGNATURES, CONTRACTS, ORDERS, AND OTHER RECORDS, AND TO ELECTRONIC DELIVERY OF NOTICES, POLICIES, AND RECORDS OF TRANSACTIONS INITIATED OR COMPLETED BY US OR VIA THE SERVICES.** You hereby waive any requirement under applicable laws or regulations in any jurisdiction that requires an original signature or delivery or retention of non-electronic records, or payments or credits by means other than electronic funds transfers.
+
+---
+
+## 24. CALIFORNIA USERS AND RESIDENTS
+
+If any complaint with us is not satisfactorily resolved, you can contact the Complaint Assistance Unit of the Division of Consumer Services of the California Department of Consumer Affairs in writing at 1625 North Market Blvd., Suite N 112, Sacramento, California 95834 or by telephone at (800) 952-5210 or (916) 445-1254.
+
+---
+
+## 25. MISCELLANEOUS
+
+These Legal Terms and any policies or operating rules posted by us on the Services constitute the entire agreement and understanding between you and us. Our failure to exercise or enforce any right or provision of these Legal Terms shall not operate as a waiver of such right or provision. If any provision of these Legal Terms is determined to be unlawful, void, or unenforceable, that provision is deemed severable from these Legal Terms and does not affect the validity and enforceability of any remaining provisions. Nothing in these Legal Terms shall be construed to create a partnership, joint venture, employment, or agency relationship between you and Cinemastro, LLC.
+
+---
+
+## 26. CONTACT US
+
+To resolve a complaint regarding the Services or to receive further information regarding use of the Services, please contact us at **support@cinemastro.com** or by mail to **1356 W Lisa Ln, Tempe, AZ 85284, United States**.
+
+---
+
+## 27. TMDB API USAGE
+
+This application uses The Movie Database (TMDB) API. By using Cinemastro, you agree to comply with [TMDB's Terms of Use](https://www.themoviedb.org/settings/api).
+
+Users and Cinemastro agree not to:
+
+- Redistribute or resell TMDB data outside Cinemastro
+- Cache TMDB data beyond permitted limits
+- Engage in bulk scraping or data mining
+- Use TMDB data for commercial purposes outside this application
+- Violate TMDB's rate limiting (40 requests/second)
+
+TMDB data is provided "as-is" under TMDB's licensing terms.

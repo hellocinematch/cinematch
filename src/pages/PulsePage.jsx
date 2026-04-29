@@ -1,5 +1,3 @@
-import { AppFooter } from "../appFooter.jsx";
-
 /**
  * Pulse — trending & popular strips. Presentational only; state and effects stay in `App.jsx`.
  */
@@ -14,9 +12,6 @@ export function PulsePage(props) {
     recNeighborCount,
     userRatings,
     startDefaultRateMore,
-    onPrivacy,
-    onTerms,
-    onAbout,
     navProps,
   } = props;
 
@@ -115,7 +110,6 @@ export function PulsePage(props) {
           </>
         )}
       </PageShell>
-      <AppFooter onPrivacy={onPrivacy} onTerms={onTerms} onAbout={onAbout} />
       <BottomNav {...navProps} />
     </div>
   );

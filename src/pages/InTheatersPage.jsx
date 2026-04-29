@@ -1,5 +1,3 @@
-import { AppFooter } from "../appFooter.jsx";
-
 /**
  * In Theaters — now playing + popular strips. Presentational only; state and effects stay in `App.jsx`.
  */
@@ -14,9 +12,6 @@ export function InTheatersPage(props) {
     recNeighborCount,
     userRatings,
     startDefaultRateMore,
-    onPrivacy,
-    onTerms,
-    onAbout,
     navProps,
   } = props;
 
@@ -100,7 +95,6 @@ export function InTheatersPage(props) {
             </div>
           )}
       </PageShell>
-      <AppFooter onPrivacy={onPrivacy} onTerms={onTerms} onAbout={onAbout} />
       <BottomNav {...navProps} />
     </div>
   );

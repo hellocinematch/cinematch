@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from "react";
 import packageJson from "../package.json";
-import { AppFooter } from "./appFooter.jsx";
 import { supabase } from "./supabase";
 import {
   CIRCLE_CAP,
@@ -46,7 +45,7 @@ import { SecondaryRegionPage } from "./pages/SecondaryRegionPage.jsx";
 
 const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
-const LegalPageAbout = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageAbout })));
+const AboutPage = lazy(() => import("./aboutPage.jsx").then((m) => ({ default: m.AboutPage })));
 
 // Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.5.0: precomputed neighbors + faster match predict; v3.4.0: detail card copy/chips refresh; v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
@@ -7729,6 +7728,7 @@ export default function App() {
     "mood-picker",
     "mood-results",
     "detail",
+    "about",
   ]);
   const menuItems = [
     { id: "circles", label: "Circles" },
@@ -7737,6 +7737,7 @@ export default function App() {
     { id: "streaming-page", label: "Streaming" },
     { id: "your-picks", label: "Your Picks" },
     { id: "watchlist", label: "Watchlist" },
+    { id: "about", label: "About" },
     ...(shouldShowSecondaryRegionPage
       ? [{ id: "secondary-region", label: V130_SECONDARY_HOME_TITLE[secondaryRegionKey] ?? "Region" }]
       : []),
@@ -7768,6 +7769,21 @@ export default function App() {
 
   function navigatePrimarySection(nextScreen) {
     clearDetailOverlayToNavigate();
+    if (nextScreen === "about") {
+      if (screen === "privacy" || screen === "terms") {
+        history.replaceState({ cinemastroLegal: true }, "", spaUrlForOverlay({ legal: "about" }));
+        legalHistoryPushedRef.current = true;
+        setScreen("about");
+      } else if (screen !== "about") {
+        openLegalPage("about");
+      }
+      return;
+    }
+    if (screen === "privacy" || screen === "terms" || screen === "about") {
+      history.replaceState(null, "", spaUrlWithoutOverlays());
+      legalHistoryPushedRef.current = false;
+      legalReturnScreenRef.current = null;
+    }
     if (nextScreen === "pulse") {
       setNavTab("home");
       setScreen("pulse");
@@ -9012,11 +9028,6 @@ export default function App() {
               </div>
             )}
           </div>
-          <AppFooter
-            onPrivacy={() => openLegalPage("privacy")}
-            onTerms={() => openLegalPage("terms")}
-            onAbout={() => openLegalPage("about")}
-          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -10347,9 +10358,6 @@ export default function App() {
           recNeighborCount={recNeighborCount}
           userRatings={userRatings}
           startDefaultRateMore={startDefaultRateMore}
-          onPrivacy={() => openLegalPage("privacy")}
-          onTerms={() => openLegalPage("terms")}
-          onAbout={() => openLegalPage("about")}
           navProps={navProps}
         />
       )}
@@ -10368,9 +10376,6 @@ export default function App() {
           recNeighborCount={recNeighborCount}
           userRatings={userRatings}
           startDefaultRateMore={startDefaultRateMore}
-          onPrivacy={() => openLegalPage("privacy")}
-          onTerms={() => openLegalPage("terms")}
-          onAbout={() => openLegalPage("about")}
           navProps={navProps}
         />
       )}
@@ -10507,11 +10512,6 @@ export default function App() {
                 </div>
               )}
           </PageShell>
-          <AppFooter
-            onPrivacy={() => openLegalPage("privacy")}
-            onTerms={() => openLegalPage("terms")}
-            onAbout={() => openLegalPage("about")}
-          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -10631,11 +10631,6 @@ export default function App() {
               </div>
             )}
           </PageShell>
-          <AppFooter
-            onPrivacy={() => openLegalPage("privacy")}
-            onTerms={() => openLegalPage("terms")}
-            onAbout={() => openLegalPage("about")}
-          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -10675,9 +10670,6 @@ export default function App() {
           recNeighborCount={recNeighborCount}
           userRatings={userRatings}
           startDefaultRateMore={startDefaultRateMore}
-          onPrivacy={() => openLegalPage("privacy")}
-          onTerms={() => openLegalPage("terms")}
-          onAbout={() => openLegalPage("about")}
           navProps={navProps}
         />
       )}
@@ -10827,11 +10819,6 @@ export default function App() {
               })}
             </div>
           )}
-          <AppFooter
-            onPrivacy={() => openLegalPage("privacy")}
-            onTerms={() => openLegalPage("terms")}
-            onAbout={() => openLegalPage("about")}
-          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -10870,11 +10857,6 @@ export default function App() {
               Skip this card
             </button>
           </div>
-          <AppFooter
-            onPrivacy={() => openLegalPage("privacy")}
-            onTerms={() => openLegalPage("terms")}
-            onAbout={() => openLegalPage("about")}
-          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -10953,11 +10935,6 @@ export default function App() {
               ))}
             </div>
           )}
-          <AppFooter
-            onPrivacy={() => openLegalPage("privacy")}
-            onTerms={() => openLegalPage("terms")}
-            onAbout={() => openLegalPage("about")}
-          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -11027,11 +11004,6 @@ export default function App() {
               )}
             </>
           )}
-          <AppFooter
-            onPrivacy={() => openLegalPage("privacy")}
-            onTerms={() => openLegalPage("terms")}
-            onAbout={() => openLegalPage("about")}
-          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -11165,11 +11137,6 @@ export default function App() {
             </div>
             <div className="profile-app-version">Cinemastro v{APP_VERSION}</div>
           </div>
-          <AppFooter
-            onPrivacy={() => openLegalPage("privacy")}
-            onTerms={() => openLegalPage("terms")}
-            onAbout={() => openLegalPage("about")}
-          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -11299,11 +11266,6 @@ export default function App() {
               </div>
             )}
           </div>
-          <AppFooter
-            onPrivacy={() => openLegalPage("privacy")}
-            onTerms={() => openLegalPage("terms")}
-            onAbout={() => openLegalPage("about")}
-          />
           <BottomNav {...navProps} />
         </div>
       )}
@@ -11320,7 +11282,12 @@ export default function App() {
       )}
       {screen === "about" && (
         <Suspense fallback={<LegalLazyFallback />}>
-          <LegalPageAbout onBack={closeLegalPage} />
+          <AboutPage
+            appVersion={APP_VERSION}
+            onBack={closeLegalPage}
+            onPrivacy={() => openLegalPage("privacy")}
+            onTerms={() => openLegalPage("terms")}
+          />
         </Suspense>
       )}
 

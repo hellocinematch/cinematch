@@ -14,7 +14,7 @@
 >
 > **Shipped (high level):** **7.0.11–7.0.12** — Footer/legal **`/privacy`**, **`/terms`**, **`/about`**; Privacy & Terms load **`Policies/*.md`** (**`markdown-it`**). **7.0.0–7.0.10** — **`pages/`**, Circles list UX, **`latest_share_at`**. **`scripts/sql/analytics-admin/`** committed. **Analytics DB migrations** (**`20260606120000`**, **`20260607120000`**) — apply on prod **SQL side** when instrumenting; **commit migration files to repo** if still missing locally (**`git status`** **`supabase/migrations`**).
 >
-> **Master list:** **`PASSDOWN-NEXT-CHAT.md`** → **Priority 1** = **US geo banner / residency notice**; then ops + analytics client wiring + remaining § backlog + parked.
+> **Master list:** **`PASSDOWN-NEXT-CHAT.md`** → **Priority 1** = **US geo banner / residency notice**; **Account & data:** delete rating, delete account; then ops + analytics client wiring + remaining § backlog + parked.
 >
 > **Ops:** Prod migrations checklist (same file). **Edge** invite fns **1.0.2**. **Vercel** = **`main`** (recent deploy includes **7.0.12**). **cron/MAU** → **`COMPUTE-NEIGHBORS-CRON.md`**.
 
@@ -67,6 +67,11 @@
 - **§17 — Watchlist:** Show **circle name** via **`source_circle_id`** (partial today).
 - **§18 — Invite → non-user email:** Full path beyond copy-to-mail — **TBD**.
 - **§19 — Bayesian normalization:** **TBD**.
+
+**Account & data**
+
+- [ ] **Delete a rating:** User-facing control to remove a title rating (detail / scores UX); define cascade (**circles**, **`rating_circle_shares`**, neighbors / predictions recompute, analytics — **TBD**).
+- [ ] **Delete account:** Self-service account deletion (**Supabase Auth** + rows cleanup / retention); align copy with **Privacy** and legal.
 
 **Security**
 
@@ -165,7 +170,7 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Last session (2026-04-29)**
 
-- **Last note:** User asked to **update passdown for next chat** after **deploy**: **`main`** pushed (**Vercel** picks up **7.0.12** — legal **`/privacy`**/**`/terms`** + **`Policies/*.md`** rendering). Reminder: **analytics** migrations (**`20260606`**/**`07`**) — confirm repo vs prod SQL; **client instrumentation** still open.
+- **Last note:** Added **Master list** items: **delete a rating** and **delete account** (self-service). Prior backlog: **analytics** migrations repo parity; **client** **`log_analytics_*`** wiring; **Priority 1** US geo banner.
 
 ---
 
