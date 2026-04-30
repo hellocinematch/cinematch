@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-29 — trust **`package.json` / `CHANGELOG.md`** (**7.0.18**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** **and** **`staging`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-04-29 — trust **`package.json` / `CHANGELOG.md`** (**7.0.20**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** **and** **`staging`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.18** — public **Beta** labeling: nav pill (**`product-beta-pill`**), **About** / **Profile** version lines; **`index.html`** title + **`application-name`**; **`site.webmanifest`** display **name**; toggle **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`** for GA. App release commit **`34c645d`** ( **`main`** may have docs-only commits after). **7.0.16–7.0.17** — **`aboutPage.jsx`** **`/about`** hub; **`AppFooter`** removed; **Terms** §23–27 incl. **TMDB API Usage**. Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.20** — Circles **copy-to-mail** invite URL: **`getCopyToMailCinemastroSiteUrl()`** (**`VITE_PUBLIC_SITE_URL`** or **`window.location.origin`** or **`https://www.cinemastro.com/`**); drops hardcoded nine-sigma. **7.0.19** — Edge **`compute-neighbors` `1.0.1`** stable **`profiles`** pagination. **7.0.18** — **Beta** labeling (**`34c645d`**). Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -10,7 +10,7 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.18**). **`git pull`** **`origin/main`** **and** **`origin/staging`**. **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.20**). **`git pull`** **`origin/main`** **and** **`origin/staging`**. **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
 > **Git / Vercel:** **`staging`** branch → **staging** Vercel project (Production branch **`staging`**, e.g. nine-sigma **`*.vercel.app`**). **`main`** → **prod** Vercel (**`www.cinemastro.com`**). Ship **staging**: push commits to **`staging`**. Ship **prod**: merge **`staging` → `main`** then push **`main`** (or PR).
 >
@@ -20,7 +20,7 @@
 >
 > **Master list:** **P1** US geo banner; **Account & data** — delete rating / account; analytics **`log_analytics_*`** wire; Circles §8/§9; rest in **`PASSDOWN-NEXT-CHAT.md`**.
 >
-> **Ops:** **`COMPUTE-NEIGHBORS-CRON.md`** — **`jobs × limit`** vs MAU. **Edge** invite **1.0.2**. **`git push` does not deploy** Edge — **`supabase functions deploy`** per **`HANDOFF.md`** project ref.
+> **Ops:** **`COMPUTE-NEIGHBORS-CRON.md`** — **`jobs × limit`** vs MAU. **Edge** invite **1.0.2**; **`compute-neighbors` `1.0.1`** (redeploy both envs after pull). **`git push` does not deploy** Edge — **`supabase functions deploy`** per **`HANDOFF.md`** project ref.
 
 ---
 
@@ -28,11 +28,11 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **7.0.18**; **Beta** toggle **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**. Confirm **`CHANGELOG`**. |
-| **Git / Vercel** | **`staging`** branch → **staging** site (Vercel Production branch **`staging`**). **`main`** → **prod** (**`www.cinemastro.com`**). **`7.0.18`** shipped from app commit **`34c645d`** ( **`git pull`** **`origin/main`** for any docs-only follow-ups). **`git pull`** both **`main`** and **`staging`** when switching machines. |
+| **App version** | **7.0.20**; **Beta** toggle **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**. Confirm **`CHANGELOG`**. |
+| **Git / Vercel** | **`staging`** branch → **staging** site (Vercel Production branch **`staging`**). **`main`** → **prod** (**`www.cinemastro.com`**). **`7.0.18`** app tip **`34c645d`**; **7.0.19** Edge neighbor pagination; **7.0.20** copy-to-mail URL — **`git pull`** **`origin/main`**. **`git pull`** both **`main`** and **`staging`** when switching machines. |
 | **Supabase — apply if missing** | See **migrations checklist** below. Analytics **`20260606`**/**`07`** may still need **`git add`**/**commit** — align repo; apply per env (**staging** vs **prod**). |
 | **Analytics instrumentation** | DB + RPCs when migrations applied; **client** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** yet. |
-| **Edge** | Invite fns **1.0.2**. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy **per Supabase project** (**staging** vs **prod**). |
+| **Edge** | **`compute-neighbors` `1.0.1`** — verify JSON **`edge.version`** after deploy. Invite fns **1.0.2**. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy **per Supabase project** (**staging** vs **prod**). |
 | **Client deploy** | **Vercel** builds from Git branch per project; SQL migrations **not** auto-applied. |
 
 **Where detail lives:** **`HANDOFF.md`**, **`CHANGELOG.md`**, **`PASSDOWN-ARCHIVE.md`**.
@@ -175,8 +175,8 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Last session (2026-04-29)**
 
-- **Last note:** User asked to **update passdown** after **merge `staging` → `main`** and prod ship. **Shipped:** **`7.0.18`** **Beta** labeling (**`34c645d`** on **`main`**/**`staging`**); **`staging`**/**`main`** workflow + dual Vercel (staging branch vs **`www.cinemastro.com`** prod); prod Supabase/Vault/Edge/cron/domain work completed this arc (verify cron waves vs MAU). **GA:** set **`PUBLIC_BETA_LABEL`** **`false`** and revert **`index.html`** / **`site.webmanifest`** names if dropping Beta from tab/install title.
-- **Prior:** **`ecd4f15`** era — About hub, Terms TMDB, no footer. **Open:** analytics migrations **git parity** + client **`log_analytics_*`**; **P1** US geo banner; **`COMPUTE-NEIGHBORS-CRON.md`** coverage as users grow; Account delete rating/account backlog.
+- **Last note:** **`code now`** — **7.0.20** Circles **copy-to-mail**: replaced hardcoded nine-sigma with **`getCopyToMailCinemastroSiteUrl()`** (`**`VITE_PUBLIC_SITE_URL`**` / **`window.location.origin`** / **`https://www.cinemastro.com/`**). Ship via **`staging` → `main`** + Vercel. Optional: set **`VITE_PUBLIC_SITE_URL`** on Vercel if origin must differ from the host (e.g. custom domain quirks).
+- **Prior:** **`compute-neighbors` `1.0.1`** + cron **`limit:10`**. **Open:** analytics migrations **git parity** + client **`log_analytics_*`**; **P1** US geo banner; **`COMPUTE-NEIGHBORS-CRON.md`** coverage; Account delete rating/account backlog.
 
 ---
 

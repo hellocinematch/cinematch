@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.20
+
+- **Circles:** Non-user **copy-to-mail** invite link no longer hardcodes the old staging host. **`getCopyToMailCinemastroSiteUrl()`** uses **`VITE_PUBLIC_SITE_URL`** if set, else the current **`window.location.origin`** (so prod vs staging Vercel URLs match the app), else **`https://www.cinemastro.com/`**.
+
+## 7.0.19
+
+- **Edge (`compute-neighbors` 1.0.1):** **`fetchAllRealUserIds`** now pages **`profiles`** with **`.order("id")`** so **`mode: "all"`** `totalEligible` matches DB reality (unordered PostgREST ranges could skip/overlap rows). **`isSeedSubject`** / in-loop checks treat **null `name`** like non-seed (aligns with SQL `coalesce`).
+
 ## 7.0.18
 
 - **Product:** Public **Beta** labeling — gold pill next to the header wordmark; **About** and **Profile** version lines; **`index.html`** title / **`application-name`**; PWA **`site.webmanifest`** name. Toggle via **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`** for GA.

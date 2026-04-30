@@ -9,7 +9,7 @@ const corsHeaders: Record<string, string> = {
 
 /** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
 const EDGE_FUNCTION_SLUG = "compute-neighbors";
-const EDGE_FUNCTION_VERSION = "1.0.0";
+const EDGE_FUNCTION_VERSION = "1.0.1";
 
 /** Profiles whose `name` starts with this (case-insensitive) are not subjects; they may still be neighbors. */
 const SEED_PREFIX = "seed";
@@ -110,12 +110,13 @@ async function fetchAllRealUserIds(admin: SupabaseClient): Promise<string[]> {
     const { data, error } = await admin
       .from("profiles")
       .select("id, name")
+      .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) throw error;
     if (!data?.length) break;
     for (const row of data) {
       const name = row.name as string | null | undefined;
-      if (!name?.toLowerCase().startsWith(SEED_PREFIX)) {
+      if (!(name ?? "").toLowerCase().startsWith(SEED_PREFIX)) {
         ids.push(row.id as string);
       }
     }
@@ -208,7 +209,7 @@ async function isSeedSubject(admin: SupabaseClient, userId: string): Promise<boo
     .maybeSingle();
   if (error) throw error;
   const name = data?.name as string | null | undefined;
-  return Boolean(name?.toLowerCase().startsWith(SEED_PREFIX));
+  return (name ?? "").toLowerCase().startsWith(SEED_PREFIX);
 }
 
 async function cleanupStagingRun(admin: SupabaseClient, runId: string): Promise<void> {

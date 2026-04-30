@@ -420,8 +420,23 @@ export async function sendCircleInvite({ circleId, invitedEmail }) {
 // Copy-to-mail — non-user circle invite (master backlog item 2; no server-sent email in this path).
 // -------------------------------------------------------------------------------------------------
 
-/** App URL for the prefilled “download Cinemastro” line (production web; swap if deploy host changes). */
-export const COPY_TO_MAIL_CINEMASTRO_URL = "https://cinematch-nine-sigma.vercel.app/";
+/**
+ * Public web URL for the “download Cinemastro” line in copy-to-mail invites.
+ * Order: **`VITE_PUBLIC_SITE_URL`** (Vercel / build), else **`window.location.origin`** (matches staging vs prod),
+ * else **`https://www.cinemastro.com/`** (SSR / tests).
+ */
+export function getCopyToMailCinemastroSiteUrl() {
+  const fromEnv = import.meta.env.VITE_PUBLIC_SITE_URL;
+  if (typeof fromEnv === "string") {
+    const t = fromEnv.trim();
+    if (t) return t.endsWith("/") ? t : `${t}/`;
+  }
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const o = window.location.origin.trim();
+    if (o) return `${o}/`;
+  }
+  return "https://www.cinemastro.com/";
+}
 
 /** `send-circle-invite` 404 when `resolve_profile_id_by_email` is empty; UI offers copy-to-mail. */
 export const INVITE_NO_CINEMASTRO_ACCOUNT_ERR_PREFIX = "No Cinemastro account found for that email";
@@ -446,7 +461,7 @@ Your circle gets:
 Start with a few ratings of movies you actually love. That's it. The magic happens from there.
 
 DOWNLOAD CINEMASTRO
-${COPY_TO_MAIL_CINEMASTRO_URL}
+${getCopyToMailCinemastroSiteUrl()}
 
 Great taste is better shared — especially when it's this easy.`;
   const fullText = `Subject: ${subject}\n\n${body}`;
