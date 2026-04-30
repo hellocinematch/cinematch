@@ -43,6 +43,7 @@ import "./App.css";
 import { PulsePage } from "./pages/PulsePage.jsx";
 import { InTheatersPage } from "./pages/InTheatersPage.jsx";
 import { SecondaryRegionPage } from "./pages/SecondaryRegionPage.jsx";
+import { PostOnboardingHelpTour, HelpFullPage } from "./helpPage.jsx";
 
 const LegalPagePrivacy = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPagePrivacy })));
 const LegalPageTerms = lazy(() => import("./legal.jsx").then((m) => ({ default: m.LegalPageTerms })));
@@ -405,7 +406,7 @@ function toYourPicksStripRows(recs, cfRecommendationIdSet) {
 // We use short query keys; `popstate` still drives closing detail/legal.
 const SPA_QS_DETAIL = "detail";
 const SPA_QS_LEGAL = "legal";
-const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about"]);
+const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about", "help"]);
 /** Only hydrate `?detail=` / `?legal=` after primary nav is up — avoids racing splash/auth/onboarding. */
 const SPA_DEEPLINK_READY_SCREENS = new Set(["circles", "pulse", "in-theaters", "streaming-page", "secondary-region", "your-picks", "discover", "profile", "watchlist", "rated", "mood-results"]);
 
@@ -1977,6 +1978,7 @@ function BottomNav({
   setMoodResults,
   onSignOut,
   clearDetailForBottomNav,
+  onOpenHelp,
 }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileNavRef = useRef(null);
@@ -2062,6 +2064,19 @@ function BottomNav({
             >
               Profile
             </button>
+            {typeof onOpenHelp === "function" ? (
+              <button
+                type="button"
+                className="avatar-menu-btn"
+                onClick={() => {
+                  clearDetailForBottomNav?.();
+                  setProfileMenuOpen(false);
+                  onOpenHelp();
+                }}
+              >
+                Help
+              </button>
+            ) : null}
             <button
               type="button"
               className="avatar-menu-btn danger"
@@ -3312,6 +3327,9 @@ export default function App() {
   const [secondaryStripReady, setSecondaryStripReady] = useState(true);
   /** Public marketing counts (RPC). Undefined until first successful fetch. */
   const [siteStats, setSiteStats] = useState(null);
+  /** One-time post-onboarding carousel (Circles + Secondary region). */
+  const [postOnboardingHelpOpen, setPostOnboardingHelpOpen] = useState(false);
+  const [postOnboardingHelpStep, setPostOnboardingHelpStep] = useState(1);
   /** v3.1.0: `movie-${tmdbId}` → `{ avgScore, ratingCount }` from `get_cinemastro_title_avgs` (badges prefer over TMDB). */
   const [cinemastroAvgByKey, setCinemastroAvgByKey] = useState({});
   /** Latest title keys for Cinemastro batch RPC (read when debounced fetch runs, not when effect first fires). */
@@ -3329,6 +3347,8 @@ export default function App() {
   const detailHistoryPushedRef = useRef(false);
   const legalReturnScreenRef = useRef(null);
   const legalHistoryPushedRef = useRef(false);
+  /** Prevents flashing the Circles tour repeatedly across effect re-runs in the same session. */
+  const offeredPostOnboardingHelpRef = useRef(false);
   /** True after we applied `?detail=` from the address bar (no extra pushState). */
   const deepLinkDetailAppliedRef = useRef(false);
   const deepLinkLegalAppliedRef = useRef(false);
@@ -4876,6 +4896,30 @@ export default function App() {
   }, [screen, catalogue, user, catalogueBootstrapDone]);
 
   useEffect(() => {
+    if (!user) {
+      offeredPostOnboardingHelpRef.current = false;
+      setPostOnboardingHelpOpen(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const meta = user.user_metadata ?? {};
+    const helpSeen = meta.help_post_onboarding_seen === true || meta.help_post_onboarding_seen === "true";
+    if (helpSeen) return;
+    const onboardingDone =
+      meta.onboarding_complete === true ||
+      meta.onboarding_complete === "true" ||
+      Object.keys(userRatings).length > 0;
+    if (!onboardingDone) return;
+    if (screen !== "circles") return;
+    if (offeredPostOnboardingHelpRef.current) return;
+    offeredPostOnboardingHelpRef.current = true;
+    setPostOnboardingHelpStep(1);
+    setPostOnboardingHelpOpen(true);
+  }, [user, screen, userRatings]);
+
+  useEffect(() => {
     if (screen !== "loading-catalogue") {
       setLoadingCatalogueSlowHint(false);
       return;
@@ -5085,6 +5129,18 @@ export default function App() {
       if (u) setUser(u);
     } catch (e) {
       console.warn("Could not persist onboarding flag:", e);
+    }
+  }
+
+  async function markPostOnboardingHelpSeen() {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.auth.updateUser({ data: { help_post_onboarding_seen: true } });
+      if (error) console.warn("Could not persist help tour flag:", error.message);
+      const u = data?.user;
+      if (u) setUser(u);
+    } catch (e) {
+      console.warn("Could not persist help tour flag:", e);
     }
   }
 
@@ -6635,6 +6691,16 @@ export default function App() {
     setScreen(ret ?? "circles");
   }
 
+  async function dismissPostOnboardingHelpTour() {
+    await markPostOnboardingHelpSeen();
+    setPostOnboardingHelpOpen(false);
+  }
+
+  async function openFullHelpFromPostOnboardingTour() {
+    await dismissPostOnboardingHelpTour();
+    openLegalPage("help");
+  }
+
   /** v4.0.8: Landing surface is now Circles; "home" as a screen has been retired. `navTab === "home"`
    *  stays as the idle bottom-nav sentinel (i.e. neither Mood nor Profile is active). */
   function goHome() {
@@ -7742,6 +7808,7 @@ export default function App() {
     "mood-results",
     "detail",
     "about",
+    "help",
   ]);
   const menuItems = [
     { id: "circles", label: "Circles" },
@@ -7783,7 +7850,7 @@ export default function App() {
   function navigatePrimarySection(nextScreen) {
     clearDetailOverlayToNavigate();
     if (nextScreen === "about") {
-      if (screen === "privacy" || screen === "terms") {
+      if (screen === "privacy" || screen === "terms" || screen === "help") {
         history.replaceState({ cinemastroLegal: true }, "", spaUrlForOverlay({ legal: "about" }));
         legalHistoryPushedRef.current = true;
         setScreen("about");
@@ -7792,7 +7859,7 @@ export default function App() {
       }
       return;
     }
-    if (screen === "privacy" || screen === "terms" || screen === "about") {
+    if (screen === "privacy" || screen === "terms" || screen === "about" || screen === "help") {
       history.replaceState(null, "", spaUrlWithoutOverlays());
       legalHistoryPushedRef.current = false;
       legalReturnScreenRef.current = null;
@@ -7920,7 +7987,7 @@ export default function App() {
     if (!legal || deepLinkLegalAppliedRef.current) return;
     if (!SPA_DEEPLINK_READY_SCREENS.has(screen)) return;
     deepLinkLegalAppliedRef.current = true;
-    legalReturnScreenRef.current = "home";
+    legalReturnScreenRef.current = "circles";
     legalHistoryPushedRef.current = false;
     setScreen(legal);
   }, [screen]);
@@ -8543,6 +8610,7 @@ export default function App() {
     setMoodResults,
     onSignOut: handleSignOut,
     clearDetailForBottomNav: clearDetailOverlayToNavigate,
+    onOpenHelp: () => openLegalPage("help"),
   };
 
   function AccountAvatarMenu() {
@@ -8569,6 +8637,16 @@ export default function App() {
               }}
             >
               Profile
+            </button>
+            <button
+              type="button"
+              className="avatar-menu-btn"
+              onClick={() => {
+                setShowAvatarMenu(false);
+                openLegalPage("help");
+              }}
+            >
+              Help
             </button>
             <button
               type="button"
@@ -11309,9 +11387,11 @@ export default function App() {
             onBack={closeLegalPage}
             onPrivacy={() => openLegalPage("privacy")}
             onTerms={() => openLegalPage("terms")}
+            onHelp={() => openLegalPage("help")}
           />
         </Suspense>
       )}
+      {screen === "help" && <HelpFullPage onBack={closeLegalPage} />}
 
       {/* DETAIL */}
       {screen === "detail" && selectedMovie && (() => {
@@ -11616,6 +11696,15 @@ export default function App() {
         );
         })()}
       </div>
+      {postOnboardingHelpOpen && user ? (
+        <PostOnboardingHelpTour
+          step={postOnboardingHelpStep}
+          onStepChange={(n) => setPostOnboardingHelpStep(n)}
+          onSkip={() => { void dismissPostOnboardingHelpTour(); }}
+          onFullHelp={() => { void openFullHelpFromPostOnboardingTour(); }}
+          onFinish={() => { void dismissPostOnboardingHelpTour(); }}
+        />
+      ) : null}
     </div>
   );
 }

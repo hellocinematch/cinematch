@@ -1,5 +1,18 @@
 # Changelog
 
+## 7.0.23
+
+- **Help tour:** Show the three-card Circles / Secondary-region tour whenever **`help_post_onboarding_seen`** is missing and the account has **finished onboarding** (metadata flag or any saved ratings), on first **Circles** landing — including **returning logins** (**reverts 7.0.22’s session-only gate**).
+
+## 7.0.22
+
+- **Help tour:** Post-onboarding cards no longer open for **returning logins** that simply lack `help_post_onboarding_seen`. The tour is **queued only when onboarding is completed in-session** (finishing the onboarding / “rate more” funnel without a prediction-specific context), then shown on the next **Circles** landing.
+
+## 7.0.21
+
+- **Help:** One-time **post-onboarding tour** (three cards: Circles ×2, Secondary region) opens on **Circles** when onboarding is finished and **`help_post_onboarding_seen`** is unset (persisted on dismiss/skip/full help via **`supabase.auth.updateUser`**). Returning users stay eligible until marked.
+- **Help:** **`/help`** screen — **Help & how to use** with sections (Pulse, In theaters, Streaming, Secondary region, Watchlist, Your picks & Discover, Circles, Profile), **ratings colors** swatches, strip-badge notes. Linked from **About**, **Profile → Help** (avatar and bottom-nav menus), and the tour.
+
 ## 7.0.20
 
 - **Circles:** Non-user **copy-to-mail** invite link no longer hardcodes the old staging host. **`getCopyToMailCinemastroSiteUrl()`** uses **`VITE_PUBLIC_SITE_URL`** if set, else the current **`window.location.origin`** (so prod vs staging Vercel URLs match the app), else **`https://www.cinemastro.com/`**.

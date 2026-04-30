@@ -8,7 +8,7 @@ const TMDB_SITE = "https://www.themoviedb.org/";
  * About Cinemastro — app metadata, legal entry points, third‑party attribution.
  * Loaded lazily from `App.jsx`.
  */
-export function AboutPage({ onBack, onPrivacy, onTerms, appVersion }) {
+export function AboutPage({ onBack, onPrivacy, onTerms, onHelp, appVersion }) {
   const { contactEmail, siteUrl } = LEGAL_PLACEHOLDERS;
   const year = new Date().getFullYear();
 
@@ -52,6 +52,13 @@ export function AboutPage({ onBack, onPrivacy, onTerms, appVersion }) {
             Cinemastro is currently available to US users only.
           </p>
           <ul className="about-link-list">
+            {typeof onHelp === "function" ? (
+              <li>
+                <button type="button" className="about-inline-link" onClick={onHelp}>
+                  Help &amp; how to use
+                </button>
+              </li>
+            ) : null}
             <li>
               <button type="button" className="about-inline-link" onClick={onPrivacy}>
                 Privacy Policy
