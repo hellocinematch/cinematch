@@ -1,5 +1,21 @@
 # Changelog
 
+## 7.0.28
+
+- **Performance — circles (step 4):** **All** / **Top** grids use merged session cache + background reconcile (`peekCircleGridMergedCache`, `setCircleGridMergedCache`, `invalidateCircleGridCaches`); instant paint when revisiting tabs; **`fingerprintRecentStripPayload`** gates **`setCircles*`** updates; **`CIRCLE_GRID_MERGED_RECACHE_MAX`** (**80**) caps silent All prefetch width. **`invalidateCircleRecentStripCache`** + grid invalidation run when **`circleRatedRefreshKey`** bumps. See **`docs/PERFORMANCE-CIRCLE-CACHE.md`**.
+
+## 7.0.27
+
+- **Performance — circles (step 3):** **`fetchMyCircles`** runs **silent** when returning to **`screen === "circles"`** (no list loading spinner once already loaded); responses are discarded if a **newer** fetch started (**nonce ref**); **`setCirclesList`** only when **`fingerprintMyCirclesList`** changes (**`src/myCirclesListFingerprint.js`**). Initial sign-in load remains a normal foreground refresh. See **`docs/PERFORMANCE-CIRCLE-CACHE.md`**.
+
+## 7.0.26
+
+- **Performance — circles (step 2):** Session **TMDB hydrate cache** for titles missing from the main catalogue (**`peekCircleTmdbHydrateCache`**, **`mergeCircleTmdbHydrateCache`**) — revisit circle detail reuses **`/movie` / `/tv`** payloads instead of fetching again (**`clearCircleTmdbHydrateSessionCache`** on sign-out). See **`docs/PERFORMANCE-CIRCLE-CACHE.md`**.
+
+## 7.0.25
+
+- **Performance — circles (step 1):** Session **stale-while-revalidate** for **circle detail** (`fetchCircleDetail`) and the **recent** rated strip **first page** (`fetchCircleRatedTitles` offset 0). Cached payloads render immediately when revisiting a circle; background refetches run and the UI updates **only when** fingerprints differ (**`src/circleDetailSessionCache.js`**). Recent-strip cache resets when **`circleRatedRefreshKey`** bumps (publish / unpublish flows); caches clear on **sign-out** and when **leaving** a circle. Staged backlog: **`docs/PERFORMANCE-CIRCLE-CACHE.md`**.
+
 ## 7.0.24
 
 - **Layout — primary nav:** Scroll offset under the fixed bar uses **`--primary-nav-overlay-clearance`** (**72px** mobile, **82px** from **900px**, **84px** from **1200px**) so **logo + Beta** does not crowd the first row of content. Nav wordmark cluster gets **`min-width:0`**, **`nowrap`**, and **`max-height`** so the row stays stable.

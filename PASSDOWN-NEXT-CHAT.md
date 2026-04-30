@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-30 — trust **`package.json` / `CHANGELOG.md`** (**7.0.24**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** **and** **`staging`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-04-30 — trust **`package.json` / `CHANGELOG.md`** (**7.0.28**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** **and** **`staging`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.24** **`cb15f4d`** — **circle detail header** (**WhatsApp-style** left-aligned **gold initials chip**, title + member line); **`--primary-nav-overlay-clearance`** so **logo + Beta** bar does not squeeze first content (**`src/App.css`** only). **7.0.21–7.0.23** **`ea8c9d4`** — **Help:** **`src/helpPage.jsx`**, **`/help`**, post-onboarding **3-card tour** (Circles ×2 + Secondary region); persists **`help_post_onboarding_seen`**; tour shows whenever that flag **missing** + onboarding done (**7.0.23** reverted narrow **7.0.22** gate). **`main`** **`staging`** synced at **`cb15f4d`** (prod pushed). **`compute-neighbors-w00`…`w19`**, **`limit: 10`** — **`COMPUTE-NEIGHBORS-CRON.md`**.
+**Recent releases (high level):** **7.0.28** circles perf **step 4** (All/Top grid merged SWR); **7.0.27** step 3 (silent **`fetchMyCircles`**); **7.0.26** step 2 (TMDB cache); **7.0.25** step 1. **`docs/PERFORMANCE-CIRCLE-CACHE.md`** — **step 5** watermark/poll only.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -10,11 +10,11 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.24**). **`git pull`** **`origin/main`** **and** **`origin/staging`**. **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.28**). **`git pull`** **`origin/main`** **and** **`origin/staging`**. **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
 > **Git / Vercel:** **`staging`** → staging site; **`main`** → **`www.cinemastro.com`**. Ship **staging** → merge **`staging → main`** → push **`main`** for prod.
 >
-> **Latest ship:** **`cb15f4d`** (**7.0.24**) — circle detail **WhatsApp-style** chrome + **`--primary-nav-overlay-clearance`**. **`ea8c9d4`** arc — **`/help`**, post-onboarding **tour**, **`help_post_onboarding_seen`**. Edge **`compute-neighbors` `1.0.1`** — verify **`edge.version`** on **staging + prod** after deploys.
+> **Latest ship:** **7.0.28** — **All / Top circle grids** merged session SWR (**step 4**). Older: **7.0.27** list silent refresh; TMDB hydrate **7.0.26**; detail+strip **7.0.25**. **`docs/PERFORMANCE-CIRCLE-CACHE.md`** — step **5** only.
 >
 > **Cron:** **`compute-neighbors-w00`–`w19`**, **`limit: 10`** ≈ **200**/week; keep envs aligned — **`COMPUTE-NEIGHBORS-CRON.md`**. Analytics migrations **`20260606`**/**`07`** often still **untracked** locally — **commit + apply**.
 >
@@ -30,7 +30,7 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **7.0.24**; **Beta** **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**. **Help:** **`help_post_onboarding_seen`** + **`/help`**. Confirm **`CHANGELOG`**. |
+| **App version** | **7.0.28**; circles perf **`steps 1–4`** shipped (**`PERFORMANCE-CIRCLE-CACHE.md`**); **step 5** watermark/poll. **Beta** **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**. **Help:** **`help_post_onboarding_seen`** + **`/help`**. Confirm **`CHANGELOG`**. |
 | **Git / Vercel** | **`staging`** → staging; **`main`** → **`www.cinemastro.com`**. **`cb15f4d`** (**7.0.24** layout pass) on **`origin/main`** and **`origin/staging`**; **`git pull`** both when switching machines. |
 | **Supabase — apply if missing** | See **migrations checklist** below. Analytics **`20260606`**/**`07`** may still need **`git add`**/**commit** — align repo; apply per env (**staging** vs **prod**). |
 | **Analytics instrumentation** | DB + RPCs when migrations applied; **client** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** yet. |
@@ -89,7 +89,7 @@
 - **§21** Code-splitting (**`lazy()` + `Suspense`**).
 - **§22** Fetch waterfalls / skeletons first.
 - **§23** Split **`App.jsx`** → **`pages/*`** (Circles intentionally remain in **`App.jsx`**).
-- **§24–27** Caching / image opt / thumbs / prefetch (optional).
+- **§24–27** Caching / image opt / thumbs / prefetch (optional). **Circles perf** through **7.0.28** — **`docs/PERFORMANCE-CIRCLE-CACHE.md`** (**step 5**: watermark / poll tuning).
 - **§28** Supabase hot paths (indexes, N+1, RLS cost).
 - **§29** Fonts subset / **`font-display`**.
 - **§30** PWA service worker (optional).
@@ -175,16 +175,19 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Handoff rule:** merge the prior session’s **last user note** here under **Last session** when you update this file. **Shipped truth:** **`CHANGELOG`** / **`package.json`**.
 
-**Last session (2026-04-30)**
+**Last session (2026-04-30 — latest)**
 
-- **Last note:** User asked to **write passdown for next chat** (this file + paste block below).
-- **Shipped this arc:** **`ea8c9d4`** — **7.0.21–7.0.23**: **`src/helpPage.jsx`**, **`PostOnboardingHelpTour`**, **`HelpFullPage`** at **`/help`**; **`SPA_LEGAL_SCREENS`** + **`help`**; About + profile menus **Help** entry; tour when **`help_post_onboarding_seen`** missing and onboarding done (**7.0.23** restored “all users missing flag” after **7.0.22** session-only pivot). **`cb15f4d`** — **7.0.24**: circle detail **WhatsApp-style** header (smaller **gold** initials disk, left title/members), **`--primary-nav-overlay-clearance`** (72 / 82 / 84px breakpoints) + nav **wordmark cluster** stability. **Beta** stays on **Cinemastro** wordmark only — not circle names.
-- **Git:** **`origin/main`** **`origin/staging`** **`cb15f4d`**; staging + prod merge/push done earlier in week.
-- **Open:** analytics **`20260606`**/**`07`** untracked/worktree drift; wire **`log_analytics_*`** in **`App.jsx`**; **P1** US geo banner; Circles §8/§9; account/rating delete; beta **100** non-seed cap (discussion only).
+- **Last note:** Implement **circles perf step 4** (All/Top grid merged SWR).
+- **Shipped:** **7.0.28** — **`circleDetailSessionCache`** `gridMergedByKey`, **`circleGridSilentRecacheAskLimit`**, **`CIRCLE_GRID_MERGED_RECACHE_MAX`**, **`App.jsx`** All/Top effects + load-more **`setCircleGridMergedCache`**; **`circleRatedRefreshKey`** sweep calls **`invalidateCircleGridCaches`**. **`CHANGELOG`**, **`docs/PERFORMANCE-CIRCLE-CACHE.md`**.
+- **Open:** Perf **step 5** (watermark / poll tuning); analytics **`20260606`**/**`07`**; **`log_analytics_*`** wiring; **P1** US geo; Circles §8/§9; account/rating delete.
 
-**Earlier (2026-04-29)**
+**Earlier (same day)**
 
-- **7.0.20** **`2093b54`**: copy-to-mail URL; **`compute-neighbors` `1.0.1`**. Cron **`w00`–`w19`** **`limit: 10`**. Optional **`VITE_PUBLIC_SITE_URL`** for invite links.
+- **7.0.27** silent Circles list (**`myCirclesListFingerprint.js`**); **7.0.26** TMDB hydrate; **7.0.25** detail+strip SWR; **Help / layout** **`ea8c9d4`** / **`cb15f4d`** — **7.0.21–7.0.24**.
+
+**Earlier**
+
+- **7.0.20** **`2093b54`**: copy-to-mail URL; **`compute-neighbors` `1.0.1`**. Cron **`w00`–`w19`** **`limit: 10`**.
 ---
 
 *Trim **Open / follow-ups** to the last one or two sessions when updating; archive older bullets to **`PASSDOWN-ARCHIVE.md`** if they contain unique decisions.*

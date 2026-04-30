@@ -498,6 +498,8 @@ export const CIRCLE_STRIP_MAX = 20;
 
 /** All / Top grid: page size (matches Discover-style first paint). Top view max rows: {@link CIRCLE_TOP_MAX}. */
 export const CIRCLE_GRID_PAGE = 10;
+/** Max rows to request in one silent All-grid reconciler (offset 0); avoids huge payloads. */
+export const CIRCLE_GRID_MERGED_RECACHE_MAX = 80;
 export const CIRCLE_TOP_MAX = 25;
 
 const CIRCLE_RATED_RPC = {

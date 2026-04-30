@@ -30,6 +30,7 @@ import {
   CIRCLE_STRIP_PAGE,
   CIRCLE_STRIP_MAX,
   CIRCLE_GRID_PAGE,
+  CIRCLE_GRID_MERGED_RECACHE_MAX,
   CIRCLE_TOP_MAX,
   fetchMyCircleUnseenActivity,
   markCircleLastSeen,
@@ -38,6 +39,27 @@ import {
   buildCopyToMailCircleInviteMailto,
   INVITE_NO_CINEMASTRO_ACCOUNT_ERR_PREFIX,
 } from "./circles";
+import {
+  peekCircleDetailCache,
+  peekRecentStripCache,
+  setCircleDetailCache,
+  setCircleRecentStripCache,
+  invalidateCircleSwrCaches,
+  invalidateCircleRecentStripCache,
+  clearCircleDetailSessionCaches,
+  fingerprintCircleDetail,
+  fingerprintRecentStripPayload,
+  peekCircleGridMergedCache,
+  setCircleGridMergedCache,
+  invalidateCircleGridCaches,
+  invalidateCircleGridCacheSingle,
+} from "./circleDetailSessionCache.js";
+import {
+  peekCircleTmdbHydrateCache,
+  mergeCircleTmdbHydrateCache,
+  clearCircleTmdbHydrateSessionCache,
+} from "./circleTmdbHydrateSessionCache.js";
+import { fingerprintMyCirclesList } from "./myCirclesListFingerprint.js";
 import { PUBLIC_BETA_LABEL } from "./productLabels.js";
 import "./App.css";
 import { PulsePage } from "./pages/PulsePage.jsx";
@@ -51,6 +73,15 @@ const AboutPage = lazy(() => import("./aboutPage.jsx").then((m) => ({ default: m
 
 // Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.5.0: precomputed neighbors + faster match predict; v3.4.0: detail card copy/chips refresh; v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
+
+/** All/Top silent refresh: reconcile up to merged row count server-side (`docs/PERFORMANCE-CIRCLE-CACHE.md` step 4). */
+function circleGridSilentRecacheAskLimit(view, mergedCache) {
+  const localLen = Array.isArray(mergedCache?.titles) ? mergedCache.titles.length : 0;
+  if (view === "top") {
+    return Math.min(CIRCLE_TOP_MAX, Math.max(CIRCLE_GRID_PAGE, localLen));
+  }
+  return Math.min(CIRCLE_GRID_MERGED_RECACHE_MAX, Math.max(CIRCLE_GRID_PAGE, localLen));
+}
 
 const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiOThhYjJlMThiODdjZmQyODFhY2JlYWZmNDhkMjE0ZSIsIm5iZiI6MTc3NDY0MTcxMS4yNDYsInN1YiI6IjY5YzZlMjJmYWRkOGNkNzhkMTUzNzgyOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.jJhQu5G7iVJyW4MqDttCqiGestEHZjsrUKe73baRO7A";
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -2554,10 +2585,12 @@ function formatPublicStat(n) {
   return `${(x / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
 }
 
-/** Phase C circle strip: resolve poster row from catalogue or TMDB hydrate map. */
+/** Phase C circle strip: resolve poster row from catalogue, in-flight hydrate map, or session TMDB cache. */
 function circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies) {
   const id = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
-  return movieLookupById.get(id) ?? circleStripExtraMovies.get(id) ?? null;
+  return (
+    movieLookupById.get(id) ?? circleStripExtraMovies.get(id) ?? peekCircleTmdbHydrateCache(id) ?? null
+  );
 }
 
 /** `openDetail` prediction payload from Edge `prediction` object (null if user already rated). */
@@ -3214,6 +3247,8 @@ export default function App() {
   const [circlesLoading, setCirclesLoading] = useState(false);
   const [circlesError, setCirclesError] = useState("");
   const [circlesLoaded, setCirclesLoaded] = useState(false);
+  /** Drops stale `reloadMyCircles` responses when a newer fetch started (nonce). */
+  const reloadCirclesFetchNonceRef = useRef(0);
   const [showCreateCircleSheet, setShowCreateCircleSheet] = useState(false);
   const [createCircleName, setCreateCircleName] = useState("");
   const [createCircleDescription, setCreateCircleDescription] = useState("");
@@ -3239,6 +3274,8 @@ export default function App() {
   /** Recent strip: more content exists to the left of current scroll (center-on-land). */
   const [circleRecentLeftScrollHint, setCircleRecentLeftScrollHint] = useState(false);
   const [circleStripExtraMovies, setCircleStripExtraMovies] = useState(() => new Map());
+  /** Bumps when {@link mergeCircleTmdbHydrateCache} runs so hydrate-id useMemo skips session-cached TMDB ids. */
+  const [circleTmdbHydrateTick, setCircleTmdbHydrateTick] = useState(0);
   /** Circle detail rated block: recent (horizontal strip) | all | top (grids). */
   const [circleRatingsView, setCircleRatingsView] = useState("recent");
   const [circleGridAllPayload, setCircleGridAllPayload] = useState(null);
@@ -3258,6 +3295,8 @@ export default function App() {
   const [publishModalError, setPublishModalError] = useState("");
   const [publishModalSelection, setPublishModalSelection] = useState(() => new Set());
   const [circleRatedRefreshKey, setCircleRatedRefreshKey] = useState(0);
+  /** When this differs from {@link circleRatedRefreshKey}, strip effect invalidates recent-strip SWR cache. */
+  const circleStripRefreshKeySweepRef = useRef(circleRatedRefreshKey);
   /** Per circle: others' unpublishes since last mark_circle_last_seen; powers list card badge (5.6.33). */
   const [circleUnseenById, setCircleUnseenById] = useState(() => ({}));
   const circleDetailActivityWatermarkRef = useRef(null);
@@ -4547,6 +4586,7 @@ export default function App() {
       const id = `${String(t.media_type)}-${Number(t.tmdb_id)}`;
       if (movieLookupById.has(id)) continue;
       if (circleStripExtraMovies.has(id)) continue;
+      if (peekCircleTmdbHydrateCache(id)) continue;
       out.push({ id, media_type: t.media_type, tmdb_id: t.tmdb_id });
     }
     return out;
@@ -4558,6 +4598,7 @@ export default function App() {
     circleGridTopPayload,
     movieLookupById,
     circleStripExtraMovies,
+    circleTmdbHydrateTick,
   ]);
 
   useEffect(() => {
@@ -4576,6 +4617,8 @@ export default function App() {
         );
       }
       if (!cancelled && fetched.size) {
+        mergeCircleTmdbHydrateCache(fetched);
+        setCircleTmdbHydrateTick((x) => x + 1);
         setCircleStripExtraMovies((prev) => new Map([...prev, ...fetched]));
       }
     })();
@@ -5325,6 +5368,9 @@ export default function App() {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
+    clearCircleDetailSessionCaches();
+    clearCircleTmdbHydrateSessionCache();
+    setCircleTmdbHydrateTick(0);
     setUser(null);
     setProfileName("");
     setUserRatings({}); setWatchlist([]);
@@ -6839,19 +6885,36 @@ export default function App() {
     setCircleDetailShowNewActivityBar(false);
   }, [selectedCircleId]);
 
-  const reloadMyCircles = useCallback(async () => {
+  const reloadMyCircles = useCallback(async ({ silent = false } = {}) => {
     if (!user) return;
-    setCirclesLoading(true);
-    setCirclesError("");
+    const myNonce = ++reloadCirclesFetchNonceRef.current;
+    const showSpinner = !silent;
+    if (showSpinner) {
+      setCirclesLoading(true);
+      setCirclesError("");
+    }
     try {
       const rows = await fetchMyCircles();
-      setCirclesList(rows);
+      if (myNonce !== reloadCirclesFetchNonceRef.current) return;
+      setCirclesList((prev) => {
+        const fpNew = fingerprintMyCirclesList(rows);
+        const fpPrev = fingerprintMyCirclesList(prev);
+        if (fpNew === fpPrev) return prev;
+        return rows;
+      });
       setCirclesLoaded(true);
     } catch (e) {
-      console.error("Circles: fetchMyCircles failed", e);
-      setCirclesError(e?.message || "Could not load your circles.");
+      if (myNonce !== reloadCirclesFetchNonceRef.current) return;
+      if (silent) {
+        console.warn("Circles: fetchMyCircles silent refresh failed", e);
+      } else {
+        console.error("Circles: fetchMyCircles failed", e);
+        setCirclesError(e?.message || "Could not load your circles.");
+      }
     } finally {
-      setCirclesLoading(false);
+      if (showSpinner) {
+        setCirclesLoading(false);
+      }
     }
   }, [user]);
 
@@ -6860,21 +6923,21 @@ export default function App() {
     if (!user) {
       setCirclesList([]);
       setCirclesLoaded(false);
+      reloadCirclesFetchNonceRef.current += 1;
       return;
     }
     if (circlesLoaded) return;
-    void reloadMyCircles();
+    void reloadMyCircles({ silent: false });
   }, [user, circlesLoaded, reloadMyCircles]);
 
-  // Also refresh whenever the user navigates to the Circles list (cheap; small response).
+  // Returning to Circles main: unseen badges + silent list reconcile (`docs/PERFORMANCE-CIRCLE-CACHE.md` step 3).
   useEffect(() => {
     if (!user) return;
     if (screen !== "circles") return;
     if (!circlesLoaded) return;
-    void reloadMyCircles();
     void refreshCircleUnseenBadges();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen]);
+    void reloadMyCircles({ silent: true });
+  }, [screen, user, circlesLoaded, refreshCircleUnseenBadges, reloadMyCircles]);
 
   const activeCirclesCount = circlesList.length;
   const atCircleCap = activeCirclesCount >= CIRCLE_CAP;
@@ -7001,11 +7064,12 @@ export default function App() {
             : c
         )
       );
-      setCircleDetailData((d) =>
-        d && d.id === editCircleId
-          ? { ...d, name: nextName, description: nextDesc, vibe: editCircleVibe }
-          : d
-      );
+      setCircleDetailData((d) => {
+        if (!d || d.id !== editCircleId) return d;
+        const next = { ...d, name: nextName, description: nextDesc, vibe: editCircleVibe };
+        setCircleDetailCache(editCircleId, next);
+        return next;
+      });
       setShowEditCircleSheet(false);
       setEditCircleId(null);
     } catch (e) {
@@ -7019,10 +7083,10 @@ export default function App() {
   function openCircleDetail(circleId) {
     if (!circleId) return;
     setSelectedCircleId(circleId);
-    setCircleDetailData(null);
+    setCircleDetailData(peekCircleDetailCache(circleId));
     setCircleDetailError("");
     setLeaveCircleError("");
-    setCircleStripPayload(null);
+    setCircleStripPayload(peekRecentStripCache(circleId));
     setCircleStripError("");
     setCircleStripExtraMovies(new Map());
     setScreen("circle-detail");
@@ -7042,22 +7106,29 @@ export default function App() {
     setScreen("circles");
   }
 
-  // Load circle detail when entering the detail screen.
+  // Load circle detail when entering the detail screen (SWR: instant cache + background refetch).
   useEffect(() => {
     if (screen !== "circle-detail") return;
     if (!selectedCircleId) return;
     let cancelled = false;
-    setCircleDetailLoading(true);
+    const cid = selectedCircleId;
+    const baselineFp = fingerprintCircleDetail(peekCircleDetailCache(cid));
+    const hadDetailCache = Boolean(baselineFp);
+    setCircleDetailLoading(!hadDetailCache);
     setCircleDetailError("");
     (async () => {
       try {
-        const detail = await fetchCircleDetail(selectedCircleId);
+        const detail = await fetchCircleDetail(cid);
         if (cancelled) return;
         if (!detail) {
           setCircleDetailError("This circle is no longer available.");
           setCircleDetailData(null);
+          invalidateCircleSwrCaches(cid);
         } else {
-          setCircleDetailData(detail);
+          setCircleDetailCache(cid, detail);
+          if (fingerprintCircleDetail(detail) !== baselineFp) {
+            setCircleDetailData(peekCircleDetailCache(cid));
+          }
         }
       } catch (e) {
         if (cancelled) return;
@@ -7093,15 +7164,25 @@ export default function App() {
     if (screen !== "circle-detail" || !selectedCircleId || !user) {
       return;
     }
+    const cid = selectedCircleId;
+    if (circleStripRefreshKeySweepRef.current !== circleRatedRefreshKey) {
+      invalidateCircleRecentStripCache(cid);
+      invalidateCircleGridCaches(cid);
+      circleStripRefreshKeySweepRef.current = circleRatedRefreshKey;
+    }
     let cancelled = false;
-    setCircleStripPayload(null);
+    const baselineFp = fingerprintRecentStripPayload(peekRecentStripCache(cid));
+    const hadStripCache = Boolean(baselineFp);
+    if (!hadStripCache) {
+      setCircleStripPayload(null);
+    }
     setCircleStripLoadingMore(false);
-    setCircleStripLoading(true);
+    setCircleStripLoading(!hadStripCache);
     setCircleStripError("");
     (async () => {
       try {
         const data = await fetchCircleRatedTitles({
-          circleId: selectedCircleId,
+          circleId: cid,
           limit: CIRCLE_STRIP_INITIAL,
           offset: 0,
           view: "recent",
@@ -7109,19 +7190,23 @@ export default function App() {
         if (cancelled) return;
         let w = null;
         try {
-          w = await getCircleOthersActivityWatermark(selectedCircleId);
+          w = await getCircleOthersActivityWatermark(cid);
         } catch (we) {
           console.warn("Circles: activity watermark after strip", we);
         }
         if (cancelled) return;
         circleDetailActivityWatermarkRef.current = w;
         setCircleDetailShowNewActivityBar(false);
-        setCircleStripPayload(data);
+        setCircleRecentStripCache(cid, data);
+        if (fingerprintRecentStripPayload(data) !== baselineFp) {
+          setCircleStripPayload(peekRecentStripCache(cid));
+        }
       } catch (e) {
         if (cancelled) return;
         console.error("Circles: fetchCircleRatedTitles failed", e);
         setCircleStripError(e?.message || "Could not load circle titles.");
         setCircleStripPayload(null);
+        invalidateCircleRecentStripCache(cid);
       } finally {
         if (!cancelled) setCircleStripLoading(false);
       }
@@ -7130,12 +7215,6 @@ export default function App() {
       cancelled = true;
     };
   }, [screen, selectedCircleId, user, circleRatedRefreshKey]);
-
-  useEffect(() => {
-    if (screen !== "circle-detail") return;
-    setCircleGridAllPayload(null);
-    setCircleGridTopPayload(null);
-  }, [circleRatedRefreshKey, screen, selectedCircleId]);
 
   useEffect(() => {
     if (!publishRatingModal) {
@@ -7165,25 +7244,43 @@ export default function App() {
   useEffect(() => {
     if (screen !== "circle-detail" || !selectedCircleId || !user) return;
     if (circleRatingsView !== "all") return;
-    if (circleGridAllPayload != null) return;
+    const cid = selectedCircleId;
     let cancelled = false;
-    setCircleGridAllLoading(true);
+
+    const mergedPeek = peekCircleGridMergedCache(cid, "all");
+    const baselineFp = fingerprintRecentStripPayload(mergedPeek);
+    const hadMergedCache = Boolean(baselineFp);
+
+    if (hadMergedCache) {
+      setCircleGridAllPayload(peekCircleGridMergedCache(cid, "all"));
+    } else {
+      setCircleGridAllPayload(null);
+    }
+    setCircleGridAllLoading(!hadMergedCache);
     setCircleGridAllError("");
     (async () => {
       try {
+        const limit = circleGridSilentRecacheAskLimit("all", mergedPeek);
         const data = await fetchCircleRatedTitles({
-          circleId: selectedCircleId,
-          limit: CIRCLE_GRID_PAGE,
+          circleId: cid,
+          limit,
           offset: 0,
           view: "all",
         });
         if (cancelled) return;
-        setCircleGridAllPayload(data);
+        const fpRemote = fingerprintRecentStripPayload(data);
+        if (fpRemote !== baselineFp) {
+          setCircleGridMergedCache(cid, "all", data);
+          setCircleGridAllPayload(peekCircleGridMergedCache(cid, "all"));
+        }
       } catch (e) {
         if (cancelled) return;
         console.error("Circles: fetchCircleRatedTitles (all) failed", e);
-        setCircleGridAllError(e?.message || "Could not load titles.");
-        setCircleGridAllPayload(null);
+        if (!hadMergedCache) {
+          setCircleGridAllError(e?.message || "Could not load titles.");
+          setCircleGridAllPayload(null);
+          invalidateCircleGridCacheSingle(cid, "all");
+        }
       } finally {
         if (!cancelled) setCircleGridAllLoading(false);
       }
@@ -7191,30 +7288,48 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [screen, selectedCircleId, user, circleRatingsView, circleGridAllPayload]);
+  }, [screen, selectedCircleId, user, circleRatingsView, circleRatedRefreshKey]);
 
   useEffect(() => {
     if (screen !== "circle-detail" || !selectedCircleId || !user) return;
     if (circleRatingsView !== "top") return;
-    if (circleGridTopPayload != null) return;
+    const cid = selectedCircleId;
     let cancelled = false;
-    setCircleGridTopLoading(true);
+
+    const mergedPeek = peekCircleGridMergedCache(cid, "top");
+    const baselineFp = fingerprintRecentStripPayload(mergedPeek);
+    const hadMergedCache = Boolean(baselineFp);
+
+    if (hadMergedCache) {
+      setCircleGridTopPayload(peekCircleGridMergedCache(cid, "top"));
+    } else {
+      setCircleGridTopPayload(null);
+    }
+    setCircleGridTopLoading(!hadMergedCache);
     setCircleGridTopError("");
     (async () => {
       try {
+        const limit = circleGridSilentRecacheAskLimit("top", mergedPeek);
         const data = await fetchCircleRatedTitles({
-          circleId: selectedCircleId,
-          limit: CIRCLE_GRID_PAGE,
+          circleId: cid,
+          limit,
           offset: 0,
           view: "top",
         });
         if (cancelled) return;
-        setCircleGridTopPayload(data);
+        const fpRemote = fingerprintRecentStripPayload(data);
+        if (fpRemote !== baselineFp) {
+          setCircleGridMergedCache(cid, "top", data);
+          setCircleGridTopPayload(peekCircleGridMergedCache(cid, "top"));
+        }
       } catch (e) {
         if (cancelled) return;
         console.error("Circles: fetchCircleRatedTitles (top) failed", e);
-        setCircleGridTopError(e?.message || "Could not load titles.");
-        setCircleGridTopPayload(null);
+        if (!hadMergedCache) {
+          setCircleGridTopError(e?.message || "Could not load titles.");
+          setCircleGridTopPayload(null);
+          invalidateCircleGridCacheSingle(cid, "top");
+        }
       } finally {
         if (!cancelled) setCircleGridTopLoading(false);
       }
@@ -7222,7 +7337,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [screen, selectedCircleId, user, circleRatingsView, circleGridTopPayload]);
+  }, [screen, selectedCircleId, user, circleRatingsView, circleRatedRefreshKey]);
 
   async function loadCircleStripMore() {
     if (!selectedCircleId || !user || circleStripLoadingMore || circleStripLoading) return;
@@ -7384,12 +7499,14 @@ export default function App() {
           ...(Array.isArray(base.titles) ? base.titles : []),
           ...(Array.isArray(data.titles) ? data.titles : []),
         ];
-        return {
+        const next = {
           ...data,
           titles: merged,
           total_eligible: data.total_eligible ?? base.total_eligible,
           has_more: Boolean(data.has_more),
         };
+        setCircleGridMergedCache(selectedCircleId, "all", next);
+        return next;
       });
     } catch (e) {
       console.error("Circles: loadCircleGridAllMore failed", e);
@@ -7420,12 +7537,14 @@ export default function App() {
         const prevTitles = Array.isArray(base.titles) ? base.titles : [];
         const nextChunk = Array.isArray(data.titles) ? data.titles : [];
         const merged = prevTitles.concat(nextChunk).slice(0, CIRCLE_TOP_MAX);
-        return {
+        const next = {
           ...data,
           titles: merged,
           total_eligible: data.total_eligible ?? base.total_eligible,
           has_more: Boolean(data.has_more) && merged.length < CIRCLE_TOP_MAX,
         };
+        setCircleGridMergedCache(selectedCircleId, "top", next);
+        return next;
       });
     } catch (e) {
       console.error("Circles: loadCircleGridTopMore failed", e);
@@ -7538,6 +7657,7 @@ export default function App() {
       await leaveCircle({
         circleId: target.id,
       });
+      invalidateCircleSwrCaches(target.id);
       setCirclesList((prev) => prev.filter((c) => c.id !== target.id));
       setLeaveConfirmCircle(null);
       backFromCircleDetail();
