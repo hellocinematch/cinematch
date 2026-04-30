@@ -18,7 +18,7 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 
 - **`main` is pushed** to `origin`. Trust **`package.json`** / **`CHANGELOG.md`** for the live version (e.g. **6.1.6** — admin-only **`leave_circle`**, pending invite labels RPC, Circle info layout; see **CHANGELOG**).
 - **Prod DB:** apply migrations in **`PASSDOWN-NEXT-CHAT.md`** checklist if missing (includes **`20260603120000_leave_circle_admin_only.sql`**, **`20260604120000_get_circle_pending_invite_labels.sql`**, and earlier Circles + watchlist migrations).
-- **Edge functions:** `match`, `compute-neighbors`, `send-circle-invite`, `accept-circle-invite`, and **`get-circle-rated-titles`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`). Invite fns **1.0.2** with **6.1.4+** admin-only host rules — verify **`edge.version`** in prod. Each function’s `index.ts` has **`EDGE_FUNCTION_VERSION`**; bump the constant whenever that function’s code changes, then redeploy.
+- **Edge functions:** `match`, `compute-neighbors`, `send-circle-invite`, `accept-circle-invite`, **`get-circle-rated-titles`**, and **`pulse-catalog`** must be deployed manually; **git push does not deploy Edge Functions** (`npx supabase@latest functions deploy … --project-ref lovpktgeutujljltlhdl`). Invite fns **1.0.2** with **6.1.4+** admin-only host rules — verify **`edge.version`** in prod. **`pulse-catalog`** needs Edge secret **`TMDB_READ_ACCESS_TOKEN`** (TMDB read token). Each function’s `index.ts` has **`EDGE_FUNCTION_VERSION`**; bump the constant whenever that function’s code changes, then redeploy.
 
 ---
 
@@ -43,7 +43,7 @@ This file is the **source of truth** for what to do when you pick up work. In Cu
 | Circles schema + display contract | `supabase/migrations/20260422120000_circles_schema.sql` (read top comment block before Phase C) |
 | RLS hotfix (helpers) | `supabase/migrations/20260423120000_circles_rls_recursion_fix.sql` |
 | Phase B RPCs | `supabase/migrations/20260424120000_circles_phase_b_helpers.sql`. Optional: `20260425120000_circles_resolve_email_grant_service_role.sql` (grant-only if DB predates grant line) |
-| Edge: invite send/accept / strip | `supabase/functions/send-circle-invite/index.ts`, `supabase/functions/accept-circle-invite/index.ts`, `supabase/functions/get-circle-rated-titles/index.ts` |
+| Edge: invite send/accept / strip / Pulse daily | `supabase/functions/send-circle-invite/index.ts`, `supabase/functions/accept-circle-invite/index.ts`, `supabase/functions/get-circle-rated-titles/index.ts`, `supabase/functions/pulse-catalog/index.ts` |
 | Circle publish (per-group visibility) | `supabase/migrations/20260524120000_rating_circle_shares.sql`; **`syncRatingCircleShares`** / **`fetchRatingCircleShareIds`** in `src/circles.js` |
 | Product spec | `Architechture/cinemastro-circles-requirements.md` (path spelling as in repo) |
 | Account security roadmap | `ACCOUNT-SECURITY.md` — OAuth, CAPTCHA, optional phone, duplicate-account posture |

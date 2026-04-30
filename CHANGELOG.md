@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.30
+
+- **Pulse — shared daily cache:** Trending + popular strips are **one catalog per UTC calendar day** for all users. **`pulse_catalog_daily`** (migration **`20260608120000_pulse_catalog_daily.sql`**) holds JSON rows; first visit after read miss invokes Edge **`pulse-catalog`** (**`1.0.0`**) to fetch TMDB and **upsert**; further visits **read** only. **Same-day** return to Pulse skips skeleton + refetch (**`pulseLoadedUtcDateRef`**). **Apply** the migration; set Edge secret **`TMDB_READ_ACCESS_TOKEN`**; **deploy** **`pulse-catalog`**. If DB/Edge is unavailable, client falls back to existing **`fetchPulseTrendingCatalog`** / **`fetchPulsePopularCatalog`**.
+
+## 7.0.29
+
+- **Performance — circles (step 5, partial):** **“New activity”** watermark poll uses **tiered backoff** while the tab is visible — **15s** → **45s** → **60s** when **`get_circle_others_activity_watermark`** returns the same timestamp as the prior poll; any change resets to **15s**. Focus / visibility / **`pageshow`** checks unchanged. Constants: **`CIRCLE_WATERMARK_POLL_MS`** in **`App.jsx`**. See **`docs/PERFORMANCE-CIRCLE-CACHE.md`**.
+
 ## 7.0.28
 
 - **Performance — circles (step 4):** **All** / **Top** grids use merged session cache + background reconcile (`peekCircleGridMergedCache`, `setCircleGridMergedCache`, `invalidateCircleGridCaches`); instant paint when revisiting tabs; **`fingerprintRecentStripPayload`** gates **`setCircles*`** updates; **`CIRCLE_GRID_MERGED_RECACHE_MAX`** (**80**) caps silent All prefetch width. **`invalidateCircleRecentStripCache`** + grid invalidation run when **`circleRatedRefreshKey`** bumps. See **`docs/PERFORMANCE-CIRCLE-CACHE.md`**.

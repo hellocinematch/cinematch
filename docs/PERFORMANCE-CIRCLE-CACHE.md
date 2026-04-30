@@ -23,6 +23,7 @@ Session-scoped **stale-while-revalidate**: show cached payload immediately, fetc
 
 - **All / Top merged grids:** Session **`gridMergedByKey`** in **`circleDetailSessionCache.js`** — full merged payloads (including **Load more**); **`peekCircleGridMergedCache` / `setCircleGridMergedCache` / `invalidateCircleGridCaches` / `invalidateCircleGridCacheSingle`**; silent reconcile uses **`circleGridSilentRecacheAskLimit`** (**Top** capped **`CIRCLE_TOP_MAX`**; **All** capped **`CIRCLE_GRID_MERGED_RECACHE_MAX`**). **`invalidateCircleSwrCaches`** and **`circleRatedRefreshKey`** sweep invalidate grids + recent strip cache.
 
-## Step 5 (planned)
+## Step 5 (in progress)
 
-- Revisit **`get_circle_others_activity_watermark`** polling / focus probes once steps 1–4 are stable; optionally narrow or simplify “new activity” UX.
+- **Shipped (7.0.29):** Visible-document watermark poll uses **tiered intervals** — **15s** → **45s** → **60s** when the server watermark is **unchanged** since the last poll; **reset to 15s** when it changes. **`CIRCLE_WATERMARK_POLL_MS`** in **`App.jsx`**.
+- **Optional later:** narrow **focus / pageshow** probes or simplify **“New activity”** UX further.

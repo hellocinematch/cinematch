@@ -74,6 +74,9 @@ const AboutPage = lazy(() => import("./aboutPage.jsx").then((m) => ({ default: m
 // Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.5.0: precomputed neighbors + faster match predict; v3.4.0: detail card copy/chips refresh; v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
 
+/** Circle detail — visible-tab watermark poll for “New activity” (`get_circle_others_activity_watermark`). Tier advances when the server timestamp is unchanged since the last poll. */
+const CIRCLE_WATERMARK_POLL_MS = [15_000, 45_000, 60_000];
+
 /** All/Top silent refresh: reconcile up to merged row count server-side (`docs/PERFORMANCE-CIRCLE-CACHE.md` step 4). */
 function circleGridSilentRecacheAskLimit(view, mergedCache) {
   const localLen = Array.isArray(mergedCache?.titles) ? mergedCache.titles.length : 0;
@@ -3220,6 +3223,8 @@ export default function App() {
   const [pulseTrending, setPulseTrending] = useState([]);
   const [pulsePopular, setPulsePopular] = useState([]);
   const [pulseCatalogReady, setPulseCatalogReady] = useState(false);
+  /** `YYYY-MM-DD` (UTC) for the last successful Pulse load — same-day revisits skip fetch + skeleton. */
+  const pulseLoadedUtcDateRef = useRef(null);
   /** In Theaters page second strip: weekly trending + same theatrical gates as Now ({@link fetchInTheaters}). */
   const [inTheatersPopularRanked, setInTheatersPopularRanked] = useState([]);
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
@@ -3838,27 +3843,90 @@ export default function App() {
     };
   }, [user]);
 
-  /** Pulse page: week trending + global popular (TMDB only on wire; match scores via predict_cached). */
+  /** Pulse page: week trending + global popular — one shared catalog per UTC day (`pulse_catalog_daily`, Edge `pulse-catalog`). */
   useEffect(() => {
     if (!user || screen !== "pulse") return;
     let cancelled = false;
+
+    const utcDate = new Date().toISOString().slice(0, 10);
+    if (pulseLoadedUtcDateRef.current === utcDate) {
+      setPulseCatalogReady(true);
+      return;
+    }
+
     setPulseCatalogReady(false);
     const defer = setTimeout(() => {
       (async () => {
-        const [trendingRows, popularRows] = await Promise.all([
-          fetchPulseTrendingCatalog(),
-          fetchPulsePopularCatalog(),
-        ]);
-        if (cancelled) return;
-        setPulseTrending(trendingRows);
-        setPulsePopular(popularRows);
-        setCatalogue((prev) => {
-          const seen = new Set(prev.map((m) => m.id));
-          const added = [...trendingRows, ...popularRows].filter((m) => !seen.has(m.id));
-          if (added.length === 0) return prev;
-          return [...prev, ...added];
-        });
-        setPulseCatalogReady(true);
+        try {
+          const { data: row, error: selErr } = await supabase
+            .from("pulse_catalog_daily")
+            .select("trending, popular")
+            .eq("utc_date", utcDate)
+            .maybeSingle();
+          if (cancelled) return;
+          if (!selErr && row && Array.isArray(row.trending) && Array.isArray(row.popular)) {
+            setPulseTrending(row.trending);
+            setPulsePopular(row.popular);
+            setCatalogue((prev) => {
+              const seen = new Set(prev.map((m) => m.id));
+              const added = [...row.trending, ...row.popular].filter((m) => m && !seen.has(m.id));
+              if (added.length === 0) return prev;
+              return [...prev, ...added];
+            });
+            setPulseCatalogReady(true);
+            pulseLoadedUtcDateRef.current = utcDate;
+            return;
+          }
+
+          const { data: inv, error: invErr } = await supabase.functions.invoke("pulse-catalog", {
+            body: { utc_date: utcDate },
+          });
+          if (cancelled) return;
+
+          const invRecord = inv && typeof inv === "object" ? inv : null;
+          const invOk = Boolean(invRecord?.ok);
+          const invTrending = invOk && Array.isArray(invRecord.trending) ? invRecord.trending : null;
+          const invPopular = invOk && Array.isArray(invRecord.popular) ? invRecord.popular : null;
+
+          if (!invErr && invOk && invTrending && invPopular) {
+            setPulseTrending(invTrending);
+            setPulsePopular(invPopular);
+            setCatalogue((prev) => {
+              const seen = new Set(prev.map((m) => m.id));
+              const added = [...invTrending, ...invPopular].filter((m) => m && !seen.has(m.id));
+              if (added.length === 0) return prev;
+              return [...prev, ...added];
+            });
+            setPulseCatalogReady(true);
+            pulseLoadedUtcDateRef.current = utcDate;
+            return;
+          }
+
+          if (invErr || !invOk) {
+            console.warn("Pulse: pulse-catalog Edge miss", invErr || inv);
+          }
+
+          const [trendingRows, popularRows] = await Promise.all([
+            fetchPulseTrendingCatalog(),
+            fetchPulsePopularCatalog(),
+          ]);
+          if (cancelled) return;
+          setPulseTrending(trendingRows);
+          setPulsePopular(popularRows);
+          setCatalogue((prev) => {
+            const seen = new Set(prev.map((m) => m.id));
+            const added = [...trendingRows, ...popularRows].filter((m) => m && !seen.has(m.id));
+            if (added.length === 0) return prev;
+            return [...prev, ...added];
+          });
+          setPulseCatalogReady(true);
+          pulseLoadedUtcDateRef.current = utcDate;
+        } catch (e) {
+          if (!cancelled) {
+            console.warn("Pulse: load failed", e);
+            setPulseCatalogReady(true);
+          }
+        }
       })();
     }, WHATS_HOT_FETCH_DEFER_MS);
     return () => {
@@ -5401,6 +5469,7 @@ export default function App() {
     setPulseTrending([]);
     setPulsePopular([]);
     setPulseCatalogReady(false);
+    pulseLoadedUtcDateRef.current = null;
     setInTheatersPopularRanked([]);
     setStreamingMoviesReady(true);
     setStreamingTvReady(true);
@@ -6784,23 +6853,26 @@ export default function App() {
     }
   }, [user]);
 
+  /** @returns {Promise<string | null | undefined>} `undefined` if skipped, `null` if error/null RPC, else ISO-ish watermark string. */
   const checkRemoteCircleNewActivity = useCallback(async () => {
-    if (screen !== "circle-detail" || !selectedCircleId) return;
-    if (circleDetailData && circleDetailData.memberCount < 2) return;
-    if (circleStripLoading) return;
+    if (screen !== "circle-detail" || !selectedCircleId) return undefined;
+    if (circleDetailData && circleDetailData.memberCount < 2) return undefined;
+    if (circleStripLoading) return undefined;
     const baseline = circleDetailActivityWatermarkRef.current;
     try {
       const remote = await getCircleOthersActivityWatermark(selectedCircleId);
-      if (remote == null) return;
+      if (remote == null) return null;
       if (baseline == null) {
         setCircleDetailShowNewActivityBar(true);
-        return;
+        return remote;
       }
       if (new Date(remote) > new Date(baseline)) {
         setCircleDetailShowNewActivityBar(true);
       }
+      return remote;
     } catch (e) {
       console.warn("Circles: activity watermark check failed", e);
+      return null;
     }
   }, [screen, selectedCircleId, circleDetailData, circleStripLoading]);
   checkRemoteCircleNewActivityRef.current = checkRemoteCircleNewActivity;
@@ -6845,18 +6917,58 @@ export default function App() {
   }, [user, refreshCircleUnseenBadges, checkRemoteCircleNewActivity]);
 
   // In-foreground: no OS “resume” event while you stay on this screen — must poll. Ref keeps the
-  // interval from resetting on every checkRemoteCircleNewActivity / circleDetailData reference churn.
+  // timeout chain from resetting on every checkRemoteCircleNewActivity / circleDetailData reference churn.
   const circleDetailIdForPoll = circleDetailData?.id;
   const circleMemberCountForPoll = circleDetailData?.memberCount;
   useEffect(() => {
     if (!user || screen !== "circle-detail" || !selectedCircleId) return;
     if (!circleDetailIdForPoll || !circleMemberCountForPoll || circleMemberCountForPoll < 2) return;
-    const t = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
+    let cancelled = false;
+    let timeoutId = 0;
+    let tier = 0;
+    let lastRemote = null;
+
+    const scheduleNext = () => {
+      if (cancelled) return;
+      const delay = CIRCLE_WATERMARK_POLL_MS[Math.min(tier, CIRCLE_WATERMARK_POLL_MS.length - 1)];
+      timeoutId = window.setTimeout(runTick, delay);
+    };
+
+    const runTick = async () => {
+      if (cancelled) return;
+      if (document.visibilityState !== "visible") {
+        scheduleNext();
+        return;
+      }
       const run = checkRemoteCircleNewActivityRef.current;
-      if (typeof run === "function") void run();
-    }, 10_000);
-    return () => window.clearInterval(t);
+      if (typeof run !== "function") {
+        scheduleNext();
+        return;
+      }
+      const remote = await run();
+      if (cancelled) return;
+      if (remote === undefined) {
+        scheduleNext();
+        return;
+      }
+      if (remote === null) {
+        scheduleNext();
+        return;
+      }
+      if (lastRemote != null && remote === lastRemote) {
+        tier = Math.min(tier + 1, CIRCLE_WATERMARK_POLL_MS.length - 1);
+      } else {
+        tier = 0;
+      }
+      lastRemote = remote;
+      scheduleNext();
+    };
+
+    scheduleNext();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [user, screen, selectedCircleId, circleDetailIdForPoll, circleMemberCountForPoll]);
 
   useEffect(() => {
