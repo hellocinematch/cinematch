@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-29 — trust **`package.json` / `CHANGELOG.md`** (**7.0.17**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-04-29 — trust **`package.json` / `CHANGELOG.md`** (**7.0.18**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** **and** **`staging`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.16–7.0.17** — **`aboutPage.jsx`** **`/about`** hub (logo, tagline, version, legal links, TMDB credits); **`AppFooter`** removed (single **`About`** via primary nav / hamburger); **`LegalTopBar`** exported from **`legal.jsx`**. **7.0.17** — **`Policies/TERMS_OF_SERVICE.md`** completed §23–26 + **§27 TMDB API Usage**; **Last updated** April 29, 2026. **`main`** includes **`ecd4f15`** (**deploy:** Vercel on **`main`**). **7.0.13–7.0.15** — footer copyright / site / US notice / TMDB logo / footer-vs-nav **`z-index`** (superseded by footer removal). **7.0.11–7.0.12** — **`/privacy`** **`/terms`** **`/about`** SPA + **`Policies/*.md`** via **`markdown-it`**. **7.x** **`pages/`** extracts — Circles stay in **`App.jsx`**. Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.18** — public **Beta** labeling: nav pill (**`product-beta-pill`**), **About** / **Profile** version lines; **`index.html`** title + **`application-name`**; **`site.webmanifest`** display **name**; toggle **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`** for GA. **`main`**/**`staging`** tip **`34c645d`**. **7.0.16–7.0.17** — **`aboutPage.jsx`** **`/about`** hub; **`AppFooter`** removed; **Terms** §23–27 incl. **TMDB API Usage**. Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -10,13 +10,17 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.17**). **`git pull`** **`main`**. Core shipped commit **`ecd4f15`** (About / Terms TMDB / no footer). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.18**). **`git pull`** **`origin/main`** **and** **`origin/staging`**. **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
-> **Shipped:** **`/about`** = full **`aboutPage.jsx`** (lazy); **`AppFooter`** deleted — legal/TMDB/US lines live on **About** + Privacy/Terms. Primary nav + drawer include **About**. **Terms** markdown: §23–27 including **TMDB API Usage** (`Policies/TERMS_OF_SERVICE.md`). **`scripts/sql/analytics-admin/`** in repo. Analytics migrations **`20260606`**/**`07`** — **commit** + prod apply when ready (**often still untracked locally** — check **`git status supabase/migrations`**).
+> **Git / Vercel:** **`staging`** branch → **staging** Vercel project (Production branch **`staging`**, e.g. nine-sigma **`*.vercel.app`**). **`main`** → **prod** Vercel (**`www.cinemastro.com`**). Ship **staging**: push commits to **`staging`**. Ship **prod**: merge **`staging` → `main`** then push **`main`** (or PR).
 >
-> **Master list:** **P1** US geo banner; **Account & data** — delete rating, delete account; analytics client **`log_analytics_*`**; Circles §8/§9; rest + parked in **`PASSDOWN-NEXT-CHAT.md`**.
+> **Shipped (app tip `34c645d`):** **Beta** UI (**`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**), **`/about`**, nav **About**, Terms §23–27 / TMDB. Analytics migrations **`20260606`**/**`07`** — **commit** + prod/staging apply when instrumenting (**check untracked** **`git status supabase/migrations`**).
 >
-> **Ops:** **`COMPUTE-NEIGHBORS-CRON.md`** when neighbors / MAU scale. **Edge** invite fns **1.0.2**. **Vercel** = **`main`** push (prod tracks **`main`**; app bundle **`ecd4f15`**).
+> **Prod backend:** Separate prod Supabase (often cloned from staging); Vault **`project_url`** / **`supabase_anon_key`** / **`compute_neighbors_cron_secret`** must match **prod** (not staging refs). Edge functions deployed to prod; **`pg_cron`**/**`pg_net`** jobs — **`COMPUTE-NEIGHBORS-CRON.md`**.
+>
+> **Master list:** **P1** US geo banner; **Account & data** — delete rating / account; analytics **`log_analytics_*`** wire; Circles §8/§9; rest in **`PASSDOWN-NEXT-CHAT.md`**.
+>
+> **Ops:** **`COMPUTE-NEIGHBORS-CRON.md`** — **`jobs × limit`** vs MAU. **Edge** invite **1.0.2**. **`git push` does not deploy** Edge — **`supabase functions deploy`** per **`HANDOFF.md`** project ref.
 
 ---
 
@@ -24,12 +28,12 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **7.0.17**; **Cinemastro** = **`APP_VERSION`**. Confirm **`CHANGELOG`**. |
-| **Git / deploy** | **`git pull`** **`origin/main`** — core app release **`ecd4f15`** (**About** hub, Terms §27 TMDB, **`AppFooter`** removed); docs commits may follow on **`main`**. |
-| **Supabase — apply if missing** | See **migrations checklist** below. Analytics **`20260606`**/**`07`** SQL may still need **`git add`**/**commit** if only applied by hand on prod — align repo with reality. |
-| **Analytics instrumentation** | DB + RPCs on prod when migrations applied; **client** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** yet. |
-| **Edge** | Invite fns **1.0.2**. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy. **`get-circle-rated-titles`** — **`git push` does not deploy** Edge. |
-| **Client deploy** | **Vercel** on **`main`** push; SQL migrations **not** auto-applied. |
+| **App version** | **7.0.18**; **Beta** toggle **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**. Confirm **`CHANGELOG`**. |
+| **Git / Vercel** | **`staging`** branch → **staging** site (Vercel Production branch **`staging`**). **`main`** → **prod** (**`www.cinemastro.com`** + prod **`*.vercel.app`**). Tips aligned at **`34c645d`** (Apr 2026); **`git pull`** both branches when switching machines. |
+| **Supabase — apply if missing** | See **migrations checklist** below. Analytics **`20260606`**/**`07`** may still need **`git add`**/**commit** — align repo; apply per env (**staging** vs **prod**). |
+| **Analytics instrumentation** | DB + RPCs when migrations applied; **client** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** yet. |
+| **Edge** | Invite fns **1.0.2**. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy **per Supabase project** (**staging** vs **prod**). |
+| **Client deploy** | **Vercel** builds from Git branch per project; SQL migrations **not** auto-applied. |
 
 **Where detail lives:** **`HANDOFF.md`**, **`CHANGELOG.md`**, **`PASSDOWN-ARCHIVE.md`**.
 
@@ -45,6 +49,7 @@
 
 ### Repo / ops / parity
 
+- [ ] **Branches:** Routine — commit on **`staging`**, push **`origin/staging`** → test staging URL; merge **`staging` → `main`**, push **`origin/main`** → prod. Keep **`staging`** rebased/merged from **`main`** periodically if both diverge.
 - [ ] **Git:** Ensure **`supabase/migrations/20260606120000_analytics_and_watch_chain_events.sql`** and **`20260607120000_log_analytics_watch_chain_rpc.sql`** are **committed on `main`** if prod (or team) expects them in repo — fix **`git status`** drift.
 - [ ] **Prod migrations:** Apply any checklist rows still missing (below); verify **`20260605`** (**`latest_share_at`**), **`20260606`** (analytics tables), **`20260607`** (analytics RPCs) on prod when instrumenting.
 - [ ] **Neighbors / MAU:** **`COMPUTE-NEIGHBORS-CRON.md`** — audit `compute-neighbors-w*` coverage as users grow.
@@ -170,7 +175,8 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Last session (2026-04-29)**
 
-- **Last note:** User asked to **update passdown for next chat**. **Shipped / deployed:** **`ecd4f15`** on **`origin/main`** — **`aboutPage.jsx`** **`/about`**, **`AppFooter`** removed, nav **About**, **Terms** §27 TMDB + restored §23–26, **`PASSDOWN`** backlog (**delete rating / account**). **Open:** analytics migrations repo parity + client **`log_analytics_*`**; **P1** US geo banner; neighbors cron coverage per **`COMPUTE-NEIGHBORS-CRON.md`**.
+- **Last note:** User asked to **update passdown** after **merge `staging` → `main`** and prod ship. **Shipped:** **`7.0.18`** **Beta** labeling (**`34c645d`** on **`main`**/**`staging`**); **`staging`**/**`main`** workflow + dual Vercel (staging branch vs **`www.cinemastro.com`** prod); prod Supabase/Vault/Edge/cron/domain work completed this arc (verify cron waves vs MAU). **GA:** set **`PUBLIC_BETA_LABEL`** **`false`** and revert **`index.html`** / **`site.webmanifest`** names if dropping Beta from tab/install title.
+- **Prior:** **`ecd4f15`** era — About hub, Terms TMDB, no footer. **Open:** analytics migrations **git parity** + client **`log_analytics_*`**; **P1** US geo banner; **`COMPUTE-NEIGHBORS-CRON.md`** coverage as users grow; Account delete rating/account backlog.
 
 ---
 
