@@ -1,5 +1,10 @@
 # Changelog
 
+## 7.0.24
+
+- **Layout — primary nav:** Scroll offset under the fixed bar uses **`--primary-nav-overlay-clearance`** (**72px** mobile, **82px** from **900px**, **84px** from **1200px**) so **logo + Beta** does not crowd the first row of content. Nav wordmark cluster gets **`min-width:0`**, **`nowrap`**, and **`max-height`** so the row stays stable.
+- **Circles — detail header:** **WhatsApp-style** row: **back** | **left-aligned** gold initials chip (**36px**, smaller than the **40px** back control) + **title** and **member count** stacked and **left-aligned** (ellipsis on long names). Slightly more padding on the blur bar; desktop gutters unchanged intent.
+
 ## 7.0.23
 
 - **Help tour:** Show the three-card Circles / Secondary-region tour whenever **`help_post_onboarding_seen`** is missing and the account has **finished onboarding** (metadata flag or any saved ratings), on first **Circles** landing — including **returning logins** (**reverts 7.0.22’s session-only gate**).
