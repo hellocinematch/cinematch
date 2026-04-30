@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-04-29 — trust **`package.json` / `CHANGELOG.md`** (**7.0.20**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** **and** **`staging`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.20** — Circles **copy-to-mail** invite URL: **`getCopyToMailCinemastroSiteUrl()`** (**`VITE_PUBLIC_SITE_URL`** or **`window.location.origin`** or **`https://www.cinemastro.com/`**); drops hardcoded nine-sigma. **7.0.19** — Edge **`compute-neighbors` `1.0.1`** stable **`profiles`** pagination. **7.0.18** — **Beta** labeling (**`34c645d`**). Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.20** — shipped on **`main`** + **`staging`** (**commit `2093b54`**): Circles **copy-to-mail** URL via **`getCopyToMailCinemastroSiteUrl()`**; includes Edge **`compute-neighbors` `1.0.1`** (**stable `profiles` pagination**). **Prod:** merge **`staging` → `main`** + push **`origin/main`** done — confirm Vercel **www** build. **7.0.18** **Beta** UI base **`34c645d`**. **Ops (hosted DB, not in git):** **`compute-neighbors-w00`…`w19`** — **`limit: 10`**, staggered Sunday UTC → **200** eligible users/week; mirror **`COMPUTE-NEIGHBORS-CRON.md`** if envs diverge. Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -14,7 +14,7 @@
 >
 > **Git / Vercel:** **`staging`** branch → **staging** Vercel project (Production branch **`staging`**, e.g. nine-sigma **`*.vercel.app`**). **`main`** → **prod** Vercel (**`www.cinemastro.com`**). Ship **staging**: push commits to **`staging`**. Ship **prod**: merge **`staging` → `main`** then push **`main`** (or PR).
 >
-> **Shipped (app tip `34c645d`):** **Beta** UI (**`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**), **`/about`**, nav **About**, Terms §23–27 / TMDB. Analytics migrations **`20260606`**/**`07`** — **commit** + prod/staging apply when instrumenting (**check untracked** **`git status supabase/migrations`**).
+> **Shipped:** **7.0.20** **`2093b54`** — copy-to-mail URL + **`compute-neighbors` `1.0.1`** (redeploy Edge on **staging + prod** if JSON **`edge.version`** not **1.0.1**). **Beta** UI base **`34c645d`**. **Cron (SQL Editor):** **`w00`–`w19`**, **`limit: 10`** ≈ **200**/week — audit when **`totalEligible`** grows. Analytics migrations **`20260606`**/**`07`** — still often **untracked**; **commit** + apply per env when instrumenting.
 >
 > **Prod backend:** Separate prod Supabase (often cloned from staging); Vault **`project_url`** / **`supabase_anon_key`** / **`compute_neighbors_cron_secret`** must match **prod** (not staging refs). Edge functions deployed to prod; **`pg_cron`**/**`pg_net`** jobs — **`COMPUTE-NEIGHBORS-CRON.md`**.
 >
@@ -52,7 +52,7 @@
 - [ ] **Branches:** Routine — commit on **`staging`**, push **`origin/staging`** → test staging URL; merge **`staging` → `main`**, push **`origin/main`** → prod. Keep **`staging`** rebased/merged from **`main`** periodically if both diverge.
 - [ ] **Git:** Ensure **`supabase/migrations/20260606120000_analytics_and_watch_chain_events.sql`** and **`20260607120000_log_analytics_watch_chain_rpc.sql`** are **committed on `main`** if prod (or team) expects them in repo — fix **`git status`** drift.
 - [ ] **Prod migrations:** Apply any checklist rows still missing (below); verify **`20260605`** (**`latest_share_at`**), **`20260606`** (analytics tables), **`20260607`** (analytics RPCs) on prod when instrumenting.
-- [ ] **Neighbors / MAU:** **`COMPUTE-NEIGHBORS-CRON.md`** — audit `compute-neighbors-w*` coverage as users grow.
+- [ ] **Neighbors / MAU:** **`COMPUTE-NEIGHBORS-CRON.md`** — **20** jobs × **`limit: 10`** = **200**/week (sync **staging** vs **prod** **`cron.job`**); add **`w20+`** / raise **`limit`** when **`totalEligible`** &gt; **200** or chunks slow/time out.
 
 ### Analytics / BD (instrumentation)
 
@@ -175,8 +175,11 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Last session (2026-04-29)**
 
-- **Last note:** **`code now`** — **7.0.20** Circles **copy-to-mail**: replaced hardcoded nine-sigma with **`getCopyToMailCinemastroSiteUrl()`** (`**`VITE_PUBLIC_SITE_URL`**` / **`window.location.origin`** / **`https://www.cinemastro.com/`**). Ship via **`staging` → `main`** + Vercel. Optional: set **`VITE_PUBLIC_SITE_URL`** on Vercel if origin must differ from the host (e.g. custom domain quirks).
-- **Prior:** **`compute-neighbors` `1.0.1`** + cron **`limit:10`**. **Open:** analytics migrations **git parity** + client **`log_analytics_*`**; **P1** US geo banner; **`COMPUTE-NEIGHBORS-CRON.md`** coverage; Account delete rating/account backlog.
+- **Last note:** User asked to **write handoff for next chat** (this file + paste block below).
+- **Shipped this arc:** **`2093b54`** on **`origin/staging`** and **`origin/main`** — **7.0.20** (`**CHANGELOG**` / **`package.json`**): **`src/circles.js`** dynamic invite link; **`compute-neighbors`** **1.0.1** ( **`profiles` `.order("id")`**, null-safe seed prefix). User merged **`staging` → `main`** and pushed **prod**. **Supabase SQL:** **`compute-neighbors-w00`…`w19`** with **`limit: 10`** (after removing old **`limit: 5`** jobs) — **200** eligible-user slots/week **per project**; **confirm** staging + prod **`cron.job`** parity and **`net.http_post`** Vault secrets.
+- **Verify:** Vercel **prod** picked up **7.0.20**; Edge responses **`edge.version` `1.0.1`** on both Supabase projects; optional **`VITE_PUBLIC_SITE_URL`** on Vercel if invite URL must override **`window.location.origin`**.
+- **Discussion (not built):** **Beta cap** — **100** completed signups **excluding** seeds (**`user_metadata.seed_user`** / email pattern); enforce server-side + UX when ready.
+- **Open:** analytics **`20260606`**/**`07`** **git add** + apply; client **`log_analytics_*`** wire; **P1** US geo banner; Account delete rating/account; Circles §8/§9.
 
 ---
 
