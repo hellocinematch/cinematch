@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-04-29 — trust **`package.json` / `CHANGELOG.md`** (**7.0.20**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** **and** **`staging`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-04-30 — trust **`package.json` / `CHANGELOG.md`** (**7.0.24**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** **and** **`staging`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.20** — shipped on **`main`** + **`staging`** (**commit `2093b54`**): Circles **copy-to-mail** URL via **`getCopyToMailCinemastroSiteUrl()`**; includes Edge **`compute-neighbors` `1.0.1`** (**stable `profiles` pagination**). **Prod:** merge **`staging` → `main`** + push **`origin/main`** done — confirm Vercel **www** build. **7.0.18** **Beta** UI base **`34c645d`**. **Ops (hosted DB, not in git):** **`compute-neighbors-w00`…`w19`** — **`limit: 10`**, staggered Sunday UTC → **200** eligible users/week; mirror **`COMPUTE-NEIGHBORS-CRON.md`** if envs diverge. Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.24** **`cb15f4d`** — **circle detail header** (**WhatsApp-style** left-aligned **gold initials chip**, title + member line); **`--primary-nav-overlay-clearance`** so **logo + Beta** bar does not squeeze first content (**`src/App.css`** only). **7.0.21–7.0.23** **`ea8c9d4`** — **Help:** **`src/helpPage.jsx`**, **`/help`**, post-onboarding **3-card tour** (Circles ×2 + Secondary region); persists **`help_post_onboarding_seen`**; tour shows whenever that flag **missing** + onboarding done (**7.0.23** reverted narrow **7.0.22** gate). **`main`** **`staging`** synced at **`cb15f4d`** (prod pushed). **`compute-neighbors-w00`…`w19`**, **`limit: 10`** — **`COMPUTE-NEIGHBORS-CRON.md`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -10,17 +10,19 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.20**). **`git pull`** **`origin/main`** **and** **`origin/staging`**. **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (**7.0.24**). **`git pull`** **`origin/main`** **and** **`origin/staging`**. **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don’t change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
-> **Git / Vercel:** **`staging`** branch → **staging** Vercel project (Production branch **`staging`**, e.g. nine-sigma **`*.vercel.app`**). **`main`** → **prod** Vercel (**`www.cinemastro.com`**). Ship **staging**: push commits to **`staging`**. Ship **prod**: merge **`staging` → `main`** then push **`main`** (or PR).
+> **Git / Vercel:** **`staging`** → staging site; **`main`** → **`www.cinemastro.com`**. Ship **staging** → merge **`staging → main`** → push **`main`** for prod.
 >
-> **Shipped:** **7.0.20** **`2093b54`** — copy-to-mail URL + **`compute-neighbors` `1.0.1`** (redeploy Edge on **staging + prod** if JSON **`edge.version`** not **1.0.1**). **Beta** UI base **`34c645d`**. **Cron (SQL Editor):** **`w00`–`w19`**, **`limit: 10`** ≈ **200**/week — audit when **`totalEligible`** grows. Analytics migrations **`20260606`**/**`07`** — still often **untracked**; **commit** + apply per env when instrumenting.
+> **Latest ship:** **`cb15f4d`** (**7.0.24**) — circle detail **WhatsApp-style** chrome + **`--primary-nav-overlay-clearance`**. **`ea8c9d4`** arc — **`/help`**, post-onboarding **tour**, **`help_post_onboarding_seen`**. Edge **`compute-neighbors` `1.0.1`** — verify **`edge.version`** on **staging + prod** after deploys.
 >
-> **Prod backend:** Separate prod Supabase (often cloned from staging); Vault **`project_url`** / **`supabase_anon_key`** / **`compute_neighbors_cron_secret`** must match **prod** (not staging refs). Edge functions deployed to prod; **`pg_cron`**/**`pg_net`** jobs — **`COMPUTE-NEIGHBORS-CRON.md`**.
+> **Cron:** **`compute-neighbors-w00`–`w19`**, **`limit: 10`** ≈ **200**/week; keep envs aligned — **`COMPUTE-NEIGHBORS-CRON.md`**. Analytics migrations **`20260606`**/**`07`** often still **untracked** locally — **commit + apply**.
 >
-> **Master list:** **P1** US geo banner; **Account & data** — delete rating / account; analytics **`log_analytics_*`** wire; Circles §8/§9; rest in **`PASSDOWN-NEXT-CHAT.md`**.
+> **Prod backend:** Vault **`project_url`** / **`supabase_anon_key`** / **`compute_neighbors_cron_secret`** match **prod** (not staging). **`pg_cron`**/**`pg_net`** jobs — **`COMPUTE-NEIGHBORS-CRON.md`**.
 >
-> **Ops:** **`COMPUTE-NEIGHBORS-CRON.md`** — **`jobs × limit`** vs MAU. **Edge** invite **1.0.2**; **`compute-neighbors` `1.0.1`** (redeploy both envs after pull). **`git push` does not deploy** Edge — **`supabase functions deploy`** per **`HANDOFF.md`** project ref.
+> **Master list:** **P1** US geo banner; analytics **`log_analytics_*`** in **`App.jsx`**; Account delete rating/account; Circles §8/§9; rest in **`PASSDOWN-NEXT-CHAT.md`**.
+>
+> **Ops:** **`COMPUTE-NEIGHBORS-CRON.md`**. **Edge** invite **1.0.2**. **`git push` does not deploy** Edge — **`supabase functions deploy`** per **`HANDOFF.md`**.
 
 ---
 
@@ -28,8 +30,8 @@
 
 | Item | State |
 |------|--------|
-| **App version** | **7.0.20**; **Beta** toggle **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**. Confirm **`CHANGELOG`**. |
-| **Git / Vercel** | **`staging`** branch → **staging** site (Vercel Production branch **`staging`**). **`main`** → **prod** (**`www.cinemastro.com`**). **`7.0.18`** app tip **`34c645d`**; **7.0.19** Edge neighbor pagination; **7.0.20** copy-to-mail URL — **`git pull`** **`origin/main`**. **`git pull`** both **`main`** and **`staging`** when switching machines. |
+| **App version** | **7.0.24**; **Beta** **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**. **Help:** **`help_post_onboarding_seen`** + **`/help`**. Confirm **`CHANGELOG`**. |
+| **Git / Vercel** | **`staging`** → staging; **`main`** → **`www.cinemastro.com`**. **`cb15f4d`** (**7.0.24** layout pass) on **`origin/main`** and **`origin/staging`**; **`git pull`** both when switching machines. |
 | **Supabase — apply if missing** | See **migrations checklist** below. Analytics **`20260606`**/**`07`** may still need **`git add`**/**commit** — align repo; apply per env (**staging** vs **prod**). |
 | **Analytics instrumentation** | DB + RPCs when migrations applied; **client** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** yet. |
 | **Edge** | **`compute-neighbors` `1.0.1`** — verify JSON **`edge.version`** after deploy. Invite fns **1.0.2**. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy **per Supabase project** (**staging** vs **prod**). |
@@ -173,14 +175,16 @@ Apply any that are missing on prod (user often uses SQL editor):
 
 **Handoff rule:** merge the prior session’s **last user note** here under **Last session** when you update this file. **Shipped truth:** **`CHANGELOG`** / **`package.json`**.
 
-**Last session (2026-04-29)**
+**Last session (2026-04-30)**
 
-- **Last note:** User asked to **write handoff for next chat** (this file + paste block below).
-- **Shipped this arc:** **`2093b54`** on **`origin/staging`** and **`origin/main`** — **7.0.20** (`**CHANGELOG**` / **`package.json`**): **`src/circles.js`** dynamic invite link; **`compute-neighbors`** **1.0.1** ( **`profiles` `.order("id")`**, null-safe seed prefix). User merged **`staging` → `main`** and pushed **prod**. **Supabase SQL:** **`compute-neighbors-w00`…`w19`** with **`limit: 10`** (after removing old **`limit: 5`** jobs) — **200** eligible-user slots/week **per project**; **confirm** staging + prod **`cron.job`** parity and **`net.http_post`** Vault secrets.
-- **Verify:** Vercel **prod** picked up **7.0.20**; Edge responses **`edge.version` `1.0.1`** on both Supabase projects; optional **`VITE_PUBLIC_SITE_URL`** on Vercel if invite URL must override **`window.location.origin`**.
-- **Discussion (not built):** **Beta cap** — **100** completed signups **excluding** seeds (**`user_metadata.seed_user`** / email pattern); enforce server-side + UX when ready.
-- **Open:** analytics **`20260606`**/**`07`** **git add** + apply; client **`log_analytics_*`** wire; **P1** US geo banner; Account delete rating/account; Circles §8/§9.
+- **Last note:** User asked to **write passdown for next chat** (this file + paste block below).
+- **Shipped this arc:** **`ea8c9d4`** — **7.0.21–7.0.23**: **`src/helpPage.jsx`**, **`PostOnboardingHelpTour`**, **`HelpFullPage`** at **`/help`**; **`SPA_LEGAL_SCREENS`** + **`help`**; About + profile menus **Help** entry; tour when **`help_post_onboarding_seen`** missing and onboarding done (**7.0.23** restored “all users missing flag” after **7.0.22** session-only pivot). **`cb15f4d`** — **7.0.24**: circle detail **WhatsApp-style** header (smaller **gold** initials disk, left title/members), **`--primary-nav-overlay-clearance`** (72 / 82 / 84px breakpoints) + nav **wordmark cluster** stability. **Beta** stays on **Cinemastro** wordmark only — not circle names.
+- **Git:** **`origin/main`** **`origin/staging`** **`cb15f4d`**; staging + prod merge/push done earlier in week.
+- **Open:** analytics **`20260606`**/**`07`** untracked/worktree drift; wire **`log_analytics_*`** in **`App.jsx`**; **P1** US geo banner; Circles §8/§9; account/rating delete; beta **100** non-seed cap (discussion only).
 
+**Earlier (2026-04-29)**
+
+- **7.0.20** **`2093b54`**: copy-to-mail URL; **`compute-neighbors` `1.0.1`**. Cron **`w00`–`w19`** **`limit: 10`**. Optional **`VITE_PUBLIC_SITE_URL`** for invite links.
 ---
 
 *Trim **Open / follow-ups** to the last one or two sessions when updating; archive older bullets to **`PASSDOWN-ARCHIVE.md`** if they contain unique decisions.*
