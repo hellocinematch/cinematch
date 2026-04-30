@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-04-29 — trust **`package.json` / `CHANGELOG.md`** (**7.0.18**). **Priority 1 product:** US geo banner / residency notice (see **Master list**). **`git pull`** **`main`** **and** **`staging`** — **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.18** — public **Beta** labeling: nav pill (**`product-beta-pill`**), **About** / **Profile** version lines; **`index.html`** title + **`application-name`**; **`site.webmanifest`** display **name**; toggle **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`** for GA. App commit **`34c645d`**; branch tips may include later docs (**e.g.** passdown **`e8372d4`**). **7.0.16–7.0.17** — **`aboutPage.jsx`** **`/about`** hub; **`AppFooter`** removed; **Terms** §23–27 incl. **TMDB API Usage**. Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.18** — public **Beta** labeling: nav pill (**`product-beta-pill`**), **About** / **Profile** version lines; **`index.html`** title + **`application-name`**; **`site.webmanifest`** display **name**; toggle **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`** for GA. App release commit **`34c645d`** ( **`main`** may have docs-only commits after). **7.0.16–7.0.17** — **`aboutPage.jsx`** **`/about`** hub; **`AppFooter`** removed; **Terms** §23–27 incl. **TMDB API Usage**. Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -29,7 +29,7 @@
 | Item | State |
 |------|--------|
 | **App version** | **7.0.18**; **Beta** toggle **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`**. Confirm **`CHANGELOG`**. |
-| **Git / Vercel** | **`staging`** branch → **staging** site (Vercel Production branch **`staging`**). **`main`** → **prod** (**`www.cinemastro.com`**). **`7.0.18`** app **`34c645d`**; **`main`** may be ahead with docs-only commits (**e.g.** **`e8372d4`** passdown). **`git pull`** both branches when switching machines. |
+| **Git / Vercel** | **`staging`** branch → **staging** site (Vercel Production branch **`staging`**). **`main`** → **prod** (**`www.cinemastro.com`**). **`7.0.18`** shipped from app commit **`34c645d`** ( **`git pull`** **`origin/main`** for any docs-only follow-ups). **`git pull`** both **`main`** and **`staging`** when switching machines. |
 | **Supabase — apply if missing** | See **migrations checklist** below. Analytics **`20260606`**/**`07`** may still need **`git add`**/**commit** — align repo; apply per env (**staging** vs **prod**). |
 | **Analytics instrumentation** | DB + RPCs when migrations applied; **client** **`log_analytics_event`** / **`log_watch_chain_event`** — **not wired** in **`App.jsx`** yet. |
 | **Edge** | Invite fns **1.0.2**. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy **per Supabase project** (**staging** vs **prod**). |
