@@ -1,3 +1,4 @@
+import { PUBLIC_BETA_LABEL } from "./productLabels.js";
 import { LEGAL_PLACEHOLDERS } from "./legalConstants.js";
 import { LegalTopBar } from "./legal.jsx";
 
@@ -23,7 +24,14 @@ export function AboutPage({ onBack, onPrivacy, onTerms, appVersion }) {
             Your Personal Film Maestro
           </h1>
           <p className="about-version-line">
-            Cinemastro <span className="about-version-num">v{appVersion}</span>
+            Cinemastro
+            {PUBLIC_BETA_LABEL ? (
+              <>
+                {" "}
+                <span className="product-beta-pill product-beta-pill--about">Beta</span>
+              </>
+            ) : null}{" "}
+            <span className="about-version-num">v{appVersion}</span>
           </p>
           <p className="legal-p about-intro">
             Discover movies and TV with predictions tuned to your taste, circles for sharing picks, watchlists,

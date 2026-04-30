@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.18
+
+- **Product:** Public **Beta** labeling — gold pill next to the header wordmark; **About** and **Profile** version lines; **`index.html`** title / **`application-name`**; PWA **`site.webmanifest`** name. Toggle via **`src/productLabels.js`** **`PUBLIC_BETA_LABEL`** for GA.
+
 ## 7.0.17
 
 - **Legal:** **Terms of Use** — completed truncated sections **23–26** (electronic signatures, California notice, miscellaneous, contact); added **§27 TMDB API Usage** (TMDB obligations, restrictions, rate-limit reference). Markdown source: **`Policies/TERMS_OF_SERVICE.md`** (**Last updated April 29, 2026**).

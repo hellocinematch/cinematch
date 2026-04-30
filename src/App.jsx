@@ -38,6 +38,7 @@ import {
   buildCopyToMailCircleInviteMailto,
   INVITE_NO_CINEMASTRO_ACCOUNT_ERR_PREFIX,
 } from "./circles";
+import { PUBLIC_BETA_LABEL } from "./productLabels.js";
 import "./App.css";
 import { PulsePage } from "./pages/PulsePage.jsx";
 import { InTheatersPage } from "./pages/InTheatersPage.jsx";
@@ -2507,14 +2508,26 @@ function AppBrand({ variant = "header", onPress }) {
       decoding="async"
     />
   );
+  const beta =
+    !splash && PUBLIC_BETA_LABEL ? (
+      <span className="product-beta-pill" aria-label="Beta release">
+        Beta
+      </span>
+    ) : null;
+  const cluster = (
+    <span className="app-brand-cluster">
+      {img}
+      {beta}
+    </span>
+  );
   if (onPress && !splash) {
     return (
       <button type="button" className="app-brand-button" onClick={onPress} aria-label="Go to home">
-        {img}
+        {cluster}
       </button>
     );
   }
-  return img;
+  return splash ? img : cluster;
 }
 
 function formatPublicStat(n) {
@@ -11135,7 +11148,16 @@ export default function App() {
               <div className="profile-settings-label" style={{ marginTop: 20 }}>Email</div>
               <div className="profile-settings-email">{user?.email || "—"}</div>
             </div>
-            <div className="profile-app-version">Cinemastro v{APP_VERSION}</div>
+            <div className="profile-app-version">
+              Cinemastro
+              {PUBLIC_BETA_LABEL ? (
+                <>
+                  {" "}
+                  <span className="product-beta-pill product-beta-pill--profile">Beta</span>
+                </>
+              ) : null}{" "}
+              v{APP_VERSION}
+            </div>
           </div>
           <BottomNav {...navProps} />
         </div>
