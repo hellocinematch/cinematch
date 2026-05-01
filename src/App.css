@@ -663,7 +663,32 @@
   .legal-topbar { display:grid; grid-template-columns:minmax(0, auto) 1fr auto; align-items:center; gap:12px; padding:14px 20px; padding-top:max(14px, env(safe-area-inset-top,0px)); border-bottom:1px solid #1a1a1a; position:sticky; top:0; background:#0a0a0a; z-index:40; }
   .legal-back { background:none; border:none; color:#888; font-size:14px; cursor:pointer; font-family:'DM Sans',sans-serif; padding:6px 0; }
   .legal-back:hover { color:#ccc; }
+  .legal-topbar-title-wrap {
+    display:flex;
+    flex-direction:row;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:center;
+    gap:8px 12px;
+    min-width:0;
+  }
   .legal-topbar-title { font-family:'DM Serif Display',serif; font-size:18px; color:#ddd7cd; text-align:center; }
+  .legal-topbar-trailing {
+    justify-self:end;
+    align-self:center;
+    min-width:0;
+    max-width:100%;
+  }
+  .legal-topbar-title-aside {
+    font-family:'DM Sans',sans-serif;
+    font-size:11px;
+    font-weight:500;
+    letter-spacing:0.02em;
+    color:#888;
+    text-align:right;
+    line-height:1.35;
+    white-space:normal;
+  }
   .legal-body { padding:20px 24px 32px; max-width:640px; margin:0 auto; }
   .legal-meta { font-size:11px; color:#555; margin-bottom:16px; }
   .legal-h2 { font-family:'DM Serif Display',serif; font-size:20px; color:#ddd7cd; margin:22px 0 10px; }
@@ -1225,6 +1250,14 @@
   .profile-top-text { flex:1; min-width:0; }
   .profile-name { font-family:'DM Serif Display',serif; font-size:24px; color:#f0ebe0; line-height:1.2; }
   .profile-stats-inline { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; align-items:center; }
+  .profile-site-stats-line {
+    margin-top:8px;
+    font-family:'DM Sans',sans-serif;
+    font-size:12px;
+    font-weight:500;
+    letter-spacing:0.02em;
+    color:#888;
+  }
   .profile-stat-chip { font-size:12px; color:#888; background:#141414; border:1px solid #252525; padding:6px 10px; border-radius:20px; font-family:'DM Sans',sans-serif; }
   button.profile-stat-chip { cursor:pointer; transition:all 0.2s; border-color:#2a2a2a; }
   button.profile-stat-chip:hover { border-color:#555; color:#ccc; }

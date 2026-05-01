@@ -1,6 +1,7 @@
 import { PUBLIC_BETA_LABEL } from "./productLabels.js";
 import { LEGAL_PLACEHOLDERS } from "./legalConstants.js";
 import { LegalTopBar } from "./legal.jsx";
+import { formatPublicStat } from "./formatPublicStat.js";
 
 const TMDB_SITE = "https://www.themoviedb.org/";
 
@@ -8,13 +9,28 @@ const TMDB_SITE = "https://www.themoviedb.org/";
  * About Cinemastro — app metadata, legal entry points, third‑party attribution.
  * Loaded lazily from `App.jsx`.
  */
-export function AboutPage({ onBack, onPrivacy, onTerms, onHelp, appVersion }) {
+export function AboutPage({ onBack, onPrivacy, onTerms, onHelp, appVersion, usersCount, ratingsCount }) {
   const { contactEmail, siteUrl } = LEGAL_PLACEHOLDERS;
   const year = new Date().getFullYear();
+  const showStats =
+    usersCount != null &&
+    ratingsCount != null &&
+    Number.isFinite(Number(usersCount)) &&
+    Number.isFinite(Number(ratingsCount));
 
   return (
     <div className="legal-shell about-shell">
-      <LegalTopBar title="About" onBack={onBack} />
+      <LegalTopBar
+        title="About"
+        onBack={onBack}
+        titleAside={
+          showStats ? (
+            <>
+              users: {formatPublicStat(Number(usersCount))}, ratings: {formatPublicStat(Number(ratingsCount))}
+            </>
+          ) : null
+        }
+      />
       <div className="legal-body about-page-body">
         <section className="about-section about-section--hero" aria-labelledby="about-hero-heading">
           <div className="about-logo-wrap">

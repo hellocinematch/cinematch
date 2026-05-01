@@ -1,5 +1,17 @@
 # Changelog
 
+## 7.0.33
+
+- **About top bar:** **`users:`** / **`ratings:`** site stats move to the **right** of the legal top bar (trailing column), **About** title stays centered.
+
+## 7.0.32
+
+- **Profile & About — community stats:** **`get_public_site_stats`** counts shown as **`users:`** / **`ratings:`** (same compact format as the nav) on **Profile** under personal stat chips, and beside the **About** top-bar title. **`formatPublicStat`** moved to **`src/formatPublicStat.js`**; **`LegalTopBar`** accepts optional **`titleAside`**.
+
+## 7.0.31
+
+- **Help — Add to Home Screen:** Fourth post-onboarding tour card (**narrow viewports** only, ≤1023px at tour open) explains **Share → Add to Home Screen** (iOS Safari) and **Chrome install / add** (Android). **`Help & how to use`** gains a full section on **Add to Home Screen** (mobile & tablet), **offline expectations**, and **iOS vs Android** steps. See **`src/helpPage.jsx`**.
+
 ## 7.0.30
 
 - **Pulse — shared daily cache:** Trending + popular strips are **one catalog per UTC calendar day** for all users. **`pulse_catalog_daily`** (migration **`20260608120000_pulse_catalog_daily.sql`**) holds JSON rows; first visit after read miss invokes Edge **`pulse-catalog`** (**`1.0.0`**) to fetch TMDB and **upsert**; further visits **read** only. **Same-day** return to Pulse skips skeleton + refetch (**`pulseLoadedUtcDateRef`**). **Apply** the migration; set Edge secret **`TMDB_READ_ACCESS_TOKEN`**; **deploy** **`pulse-catalog`**. If DB/Edge is unavailable, client falls back to existing **`fetchPulseTrendingCatalog`** / **`fetchPulsePopularCatalog`**.

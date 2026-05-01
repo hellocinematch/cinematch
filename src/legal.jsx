@@ -2,14 +2,18 @@ import { LEGAL_PRIVACY_HTML, LEGAL_TERMS_HTML } from "./legalMarkdown.js";
 
 /** Full legal pages — lazy-loaded from App.jsx to keep initial JS smaller on mobile. */
 
-export function LegalTopBar({ title, onBack }) {
+export function LegalTopBar({ title, onBack, titleAside = null }) {
   return (
     <div className="legal-topbar">
       <button type="button" className="legal-back" onClick={onBack}>
         ← Back
       </button>
-      <div className="legal-topbar-title">{title}</div>
-      <div />
+      <div className="legal-topbar-title-wrap">
+        <div className="legal-topbar-title">{title}</div>
+      </div>
+      <div className="legal-topbar-trailing">
+        {titleAside ? <div className="legal-topbar-title-aside">{titleAside}</div> : null}
+      </div>
     </div>
   );
 }

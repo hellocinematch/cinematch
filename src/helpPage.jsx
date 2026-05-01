@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { LegalTopBar } from "./legal.jsx";
 
 const RATING_COLORS = [
@@ -8,6 +9,12 @@ const RATING_COLORS = [
   { hex: "#444", label: "Unset / muted", hint: "Score not chosen yet." },
 ];
 
+/** @typedef {{ title: string, micro?: string, showFullHelpLink?: boolean, bullets?: string[], paragraphs?: string[], mobileOnly?: boolean }} PostHelpCard */
+
+/** Max-width breakpoint: include phone + tablet for “Add to Home Screen” tour card (desktop skips it). */
+const POST_HELP_MOBILEISH_MQ = "(max-width: 1023px)";
+
+/** @type {PostHelpCard[]} */
 const POST_HELP_CARDS = [
   {
     title: "Circles are private groups",
@@ -38,10 +45,27 @@ const POST_HELP_CARDS = [
     micro: 'Wrong vibes? Adjust Profile → Secondary region.',
     showFullHelpLink: false,
   },
+  {
+    title: "Add Cinemastro to your Home Screen",
+    bullets: [
+      "On iPhone or iPad (Safari): tap Share → Add to Home Screen. Open from the new icon — full screen, like an app.",
+      "On Android (Chrome): open the menu (⋮) → Install app or Add to Home screen (wording varies by device).",
+    ],
+    micro:
+      "Same account as the website — one tap to open instead of hunting for a browser tab every time.",
+    showFullHelpLink: true,
+    mobileOnly: true,
+  },
 ];
 
+function postHelpDeckForInitialViewport() {
+  const narrow =
+    typeof window !== "undefined" && window.matchMedia(POST_HELP_MOBILEISH_MQ).matches;
+  return POST_HELP_CARDS.filter((c) => !c.mobileOnly || narrow);
+}
+
 /**
- * One-time post-onboarding carousel (Circles ×2 + Secondary region).
+ * One-time post-onboarding carousel (Circles ×2 + Secondary region + optional Home Screen on narrow viewports).
  */
 export function PostOnboardingHelpTour({
   step,
@@ -50,9 +74,11 @@ export function PostOnboardingHelpTour({
   onFullHelp,
   onFinish,
 }) {
-  const idx = Math.min(Math.max(Number(step), 1), POST_HELP_CARDS.length) - 1;
-  const card = POST_HELP_CARDS[idx];
-  const isLast = step >= POST_HELP_CARDS.length;
+  const deck = useMemo(() => postHelpDeckForInitialViewport(), []);
+  const len = deck.length;
+  const idx = Math.min(Math.max(Number(step), 1), len) - 1;
+  const card = deck[idx];
+  const isLast = step >= len;
 
   return (
     <div
@@ -65,7 +91,7 @@ export function PostOnboardingHelpTour({
       <div className="post-help-card">
         <div className="post-help-card__top">
           <span className="post-help-card__steps" aria-live="polite">
-            {step} / {POST_HELP_CARDS.length}
+            {step} / {len}
           </span>
           <button type="button" className="post-help-card__skip" onClick={onSkip}>
             Skip tour
@@ -164,6 +190,29 @@ export function HelpFullPage({ onBack }) {
         <h2 className="legal-h2">Profile</h2>
         <p className="legal-p">
           Your name and taste controls — genres, streaming focus, Mood regions, and Secondary region shape what each surface shows.
+        </p>
+
+        <h2 className="legal-h2">Add to Home Screen (mobile &amp; tablet)</h2>
+        <p className="legal-p">
+          Cinemastro runs in your browser, but you can <strong style={{ color: "#ccc", fontWeight: 600 }}>pin it to your Home Screen</strong>
+          {' '}so it opens in its own window without the usual browser bars. Handy if you use it a lot on a phone — you don&apos;t install from the
+          App Store or Play Store; it&apos;s the same site, and you get updates when we ship them.
+        </p>
+        <p className="legal-p legal-muted">
+          You still need an internet connection for most features (ratings, Circles, recommendations). This shortcut is about opening Cinemastro faster, not full offline mode.
+        </p>
+        <p className="legal-p">
+          <strong style={{ color: "#ccc", fontWeight: 600 }}>iPhone and iPad (Safari):</strong>{' '}
+          use Safari (in-app browsers don&apos;t always support Add to Home Screen). Tap <strong style={{ color: "#ccc", fontWeight: 600 }}>Share</strong>
+          {' → '}<strong style={{ color: "#ccc", fontWeight: 600 }}>Add to Home Screen</strong> and confirm. Then open Cinemastro from the icon on your Home Screen.
+        </p>
+        <p className="legal-p">
+          <strong style={{ color: "#ccc", fontWeight: 600 }}>Android (Chrome):</strong>{' '}
+          open the <strong style={{ color: "#ccc", fontWeight: 600 }}>⋮</strong> menu → look for <strong style={{ color: "#ccc", fontWeight: 600 }}>Install app</strong>
+          {' '}or <strong style={{ color: "#ccc", fontWeight: 600 }}>Add to Home screen</strong> and follow the prompts. Wording varies by manufacturer; if you don&apos;t see it, try updating Chrome or opening the site in Chrome first.
+        </p>
+        <p className="legal-p legal-muted">
+          If Cinemastro already opens full screen from an icon on your Home Screen, you&apos;re set — you can skip this section.
         </p>
 
         <h2 className="legal-h2">Ratings — colors</h2>

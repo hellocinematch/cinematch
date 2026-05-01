@@ -61,6 +61,7 @@ import {
 } from "./circleTmdbHydrateSessionCache.js";
 import { fingerprintMyCirclesList } from "./myCirclesListFingerprint.js";
 import { PUBLIC_BETA_LABEL } from "./productLabels.js";
+import { formatPublicStat } from "./formatPublicStat.js";
 import "./App.css";
 import { PulsePage } from "./pages/PulsePage.jsx";
 import { InTheatersPage } from "./pages/InTheatersPage.jsx";
@@ -2577,15 +2578,6 @@ function AppBrand({ variant = "header", onPress }) {
     );
   }
   return splash ? img : cluster;
-}
-
-function formatPublicStat(n) {
-  if (n == null || !Number.isFinite(n)) return "—";
-  const x = Math.floor(n);
-  if (x < 1000) return String(x);
-  if (x < 10000) return `${(x / 1000).toFixed(1).replace(/\.0$/, "")}k`;
-  if (x < 1_000_000) return `${Math.round(x / 1000)}k`;
-  return `${(x / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
 }
 
 /** Phase C circle strip: resolve poster row from catalogue, in-flight hydrate map, or session TMDB cache. */
@@ -11351,6 +11343,15 @@ export default function App() {
                 </span>
                 <span className="profile-stat-chip">Matches {recommendations.length}</span>
               </div>
+              {siteStats?.community != null &&
+              siteStats?.ratings != null &&
+              Number.isFinite(siteStats.community) &&
+              Number.isFinite(siteStats.ratings) ? (
+                <div className="profile-site-stats-line">
+                  users: {formatPublicStat(siteStats.community)}, ratings:{" "}
+                  {formatPublicStat(siteStats.ratings)}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="section profile-watchlist-section">
@@ -11616,6 +11617,8 @@ export default function App() {
         <Suspense fallback={<LegalLazyFallback />}>
           <AboutPage
             appVersion={APP_VERSION}
+            usersCount={siteStats?.community}
+            ratingsCount={siteStats?.ratings}
             onBack={closeLegalPage}
             onPrivacy={() => openLegalPage("privacy")}
             onTerms={() => openLegalPage("terms")}
