@@ -1,8 +1,12 @@
 # Changelog
 
+## 7.0.35
+
+- **Bottom nav — Circles:** First slot opens **Circles** (same routing as drawer / primary **`navigatePrimarySection('circles')`**). **`BottomNavCirclesRingsIcon`**: three **interlocking ring** strokes in wordmark **`#f0ebe0`** / **`#8B1A1A`** / **`#e8c96a`**, **22×22** viewBox aligned with **`BottomNavListIcon`**. Active while **`circles`** or **`circle-detail`**.
+
 ## 7.0.34
 
-- **Circles — globally unique names (active):** Database partial unique index on **`lower(trim(name))`** for **`status = 'active'`** — migration **`20260609120000_circles_active_name_unique_ci.sql`**. Matches client trim + case-insensitive collisions; **`archived`** rows are excluded so legacy data stays valid. **`createCircle`** / **`updateCircle`** map Postgres **`23505`** to **That circle name is already taken.** (`**src/circles.js**`).
+- **Circles — globally unique names (active):** Database partial unique index on **`lower(trim(name))`** for **`status = 'active'`** — migration **`20260609120000_circles_active_name_unique_ci.sql`**. Matches client trim + case-insensitive collisions; **`archived`** rows are excluded so legacy data stays valid. **`createCircle`** / **`updateCircle`** map Postgres **`23505`** to **That circle name is already taken.** See **`src/circles.js`**.
 
 ## 7.0.33
 

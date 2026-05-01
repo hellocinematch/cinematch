@@ -2004,6 +2004,20 @@ function BottomNavListIcon() {
   );
 }
 
+/** Bottom bar — interconnecting rings; stroke colors align with `public/cinemastro-logo.svg` wordmark. */
+function BottomNavCirclesRingsIcon() {
+  return (
+    <svg className="bottom-nav-circles-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      {/* Bottom-left */}
+      <circle cx="9" cy="15.35" r="4.05" stroke="#f0ebe0" strokeWidth="2" />
+      {/* Bottom-right */}
+      <circle cx="15" cy="15.35" r="4.05" stroke="#8B1A1A" strokeWidth="2" />
+      {/* Top — drawn last so gold reads on top where paths cross */}
+      <circle cx="12" cy="8.65" r="4.05" stroke="#e8c96a" strokeWidth="2" />
+    </svg>
+  );
+}
+
 function BottomNav({
   navTab,
   setNavTab,
@@ -2014,6 +2028,8 @@ function BottomNav({
   onSignOut,
   clearDetailForBottomNav,
   onOpenHelp,
+  circlesBottomNavActive,
+  onNavigateCircles,
 }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileNavRef = useRef(null);
@@ -2031,6 +2047,31 @@ function BottomNav({
 
   return (
     <div className="bottom-nav">
+      <div
+        className={`nav-item ${circlesBottomNavActive ? "active" : ""}`}
+        role="button"
+        tabIndex={0}
+        aria-label="Circles"
+        onClick={() => {
+          clearDetailForBottomNav?.();
+          setProfileMenuOpen(false);
+          onNavigateCircles?.();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            clearDetailForBottomNav?.();
+            setProfileMenuOpen(false);
+            onNavigateCircles?.();
+          }
+        }}
+      >
+        <div className={`nav-item__icon-wrap ${circlesBottomNavActive ? "nav-item__icon-wrap--active" : ""}`}>
+          <div className="nav-icon nav-icon--svg">
+            <BottomNavCirclesRingsIcon />
+          </div>
+        </div>
+      </div>
       <div
         className={`nav-item ${navTab === "mood" ? "active" : ""}`}
         onClick={() => {
@@ -8835,6 +8876,8 @@ export default function App() {
     onSignOut: handleSignOut,
     clearDetailForBottomNav: clearDetailOverlayToNavigate,
     onOpenHelp: () => openLegalPage("help"),
+    circlesBottomNavActive: screen === "circles" || screen === "circle-detail",
+    onNavigateCircles: () => navigatePrimarySection("circles"),
   };
 
   function AccountAvatarMenu() {
