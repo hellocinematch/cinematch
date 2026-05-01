@@ -79,6 +79,16 @@ export function validateCircleName(raw) {
   return { ok: true, name: s };
 }
 
+/** Shown when `circles_active_name_lower_trim_unique` rejects insert/update (Postgres 23505). */
+export const CIRCLE_NAME_TAKEN_MESSAGE = "That circle name is already taken.";
+
+function isPgUniqueViolation(err) {
+  if (!err) return false;
+  if (String(err.code) === "23505") return true;
+  const hint = `${err.details ?? ""} ${err.message ?? ""}`;
+  return /circles_active_name_lower_trim_unique/i.test(hint);
+}
+
 /** Two-letter placeholder initials for circle avatar (Unicode letters; duplicates if only one). */
 export function circleAvatarInitials(name) {
   const s = String(name ?? "").trim();
@@ -172,7 +182,10 @@ export async function createCircle({ name, description, vibe, creatorId }) {
     })
     .select("id, name, description, vibe, status, archived_at, created_at, creator_id")
     .single();
-  if (insertErr) throw insertErr;
+  if (insertErr) {
+    if (isPgUniqueViolation(insertErr)) throw new Error(CIRCLE_NAME_TAKEN_MESSAGE);
+    throw insertErr;
+  }
 
   const { error: memberErr } = await supabase
     .from("circle_members")
@@ -212,7 +225,10 @@ export async function updateCircle({ circleId, name, description, vibe }) {
     .eq("id", circleId)
     .select("id, name, description, vibe, status, archived_at, created_at, creator_id")
     .maybeSingle();
-  if (error) throw new Error(error.message || "Could not update circle.");
+  if (error) {
+    if (isPgUniqueViolation(error)) throw new Error(CIRCLE_NAME_TAKEN_MESSAGE);
+    throw new Error(error.message || "Could not update circle.");
+  }
   if (!data) throw new Error("Could not update circle.");
   return data;
 }

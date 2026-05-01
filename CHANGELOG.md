@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.34
+
+- **Circles — globally unique names (active):** Database partial unique index on **`lower(trim(name))`** for **`status = 'active'`** — migration **`20260609120000_circles_active_name_unique_ci.sql`**. Matches client trim + case-insensitive collisions; **`archived`** rows are excluded so legacy data stays valid. **`createCircle`** / **`updateCircle`** map Postgres **`23505`** to **That circle name is already taken.** (`**src/circles.js**`).
+
 ## 7.0.33
 
 - **About top bar:** **`users:`** / **`ratings:`** site stats move to the **right** of the legal top bar (trailing column), **About** title stays centered.
