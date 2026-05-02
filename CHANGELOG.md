@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.36
+
+- **Onboarding / Rate more — poster on mobile:** **`.onboarding .card-poster`** uses **~2:3** aspect, **`object-fit: contain`**, and a **shorter height cap** (**`min(22vh, 168px)`** base; slightly larger at **600px+** / **900px+**) so the image reads as a **poster tile**, not a wide hero, and **`RatingScoreChips`** stay visually primary on small viewports.
+
 ## 7.0.35
 
 - **Bottom nav — Circles:** First slot opens **Circles** (same routing as drawer / primary **`navigatePrimarySection('circles')`**). **`BottomNavCirclesRingsIcon`**: three **interlocking ring** strokes in wordmark **`#f0ebe0`** / **`#8B1A1A`** / **`#e8c96a`**, **22×22** viewBox aligned with **`BottomNavListIcon`**. Active while **`circles`** or **`circle-detail`**.
