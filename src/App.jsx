@@ -5409,7 +5409,8 @@ export default function App() {
       setAuthLoading(false);
     }
     if (error) { setAuthError(error.message); return; }
-    if (data.user) {
+    // With session only: otherwise RLS blocks update; DB trigger syncs profiles.name from signup metadata (migration profiles_sync_display_name_from_auth_users).
+    if (data.user && data.session) {
       const { error: profileErr } = await supabase
         .from("profiles")
         .update({ name: trimmedName })

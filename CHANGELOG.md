@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.41
+
+- **Auth — display name + email confirm:** Migration **`20260610120000_profiles_sync_display_name_from_auth_users.sql`** — **`AFTER INSERT OR UPDATE OF raw_user_meta_data`** on **`auth.users`** upserts **`public.profiles.name`** from **`raw_user_meta_data->>'name'`** (fallback email local-part / **`User`**); backfills existing rows where meta had a name but **`profiles.name`** was blank. **Apply on each env.** Client **`signUp`**: **`profiles.update`** for name runs **only when `data.session`** exists (avoids pointless RLS failures when confirmation is required).
+
 ## 7.0.40
 
 - **Profile — display name:** Removed the Display name block from Settings. Tap the **header name** to open the **Edit display name** sheet (same save flow as before).
