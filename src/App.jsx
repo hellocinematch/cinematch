@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import {
   CIRCLE_CAP,
   CIRCLE_MEMBER_CAP,
+  CIRCLE_NAME_MIN,
   CIRCLE_NAME_MAX,
   validateCircleName,
   circleAvatarInitials,
@@ -74,6 +75,9 @@ const AboutPage = lazy(() => import("./aboutPage.jsx").then((m) => ({ default: m
 
 // Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.5.0: precomputed neighbors + faster match predict; v3.4.0: detail card copy/chips refresh; v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
+
+/** Upper bound for `profiles.name` on sign-up (DB backfill uses 120-char cap). */
+const PROFILE_DISPLAY_NAME_MAX = 120;
 
 /** Circle detail — visible-tab watermark poll for “New activity” (`get_circle_others_activity_watermark`). Tier advances when the server timestamp is unchanged since the last poll. */
 const CIRCLE_WATERMARK_POLL_MS = [15_000, 45_000, 60_000];
@@ -3376,6 +3380,9 @@ export default function App() {
   const [profileName, setProfileName] = useState("");
   const [inviteToast, setInviteToast] = useState(null);
   const [profileSettingsError, setProfileSettingsError] = useState("");
+  /** Profile screen — display name input; synced when opening Profile or when `profileName` loads. */
+  const [profileNameDraft, setProfileNameDraft] = useState("");
+  const [profileNameSaveBusy, setProfileNameSaveBusy] = useState(false);
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
   const [showGenreIds, setShowGenreIds] = useState([]);
   /** Region buckets to include (Settings). Empty = all regions. Logged-out users ignore. */
@@ -5372,11 +5379,26 @@ export default function App() {
   }
 
   async function handleSignUp() {
-    setAuthError(""); setAuthLoading(true);
+    setAuthError("");
+    setAuthNotice("");
+    const trimmedName = authName.trim();
+    if (trimmedName.length < CIRCLE_NAME_MIN) {
+      setAuthError(`Enter your display name (at least ${CIRCLE_NAME_MIN} characters).`);
+      return;
+    }
+    if (trimmedName.length > PROFILE_DISPLAY_NAME_MAX) {
+      setAuthError(`Display name must be at most ${PROFILE_DISPLAY_NAME_MAX} characters.`);
+      return;
+    }
+    setAuthLoading(true);
     let data;
     let error;
     try {
-      ({ data, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword, options: { data: { name: authName } } }));
+      ({ data, error } = await supabase.auth.signUp({
+        email: authEmail,
+        password: authPassword,
+        options: { data: { name: trimmedName } },
+      }));
     } catch (e) {
       setAuthError(e?.message || "Sign up failed. Check your connection and try again.");
       return;
@@ -5385,7 +5407,13 @@ export default function App() {
     }
     if (error) { setAuthError(error.message); return; }
     if (data.user) {
-      await supabase.from("profiles").update({ name: authName }).eq("id", data.user.id);
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .update({ name: trimmedName })
+        .eq("id", data.user.id);
+      if (profileErr) {
+        console.warn("profiles name after signup:", profileErr.message);
+      }
     }
     // Email confirmation: no session yet — stay on auth and ask user to confirm, then sign in.
     if (!data.session) {
@@ -8854,8 +8882,63 @@ export default function App() {
     return formatScore(pred.low) !== formatScore(pred.high);
   };
   const obMovie = obMovies[obStep];
-  const userInitial = user?.user_metadata?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "?";
-  const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "there";
+  const headerDisplayName = useMemo(() => {
+    if (profileName && profileName.trim()) return profileName.trim();
+    const meta = user?.user_metadata?.name;
+    if (typeof meta === "string" && meta.trim()) return meta.trim();
+    const local = user?.email?.split("@")[0];
+    if (local) return local;
+    return "there";
+  }, [profileName, user]);
+
+  const headerInitial = useMemo(() => {
+    const s = headerDisplayName;
+    const ch = s && s.length > 0 ? s.charAt(0) : "";
+    if (ch) return ch.toUpperCase();
+    return user?.email?.[0]?.toUpperCase() || "?";
+  }, [headerDisplayName, user?.email]);
+
+  useEffect(() => {
+    if (screen !== "profile" || !user) return;
+    setProfileNameDraft(
+      (profileName && profileName.trim()) ||
+        (typeof user.user_metadata?.name === "string" && user.user_metadata.name.trim()) ||
+        user.email?.split("@")[0] ||
+        "",
+    );
+  }, [screen, user, profileName]);
+
+  async function persistProfileDisplayName() {
+    if (!user) return;
+    setProfileSettingsError("");
+    const trimmed = profileNameDraft.trim();
+    if (trimmed.length < CIRCLE_NAME_MIN) {
+      setProfileSettingsError(`Display name must be at least ${CIRCLE_NAME_MIN} characters.`);
+      return;
+    }
+    if (trimmed.length > PROFILE_DISPLAY_NAME_MAX) {
+      setProfileSettingsError(`Display name must be at most ${PROFILE_DISPLAY_NAME_MAX} characters.`);
+      return;
+    }
+    if (trimmed === headerDisplayName) return;
+
+    setProfileNameSaveBusy(true);
+    try {
+      const { error } = await supabase.from("profiles").update({ name: trimmed }).eq("id", user.id);
+      if (error) {
+        setProfileSettingsError(`Could not save display name: ${error.message}`);
+        return;
+      }
+      const { data: authData, error: authErr } = await supabase.auth.updateUser({ data: { name: trimmed } });
+      if (authErr) console.warn("updateUser metadata name:", authErr.message);
+      if (authData?.user) setUser(authData.user);
+      setProfileName(trimmed);
+      setProfileSettingsError("");
+    } finally {
+      setProfileNameSaveBusy(false);
+    }
+  }
+
   const ratedMovies = Object.entries(userRatings).map(([id, score]) => {
     const movie = catalogue.find(m => m.id === id);
     return movie ? { movie, score } : null;
@@ -8890,7 +8973,7 @@ export default function App() {
             setShowAvatarMenu(v => !v);
           }}
         >
-          {userInitial}
+          {headerInitial}
         </div>
         {showAvatarMenu && (
           <div className="avatar-menu" onClick={e => e.stopPropagation()}>
@@ -8973,7 +9056,18 @@ export default function App() {
             {authMode === "signup" && (
               <div className="auth-field">
                 <label className="auth-label">Your name</label>
-                <input className="auth-input" type="text" placeholder="e.g. Alex" value={authName} onChange={e => setAuthName(e.target.value)} />
+                <input
+                  className="auth-input"
+                  type="text"
+                  name="display-name"
+                  autoComplete="name"
+                  placeholder="e.g. Alex"
+                  required
+                  minLength={CIRCLE_NAME_MIN}
+                  maxLength={PROFILE_DISPLAY_NAME_MAX}
+                  value={authName}
+                  onChange={e => setAuthName(e.target.value)}
+                />
               </div>
             )}
             <div className="auth-field">
@@ -11370,9 +11464,9 @@ export default function App() {
       {screen === "profile" && (
         <div className="profile">
           <div className="profile-top">
-            <div className="profile-avatar">{userInitial}</div>
+            <div className="profile-avatar">{headerInitial}</div>
             <div className="profile-top-text">
-              <div className="profile-name">{userName}</div>
+              <div className="profile-name">{headerDisplayName}</div>
               <div className="profile-stats-inline">
                 <button
                   type="button"
@@ -11425,7 +11519,27 @@ export default function App() {
             <div className="profile-settings-title">Settings</div>
             {profileSettingsError && <div className="auth-error" style={{ marginBottom: 12 }}>{profileSettingsError}</div>}
             <div className="profile-settings-card">
-              <div className="profile-settings-label">Where you watch</div>
+              <div className="profile-settings-label">Display name</div>
+              <p className="settings-providers-hint">Shown on your profile, in Circles, and in invites. At least {CIRCLE_NAME_MIN} characters.</p>
+              <input
+                type="text"
+                className="auth-input"
+                style={{ marginBottom: 10 }}
+                autoComplete="name"
+                maxLength={PROFILE_DISPLAY_NAME_MAX}
+                value={profileNameDraft}
+                onChange={(e) => setProfileNameDraft(e.target.value)}
+                aria-label="Display name"
+              />
+              <button
+                type="button"
+                className="settings-genre-action-btn"
+                disabled={profileNameSaveBusy}
+                onClick={() => { void persistProfileDisplayName(); }}
+              >
+                {profileNameSaveBusy ? "Saving…" : "Save display name"}
+              </button>
+              <div className="profile-settings-label" style={{ marginTop: 20 }}>Where you watch</div>
               <p className="settings-providers-hint">Select the services you subscribe to. We’ll use this to tailor availability and picks.</p>
               <div className="settings-provider-grid">
                 {STREAMING_SERVICES.map(s => (

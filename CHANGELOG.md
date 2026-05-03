@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.38
+
+- **Profile — display name:** Settings card adds **Display name** field (**Save display name**) — updates **`profiles.name`** and **`auth.updateUser({ data: { name } })`** so avatars and metadata stay aligned. Profile header and menu initial use **`profiles.name`** when present (then metadata, then email local-part).
+
+## 7.0.37
+
+- **Auth — display name required on sign-up:** Validate trimmed name (**≥ `CIRCLE_NAME_MIN`**, **≤ 120** chars) before **`signUp`**; **`profiles`** update uses the same trimmed value. Sign-up field **`required`** + **`minLength`** / **`maxLength`** for browser hints.
+
 ## 7.0.36
 
 - **Onboarding / Rate more — poster on mobile:** **`.onboarding .card-poster`** uses **~2:3** aspect, **`object-fit: contain`**, and a **shorter height cap** (**`min(22vh, 168px)`** base; slightly larger at **600px+** / **900px+**) so the image reads as a **poster tile**, not a wide hero, and **`RatingScoreChips`** stay visually primary on small viewports.
