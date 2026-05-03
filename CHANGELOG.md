@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.40
+
+- **Profile — display name:** Removed the Display name block from Settings. Tap the **header name** to open the **Edit display name** sheet (same save flow as before).
+
+## 7.0.39
+
+- **Profile — display name settings UX:** Collapsed row shows current name + **Edit display name**; editing opens the shared bottom sheet (**Save** / **Cancel**) instead of an always-visible field. Validation errors appear in the sheet only.
+
 ## 7.0.38
 
 - **Profile — display name:** Settings card adds **Display name** field (**Save display name**) — updates **`profiles.name`** and **`auth.updateUser({ data: { name } })`** so avatars and metadata stay aligned. Profile header and menu initial use **`profiles.name`** when present (then metadata, then email local-part).

@@ -3383,6 +3383,9 @@ export default function App() {
   /** Profile screen — display name input; synced when opening Profile or when `profileName` loads. */
   const [profileNameDraft, setProfileNameDraft] = useState("");
   const [profileNameSaveBusy, setProfileNameSaveBusy] = useState(false);
+  /** Profile → Settings: bottom sheet to edit display name (collapsed row when closed). */
+  const [showProfileDisplayNameEditor, setShowProfileDisplayNameEditor] = useState(false);
+  const [profileDisplayNameFormError, setProfileDisplayNameFormError] = useState("");
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
   const [showGenreIds, setShowGenreIds] = useState([]);
   /** Region buckets to include (Settings). Empty = all regions. Logged-out users ignore. */
@@ -8899,44 +8902,63 @@ export default function App() {
   }, [headerDisplayName, user?.email]);
 
   useEffect(() => {
-    if (screen !== "profile" || !user) return;
+    if (screen !== "profile" || !user || showProfileDisplayNameEditor) return;
     setProfileNameDraft(
       (profileName && profileName.trim()) ||
         (typeof user.user_metadata?.name === "string" && user.user_metadata.name.trim()) ||
         user.email?.split("@")[0] ||
         "",
     );
-  }, [screen, user, profileName]);
+  }, [screen, user, profileName, showProfileDisplayNameEditor]);
+
+  useEffect(() => {
+    if (screen !== "profile") setShowProfileDisplayNameEditor(false);
+  }, [screen]);
 
   async function persistProfileDisplayName() {
     if (!user) return;
-    setProfileSettingsError("");
+    setProfileDisplayNameFormError("");
     const trimmed = profileNameDraft.trim();
     if (trimmed.length < CIRCLE_NAME_MIN) {
-      setProfileSettingsError(`Display name must be at least ${CIRCLE_NAME_MIN} characters.`);
+      setProfileDisplayNameFormError(`Display name must be at least ${CIRCLE_NAME_MIN} characters.`);
       return;
     }
     if (trimmed.length > PROFILE_DISPLAY_NAME_MAX) {
-      setProfileSettingsError(`Display name must be at most ${PROFILE_DISPLAY_NAME_MAX} characters.`);
+      setProfileDisplayNameFormError(`Display name must be at most ${PROFILE_DISPLAY_NAME_MAX} characters.`);
       return;
     }
-    if (trimmed === headerDisplayName) return;
+    if (trimmed === headerDisplayName) {
+      setShowProfileDisplayNameEditor(false);
+      return;
+    }
 
     setProfileNameSaveBusy(true);
     try {
       const { error } = await supabase.from("profiles").update({ name: trimmed }).eq("id", user.id);
       if (error) {
-        setProfileSettingsError(`Could not save display name: ${error.message}`);
+        setProfileDisplayNameFormError(`Could not save display name: ${error.message}`);
         return;
       }
       const { data: authData, error: authErr } = await supabase.auth.updateUser({ data: { name: trimmed } });
       if (authErr) console.warn("updateUser metadata name:", authErr.message);
       if (authData?.user) setUser(authData.user);
       setProfileName(trimmed);
-      setProfileSettingsError("");
+      setProfileDisplayNameFormError("");
+      setShowProfileDisplayNameEditor(false);
     } finally {
       setProfileNameSaveBusy(false);
     }
+  }
+
+  function openProfileDisplayNameEditor() {
+    setProfileDisplayNameFormError("");
+    setProfileNameDraft(
+      (profileName && profileName.trim()) ||
+        (typeof user?.user_metadata?.name === "string" && user.user_metadata.name.trim()) ||
+        user?.email?.split("@")[0] ||
+        "",
+    );
+    setShowProfileDisplayNameEditor(true);
   }
 
   const ratedMovies = Object.entries(userRatings).map(([id, score]) => {
@@ -11466,7 +11488,14 @@ export default function App() {
           <div className="profile-top">
             <div className="profile-avatar">{headerInitial}</div>
             <div className="profile-top-text">
-              <div className="profile-name">{headerDisplayName}</div>
+              <button
+                type="button"
+                className="profile-name profile-name-btn"
+                onClick={openProfileDisplayNameEditor}
+                aria-label={`Edit display name (${headerDisplayName})`}
+              >
+                {headerDisplayName}
+              </button>
               <div className="profile-stats-inline">
                 <button
                   type="button"
@@ -11519,27 +11548,7 @@ export default function App() {
             <div className="profile-settings-title">Settings</div>
             {profileSettingsError && <div className="auth-error" style={{ marginBottom: 12 }}>{profileSettingsError}</div>}
             <div className="profile-settings-card">
-              <div className="profile-settings-label">Display name</div>
-              <p className="settings-providers-hint">Shown on your profile, in Circles, and in invites. At least {CIRCLE_NAME_MIN} characters.</p>
-              <input
-                type="text"
-                className="auth-input"
-                style={{ marginBottom: 10 }}
-                autoComplete="name"
-                maxLength={PROFILE_DISPLAY_NAME_MAX}
-                value={profileNameDraft}
-                onChange={(e) => setProfileNameDraft(e.target.value)}
-                aria-label="Display name"
-              />
-              <button
-                type="button"
-                className="settings-genre-action-btn"
-                disabled={profileNameSaveBusy}
-                onClick={() => { void persistProfileDisplayName(); }}
-              >
-                {profileNameSaveBusy ? "Saving…" : "Save display name"}
-              </button>
-              <div className="profile-settings-label" style={{ marginTop: 20 }}>Where you watch</div>
+              <div className="profile-settings-label">Where you watch</div>
               <p className="settings-providers-hint">Select the services you subscribe to. We’ll use this to tailor availability and picks.</p>
               <div className="settings-provider-grid">
                 {STREAMING_SERVICES.map(s => (
@@ -11627,6 +11636,62 @@ export default function App() {
               v{APP_VERSION}
             </div>
           </div>
+          {showProfileDisplayNameEditor && (
+            <div
+              className="circles-sheet-root"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="profile-display-name-sheet-title"
+            >
+              <button
+                type="button"
+                className="circles-sheet-backdrop"
+                aria-label="Close"
+                onClick={() => setShowProfileDisplayNameEditor(false)}
+              />
+              <div className="circles-sheet profile-display-name-sheet">
+                <div className="circles-sheet-handle" aria-hidden />
+                <h2 id="profile-display-name-sheet-title" className="circles-sheet-title">
+                  Edit display name
+                </h2>
+                <p className="circles-sheet-sub">
+                  At least {CIRCLE_NAME_MIN} characters; shown in Circles and invites.
+                </p>
+                {profileDisplayNameFormError ? (
+                  <div className="auth-error profile-display-name-sheet-error">{profileDisplayNameFormError}</div>
+                ) : null}
+                <input
+                  type="text"
+                  className="auth-input"
+                  autoComplete="name"
+                  maxLength={PROFILE_DISPLAY_NAME_MAX}
+                  value={profileNameDraft}
+                  onChange={(e) => setProfileNameDraft(e.target.value)}
+                  aria-label="Display name"
+                />
+                <div className="circles-sheet-actions">
+                  <button
+                    type="button"
+                    className="circles-btn-ghost"
+                    onClick={() => setShowProfileDisplayNameEditor(false)}
+                    disabled={profileNameSaveBusy}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="circles-btn-primary"
+                    disabled={profileNameSaveBusy}
+                    onClick={() => {
+                      void persistProfileDisplayName();
+                    }}
+                  >
+                    {profileNameSaveBusy ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <BottomNav {...navProps} />
         </div>
       )}
