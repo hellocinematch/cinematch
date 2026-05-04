@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.51
+
+- **Circles — title detail (no-circle nudge):** Zero-circle **create circle** nudge after **Submit Rating** / **Save new** no longer requires **`circlesLoaded`**. Before deciding, **`resolveActiveCircleCountForNudge()`** uses **`fetchMyCircles()`** once when the circles list hasn’t finished its first load, so fast paths after login still see the modal. If that fetch fails, behavior falls through to **Publish to circles** (first submit) or no modal (**Save new**).
+
 ## 7.0.50
 
 - **Circles — title detail rating:** The **no active circles** “Create a circle” nudge (same **localStorage** cap as first submit) now runs after **Change rating → Save new**, not only after the first **Submit Rating**. Only when the signed-in user’s rating **upsert** succeeds.

@@ -6666,6 +6666,26 @@ export default function App() {
     );
   }
 
+  /** Membership count for detail “create circle” nudge; avoids skip when circles list hasn’t finished first load (`circlesLoaded` false). */
+  async function resolveActiveCircleCountForNudge() {
+    if (!user) return { ok: true, activeCount: 0 };
+    if (circlesLoaded) {
+      return {
+        ok: true,
+        activeCount: circlesList.filter((c) => c?.status === "active").length,
+      };
+    }
+    try {
+      const rows = await fetchMyCircles();
+      return {
+        ok: true,
+        activeCount: (rows || []).filter((c) => c?.status === "active").length,
+      };
+    } catch {
+      return { ok: false, activeCount: null };
+    }
+  }
+
   async function addRating(movieId, score, options = {}) {
     const skipPublishModal = options.skipPublishModal === true;
     const pendingNavigate = options.pendingNavigate ?? "none";
@@ -6690,17 +6710,16 @@ export default function App() {
 
     const shouldOpenPublish = Boolean(user) && !skipPublishModal && !hadRating;
     if (shouldOpenPublish) {
-      if (
-        options.afterDetailSubmit === true &&
-        circlesLoaded &&
-        circlesList.filter((c) => c?.status === "active").length === 0
-      ) {
-        if (readNoCirclesDetailRatingNudgeCount() < NO_CIRCLES_DETAIL_RATING_NUDGE_MAX) {
-          bumpNoCirclesDetailRatingNudgeCount();
-          setNoCirclesAfterDetailRatingModal({
-            pendingNavigate: options.pendingNavigate ?? "none",
-          });
-          return;
+      if (options.afterDetailSubmit === true) {
+        const { ok: circlesOk, activeCount } = await resolveActiveCircleCountForNudge();
+        if (circlesOk && activeCount === 0) {
+          if (readNoCirclesDetailRatingNudgeCount() < NO_CIRCLES_DETAIL_RATING_NUDGE_MAX) {
+            bumpNoCirclesDetailRatingNudgeCount();
+            setNoCirclesAfterDetailRatingModal({
+              pendingNavigate: options.pendingNavigate ?? "none",
+            });
+            return;
+          }
         }
       }
       const defaults = [];
@@ -6720,11 +6739,14 @@ export default function App() {
     if (
       options.afterDetailRatingUpdate === true &&
       Boolean(user) &&
-      ratingsUpsertOk &&
-      circlesLoaded &&
-      circlesList.filter((c) => c?.status === "active").length === 0
+      ratingsUpsertOk
     ) {
-      if (readNoCirclesDetailRatingNudgeCount() < NO_CIRCLES_DETAIL_RATING_NUDGE_MAX) {
+      const { ok: circlesOk, activeCount } = await resolveActiveCircleCountForNudge();
+      if (
+        circlesOk &&
+        activeCount === 0 &&
+        readNoCirclesDetailRatingNudgeCount() < NO_CIRCLES_DETAIL_RATING_NUDGE_MAX
+      ) {
         bumpNoCirclesDetailRatingNudgeCount();
         setNoCirclesAfterDetailRatingModal({
           pendingNavigate: options.pendingNavigate ?? "none",
