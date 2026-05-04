@@ -1,5 +1,14 @@
 # Changelog
 
+## 7.0.45
+
+- **Circles — share invite link:** `navigator.share` no longer passes a separate `url` alongside `text` (many apps only received the URL). Share payload is **`title` + `text`** with the link inlined in `text`.
+
+## 7.0.44
+
+- **Circles — share invite link:** Invite sheet adds **Search by email**, **Or share a link**, and **Share invite link** (Edge **`create-circle-invite-link`** `1.0.0`) — native share with `/join/<token>` (URL from **`VITE_PUBLIC_SITE_URL`** / **`window.location.origin`**). **`/join/:token`** route: **`preview-circle-invite-link`** `1.0.0` (anon; **`verify_jwt = false`** in **`supabase/config.toml`**), **`pendingCircleInviteToken`** through auth, **`claim-circle-invite-token`** `1.0.0`, Join / Decline via existing accept/decline. Removed copy-to-mail fallback when email has no account; **`send-circle-invite`** `1.0.3` suggests share link. Migration **`20260613120000_circle_invite_share_links.sql`**: nullable **`invited_user_id`**, **`invite_token`**, **`invite_email`**, **`expires_at`**, status **`revoked`**, pending-invite labels exclude unclaimed link rows, recipient **DELETE** own declined rows. **Apply migration; deploy new Edge functions + redeploy `send-circle-invite`.**
+- **Circles — hosts:** Client **`isCircleModerator`** and **`send-circle-invite`** allow **creator** and **admin** (creators can invite).
+
 ## 7.0.43
 
 - **Circles — last member leave:** **`leave_circle`** deleted **`circles`** under the same RLS as the signed-in user; **`creator can delete own circle`** requires **`is_circle_moderator`** ( **`admin`** ). A **sole** **`member`** row led to **0 rows deleted** and no error, so the empty circle could remain. Migration **`20260612120000_leave_circle_delete_bypass_rls.sql`** sets **`set row_security = off`** on the RPC and asserts delete / membership row counts. **Apply on each hosted DB.**

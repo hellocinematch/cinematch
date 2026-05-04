@@ -27,6 +27,12 @@ import {
   fetchCircleTitlePublishers,
   fetchCirclePendingInviteLabels,
   fetchCircleRatedTitles,
+  readJoinInviteTokenFromPath,
+  PENDING_CIRCLE_INVITE_TOKEN_KEY,
+  buildCircleInviteShareUrl,
+  previewCircleInviteLink,
+  claimCircleInviteToken,
+  createCircleInviteLink,
   CIRCLE_STRIP_INITIAL,
   CIRCLE_STRIP_PAGE,
   CIRCLE_STRIP_MAX,
@@ -36,9 +42,6 @@ import {
   fetchMyCircleUnseenActivity,
   markCircleLastSeen,
   getCircleOthersActivityWatermark,
-  buildCopyToMailCircleInviteText,
-  buildCopyToMailCircleInviteMailto,
-  INVITE_NO_CINEMASTRO_ACCOUNT_ERR_PREFIX,
 } from "./circles";
 import {
   peekCircleDetailCache,
@@ -477,6 +480,9 @@ function spaUrlWithoutOverlays() {
   const u = new URL(window.location.href);
   const legalSeg = pathnameLegalSegment(u.pathname);
   if (legalSeg) {
+    u.pathname = "/";
+  }
+  if (readJoinInviteTokenFromPath(u.pathname)) {
     u.pathname = "/";
   }
   u.searchParams.delete(SPA_QS_DETAIL);
@@ -3376,13 +3382,25 @@ export default function App() {
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [inviteEmailDraft, setInviteEmailDraft] = useState("");
   const [inviteSheetSubmitting, setInviteSheetSubmitting] = useState(false);
+  const [inviteLinkBusy, setInviteLinkBusy] = useState(false);
   const [inviteSheetError, setInviteSheetError] = useState("");
-  /** After send fails with no matching account: show prefilled copy-to-mail (Circles item 2). */
-  const [inviteSheetNoAccountCopy, setInviteSheetNoAccountCopy] = useState(false);
-  const [inviteCopyMailStatus, setInviteCopyMailStatus] = useState("");
-  /** `profiles.name` from `loadUserData` — for copy-to-mail “friend” name. */
+  /** `profiles.name` from `loadUserData` — unused here but kept with invite UX. */
   const [profileName, setProfileName] = useState("");
   const [inviteToast, setInviteToast] = useState(null);
+  /** `/join/:token` flow — token from URL or {@link PENDING_CIRCLE_INVITE_TOKEN_KEY} after auth. */
+  const [circleJoinModel, setCircleJoinModel] = useState({
+    token: "",
+    previewLoading: false,
+    preview: null,
+    previewError: "",
+    claimInviteId: null,
+    claimError: "",
+    alreadyMember: null,
+    busy: null,
+  });
+  const circleJoinClaimAttemptedRef = useRef(null);
+  /** Where auth “← Back” returns: splash vs circle-join. */
+  const authResumeScreenRef = useRef("splash");
   const [profileSettingsError, setProfileSettingsError] = useState("");
   /** Profile screen — display name input; synced when opening Profile or when `profileName` loads. */
   const [profileNameDraft, setProfileNameDraft] = useState("");
@@ -3723,6 +3741,21 @@ export default function App() {
       }
       if (session?.user && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
         setUser(session.user);
+        let joinTok = "";
+        try {
+          joinTok =
+            readJoinInviteTokenFromPath(window.location.pathname) ||
+            (typeof localStorage !== "undefined"
+              ? localStorage.getItem(PENDING_CIRCLE_INVITE_TOKEN_KEY) || ""
+              : "");
+        } catch {
+          joinTok = "";
+        }
+        joinTok = joinTok.trim();
+        if (joinTok) {
+          setScreen("circle-join");
+          return;
+        }
         goAppFromSplash();
         return;
       }
@@ -3730,6 +3763,94 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const tok = readJoinInviteTokenFromPath(window.location.pathname);
+    if (tok) setScreen("circle-join");
+  }, []);
+
+  useEffect(() => {
+    if (screen !== "circle-join") {
+      circleJoinClaimAttemptedRef.current = null;
+      return;
+    }
+    const fromUrl = readJoinInviteTokenFromPath(window.location.pathname);
+    let fromStorage = "";
+    try {
+      fromStorage = localStorage.getItem(PENDING_CIRCLE_INVITE_TOKEN_KEY) || "";
+    } catch {
+      fromStorage = "";
+    }
+    const token = (fromUrl || fromStorage || "").trim();
+    if (!token) {
+      setCircleJoinModel({
+        token: "",
+        previewLoading: false,
+        preview: null,
+        previewError: "Missing invite link.",
+        claimInviteId: null,
+        claimError: "",
+        alreadyMember: null,
+        busy: null,
+      });
+      return;
+    }
+
+    circleJoinClaimAttemptedRef.current = null;
+    setCircleJoinModel({
+      token,
+      previewLoading: true,
+      preview: null,
+      previewError: "",
+      claimInviteId: null,
+      claimError: "",
+      alreadyMember: null,
+      busy: null,
+    });
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await previewCircleInviteLink({ token });
+        if (cancelled) return;
+        if (data?.expired) {
+          setCircleJoinModel((m) => ({
+            ...m,
+            previewLoading: false,
+            previewError: typeof data.error === "string" ? data.error : "This invite has expired.",
+          }));
+          return;
+        }
+        if (!data?.ok) {
+          setCircleJoinModel((m) => ({
+            ...m,
+            previewLoading: false,
+            previewError:
+              typeof data?.error === "string" ? data.error : "This invite is no longer valid.",
+          }));
+          return;
+        }
+        setCircleJoinModel((m) => ({
+          ...m,
+          previewLoading: false,
+          preview: {
+            circle_name: data.circle_name,
+            inviter_name: data.inviter_name,
+          },
+        }));
+      } catch (e) {
+        if (cancelled) return;
+        setCircleJoinModel((m) => ({
+          ...m,
+          previewLoading: false,
+          previewError: e?.message || "Could not load invite.",
+        }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -5385,6 +5506,21 @@ export default function App() {
     persistStreamingProviders(next);
   }
 
+  function peekPendingCircleInviteToken() {
+    try {
+      const fromPath = readJoinInviteTokenFromPath(window.location.pathname);
+      if (fromPath) return fromPath.trim();
+      const s = localStorage.getItem(PENDING_CIRCLE_INVITE_TOKEN_KEY);
+      return s && s.trim() ? s.trim() : "";
+    } catch {
+      return "";
+    }
+  }
+
+  function shouldOpenCircleJoinAfterAuth() {
+    return Boolean(peekPendingCircleInviteToken());
+  }
+
   async function handleSignUp() {
     setAuthError("");
     setAuthNotice("");
@@ -5429,8 +5565,11 @@ export default function App() {
       return;
     }
     setUser(data.user);
-    // Same path as sign-in: wait for catalogue in loading-catalogue before pref/onboarding (avoids empty obMovies).
-    setScreen("loading-catalogue");
+    if (shouldOpenCircleJoinAfterAuth()) {
+      setScreen("circle-join");
+    } else {
+      setScreen("loading-catalogue");
+    }
   }
 
   async function handleSignIn() {
@@ -5446,7 +5585,14 @@ export default function App() {
       setAuthLoading(false);
     }
     if (error) { setAuthError(error.message); return; }
-    if (data.user) { setUser(data.user); setScreen("loading-catalogue"); }
+    if (data.user) {
+      setUser(data.user);
+      if (shouldOpenCircleJoinAfterAuth()) {
+        setScreen("circle-join");
+      } else {
+        setScreen("loading-catalogue");
+      }
+    }
   }
 
   async function handleForgotPassword() {
@@ -7928,30 +8074,94 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
 
+  /* Claim runs once per token after preview — granular deps + circleJoinClaimAttemptedRef gate (full model omitted). */
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (screen !== "circle-join") return;
+    if (!user) return;
+    const token = circleJoinModel.token;
+    const { preview, previewLoading, previewError, claimInviteId, alreadyMember, busy, claimError } =
+      circleJoinModel;
+    if (!token || previewLoading || previewError || !preview || claimInviteId || alreadyMember || claimError) return;
+    if (busy) return;
+    if (circleJoinClaimAttemptedRef.current === token) return;
+    circleJoinClaimAttemptedRef.current = token;
+
+    let cancelled = false;
+    void (async () => {
+      setCircleJoinModel((m) => ({ ...m, busy: "claim", claimError: "" }));
+      try {
+        const res = await claimCircleInviteToken({ token });
+        if (cancelled) return;
+        if (res?.already_member) {
+          try {
+            localStorage.removeItem(PENDING_CIRCLE_INVITE_TOKEN_KEY);
+          } catch {
+            /* ignore */
+          }
+          setCircleJoinModel((m) => ({
+            ...m,
+            busy: null,
+            alreadyMember: {
+              circleName: res.circle_name || "this circle",
+            },
+          }));
+          return;
+        }
+        const inviteId = typeof res?.invite_id === "string" ? res.invite_id : "";
+        if (!inviteId) {
+          setCircleJoinModel((m) => ({
+            ...m,
+            busy: null,
+            claimError: "Could not claim this invite.",
+          }));
+          circleJoinClaimAttemptedRef.current = null;
+          return;
+        }
+        try {
+          localStorage.removeItem(PENDING_CIRCLE_INVITE_TOKEN_KEY);
+        } catch {
+          /* ignore */
+        }
+        setCircleJoinModel((m) => ({
+          ...m,
+          busy: null,
+          claimInviteId: inviteId,
+          preview: {
+            circle_name: res.circle_name || m.preview?.circle_name || "Circle",
+            inviter_name: res.inviter_name || m.preview?.inviter_name || "Someone",
+          },
+        }));
+        void reloadPendingInvites();
+      } catch (e) {
+        if (cancelled) return;
+        circleJoinClaimAttemptedRef.current = null;
+        setCircleJoinModel((m) => ({
+          ...m,
+          busy: null,
+          claimError: e?.message || "Could not claim invite.",
+        }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    screen,
+    user,
+    circleJoinModel.token,
+    circleJoinModel.previewLoading,
+    circleJoinModel.previewError,
+    circleJoinModel.preview,
+    circleJoinModel.claimInviteId,
+    circleJoinModel.alreadyMember,
+    circleJoinModel.claimError,
+    circleJoinModel.busy,
+    reloadPendingInvites,
+  ]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
   const pendingInvitesCount = pendingInvites.length;
-
-  const inviterDisplayNameForCopy = useMemo(() => {
-    if (profileName && profileName.trim()) return profileName.trim();
-    const meta = user?.user_metadata?.name;
-    if (typeof meta === "string" && meta.trim()) return meta.trim();
-    const local = user?.email?.split("@")[0];
-    if (local) return local;
-    return "A friend";
-  }, [profileName, user]);
-
-  const copyToMailFullText = useMemo(
-    () => buildCopyToMailCircleInviteText({ inviterDisplayName: inviterDisplayNameForCopy }).fullText,
-    [inviterDisplayNameForCopy],
-  );
-
-  const copyToMailMailtoHref = useMemo(
-    () =>
-      buildCopyToMailCircleInviteMailto({
-        inviterDisplayName: inviterDisplayNameForCopy,
-        recipientEmail: inviteEmailDraft.trim(),
-      }),
-    [inviterDisplayNameForCopy, inviteEmailDraft],
-  );
 
   function openInvitesPanel() {
     setInviteActionError("");
@@ -8037,34 +8247,163 @@ export default function App() {
     }
   }
 
+  function goAuthFromCircleJoin(mode) {
+    try {
+      const t = (circleJoinModel.token || "").trim() || peekPendingCircleInviteToken();
+      if (t) localStorage.setItem(PENDING_CIRCLE_INVITE_TOKEN_KEY, t);
+    } catch {
+      /* ignore */
+    }
+    authResumeScreenRef.current = "circle-join";
+    history.replaceState(null, "", spaUrlWithoutOverlays());
+    setAuthMode(mode);
+    setAuthError("");
+    setAuthNotice("");
+    setScreen("auth");
+  }
+
+  function finishCircleJoinFlow() {
+    try {
+      localStorage.removeItem(PENDING_CIRCLE_INVITE_TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+    history.replaceState(null, "", spaUrlWithoutOverlays());
+    circleJoinClaimAttemptedRef.current = null;
+    setCircleJoinModel({
+      token: "",
+      previewLoading: false,
+      preview: null,
+      previewError: "",
+      claimInviteId: null,
+      claimError: "",
+      alreadyMember: null,
+      busy: null,
+    });
+    setNavTab("home");
+    setScreen("circles");
+  }
+
+  async function handleCircleJoinAccept() {
+    const inviteId = circleJoinModel.claimInviteId;
+    if (!user || !inviteId || circleJoinModel.busy) return;
+    setCircleJoinModel((m) => ({ ...m, busy: "accept" }));
+    try {
+      const res = await acceptCircleInvite({ inviteId });
+      setPendingInvites((prev) => prev.filter((row) => row.id !== inviteId));
+      const raw = res?.circle;
+      const circleName =
+        circleJoinModel.preview?.circle_name ||
+        (raw && typeof raw === "object" ? raw.name : null) ||
+        "the circle";
+      let nextCircleId = null;
+      if (raw && typeof raw === "object") {
+        const members = Array.isArray(raw.circle_members) ? raw.circle_members : [];
+        const normalized = {
+          id: raw.id,
+          name: raw.name,
+          description: raw.description ?? "",
+          vibe: raw.vibe ?? "Mixed Bag",
+          status: raw.status,
+          archivedAt: raw.archived_at,
+          createdAt: raw.created_at,
+          creatorId: raw.creator_id,
+          memberCount: members.length,
+          members,
+        };
+        if (normalized.status === "active") {
+          nextCircleId = normalized.id;
+          setCirclesList((prev) => {
+            const without = prev.filter((c) => c.id !== normalized.id);
+            return [normalized, ...without];
+          });
+          setSelectedCircleId(normalized.id);
+          setCircleDetailData(normalized);
+        }
+      }
+      setInviteToast({
+        tone: "ok",
+        text: `Joined ${circleName}.`,
+      });
+      finishCircleJoinFlow();
+      if (nextCircleId) setScreen("circle-detail");
+    } catch (e) {
+      console.error("Circles: join-from-link accept failed", e);
+      setCircleJoinModel((m) => ({
+        ...m,
+        busy: null,
+        claimError: e?.message || "Could not join this circle.",
+      }));
+    }
+  }
+
+  async function handleCircleJoinDecline() {
+    const inviteId = circleJoinModel.claimInviteId;
+    if (!user || !inviteId || circleJoinModel.busy) return;
+    setCircleJoinModel((m) => ({ ...m, busy: "decline" }));
+    try {
+      await declineCircleInvite({ inviteId });
+      setPendingInvites((prev) => prev.filter((row) => row.id !== inviteId));
+      finishCircleJoinFlow();
+    } catch (e) {
+      console.error("Circles: join-from-link decline failed", e);
+      setCircleJoinModel((m) => ({
+        ...m,
+        busy: null,
+        claimError: e?.message || "Could not decline this invite.",
+      }));
+    }
+  }
+
   function openInviteSheet() {
     setShowCircleInfoSheet(false);
     setInviteEmailDraft("");
     setInviteSheetError("");
-    setInviteSheetNoAccountCopy(false);
-    setInviteCopyMailStatus("");
+    setInviteLinkBusy(false);
     setShowInviteSheet(true);
   }
 
   function closeInviteSheet() {
-    if (inviteSheetSubmitting) return;
+    if (inviteSheetSubmitting || inviteLinkBusy) return;
     setShowInviteSheet(false);
     setInviteSheetError("");
-    setInviteSheetNoAccountCopy(false);
-    setInviteCopyMailStatus("");
+    setInviteLinkBusy(false);
   }
 
-  async function copyInviteMailToClipboard() {
-    const text = copyToMailFullText;
-    if (!text) return;
+  async function submitShareInviteLink() {
+    if (!user || inviteLinkBusy || inviteSheetSubmitting || !circleDetailData?.id) return;
+    setInviteLinkBusy(true);
+    setInviteSheetError("");
     try {
-      await navigator.clipboard.writeText(text);
-      setInviteCopyMailStatus("copied");
-      window.setTimeout(() => setInviteCopyMailStatus(""), 2200);
+      const res = await createCircleInviteLink({ circleId: circleDetailData.id });
+      const tok =
+        (typeof res?.invite_token === "string" && res.invite_token) ||
+        (res?.invite && typeof res.invite.invite_token === "string" ? res.invite.invite_token : "");
+      if (!tok) throw new Error("Could not create invite link.");
+      const url = buildCircleInviteShareUrl(tok);
+      const msg = `Join my circle on Cinemastro 🎬 ${url}`;
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        /* Avoid `{ url }` + `{ text }` together — many targets (esp. iOS) forward only the URL and drop text. */
+        await navigator.share({
+          title: "Join my circle on Cinemastro",
+          text: msg,
+        });
+      } else if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(msg);
+        setInviteToast({ tone: "ok", text: "Invite message copied — paste it into any app." });
+      } else {
+        setInviteToast({ tone: "warn", text: msg });
+      }
+      closeInviteSheet();
     } catch (e) {
-      console.warn("Cinemastro: copy invite message failed", e);
-      setInviteCopyMailStatus("failed");
-      window.setTimeout(() => setInviteCopyMailStatus(""), 2200);
+      const msg = e?.message || "Could not create invite link.";
+      if (String(msg).includes("AbortError") || String(msg).includes("share canceled")) {
+        /* user dismissed native sheet */
+      } else {
+        setInviteSheetError(msg);
+      }
+    } finally {
+      setInviteLinkBusy(false);
     }
   }
 
@@ -8078,7 +8417,6 @@ export default function App() {
     }
     setInviteSheetSubmitting(true);
     setInviteSheetError("");
-    setInviteSheetNoAccountCopy(false);
     try {
       const res = await sendCircleInvite({
         circleId: circleDetailData.id,
@@ -8108,13 +8446,7 @@ export default function App() {
       setInviteEmailDraft("");
     } catch (e) {
       console.error("Circles: sendCircleInvite failed", e);
-      const msg = e?.message || "Could not send the invite.";
-      if (String(msg).includes(INVITE_NO_CINEMASTRO_ACCOUNT_ERR_PREFIX)) {
-        setInviteSheetNoAccountCopy(true);
-        setInviteSheetError("");
-      } else {
-        setInviteSheetError(msg);
-      }
+      setInviteSheetError(e?.message || "Could not send the invite.");
     } finally {
       setInviteSheetSubmitting(false);
     }
@@ -9108,15 +9440,20 @@ export default function App() {
       {screen === "splash" && (
         <div className="splash">
           <div className="splash-logo"><AppBrand variant="splash" /></div>
-          <button className="btn-primary" onClick={() => { setAuthMode("signup"); setScreen("auth"); }}>Get Started</button>
-          <button className="btn-ghost" onClick={() => { setAuthMode("signin"); setScreen("auth"); }}>Sign In</button>
+          <button className="btn-primary" onClick={() => { authResumeScreenRef.current = "splash"; setAuthMode("signup"); setScreen("auth"); }}>Get Started</button>
+          <button className="btn-ghost" onClick={() => { authResumeScreenRef.current = "splash"; setAuthMode("signin"); setScreen("auth"); }}>Sign In</button>
         </div>
       )}
 
       {/* AUTH */}
       {screen === "auth" && (
         <div className="auth">
-          <button className="auth-back" onClick={() => setScreen("splash")}>← Back</button>
+          <button type="button" className="auth-back" onClick={() => {
+            const ret = authResumeScreenRef.current;
+            authResumeScreenRef.current = "splash";
+            setScreen(ret === "circle-join" ? "circle-join" : "splash");
+          }}
+          >← Back</button>
           <div className="auth-inner">
             <div className="auth-title">{authMode === "signup" ? "Create account" : authMode === "reset" ? "Reset password" : "Welcome back"}</div>
             <div className="auth-sub">{authMode === "signup" ? "Join Cinemastro to get personalised picks" : authMode === "reset" ? "Set a new password for your account" : "Sign in to your Cinemastro account"}</div>
@@ -9161,6 +9498,117 @@ export default function App() {
                   ? <>Already have an account? <span onClick={() => { setAuthMode("signin"); setAuthError(""); setAuthNotice(""); }}>Sign in</span></>
                   : <>New to Cinemastro? <span onClick={() => { setAuthMode("signup"); setAuthError(""); setAuthNotice(""); }}>Create account</span></>}
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {screen === "circle-join" && (
+        <div className="auth circle-join-flow">
+          <div className="auth-inner">
+            <div className="auth-title">Circle invite</div>
+            {circleJoinModel.previewLoading && (
+              <div className="auth-sub">Checking your invite…</div>
+            )}
+            {(circleJoinModel.previewError || circleJoinModel.claimError) && (
+              <>
+                <div className="auth-error">{circleJoinModel.previewError || circleJoinModel.claimError}</div>
+                <button type="button" className="auth-btn" onClick={() => finishCircleJoinFlow()}>
+                  Close
+                </button>
+                {circleJoinModel.claimError && (
+                  <button
+                    type="button"
+                    className="auth-link-btn"
+                    style={{ marginTop: 12, display: "block" }}
+                    onClick={() => {
+                      circleJoinClaimAttemptedRef.current = null;
+                      setCircleJoinModel((m) => ({
+                        ...m,
+                        claimError: "",
+                        busy: null,
+                      }));
+                    }}
+                  >
+                    Try again
+                  </button>
+                )}
+              </>
+            )}
+            {!circleJoinModel.previewLoading &&
+              !circleJoinModel.previewError &&
+              !circleJoinModel.claimError &&
+              circleJoinModel.preview &&
+              !circleJoinModel.alreadyMember &&
+              !circleJoinModel.claimInviteId &&
+              !user && (
+              <>
+                <div className="auth-sub">
+                  <strong>{circleJoinModel.preview.inviter_name}</strong>
+                  {" "}invited you to join{" "}
+                  <strong>{circleJoinModel.preview.circle_name}</strong>
+                  {" "}on Cinemastro.
+                </div>
+                <button type="button" className="auth-btn" onClick={() => goAuthFromCircleJoin("signin")}>
+                  Log in
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  style={{ marginTop: 10, width: "100%" }}
+                  onClick={() => goAuthFromCircleJoin("signup")}
+                >
+                  Create an account
+                </button>
+              </>
+            )}
+            {!circleJoinModel.previewLoading &&
+              !circleJoinModel.previewError &&
+              circleJoinModel.busy === "claim" &&
+              user && (
+              <div className="auth-sub">Connecting invite to your account…</div>
+            )}
+            {circleJoinModel.alreadyMember && (
+              <>
+                <div className="auth-sub">
+                  You&apos;re already a member of{" "}
+                  <strong>{circleJoinModel.alreadyMember.circleName}</strong>.
+                </div>
+                <button type="button" className="auth-btn" onClick={() => finishCircleJoinFlow()}>
+                  OK
+                </button>
+              </>
+            )}
+            {!circleJoinModel.previewLoading &&
+              !circleJoinModel.previewError &&
+              !circleJoinModel.claimError &&
+              circleJoinModel.claimInviteId &&
+              circleJoinModel.preview &&
+              user && (
+              <>
+                <div className="auth-sub">
+                  <strong>{circleJoinModel.preview.inviter_name}</strong>
+                  {" "}invited you to{" "}
+                  <strong>{circleJoinModel.preview.circle_name}</strong>.
+                </div>
+                <button
+                  type="button"
+                  className="auth-btn"
+                  disabled={Boolean(circleJoinModel.busy)}
+                  onClick={() => void handleCircleJoinAccept()}
+                >
+                  {circleJoinModel.busy === "accept" ? "Joining…" : "Join circle"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  style={{ marginTop: 10, width: "100%" }}
+                  disabled={Boolean(circleJoinModel.busy)}
+                  onClick={() => void handleCircleJoinDecline()}
+                >
+                  {circleJoinModel.busy === "decline" ? "Declining…" : "Decline"}
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -10627,106 +11075,56 @@ export default function App() {
             <div className="circles-sheet-handle" aria-hidden="true" />
             <div className="circles-sheet-title">Invite a member</div>
             <div className="circles-sheet-sub">
-              If they already use Cinemastro with this email, we&apos;ll send an in-app invite. If not, try
-              Send — then copy the message below and paste it into your own email app.
+              Invite someone who already uses Cinemastro by email, or share a link they can open after signing up.
             </div>
 
             <div className="circles-field">
-              <label className="circles-field-label">Email</label>
+              <label className="circles-field-label">Search by email</label>
               <input
                 className="circles-input"
                 type="email"
                 autoComplete="email"
                 placeholder="friend@example.com"
                 value={inviteEmailDraft}
-                onChange={(e) => {
-                  setInviteEmailDraft(e.target.value);
-                  setInviteSheetNoAccountCopy(false);
-                  setInviteCopyMailStatus("");
-                }}
-                disabled={inviteSheetSubmitting}
+                onChange={(e) => setInviteEmailDraft(e.target.value)}
+                disabled={inviteSheetSubmitting || inviteLinkBusy}
                 autoFocus
               />
             </div>
 
             {inviteSheetError && <div className="circles-error-banner">{inviteSheetError}</div>}
 
-            {inviteSheetNoAccountCopy && (
-              <div className="circles-copy-mail-block">
-                <div className="circles-info-banner">
-                  No Cinemastro account for that address yet. Your friend can sign up, then you can share the circle from the app. For now, copy the text below and send it from your email.
-                </div>
-                <div className="circles-field">
-                  <label className="circles-field-label" id="copy-mail-invite-label">
-                    Message to copy (subject + body)
-                  </label>
-                  <textarea
-                    className="circles-textarea circles-copy-mail-textarea"
-                    readOnly
-                    value={copyToMailFullText}
-                    rows={20}
-                    aria-labelledby="copy-mail-invite-label"
-                  />
-                </div>
-                <p className="circles-copy-mail-instructions">
-                  Copy the text, open your email app, start a new message, set the subject / paste the body, and
-                  send to <strong>{inviteEmailDraft.trim() || "—"}</strong>.
-                </p>
-                {inviteCopyMailStatus === "failed" && (
-                  <p className="circles-error-banner" role="status">
-                    Copy failed — select the text in the box and copy manually.
-                  </p>
-                )}
-                <div className="circles-copy-mail-actions">
-                  {copyToMailMailtoHref ? (
-                    <a
-                      className="circles-btn-mailto circles-copy-mail-mailto"
-                      href={copyToMailMailtoHref}
-                    >
-                      Open in email app
-                    </a>
-                  ) : (
-                    <span
-                      className="circles-btn-mailto circles-copy-mail-mailto"
-                      aria-disabled="true"
-                    >
-                      Open in email app
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    className="circles-btn-primary"
-                    onClick={() => void copyInviteMailToClipboard()}
-                    disabled={!copyToMailFullText}
-                  >
-                    {inviteCopyMailStatus === "copied"
-                      ? "Copied"
-                      : inviteCopyMailStatus === "failed"
-                        ? "Try copy again"
-                        : "Copy for email"}
-                  </button>
-                </div>
-              </div>
-            )}
-
             <div className="circles-sheet-actions">
               <button
                 type="button"
                 className="circles-btn-ghost"
                 onClick={closeInviteSheet}
-                disabled={inviteSheetSubmitting}
+                disabled={inviteSheetSubmitting || inviteLinkBusy}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 className="circles-btn-primary"
-                onClick={submitInviteByEmail}
-                disabled={inviteSheetSubmitting || !inviteEmailDraft.trim()}
+                onClick={() => void submitInviteByEmail()}
+                disabled={inviteSheetSubmitting || inviteLinkBusy || !inviteEmailDraft.trim()}
               >
                 {inviteSheetSubmitting ? "Sending…" : "Send invite"}
               </button>
             </div>
+
+            <div className="circles-invite-divider" role="separator">
+              Or share a link
+            </div>
+
+            <button
+              type="button"
+              className="circles-btn-primary circles-invite-share-link-btn"
+              onClick={() => void submitShareInviteLink()}
+              disabled={inviteSheetSubmitting || inviteLinkBusy}
+            >
+              {inviteLinkBusy ? "Preparing…" : "Share invite link"}
+            </button>
           </div>
         </div>
       )}

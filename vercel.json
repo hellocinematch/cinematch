@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/privacy", "destination": "/index.html" },
     { "source": "/terms", "destination": "/index.html" },
-    { "source": "/about", "destination": "/index.html" }
+    { "source": "/about", "destination": "/index.html" },
+    { "source": "/join/:token*", "destination": "/index.html" }
   ]
 }

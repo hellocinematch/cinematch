@@ -348,9 +348,10 @@ export function currentUserRole(circle, userId) {
   return row?.role ?? null;
 }
 
-/** True if the user is a circle **admin** (host). */
+/** True if the user is a circle host (**creator** or **admin**). */
 export function isCircleModerator(circle, userId) {
-  return currentUserRole(circle, userId) === "admin";
+  const role = currentUserRole(circle, userId);
+  return role === "admin" || role === "creator";
 }
 
 // =================================================================================================
@@ -432,72 +433,54 @@ export async function sendCircleInvite({ circleId, invitedEmail }) {
   });
 }
 
-// -------------------------------------------------------------------------------------------------
-// Copy-to-mail — non-user circle invite (master backlog item 2; no server-sent email in this path).
-// -------------------------------------------------------------------------------------------------
+/** localStorage key — preserved through email/password auth until the invite is claimed. */
+export const PENDING_CIRCLE_INVITE_TOKEN_KEY = "pendingCircleInviteToken";
 
-/**
- * Public web URL for the “download Cinemastro” line in copy-to-mail invites.
- * Order: **`VITE_PUBLIC_SITE_URL`** (Vercel / build), else **`window.location.origin`** (matches staging vs prod),
- * else **`https://www.cinemastro.com/`** (SSR / tests).
- */
-export function getCopyToMailCinemastroSiteUrl() {
-  const fromEnv = import.meta.env.VITE_PUBLIC_SITE_URL;
-  if (typeof fromEnv === "string") {
-    const t = fromEnv.trim();
-    if (t) return t.endsWith("/") ? t : `${t}/`;
-  }
-  if (typeof window !== "undefined" && window.location?.origin) {
-    const o = window.location.origin.trim();
-    if (o) return `${o}/`;
-  }
-  return "https://www.cinemastro.com/";
+/** Parse `/join/:token` path segment (leading/trailing slashes tolerated). */
+export function readJoinInviteTokenFromPath(pathname) {
+  const raw = String(pathname || "").trim().replace(/\/+$/, "");
+  const m = raw.match(/^\/join\/([^/]+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
 }
 
-/** `send-circle-invite` 404 when `resolve_profile_id_by_email` is empty; UI offers copy-to-mail. */
-export const INVITE_NO_CINEMASTRO_ACCOUNT_ERR_PREFIX = "No Cinemastro account found for that email";
-
 /**
- * @param {{ inviterDisplayName: string }} args — inviter from `profiles.name` with auth fallbacks in the client.
- * @returns {{ subject: string, body: string, fullText: string }} — `fullText` = Subject line + body for clipboard.
+ * Canonical share URL for a circle invite token.
+ * Uses **`VITE_PUBLIC_SITE_URL`** when set, else **`window.location.origin`**, else **`https://www.cinemastro.com`**.
  */
-export function buildCopyToMailCircleInviteText({ inviterDisplayName }) {
-  const friend = (inviterDisplayName || "").trim() || "A friend";
-  const subject = `You've been invited to join ${friend}'s circle (don't worry, it's about movies)`;
-  const body = `Plot twist: ${friend} thinks your movie taste is so good, they invited you to join Cinemastro.
-
-Cinemastro is what happens when a recommendation app stops guessing and starts knowing. It learns what you love and predicts your rating before you watch. No trending lists, no algorithm confusion. Just movies made for you.
-
-Your circle gets:
-
-  • Personalized predictions (scary accurate)
-  • A group pick that actually works for everyone
-  • Zero judgment about your guilty pleasure watches
-
-Start with a few ratings of movies you actually love. That's it. The magic happens from there.
-
-DOWNLOAD CINEMASTRO
-${getCopyToMailCinemastroSiteUrl()}
-
-Great taste is better shared — especially when it's this easy.`;
-  const fullText = `Subject: ${subject}\n\n${body}`;
-  return { subject, body, fullText };
+export function buildCircleInviteShareUrl(token) {
+  const t = (token || "").trim();
+  if (!t) return "";
+  let base = import.meta.env.VITE_PUBLIC_SITE_URL;
+  if (typeof base !== "string" || !base.trim()) {
+    if (typeof window !== "undefined" && window.location?.origin) {
+      base = window.location.origin;
+    } else {
+      base = "https://www.cinemastro.com";
+    }
+  }
+  base = String(base).trim().replace(/\/+$/, "");
+  return `${base}/join/${encodeURIComponent(t)}`;
 }
 
-const MAILTO_INVITE_EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Anonymous-friendly preview for `/join/:token` (Edge uses service role). */
+export async function previewCircleInviteLink({ token }) {
+  const t = (token || "").trim();
+  if (!t) throw new Error("Missing invite.");
+  return invokeCirclesEdge("preview-circle-invite-link", { token });
+}
 
-/**
- * `mailto:` for prefilled To / Subject / Body. Uses `encodeURIComponent` (spaces → `%20`), not
- * `URLSearchParams` / `+` — Apple Mail and others show literal `+` in the compose fields otherwise.
- * Length can be large — some clients truncate; copy remains the fallback.
- * @param {{ inviterDisplayName: string, recipientEmail: string }} args
- * @returns {string} `mailto:…` or `""` if the address is empty / invalid
- */
-export function buildCopyToMailCircleInviteMailto({ inviterDisplayName, recipientEmail }) {
-  const to = (recipientEmail || "").trim();
-  if (!to || !MAILTO_INVITE_EMAIL_OK.test(to)) return "";
-  const { subject, body } = buildCopyToMailCircleInviteText({ inviterDisplayName });
-  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+/** Bind `auth.uid()` to a link invite row (first caller wins). Requires session. */
+export async function claimCircleInviteToken({ token }) {
+  const t = (token || "").trim();
+  if (!t) throw new Error("Missing invite.");
+  return invokeCirclesEdge("claim-circle-invite-token", { token });
+}
+
+/** Host-only: mint `invite_token` row (Edge). */
+export async function createCircleInviteLink({ circleId }) {
+  const id = (circleId || "").trim();
+  if (!id) throw new Error("Missing circle.");
+  return invokeCirclesEdge("create-circle-invite-link", { circle_id: id });
 }
 
 /** Accepts a pending invite. Returns the full circle row (with members[]) so the caller can

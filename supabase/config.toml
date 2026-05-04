@@ -5,3 +5,6 @@
 # This function enforces trust via COMPUTE_NEIGHBORS_CRON_SECRET / service role inside the handler.
 [functions.compute-neighbors]
 verify_jwt = false
+
+[functions.preview-circle-invite-link]
+verify_jwt = false

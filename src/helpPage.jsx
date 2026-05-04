@@ -20,7 +20,7 @@ const POST_HELP_CARDS = [
     title: "Circles are private groups",
     bullets: [
       "Circles bring together people you trust — not the whole internet.",
-      "Hosts create a circle and invite by email. Members share activity inside that circle only.",
+      "Hosts create a circle and invite by email or share link. Members share activity inside that circle only.",
       'Invites can sit pending until someone joins or declines — check Circles anytime.',
     ],
     micro: "What gets shared inside a circle is on the next card.",

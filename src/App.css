@@ -2391,6 +2391,24 @@
   .circles-sheet-handle { width:40px; height:4px; border-radius:2px; background:#333; align-self:center; margin-bottom:4px; }
   .circles-sheet-title { font-family:'DM Serif Display',serif; font-size:24px; color:#f0ebe0; }
   .circles-sheet-sub { font-size:13px; color:#888; margin-top:-6px; }
+  .circles-invite-divider {
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-size:12px;
+    letter-spacing:1.2px;
+    text-transform:uppercase;
+    color:#666;
+    margin:4px 0 2px;
+  }
+  .circles-invite-divider::before,
+  .circles-invite-divider::after {
+    content:"";
+    flex:1;
+    height:1px;
+    background:#2a2a2a;
+  }
+  .circles-invite-share-link-btn { width:100%; flex:none !important; }
   .circles-field { display:flex; flex-direction:column; gap:6px; position:relative; }
   .circles-field-label { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#888; font-weight:600; }
   .circles-field-required { color:#e8c96a; }

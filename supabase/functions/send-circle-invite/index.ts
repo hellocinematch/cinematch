@@ -34,7 +34,7 @@ const corsHeaders: Record<string, string> = {
 
 /** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
 const EDGE_FUNCTION_SLUG = "send-circle-invite";
-const EDGE_FUNCTION_VERSION = "1.0.2";
+const EDGE_FUNCTION_VERSION = "1.0.3";
 
 const CIRCLE_MEMBER_CAP = 25;
 const CIRCLE_USER_ACTIVE_CAP = 10;
@@ -143,7 +143,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Could not verify your membership." }, 500);
     }
     const r = typeof callerMembership?.role === "string" ? callerMembership.role : "";
-    if (r !== "admin") {
+    if (r !== "admin" && r !== "creator") {
       return jsonResponse({ error: "Only a circle host can send invites." }, 403);
     }
     if (circleRow.status !== "active") {
@@ -163,7 +163,10 @@ Deno.serve(async (req: Request) => {
     }
     if (!resolved.ok) {
       return jsonResponse(
-        { error: "No Cinemastro account found for that email. Ask them to sign up first." },
+        {
+          error:
+            "No Cinemastro account found for that email. Use “Share invite link” on the same screen so they can join after signing up.",
+        },
         404,
       );
     }
