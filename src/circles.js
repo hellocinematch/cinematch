@@ -100,27 +100,14 @@ export function circleAvatarInitials(name) {
   return (a + b).toLocaleUpperCase();
 }
 
-/** RLS on `circles` restricts selects to circles the current user belongs to, so the scope is
- *  naturally correct without a `where user_id = auth.uid()` clause. We embed circle_members so we
- *  can derive member_count and the current user's role (admin vs member) in one trip. */
+/** Active circles the user **belongs to** — backed by Postgres **`get_my_circles()`** RPC so the list is not driven by
+ *  **`creator can read own circle`** without membership (which yielded empty nested **`circle_members`** under RLS). */
 export async function fetchMyCircles() {
-  const { data, error } = await supabase
-    .from("circles")
-    .select(`
-      id,
-      name,
-      description,
-      vibe,
-      status,
-      archived_at,
-      created_at,
-      creator_id,
-      circle_members ( user_id, role, joined_at )
-    `)
-    .eq("status", "active")
-    .order("created_at", { ascending: false });
+  const { data, error } = await supabase.rpc("get_my_circles");
   if (error) throw error;
-  return (data || []).map(normalizeCircleRow);
+  if (data == null) return [];
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map(normalizeCircleRow);
 }
 
 export async function fetchCircleDetail(circleId) {

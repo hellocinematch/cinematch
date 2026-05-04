@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.49
+
+- **Circles — My list:** **`fetchMyCircles`** now calls Postgres **`get_my_circles()`** (`SECURITY DEFINER`, membership-only join + full **`circle_members`** aggregate). Fixes ghosts where **`creator can read own circle`** still returned a row after leave while nested members were RLS-empty (**0 members**, **leave → not a member**). Migration **`20260614120000_get_my_circles_rpc.sql`** — apply on each hosted DB.
+
 ## 7.0.48
 
 - **Circles — title detail rating:** If the user submits their **first rating** on a title from **detail** and has **no active circles**, show a short modal inviting them to **create a circle** and invite friends (**Create circle** / **Cancel**). Shown **at most twice** per capped streak (stored in **`localStorage`**); counter **resets** once they belong to any **active** circle. After the cap, behavior falls back to the existing **Publish to circles** modal.
