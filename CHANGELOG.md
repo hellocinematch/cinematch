@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.52
+
+- **Discover — search:** After a query (applied search ≥ **2** characters), the grid keeps **TMDB search API order** (merged pages + dedupe + excluded-genre filters). **Catalogue browse** without search still sorts by **year** (newest first, undated at tail).
+
 ## 7.0.51
 
 - **Circles — title detail (no-circle nudge):** Zero-circle **create circle** nudge after **Submit Rating** / **Save new** no longer requires **`circlesLoaded`**. Before deciding, **`resolveActiveCircleCountForNudge()`** uses **`fetchMyCircles()`** once when the circles list hasn’t finished its first load, so fast paths after login still see the modal. If that fetch fails, behavior falls through to **Publish to circles** (first submit) or no modal (**Save new**).

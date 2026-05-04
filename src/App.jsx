@@ -6407,10 +6407,10 @@ export default function App() {
   }, [theaterRecs, streamingRecs, whatsHotRecsResolved, pulseTrendingRecsResolved, pulsePopularRecsResolved, inTheatersPagePopularRecsResolved, secondaryStripRecsResolved, moreForYouStrip]);
 
   const discoverItems = useMemo(() => {
-    let base;
-    if (appliedSearchQuery.length >= 2) base = searchResults;
-    else base = catalogue.filter(m => activeFilter === "All" ? true : activeFilter === "Movies" ? m.type === "movie" : m.type === "tv");
-    // Discover should surface fresher releases first; undated rows stay at the tail.
+    /** Search (`appliedSearchQuery` ≥ 2): keep TMDB `/search/movie|tv` order (merged pages, dedupe, genre filter). Browse catalogue: newest year first; undated at tail. */
+    if (appliedSearchQuery.length >= 2) return searchResults;
+    const base = catalogue.filter(m =>
+      activeFilter === "All" ? true : activeFilter === "Movies" ? m.type === "movie" : m.type === "tv");
     return [...base].sort((a, b) => {
       const ay = Number.parseInt(a?.year || "", 10);
       const by = Number.parseInt(b?.year || "", 10);
