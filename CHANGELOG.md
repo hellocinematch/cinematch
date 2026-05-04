@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.54
+
+- **Circles — Recent strip:** Tapping **Earlier** no longer jumps the horizontal strip to the far left. **`scrollLeft`** is adjusted by the prepended row width (recent titles render oldest-first via reverse order) so the same titles stay in view. Failed loads skip a one-off re-center so the viewport doesn’t move.
+
 ## 7.0.53
 
 - **Title detail — community vs TMDB:** The right score column shows **Cinemastro** only when **`get_cinemastro_title_avgs`** reports **`rating_count` ≥ 1**; otherwise it falls back to **TMDB** (same **`movie.tmdbRating`** path as before). Removed the **TMDB-based** sublabel under Cinemastro. **`stripBadgeDisplay`** (poster / Discover / grids) uses the same **≥ 1** gate before the gold Cinemastro badge so cold titles show TMDB like detail.

@@ -3473,7 +3473,10 @@ export default function App() {
   const circleRecentStripRef = useRef(null);
   const circleRecentNewestRef = useRef(null);
   const circleRecentAddCtaRef = useRef(null);
-  const circleRecentSkipScrollAfterLoadMoreRef = useRef(false);
+  /** After “Earlier” loads more titles (prepended on the left when reversed), restore horizontal scroll via width delta. */
+  const circleRecentEarlierScrollPreserveRef = useRef(null);
+  /** If “Earlier” fetch fails, skip one re-center (preserve ref cleared; payload unchanged). */
+  const circleRecentEarlierSkipCenterOnceRef = useRef(false);
   /** Browser Back should return to the in-app screen that opened detail, not leave the site (SPA history). */
   const detailReturnScreenRef = useRef(null);
   const detailHistoryPushedRef = useRef(false);
@@ -7607,6 +7610,8 @@ export default function App() {
 
   useEffect(() => {
     setCircleStripExtraMovies(new Map());
+    circleRecentEarlierScrollPreserveRef.current = null;
+    circleRecentEarlierSkipCenterOnceRef.current = false;
   }, [selectedCircleId]);
 
   useEffect(() => {
@@ -7809,7 +7814,15 @@ export default function App() {
     const offset = cur.length;
     if (offset >= CIRCLE_STRIP_MAX || !prev.has_more) return;
 
-    circleRecentSkipScrollAfterLoadMoreRef.current = true;
+    const scrollerBefore = circleRecentStripRef.current;
+    circleRecentEarlierScrollPreserveRef.current = scrollerBefore
+      ? {
+          prevScrollLeft: scrollerBefore.scrollLeft,
+          prevScrollWidth: scrollerBefore.scrollWidth,
+          prevTitlesLen: cur.length,
+          circleId: selectedCircleId,
+        }
+      : null;
     setCircleStripLoadingMore(true);
     setCircleStripError("");
     try {
@@ -7833,6 +7846,8 @@ export default function App() {
         };
       });
     } catch (e) {
+      circleRecentEarlierScrollPreserveRef.current = null;
+      circleRecentEarlierSkipCenterOnceRef.current = true;
       console.error("Circles: loadCircleStripMore failed", e);
       setCircleStripError(e?.message || "Could not load more titles.");
     } finally {
@@ -7876,16 +7891,40 @@ export default function App() {
     [selectedCircleId],
   );
 
-  // Circle Recent: on first load / circle change, scroll so newest title is ~centered; skip re-center after “Load earlier”.
+  // Circle Recent: on first load / circle change, scroll so newest title is ~centered; after “Earlier”, preserve scroll across prepended width.
   useLayoutEffect(() => {
     if (screen !== "circle-detail" || circleRatingsView !== "recent" || !circleStripPayload) return;
     if (circleStripLoading) return;
     if (circleStripLoadingMore) return;
-    if (circleRecentSkipScrollAfterLoadMoreRef.current) {
-      circleRecentSkipScrollAfterLoadMoreRef.current = false;
+    const scroller = circleRecentStripRef.current;
+    if (circleRecentEarlierSkipCenterOnceRef.current) {
+      circleRecentEarlierSkipCenterOnceRef.current = false;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          updateCircleRecentScrollLeftHint();
+        });
+      });
       return;
     }
-    const scroller = circleRecentStripRef.current;
+    const preserve = circleRecentEarlierScrollPreserveRef.current;
+    if (preserve) {
+      const titlesNow = Array.isArray(circleStripPayload.titles) ? circleStripPayload.titles.length : 0;
+      const restoreOk =
+        selectedCircleId === preserve.circleId && titlesNow > preserve.prevTitlesLen;
+      if (restoreOk && scroller) {
+        const delta = scroller.scrollWidth - preserve.prevScrollWidth;
+        const nextLeft = preserve.prevScrollLeft + delta;
+        scroller.scrollLeft = Math.max(0, Math.min(nextLeft, scroller.scrollWidth - scroller.clientWidth));
+        circleRecentEarlierScrollPreserveRef.current = null;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            updateCircleRecentScrollLeftHint();
+          });
+        });
+        return;
+      }
+      circleRecentEarlierScrollPreserveRef.current = null;
+    }
     if (!scroller) return;
     const t = Array.isArray(circleStripPayload.titles) ? circleStripPayload.titles : [];
     const center = (el) => {
