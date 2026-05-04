@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.47
+
+- **Circles — `/join/:token`:** Fixed claim still stuck on **“Connecting invite to your account…”** under React **`StrictMode`** (dev default in `main.jsx`): effect cleanup used `cancelled` while **`circleJoinClaimAttemptedRef`** stayed set to the token, so the remounted effect skipped starting claim and the first async exited without updating state. Claim logic now uses a **generation ref**, clears **attempted** ref on cleanup, drops **`if (busy) return`**, and ignores stale post-`await` work by generation.
+
 ## 7.0.46
 
 - **Circles — `/join/:token`:** Fixed invite claim stuck on **“Connecting invite to your account…”** after sign-in. The claim `useEffect` listed `busy` in its dependency array; setting `busy: "claim"` re-ran the effect and cancelled the in-flight `claimCircleInviteToken` request without applying its result.

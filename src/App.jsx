@@ -3399,6 +3399,8 @@ export default function App() {
     busy: null,
   });
   const circleJoinClaimAttemptedRef = useRef(null);
+  /** Bumps on claim-effect cleanup so stale async work after `await` does not apply (StrictMode remount + deps). */
+  const circleJoinClaimGenRef = useRef(0);
   /** Where auth “← Back” returns: splash vs circle-join. */
   const authResumeScreenRef = useRef("splash");
   const [profileSettingsError, setProfileSettingsError] = useState("");
@@ -8074,27 +8076,28 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
 
-  /* Claim runs once per token after preview — granular deps + circleJoinClaimAttemptedRef gate (full model omitted).
-   * Do not list `circleJoinModel.busy` in deps: setting `busy: "claim"` would re-run this effect, run cleanup
-   * (`cancelled = true`), and the in-flight `claimCircleInviteToken` would then bail without clearing `busy`. */
+  /* Claim runs after preview + session — {@link circleJoinClaimAttemptedRef} avoids duplicate starts per token.
+   * Do not list `circleJoinModel.busy` in deps (would cancel in-flight claim via cleanup).
+   * StrictMode double-mount: cleanup must reset {@link circleJoinClaimAttemptedRef} and use generation (not a boolean
+   * `cancelled`) so the second mount can start claim and stale async completions never apply. Do not `if (busy) return`
+   * — remount can run while `busy === "claim"` from the first invoke’s synchronous setState. */
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (screen !== "circle-join") return;
     if (!user) return;
     const token = circleJoinModel.token;
-    const { preview, previewLoading, previewError, claimInviteId, alreadyMember, busy, claimError } =
+    const { preview, previewLoading, previewError, claimInviteId, alreadyMember, claimError } =
       circleJoinModel;
     if (!token || previewLoading || previewError || !preview || claimInviteId || alreadyMember || claimError) return;
-    if (busy) return;
     if (circleJoinClaimAttemptedRef.current === token) return;
     circleJoinClaimAttemptedRef.current = token;
 
-    let cancelled = false;
+    const genAtStart = circleJoinClaimGenRef.current;
     void (async () => {
       setCircleJoinModel((m) => ({ ...m, busy: "claim", claimError: "" }));
       try {
         const res = await claimCircleInviteToken({ token });
-        if (cancelled) return;
+        if (circleJoinClaimGenRef.current !== genAtStart) return;
         if (res?.already_member) {
           try {
             localStorage.removeItem(PENDING_CIRCLE_INVITE_TOKEN_KEY);
@@ -8136,7 +8139,7 @@ export default function App() {
         }));
         void reloadPendingInvites();
       } catch (e) {
-        if (cancelled) return;
+        if (circleJoinClaimGenRef.current !== genAtStart) return;
         circleJoinClaimAttemptedRef.current = null;
         setCircleJoinModel((m) => ({
           ...m,
@@ -8146,7 +8149,8 @@ export default function App() {
       }
     })();
     return () => {
-      cancelled = true;
+      circleJoinClaimGenRef.current += 1;
+      circleJoinClaimAttemptedRef.current = null;
     };
   }, [
     screen,
