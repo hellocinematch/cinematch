@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.43
+
+- **Circles — last member leave:** **`leave_circle`** deleted **`circles`** under the same RLS as the signed-in user; **`creator can delete own circle`** requires **`is_circle_moderator`** ( **`admin`** ). A **sole** **`member`** row led to **0 rows deleted** and no error, so the empty circle could remain. Migration **`20260612120000_leave_circle_delete_bypass_rls.sql`** sets **`set row_security = off`** on the RPC and asserts delete / membership row counts. **Apply on each hosted DB.**
+
 ## 7.0.42
 
 - **Title detail — clear rating:** While changing a saved score, **Save new**, **Cancel**, and a red **Clear rating** control. **Clear rating** asks for confirmation: the title is removed from **all circles** it was published to and the global rating is deleted. Migration **`20260611120000_ratings_rls_delete_own.sql`** adds **`ratings` DELETE** for **`authenticated`** (own rows only); apply on each hosted DB.
