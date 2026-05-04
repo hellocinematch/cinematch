@@ -1604,6 +1604,26 @@
   .circles-pending-at-cap-hint { margin-top:10px; padding:10px 14px; background:#1a1810; border:1px solid #3a3220; color:#c8c0a8; border-radius:10px; font-size:13px; line-height:1.45; }
   .circles-error-banner { margin-top:12px; padding:10px 14px; background:#1a0808; border:1px solid #441111; color:#f09a9a; border-radius:10px; font-size:13px; overflow-wrap:anywhere; }
 
+  /* Zero-circle recommendation nudge (Circles tab banner) */
+  .circles-zero-nudge-banner {
+    margin-top:12px;
+    padding:12px 14px;
+    background:#141c12;
+    border:1px solid #2a3a22;
+    border-radius:10px;
+    font-size:13px;
+    line-height:1.45;
+    color:#d4dcc8;
+  }
+  .circles-zero-nudge-banner__text { margin:0 0 10px; }
+  .circles-zero-nudge-banner__actions {
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px 10px;
+  }
+  .circles-zero-nudge-banner__btn { padding:8px 14px; font-size:12px; }
+
   .circles-skeleton { padding:20px 24px; display:flex; flex-direction:column; gap:12px; }
   .circles-skeleton-card { height:96px; border-radius:14px; background:linear-gradient(90deg,#121212 0%,#1a1a1a 50%,#121212 100%); background-size:200% 100%; animation:shimmer 1.4s linear infinite; }
 

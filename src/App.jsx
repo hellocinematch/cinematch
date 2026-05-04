@@ -101,6 +101,31 @@ function bumpNoCirclesDetailRatingNudgeCount() {
   }
 }
 
+/** Circles list tip + modal for onboarded raters with zero active circles (see zero-circles nudge UX). */
+const ZERO_CIRCLES_HOME_MODAL_LAST_AT_MS_KEY = "cinemastro_zero_circles_home_modal_last_ms";
+const ZERO_CIRCLES_LIST_BANNER_NEVER_KEY = "cinemastro_zero_circles_list_banner_never";
+const ZERO_CIRCLES_LIST_BANNER_DISMISSED_SESSION_KEY = "cinemastro_zero_circles_list_banner_dismissed_sess";
+const ZERO_CIRCLES_HOME_MODAL_COOLDOWN_MS = 2 * 24 * 60 * 60 * 1000;
+
+function readZeroCirclesHomeModalLastAtMs() {
+  try {
+    const raw = localStorage.getItem(ZERO_CIRCLES_HOME_MODAL_LAST_AT_MS_KEY);
+    if (raw == null || raw === "") return null;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeZeroCirclesHomeModalLastAtMs(nowMs) {
+  try {
+    localStorage.setItem(ZERO_CIRCLES_HOME_MODAL_LAST_AT_MS_KEY, String(nowMs));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Upper bound for `profiles.name` on sign-up (DB backfill uses 120-char cap). */
 const PROFILE_DISPLAY_NAME_MAX = 120;
 
@@ -3364,6 +3389,11 @@ export default function App() {
   const [publishRatingModal, setPublishRatingModal] = useState(null);
   /** First-time rating from title detail while user has zero active circles — capped nudge (see constants above). */
   const [noCirclesAfterDetailRatingModal, setNoCirclesAfterDetailRatingModal] = useState(null);
+  /** Circles tab: modal suggesting create circle (cooldown via {@link ZERO_CIRCLES_HOME_MODAL_LAST_AT_MS_KEY}). */
+  const [zeroCirclesHomeNudgeModalOpen, setZeroCirclesHomeNudgeModalOpen] = useState(false);
+  /** Circles list banner: session dismiss + “never” from localStorage (synced on login / reset). */
+  const [zeroCirclesBannerNever, setZeroCirclesBannerNever] = useState(false);
+  const [zeroCirclesBannerSessionDismissed, setZeroCirclesBannerSessionDismissed] = useState(false);
   const [publishModalBusy, setPublishModalBusy] = useState(false);
   const [publishModalError, setPublishModalError] = useState("");
   const [publishModalSelection, setPublishModalSelection] = useState(() => new Set());
@@ -3462,6 +3492,8 @@ export default function App() {
   /** One-time post-onboarding carousel (Circles + Secondary region). */
   const [postOnboardingHelpOpen, setPostOnboardingHelpOpen] = useState(false);
   const [postOnboardingHelpStep, setPostOnboardingHelpStep] = useState(1);
+  /** Read inside deferred zero-circles modal timer so we don’t stack under post-onboarding help. */
+  const postOnboardingHelpOpenRef = useRef(false);
   /** v3.1.0: `movie-${tmdbId}` → `{ avgScore, ratingCount }` from `get_cinemastro_title_avgs` (badges prefer over TMDB). */
   const [cinemastroAvgByKey, setCinemastroAvgByKey] = useState({});
   /** Latest title keys for Cinemastro batch RPC (read when debounced fetch runs, not when effect first fires). */
@@ -6832,6 +6864,33 @@ export default function App() {
     openCreateCircleSheet();
   }
 
+  function dismissZeroCirclesHomeNudgeModal() {
+    setZeroCirclesHomeNudgeModalOpen(false);
+  }
+
+  function openCreateCircleFromZeroCirclesHomeNudgeModal() {
+    setZeroCirclesHomeNudgeModalOpen(false);
+    openCreateCircleSheet();
+  }
+
+  function dismissZeroCirclesListBannerForSession() {
+    try {
+      sessionStorage.setItem(ZERO_CIRCLES_LIST_BANNER_DISMISSED_SESSION_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setZeroCirclesBannerSessionDismissed(true);
+  }
+
+  function neverShowZeroCirclesListBanner() {
+    try {
+      localStorage.setItem(ZERO_CIRCLES_LIST_BANNER_NEVER_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setZeroCirclesBannerNever(true);
+  }
+
   function togglePublishCirclePick(circleId) {
     setPublishModalSelection((prev) => {
       const n = new Set(prev);
@@ -7395,15 +7454,92 @@ export default function App() {
   }, [screen, user, circlesLoaded, refreshCircleUnseenBadges, reloadMyCircles]);
 
   const activeCirclesCount = circlesList.length;
-  /** Reset capped “create circle” nudge once they belong to any active circle. */
+  const eligibleZeroCirclesNudge = useMemo(() => {
+    if (!user || !circlesLoaded || !pendingInvitesLoaded) return false;
+    const meta = user.user_metadata ?? {};
+    const onboardingDone =
+      meta.onboarding_complete === true ||
+      meta.onboarding_complete === "true" ||
+      Object.keys(userRatings).length > 0;
+    if (!onboardingDone) return false;
+    if (Object.keys(userRatings).length < 1) return false;
+    return !circlesList.some((c) => c?.status === "active");
+  }, [user, userRatings, circlesList, circlesLoaded, pendingInvitesLoaded]);
+
+  /** Reset circle nudges once they belong to any active circle. */
   useEffect(() => {
     if (!circlesList.some((c) => c?.status === "active")) return;
     try {
       localStorage.removeItem(NO_CIRCLES_DETAIL_RATING_NUDGE_COUNT_KEY);
+      localStorage.removeItem(ZERO_CIRCLES_HOME_MODAL_LAST_AT_MS_KEY);
+      localStorage.removeItem(ZERO_CIRCLES_LIST_BANNER_NEVER_KEY);
+      sessionStorage.removeItem(ZERO_CIRCLES_LIST_BANNER_DISMISSED_SESSION_KEY);
     } catch {
       /* ignore */
     }
+    setZeroCirclesBannerNever(false);
+    setZeroCirclesBannerSessionDismissed(false);
+    setZeroCirclesHomeNudgeModalOpen(false);
   }, [circlesList]);
+
+  useEffect(() => {
+    if (!user) {
+      setZeroCirclesBannerNever(false);
+      setZeroCirclesBannerSessionDismissed(false);
+      setZeroCirclesHomeNudgeModalOpen(false);
+      return;
+    }
+    try {
+      setZeroCirclesBannerNever(localStorage.getItem(ZERO_CIRCLES_LIST_BANNER_NEVER_KEY) === "1");
+      setZeroCirclesBannerSessionDismissed(
+        sessionStorage.getItem(ZERO_CIRCLES_LIST_BANNER_DISMISSED_SESSION_KEY) === "1",
+      );
+    } catch {
+      setZeroCirclesBannerNever(false);
+      setZeroCirclesBannerSessionDismissed(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    postOnboardingHelpOpenRef.current = postOnboardingHelpOpen;
+  }, [postOnboardingHelpOpen]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (screen !== "circles") return;
+    if (!eligibleZeroCirclesNudge) return;
+    if (!circlesLoaded || !pendingInvitesLoaded) return;
+    if (postOnboardingHelpOpen) return;
+    if (noCirclesAfterDetailRatingModal) return;
+    if (showCreateCircleSheet) return;
+    if (publishRatingModal) return;
+
+    const delayMs = 450;
+    const timer = window.setTimeout(() => {
+      if (postOnboardingHelpOpenRef.current) return;
+      if (screen !== "circles") return;
+      const lastMs = readZeroCirclesHomeModalLastAtMs();
+      if (lastMs != null && Date.now() - lastMs < ZERO_CIRCLES_HOME_MODAL_COOLDOWN_MS) return;
+      writeZeroCirclesHomeModalLastAtMs(Date.now());
+      setZeroCirclesHomeNudgeModalOpen(true);
+    }, delayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    user,
+    screen,
+    eligibleZeroCirclesNudge,
+    circlesLoaded,
+    pendingInvitesLoaded,
+    postOnboardingHelpOpen,
+    noCirclesAfterDetailRatingModal,
+    showCreateCircleSheet,
+    publishRatingModal,
+  ]);
+
+  useEffect(() => {
+    if (screen !== "circles") setZeroCirclesHomeNudgeModalOpen(false);
+  }, [screen]);
 
   const atCircleCap = activeCirclesCount >= CIRCLE_CAP;
   /** Pending invites merged into the main list; hidden entirely at max circles (passdown). */
@@ -9987,6 +10123,36 @@ export default function App() {
               {pendingInvitesError && (
                 <div className="circles-error-banner">{pendingInvitesError}</div>
               )}
+              {eligibleZeroCirclesNudge &&
+              circlesLoaded &&
+              pendingInvitesLoaded &&
+              !zeroCirclesBannerNever &&
+              !zeroCirclesBannerSessionDismissed ? (
+                <div className="circles-zero-nudge-banner" role="region" aria-label="Circles and recommendations">
+                  <p className="circles-zero-nudge-banner__text">
+                    Circles help Cinemastro tune picks using who you watch with. Create one anytime — they stay private
+                    to your group.
+                  </p>
+                  <div className="circles-zero-nudge-banner__actions">
+                    <button
+                      type="button"
+                      className="circles-btn-primary circles-zero-nudge-banner__btn"
+                      onClick={() => {
+                        openCreateCircleSheet();
+                      }}
+                      disabled={atCircleCap || !user}
+                    >
+                      Create circle
+                    </button>
+                    <button type="button" className="circles-btn-ghost" onClick={dismissZeroCirclesListBannerForSession}>
+                      Dismiss
+                    </button>
+                    <button type="button" className="circles-btn-ghost" onClick={neverShowZeroCirclesListBanner}>
+                      Don&apos;t show again
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {circlesLoading && !circlesLoaded && listInvitesShown.length === 0 ? (
@@ -11317,6 +11483,48 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Zero active circles — Circles tab modal (2-day cooldown; deferred past post-onboarding help). */}
+      {zeroCirclesHomeNudgeModalOpen ? (
+        <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Circles and your picks">
+          <button
+            type="button"
+            className="circles-modal-backdrop"
+            aria-label="Close"
+            onClick={dismissZeroCirclesHomeNudgeModal}
+          />
+          <div className="circles-modal-panel">
+            <div className="circles-modal-header">
+              <h2 className="circles-modal-title">Circles tune your picks</h2>
+              <button
+                type="button"
+                className="circles-modal-close"
+                aria-label="Close"
+                onClick={dismissZeroCirclesHomeNudgeModal}
+              >
+                ×
+              </button>
+            </div>
+            <p className="circles-modal-sub">
+              You&apos;re not in a circle yet. Private circles let Cinemastro see who you watch with and tune
+              recommendations — without flooding your profile.
+            </p>
+            <div className="circles-sheet-actions">
+              <button type="button" className="circles-btn-ghost" onClick={dismissZeroCirclesHomeNudgeModal}>
+                Maybe later
+              </button>
+              <button
+                type="button"
+                className="circles-btn-primary"
+                onClick={openCreateCircleFromZeroCirclesHomeNudgeModal}
+                disabled={atCircleCap || !user}
+              >
+                Create circle
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* No active circles — nudge after first-time rating from title detail (capped). */}
       {noCirclesAfterDetailRatingModal ? (

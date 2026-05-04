@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.56
+
+- **Circles — zero-circle nudge:** On the **Circles** tab, onboarded users with **≥1 rating** and **no active circles** see an optional **banner** (Dismiss for this session, **Don’t show again**) explaining that circles help Cinemastro **tune picks** using who you watch with; plus a **modal** on eligible visits at most **once per 2 days** (**Maybe later** / **Create circle**). Scheduling waits **450ms** and skips while **post-onboarding help** or other circle modals/sheets are open. Resets when the user joins or creates an active circle.
+
+## 7.0.55
+
+- **Ops — platform growth (hosted DB):** Migration **`20260615120000_platform_growth_daily.sql`** adds **`public.ratings.created_at`** (backfilled from **`rated_at`** for existing rows; **`DEFAULT now()`** on new inserts), **`public.platform_growth_daily`** with UTC **`stat_date`**, cumulative totals (**users** from **`auth.users`**, **ratings**, **circles**) through end of day, plus explicit **`new_*`** deltas. **`platform_growth_refresh_range(from, to)`** and **`platform_growth_refresh_through_yesterday()`** recompute from live tables (anchor **2026-04-30**). Registers **`pg_cron`** job **`platform-growth-daily-utc`** at **00:15 UTC** when the **`cron`** schema exists (skipped locally if absent). **Apply on staging/prod**; query e.g. **`select * from public.platform_growth_daily order by stat_date desc`**. No app bundle change beyond version alignment.
+
 ## 7.0.54
 
 - **Circles — Recent strip:** Tapping **Earlier** no longer jumps the horizontal strip to the far left. **`scrollLeft`** is adjusted by the prepended row width (recent titles render oldest-first via reverse order) so the same titles stay in view. Failed loads skip a one-off re-center so the viewport doesn’t move.
