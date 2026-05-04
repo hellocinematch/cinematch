@@ -8074,7 +8074,9 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen]);
 
-  /* Claim runs once per token after preview — granular deps + circleJoinClaimAttemptedRef gate (full model omitted). */
+  /* Claim runs once per token after preview — granular deps + circleJoinClaimAttemptedRef gate (full model omitted).
+   * Do not list `circleJoinModel.busy` in deps: setting `busy: "claim"` would re-run this effect, run cleanup
+   * (`cancelled = true`), and the in-flight `claimCircleInviteToken` would then bail without clearing `busy`. */
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (screen !== "circle-join") return;
@@ -8156,7 +8158,6 @@ export default function App() {
     circleJoinModel.claimInviteId,
     circleJoinModel.alreadyMember,
     circleJoinModel.claimError,
-    circleJoinModel.busy,
     reloadPendingInvites,
   ]);
   /* eslint-enable react-hooks/exhaustive-deps */

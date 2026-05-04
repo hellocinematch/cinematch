@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.46
+
+- **Circles — `/join/:token`:** Fixed invite claim stuck on **“Connecting invite to your account…”** after sign-in. The claim `useEffect` listed `busy` in its dependency array; setting `busy: "claim"` re-ran the effect and cancelled the in-flight `claimCircleInviteToken` request without applying its result.
+
 ## 7.0.45
 
 - **Circles — share invite link:** `navigator.share` no longer passes a separate `url` alongside `text` (many apps only received the URL). Share payload is **`title` + `text`** with the link inlined in `text`.
