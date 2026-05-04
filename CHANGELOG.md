@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.48
+
+- **Circles — title detail rating:** If the user submits their **first rating** on a title from **detail** and has **no active circles**, show a short modal inviting them to **create a circle** and invite friends (**Create circle** / **Cancel**). Shown **at most twice** per capped streak (stored in **`localStorage`**); counter **resets** once they belong to any **active** circle. After the cap, behavior falls back to the existing **Publish to circles** modal.
+
 ## 7.0.47
 
 - **Circles — `/join/:token`:** Fixed claim still stuck on **“Connecting invite to your account…”** under React **`StrictMode`** (dev default in `main.jsx`): effect cleanup used `cancelled` while **`circleJoinClaimAttemptedRef`** stayed set to the token, so the remounted effect skipped starting claim and the first async exited without updating state. Claim logic now uses a **generation ref**, clears **attempted** ref on cleanup, drops **`if (busy) return`**, and ignores stale post-`await` work by generation.
