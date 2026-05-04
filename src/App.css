@@ -1247,6 +1247,40 @@
   .btn-full-dark { background:#1a1a1a; color:#ccc; border:1px solid #2a2a2a; }
   .btn-full-dark:hover { border-color:#555; }
   .btn-full-dark:disabled { opacity:0.45; cursor:not-allowed; border-color:#2a2a2a; }
+  .btn-full-danger {
+    flex:1;
+    padding:14px;
+    font-family:'DM Sans',sans-serif;
+    font-size:14px;
+    font-weight:500;
+    cursor:pointer;
+    border-radius:2px;
+    transition:all 0.2s;
+    background: rgba(139, 26, 26, 0.22);
+    color: #f0d0d0;
+    border: 1px solid #8B1A1A;
+  }
+  .btn-full-danger:not(:disabled):hover { background: rgba(139, 26, 26, 0.35); border-color: #a82222; }
+  .btn-full-danger:disabled { opacity: 0.45; cursor: not-allowed; }
+  .detail-clear-rating-confirm {
+    margin-top: 14px;
+    padding: 14px 12px;
+    border-radius: 2px;
+    border: 1px solid #8B1A1A;
+    background: rgba(139, 26, 26, 0.14);
+  }
+  .detail-clear-rating-confirm-msg {
+    margin: 0 0 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    color: #e8d4d4;
+  }
+  .detail-clear-rating-err {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: #f0a0a0;
+  }
   .saved-style { background:#1a2a1a !important; color:#6aaa6a !important; border-color:#2a4a2a !important; }
   .rated-box { background:#141414; border:1px solid #2a4a2a; border-radius:12px; padding:20px; text-align:center; }
   .rated-score { font-family:'DM Serif Display',serif; font-size:48px; color:#e8c96a; }

@@ -3222,6 +3222,10 @@ export default function App() {
   const [detailRating, setDetailRating] = useState(7);
   const [detailTouched, setDetailTouched] = useState(false);
   const [detailEditRating, setDetailEditRating] = useState(false);
+  /** Title detail: "Clear rating" second step — confirm remove from all circles + delete rating. */
+  const [detailClearRatingConfirm, setDetailClearRatingConfirm] = useState(false);
+  const [detailClearRatingBusy, setDetailClearRatingBusy] = useState(false);
+  const [detailClearRatingErr, setDetailClearRatingErr] = useState("");
   /** `openDetail` snapshot: **circle** vs **discover** vs **other** — gates **Rate this** / **Rate more** (6.1.0). */
   const [detailRateEntry, setDetailRateEntry] = useState(null);
   const [rateMoreMovies, setRateMoreMovies] = useState([]);
@@ -6531,6 +6535,36 @@ export default function App() {
     }
   }
 
+  async function clearMyRatingForMovieId(movieId) {
+    if (!user) return;
+    const parts = String(movieId).split("-");
+    const type = parts[0];
+    const tmdbId = parseInt(parts[1], 10);
+    if ((type !== "movie" && type !== "tv") || !Number.isFinite(tmdbId)) return;
+    const { error: shErr } = await supabase
+      .from("rating_circle_shares")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", type);
+    if (shErr) throw new Error(shErr.message || "Could not update circles");
+    const { error: rErr } = await supabase
+      .from("ratings")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", type);
+    if (rErr) throw new Error(rErr.message || "Could not clear rating");
+    setUserRatings((prev) => {
+      const n = { ...prev };
+      delete n[movieId];
+      return n;
+    });
+    void refreshCinemastroAvgForMediaId(movieId);
+    scheduleComputeNeighborsRebuild();
+    setCircleRatedRefreshKey((k) => k + 1);
+  }
+
   async function completePublishRatingModal(selectedIds) {
     const ctx = publishRatingModal;
     if (!ctx) return;
@@ -6778,10 +6812,14 @@ export default function App() {
     void refreshCinemastroAvgForMediaId(movie.id);
     if (opts.startEditing && userRatings[movie.id] != null) {
       setDetailEditRating(true);
+      setDetailClearRatingConfirm(false);
+      setDetailClearRatingErr("");
       setDetailRating(userRatings[movie.id]);
       setDetailTouched(true);
     } else {
       setDetailEditRating(false);
+      setDetailClearRatingConfirm(false);
+      setDetailClearRatingErr("");
       setDetailRating(7);
       /** Chips: require an explicit pick; show **—** until then (6.1.0). */
       setDetailTouched(userRatings[movie.id] != null);
@@ -6838,6 +6876,8 @@ export default function App() {
     }
     history.replaceState(null, "", spaUrlWithoutOverlays());
     setDetailEditRating(false);
+    setDetailClearRatingConfirm(false);
+    setDetailClearRatingErr("");
     setDetailRateEntry(null);
     setSelected(null);
     // navTab === "home" is the idle bottom-nav sentinel; the landing screen is now "circles".
@@ -6893,6 +6933,8 @@ export default function App() {
     setScreen("circles");
     setSelected(null);
     setDetailEditRating(false);
+    setDetailClearRatingConfirm(false);
+    setDetailClearRatingErr("");
     setDetailRateEntry(null);
     setShowAvatarMenu(false);
   }
@@ -8132,6 +8174,8 @@ export default function App() {
     detailReturnScreenRef.current = null;
     setSelected(null);
     setDetailEditRating(false);
+    setDetailClearRatingConfirm(false);
+    setDetailClearRatingErr("");
     setDetailRateEntry(null);
   }
 
@@ -8243,6 +8287,8 @@ export default function App() {
         const ret = detailReturnScreenRef.current;
         detailReturnScreenRef.current = null;
         setDetailEditRating(false);
+        setDetailClearRatingConfirm(false);
+        setDetailClearRatingErr("");
         setDetailRateEntry(null);
         setSelected(null);
         if (ret != null) setScreen(ret);
@@ -12084,7 +12130,13 @@ export default function App() {
                       <div className="rated-label">Your rating saved ✓</div>
                       {hasPersonalPrediction(prediction) && <div className="rated-pred">Predicted was {formatScore(prediction.predicted)} ({formatScore(prediction.low)}–{formatScore(prediction.high)})</div>}
                       <button type="button" className="btn-full btn-full-dark" style={{ marginTop: 16, width: "100%" }}
-                        onClick={() => { setDetailEditRating(true); setDetailRating(myRating); setDetailTouched(true); }}>
+                        onClick={() => {
+                          setDetailEditRating(true);
+                          setDetailClearRatingConfirm(false);
+                          setDetailClearRatingErr("");
+                          setDetailRating(myRating);
+                          setDetailTouched(true);
+                        }}>
                         Change rating
                       </button>
                       {user && publishModalCircles.length > 0 ? (
@@ -12107,23 +12159,103 @@ export default function App() {
                     </div>
                   ) : myRating && detailEditRating ? (
                     <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
-                      <div className="d-rate-label">Update your rating</div>
-                      <RatingScoreChips
-                        variant="detail"
-                        value={detailRating}
-                        touched={detailTouched}
-                        onPick={(v) => { setDetailRating(v); setDetailTouched(true); }}
-                      />
-                      <div className="d-actions" style={{ marginTop: 14 }}>
-                        <button className="btn-full btn-full-gold" disabled={!detailTouched}
-                          onClick={() => { void addRating(movie.id, detailRating, { skipPublishModal: true }); setDetailEditRating(false); }}>
-                          Save new rating
-                        </button>
-                        <button type="button" className="btn-full btn-full-dark"
-                          onClick={() => { setDetailEditRating(false); setDetailRating(myRating); }}>
-                          Cancel
-                        </button>
+                      <div className="d-rate-label">
+                        {detailClearRatingConfirm ? "Clear your rating?" : "Update your rating"}
                       </div>
+                      {detailClearRatingConfirm ? (
+                        <div className="detail-clear-rating-confirm">
+                          <p className="detail-clear-rating-confirm-msg">
+                            This title will be removed from every circle you published it to, and your rating will be cleared.
+                          </p>
+                          <div className="d-actions">
+                            <button
+                              type="button"
+                              className="btn-full-danger"
+                              disabled={detailClearRatingBusy || !user}
+                              onClick={() => {
+                                setDetailClearRatingErr("");
+                                setDetailClearRatingBusy(true);
+                                void (async () => {
+                                  try {
+                                    await clearMyRatingForMovieId(movie.id);
+                                    setDetailEditRating(false);
+                                    setDetailClearRatingConfirm(false);
+                                    setDetailRating(7);
+                                    setDetailTouched(false);
+                                  } catch (e) {
+                                    setDetailClearRatingErr(e?.message || "Could not clear rating.");
+                                  } finally {
+                                    setDetailClearRatingBusy(false);
+                                  }
+                                })();
+                              }}
+                            >
+                              {detailClearRatingBusy ? "Removing…" : "Remove rating"}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-full btn-full-dark"
+                              disabled={detailClearRatingBusy}
+                              onClick={() => {
+                                setDetailClearRatingConfirm(false);
+                                setDetailClearRatingErr("");
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          {detailClearRatingErr ? (
+                            <p className="detail-clear-rating-err">{detailClearRatingErr}</p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <>
+                          <RatingScoreChips
+                            variant="detail"
+                            value={detailRating}
+                            touched={detailTouched}
+                            onPick={(v) => { setDetailRating(v); setDetailTouched(true); }}
+                          />
+                          <div className="d-actions" style={{ marginTop: 14 }}>
+                            <button
+                              type="button"
+                              className="btn-full btn-full-gold"
+                              disabled={!detailTouched}
+                              onClick={() => {
+                                void addRating(movie.id, detailRating, { skipPublishModal: true });
+                                setDetailEditRating(false);
+                                setDetailClearRatingConfirm(false);
+                                setDetailClearRatingErr("");
+                              }}
+                            >
+                              Save new
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-full btn-full-dark"
+                              onClick={() => {
+                                setDetailEditRating(false);
+                                setDetailClearRatingConfirm(false);
+                                setDetailClearRatingErr("");
+                                setDetailRating(myRating);
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-full-danger"
+                              disabled={!user}
+                              onClick={() => {
+                                setDetailClearRatingConfirm(true);
+                                setDetailClearRatingErr("");
+                              }}
+                            >
+                              Clear rating
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : !myRating ? (
                     <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>

@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.42
+
+- **Title detail — clear rating:** While changing a saved score, **Save new**, **Cancel**, and a red **Clear rating** control. **Clear rating** asks for confirmation: the title is removed from **all circles** it was published to and the global rating is deleted. Migration **`20260611120000_ratings_rls_delete_own.sql`** adds **`ratings` DELETE** for **`authenticated`** (own rows only); apply on each hosted DB.
+
 ## 7.0.41
 
 - **Auth — display name + email confirm:** Migration **`20260610120000_profiles_sync_display_name_from_auth_users.sql`** — **`AFTER INSERT OR UPDATE OF raw_user_meta_data`** on **`auth.users`** upserts **`public.profiles.name`** from **`raw_user_meta_data->>'name'`** (fallback email local-part / **`User`**); backfills existing rows where meta had a name but **`profiles.name`** was blank. **Apply on each env.** Client **`signUp`**: **`profiles.update`** for name runs **only when `data.session`** exists (avoids pointless RLS failures when confirmation is required).
