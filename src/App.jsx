@@ -2840,13 +2840,10 @@ function stripBadgeDisplay(
   const entry = key != null ? cinemastroAvgByKey[key] : undefined;
   const cAvg = cinemastroEntryAvg(entry);
   const cCount = cinemastroEntryCount(entry);
-  if (typeof cAvg === "number" && Number.isFinite(cAvg)) {
+  if (typeof cAvg === "number" && Number.isFinite(cAvg) && (cCount ?? 0) >= 1) {
     return {
       text: formatScore(cAvg),
-      title:
-        cCount != null && cCount > 0
-          ? `Cinemastro rating · ${formatPublicStat(cCount)} ratings`
-          : "Cinemastro rating",
+      title: `Cinemastro rating · ${formatPublicStat(cCount)} ratings`,
       color: "#e8c96a",
       pillClass: "strip-badge--cinemastro",
       cinemastroCount: cCount ?? null,
@@ -12449,7 +12446,10 @@ export default function App() {
         const detailCinemastroEntry = detailMediaKey != null ? cinemastroAvgByKey[detailMediaKey] : undefined;
         const detailCinemastroAvg = cinemastroEntryAvg(detailCinemastroEntry);
         const detailCinemastroCount = cinemastroEntryCount(detailCinemastroEntry);
-        const detailHasCinemastro = typeof detailCinemastroAvg === "number" && Number.isFinite(detailCinemastroAvg);
+        const detailHasCinemastro =
+          typeof detailCinemastroAvg === "number" &&
+          Number.isFinite(detailCinemastroAvg) &&
+          (detailCinemastroCount ?? 0) >= 1;
         const detailTmdbNum = movie.tmdbRating != null && Number.isFinite(Number(movie.tmdbRating)) ? Number(movie.tmdbRating) : null;
         const heroBackdropSrc = movie.backdrop || movie.poster || null;
         const showRateMorePill =
@@ -12592,10 +12592,7 @@ export default function App() {
                         <div className="detail-score-val-cluster">
                           <span className="detail-inline-score-val">{formatScore(detailCinemastroAvg)}</span>
                           <div className="detail-score-meta-stack">
-                            <span className="detail-cine-sub--inline">TMDB-based</span>
-                            {detailCinemastroCount != null && detailCinemastroCount >= 1 ? (
-                              <CinemastroVoteMeter count={detailCinemastroCount} className="cinemastro-vote-meter--detail-stack" />
-                            ) : null}
+                            <CinemastroVoteMeter count={detailCinemastroCount} className="cinemastro-vote-meter--detail-stack" />
                           </div>
                         </div>
                       ) : detailTmdbNum != null ? (

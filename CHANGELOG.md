@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.53
+
+- **Title detail — community vs TMDB:** The right score column shows **Cinemastro** only when **`get_cinemastro_title_avgs`** reports **`rating_count` ≥ 1**; otherwise it falls back to **TMDB** (same **`movie.tmdbRating`** path as before). Removed the **TMDB-based** sublabel under Cinemastro. **`stripBadgeDisplay`** (poster / Discover / grids) uses the same **≥ 1** gate before the gold Cinemastro badge so cold titles show TMDB like detail.
+
 ## 7.0.52
 
 - **Discover — search:** After a query (applied search ≥ **2** characters), the grid keeps **TMDB search API order** (merged pages + dedupe + excluded-genre filters). **Catalogue browse** without search still sorts by **year** (newest first, undated at tail).
