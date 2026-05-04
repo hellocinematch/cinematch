@@ -79,7 +79,7 @@ const AboutPage = lazy(() => import("./aboutPage.jsx").then((m) => ({ default: m
 // Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.5.0: precomputed neighbors + faster match predict; v3.4.0: detail card copy/chips refresh; v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
 
-/** Cap “no circles yet” nudge after title-detail Submit Rating; counter resets when user has an active circle. */
+/** Cap “no circles yet” nudge after title-detail first submit or Save new; counter resets when user has an active circle. */
 const NO_CIRCLES_DETAIL_RATING_NUDGE_MAX = 2;
 const NO_CIRCLES_DETAIL_RATING_NUDGE_COUNT_KEY = "cinemastro_no_circles_detail_rating_nudge_count";
 
@@ -6675,11 +6675,13 @@ export default function App() {
     setUserRatings(prev => ({ ...prev, [movieId]: score }));
     setWatchlist(prev => prev.filter(m => m.id !== movieId));
     setSelectedToWatch(prev => { const n = { ...prev }; delete n[movieId]; return n; });
+    let ratingsUpsertOk = false;
     if (user) {
       const [type, tmdbId] = movieId.split("-");
       const { error: ratingErr } = await supabase.from("ratings").upsert({ user_id: user.id, tmdb_id: parseInt(tmdbId), media_type: type, score }, { onConflict: "user_id,tmdb_id,media_type" });
       if (ratingErr) console.warn("Could not save rating:", ratingErr.message);
       else {
+        ratingsUpsertOk = true;
         void refreshCinemastroAvgForMediaId(movieId);
         scheduleComputeNeighborsRebuild();
       }
@@ -6713,6 +6715,22 @@ export default function App() {
         defaultCircleIds: [...new Set(defaults)],
       });
       return;
+    }
+
+    if (
+      options.afterDetailRatingUpdate === true &&
+      Boolean(user) &&
+      ratingsUpsertOk &&
+      circlesLoaded &&
+      circlesList.filter((c) => c?.status === "active").length === 0
+    ) {
+      if (readNoCirclesDetailRatingNudgeCount() < NO_CIRCLES_DETAIL_RATING_NUDGE_MAX) {
+        bumpNoCirclesDetailRatingNudgeCount();
+        setNoCirclesAfterDetailRatingModal({
+          pendingNavigate: options.pendingNavigate ?? "none",
+        });
+        return;
+      }
     }
 
     if (pendingNavigate === "back") {
@@ -12731,7 +12749,10 @@ export default function App() {
                               className="btn-full btn-full-gold"
                               disabled={!detailTouched}
                               onClick={() => {
-                                void addRating(movie.id, detailRating, { skipPublishModal: true });
+                                void addRating(movie.id, detailRating, {
+                                  skipPublishModal: true,
+                                  afterDetailRatingUpdate: true,
+                                });
                                 setDetailEditRating(false);
                                 setDetailClearRatingConfirm(false);
                                 setDetailClearRatingErr("");

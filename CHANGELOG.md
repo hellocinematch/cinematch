@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.50
+
+- **Circles — title detail rating:** The **no active circles** “Create a circle” nudge (same **localStorage** cap as first submit) now runs after **Change rating → Save new**, not only after the first **Submit Rating**. Only when the signed-in user’s rating **upsert** succeeds.
+
 ## 7.0.49
 
 - **Circles — My list:** **`fetchMyCircles`** now calls Postgres **`get_my_circles()`** (`SECURITY DEFINER`, membership-only join + full **`circle_members`** aggregate). Fixes ghosts where **`creator can read own circle`** still returned a row after leave while nested members were RLS-empty (**0 members**, **leave → not a member**). Migration **`20260614120000_get_my_circles_rpc.sql`** — apply on each hosted DB.
