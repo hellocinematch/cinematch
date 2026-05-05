@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.57
+
+- **Title detail — overlay navigation:** Opening title detail no longer switches `screen` to a dedicated `"detail"` route. Detail renders as a **fixed panel** below the primary nav (`detail-overlay-root`, z-index under the nav chrome). The underlying page (**Circles**, **Discover**, **Your Picks**, **watchlist**, etc.) **stays mounted**, so **horizontal strip scroll position** is preserved when the user returns from detail (same pattern as modals such as “who rated”). Duplicate **bottom nav** on underlying surfaces is suppressed while the overlay is open. Browser **back** / **`goBack`** still clears selection and history as before, without remounting strips.
+
 ## 7.0.56
 
 - **Circles — zero-circle nudge:** On the **Circles** tab, onboarded users with **≥1 rating** and **no active circles** see an optional **banner** (Dismiss for this session, **Don’t show again**) explaining that circles help Cinemastro **tune picks** using who you watch with; plus a **modal** on eligible visits at most **once per 2 days** (**Maybe later** / **Create circle**). Scheduling waits **450ms** and skips while **post-onboarding help** or other circle modals/sheets are open. Resets when the user joins or creates an active circle.

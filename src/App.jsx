@@ -2087,6 +2087,8 @@ function BottomNav({
   onOpenHelp,
   circlesBottomNavActive,
   onNavigateCircles,
+  /** True on underlying surfaces while title detail overlay is open — avoids duplicate fixed nav. */
+  suppressBecauseDetailOverlay,
 }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileNavRef = useRef(null);
@@ -2101,6 +2103,8 @@ function BottomNav({
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [profileMenuOpen]);
+
+  if (suppressBecauseDetailOverlay) return null;
 
   return (
     <div className="bottom-nav">
@@ -3537,10 +3541,10 @@ export default function App() {
   }, [screen]);
 
   useEffect(() => {
-    if (screen !== "discover" && screen !== "detail") {
+    if (screen !== "discover" && !selectedMovie) {
       rateTitleReturnCircleIdRef.current = null;
     }
-  }, [screen]);
+  }, [screen, selectedMovie]);
 
   function shouldDeferComputeNeighbors() {
     const s = screenRef.current;
@@ -3618,7 +3622,7 @@ export default function App() {
     languageLabel: null,
   });
   useEffect(() => {
-    if (screen !== "detail" || !selectedMovie?.movie) {
+    if (!selectedMovie?.movie) {
       setDetailMeta({
         tagline: null,
         genresLine: null,
@@ -3650,7 +3654,7 @@ export default function App() {
       cancelled = true;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when detail title id changes
-  }, [screen, selectedMovie?.movie?.id]);
+  }, [selectedMovie?.movie?.id]);
 
   // iOS Safari can keep horizontal viewport drift even when overflow-x is hidden.
   // Guard in two layers:
@@ -7119,7 +7123,7 @@ export default function App() {
       /** Chips: require an explicit pick; show **—** until then (6.1.0). */
       setDetailTouched(userRatings[movie.id] != null);
     }
-    setScreen("detail");
+    /** Title detail is a fixed overlay; keep underlying `screen` so strips stay mounted and horizontal scroll is preserved. */
     const movieId = movie.id;
     void (async () => {
       try {
@@ -7175,16 +7179,7 @@ export default function App() {
     setDetailClearRatingErr("");
     setDetailRateEntry(null);
     setSelected(null);
-    // navTab === "home" is the idle bottom-nav sentinel; the landing screen is now "circles".
-    setScreen(
-      navTab === "mood"
-        ? "mood-results"
-        : navTab === "home"
-          ? "circles"
-          : navTab === "watchlist"
-            ? "watchlist"
-            : navTab,
-    );
+    /** Underlying screen was never switched to `"detail"`; no `setScreen` — avoids remounting strips. */
   }
 
   function openLegalPage(target) {
@@ -8752,7 +8747,6 @@ export default function App() {
     "rated",
     "mood-picker",
     "mood-results",
-    "detail",
     "about",
     "help",
   ]);
@@ -8773,7 +8767,7 @@ export default function App() {
 
   /** Leaving title detail via top nav (not browser back): drop overlay URL + selection without `history.back()`. */
   function clearDetailOverlayToNavigate() {
-    if (screen !== "detail") return;
+    if (!selectedMovie) return;
     if (detailHistoryPushedRef.current) {
       history.replaceState(null, "", spaUrlWithoutOverlays());
       detailHistoryPushedRef.current = false;
@@ -8891,14 +8885,13 @@ export default function App() {
     const onPopState = () => {
       if (detailHistoryPushedRef.current) {
         detailHistoryPushedRef.current = false;
-        const ret = detailReturnScreenRef.current;
         detailReturnScreenRef.current = null;
         setDetailEditRating(false);
         setDetailClearRatingConfirm(false);
         setDetailClearRatingErr("");
         setDetailRateEntry(null);
         setSelected(null);
-        if (ret != null) setScreen(ret);
+        /** Underlying `screen` unchanged — omit `setScreen(ret)`. */
         return;
       }
       if (legalHistoryPushedRef.current) {
@@ -9637,6 +9630,7 @@ export default function App() {
     onOpenHelp: () => openLegalPage("help"),
     circlesBottomNavActive: screen === "circles" || screen === "circle-detail",
     onNavigateCircles: () => navigatePrimarySection("circles"),
+    suppressBecauseDetailOverlay: Boolean(selectedMovie),
   };
 
   function AccountAvatarMenu() {
@@ -9707,7 +9701,7 @@ export default function App() {
             }}
             onHome={goHome}
             discoverActive={screen === "discover"}
-            onDetailBack={screen === "detail" ? goBack : undefined}
+            onDetailBack={selectedMovie ? goBack : undefined}
           />
         )}
 
@@ -12684,8 +12678,8 @@ export default function App() {
       )}
       {screen === "help" && <HelpFullPage onBack={closeLegalPage} />}
 
-      {/* DETAIL */}
-      {screen === "detail" && selectedMovie && (() => {
+      {/* Title detail: fixed shell below primary nav — underlying route stays mounted for strip scroll. */}
+      {selectedMovie && (() => {
         const { movie, prediction, predictionLoading } = selectedMovie;
         const showPredSkeleton = Boolean(predictionLoading);
         const myRating = userRatings[movie.id];
@@ -12762,6 +12756,7 @@ export default function App() {
           </>
         );
         return (
+          <div className="detail-overlay-root">
           <div className="detail">
             {!showPrimaryNav ? (
               <div className="page-topbar">
@@ -13077,7 +13072,8 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <BottomNav {...navProps} />
+            <BottomNav {...navProps} suppressBecauseDetailOverlay={false} />
+          </div>
           </div>
         );
         })()}
