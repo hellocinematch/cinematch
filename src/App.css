@@ -2429,6 +2429,8 @@
   }
   .circles-modal-close:hover { color:#f0ebe0; background:rgba(255,255,255,0.06); }
   .circles-modal-sub { font-size:13px; color:#888; margin-top:-2px; line-height:1.4; word-break:break-word; }
+  .circles-modal-sub + .circles-modal-sub { margin-top:10px; }
+  .circles-modal-sub--fine-print { font-size:11px; color:#666; margin-top:12px; }
   .publish-rating-circle-list { max-height:min(45vh, 280px); overflow-y:auto; margin-top:4px; display:flex; flex-direction:column; gap:0; }
   .publish-rating-circle-row { display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid #222; font-family:'DM Sans',sans-serif; font-size:14px; color:#e8e8e8; cursor:pointer; }
   .publish-rating-circle-row:last-child { border-bottom:none; }
@@ -2470,6 +2472,12 @@
   .circles-textarea:disabled { opacity:0.6; }
   .circles-field-count { position:absolute; top:0; right:0; font-size:11px; color:#555; font-family:'DM Sans',sans-serif; }
   .circles-sheet-actions { display:flex; gap:10px; margin-top:8px; }
+  .circles-sheet-actions--pwa-education { flex-wrap:wrap; margin-top:14px; }
+  .circles-sheet-actions--pwa-education .circles-btn-ghost,
+  .circles-sheet-actions--pwa-education .circles-btn-primary { flex:1 1 calc(33.333% - 7px); min-width:min(100%, 104px); justify-content:center; }
+  .pwa-education-steps { margin:12px 0 0; padding:0 0 0 18px; font-size:13px; color:#b8b4ac; line-height:1.55; text-align:left; }
+  .pwa-education-steps li { margin-bottom:10px; }
+  .pwa-education-steps strong { color:#d8d4cc; font-weight:600; }
   .circles-info-banner { margin-top:4px; padding:10px 14px; background:#1a1a10; border:1px solid #3a3a2a; color:#c8c4bc; border-radius:10px; font-size:13px; line-height:1.45; }
   .circles-copy-mail-block { display:flex; flex-direction:column; gap:8px; margin-top:4px; }
   .circles-copy-mail-textarea { min-height:200px; font-size:13px; line-height:1.45; resize:vertical; }

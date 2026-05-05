@@ -126,6 +126,65 @@ function writeZeroCirclesHomeModalLastAtMs(nowMs) {
   }
 }
 
+/** Circles tab — mobile install hint (`readPwaEducation*` / `writePwaEducation*` below). */
+const PWA_EDUCATION_NEVER_KEY = "cinemastro_pwa_education_never";
+const PWA_EDUCATION_NEXT_SHOW_AT_MS_KEY = "cinemastro_pwa_education_next_show_at_ms";
+const PWA_EDUCATION_GOT_IT_DELAY_MS = 2 * 24 * 60 * 60 * 1000;
+const PWA_EDUCATION_REMIND_LATER_DELAY_MS = 24 * 60 * 60 * 1000;
+
+function isRunningAsInstalledPwa() {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.matchMedia("(display-mode: standalone)").matches) return true;
+    if (window.matchMedia("(display-mode: minimal-ui)").matches) return true;
+  } catch {
+    /* ignore */
+  }
+  return typeof navigator !== "undefined" && navigator.standalone === true;
+}
+
+function isLikelyMobileTouchInstallerBrowser() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+}
+
+function readPwaEducationNeverFlag() {
+  try {
+    return localStorage.getItem(PWA_EDUCATION_NEVER_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readPwaEducationNextShowAtMs() {
+  try {
+    const raw = localStorage.getItem(PWA_EDUCATION_NEXT_SHOW_AT_MS_KEY);
+    if (raw == null || raw === "") return null;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePwaEducationNextShowAtMs(ms) {
+  try {
+    localStorage.setItem(PWA_EDUCATION_NEXT_SHOW_AT_MS_KEY, String(ms));
+  } catch {
+    /* ignore */
+  }
+}
+
+function writePwaEducationNeverFlag() {
+  try {
+    localStorage.setItem(PWA_EDUCATION_NEVER_KEY, "1");
+    localStorage.removeItem(PWA_EDUCATION_NEXT_SHOW_AT_MS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Upper bound for `profiles.name` on sign-up (DB backfill uses 120-char cap). */
 const PROFILE_DISPLAY_NAME_MAX = 120;
 
@@ -3398,6 +3457,9 @@ export default function App() {
   /** Circles list banner: session dismiss + “never” from localStorage (synced on login / reset). */
   const [zeroCirclesBannerNever, setZeroCirclesBannerNever] = useState(false);
   const [zeroCirclesBannerSessionDismissed, setZeroCirclesBannerSessionDismissed] = useState(false);
+  /** Mobile web — Add to Home Screen / install (see {@link PWA_EDUCATION_* } keys). */
+  const [pwaEducationModalOpen, setPwaEducationModalOpen] = useState(false);
+  const [pwaEducationScheduleEpoch, setPwaEducationScheduleEpoch] = useState(0);
   const [publishModalBusy, setPublishModalBusy] = useState(false);
   const [publishModalError, setPublishModalError] = useState("");
   const [publishModalSelection, setPublishModalSelection] = useState(() => new Set());
@@ -6877,6 +6939,24 @@ export default function App() {
     openCreateCircleSheet();
   }
 
+  function dismissPwaEducationGotIt() {
+    writePwaEducationNextShowAtMs(Date.now() + PWA_EDUCATION_GOT_IT_DELAY_MS);
+    setPwaEducationModalOpen(false);
+    setPwaEducationScheduleEpoch((n) => n + 1);
+  }
+
+  function dismissPwaEducationRemindLater() {
+    writePwaEducationNextShowAtMs(Date.now() + PWA_EDUCATION_REMIND_LATER_DELAY_MS);
+    setPwaEducationModalOpen(false);
+    setPwaEducationScheduleEpoch((n) => n + 1);
+  }
+
+  function dismissPwaEducationNever() {
+    writePwaEducationNeverFlag();
+    setPwaEducationModalOpen(false);
+    setPwaEducationScheduleEpoch((n) => n + 1);
+  }
+
   function dismissZeroCirclesListBannerForSession() {
     try {
       sessionStorage.setItem(ZERO_CIRCLES_LIST_BANNER_DISMISSED_SESSION_KEY, "1");
@@ -7461,6 +7541,18 @@ export default function App() {
     return !circlesList.some((c) => c?.status === "active");
   }, [user, userRatings, circlesList, circlesLoaded, pendingInvitesLoaded]);
 
+  const pwaEducationEligible = useMemo(() => {
+    void pwaEducationScheduleEpoch;
+    if (!user) return false;
+    if (typeof window === "undefined") return false;
+    if (isRunningAsInstalledPwa()) return false;
+    if (!isLikelyMobileTouchInstallerBrowser()) return false;
+    if (readPwaEducationNeverFlag()) return false;
+    const next = readPwaEducationNextShowAtMs();
+    if (next != null && Date.now() < next) return false;
+    return true;
+  }, [user, pwaEducationScheduleEpoch]);
+
   /** Reset circle nudges once they belong to any active circle. */
   useEffect(() => {
     if (!circlesList.some((c) => c?.status === "active")) return;
@@ -7535,6 +7627,50 @@ export default function App() {
   useEffect(() => {
     if (screen !== "circles") setZeroCirclesHomeNudgeModalOpen(false);
   }, [screen]);
+
+  useEffect(() => {
+    if (!user) setPwaEducationModalOpen(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (screen !== "circles") setPwaEducationModalOpen(false);
+  }, [screen]);
+
+  useEffect(() => {
+    if (!pwaEducationEligible) return;
+    if (screen !== "circles") return;
+    if (!circlesLoaded) return;
+    if (postOnboardingHelpOpen) return;
+    if (zeroCirclesHomeNudgeModalOpen) return;
+    if (noCirclesAfterDetailRatingModal) return;
+    if (showCreateCircleSheet) return;
+    if (publishRatingModal) return;
+    if (selectedMovie) return;
+
+    const delayMs = 800;
+    const timer = window.setTimeout(() => {
+      if (postOnboardingHelpOpenRef.current) return;
+      if (screen !== "circles") return;
+      if (zeroCirclesHomeNudgeModalOpen) return;
+      if (noCirclesAfterDetailRatingModal) return;
+      if (showCreateCircleSheet) return;
+      if (publishRatingModal) return;
+      if (selectedMovie) return;
+      setPwaEducationModalOpen(true);
+    }, delayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    pwaEducationEligible,
+    screen,
+    circlesLoaded,
+    postOnboardingHelpOpen,
+    zeroCirclesHomeNudgeModalOpen,
+    noCirclesAfterDetailRatingModal,
+    showCreateCircleSheet,
+    publishRatingModal,
+    selectedMovie,
+  ]);
 
   const atCircleCap = activeCirclesCount >= CIRCLE_CAP;
   /** Pending invites merged into the main list; hidden entirely at max circles (passdown). */
@@ -11514,6 +11650,62 @@ export default function App() {
                 disabled={atCircleCap || !user}
               >
                 Create circle
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Mobile web — Add to Home Screen / install (remind 1d · Got it 2d · never). */}
+      {pwaEducationModalOpen ? (
+        <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Install Cinemastro">
+          <button
+            type="button"
+            className="circles-modal-backdrop"
+            aria-label="Close"
+            onClick={dismissPwaEducationGotIt}
+          />
+          <div className="circles-modal-panel">
+            <div className="circles-modal-header">
+              <h2 className="circles-modal-title">Add Cinemastro to your home screen</h2>
+              <button
+                type="button"
+                className="circles-modal-close"
+                aria-label="Close"
+                onClick={dismissPwaEducationGotIt}
+              >
+                ×
+              </button>
+            </div>
+            <p className="circles-modal-sub">
+              Opens faster from your home screen — same login as in the browser.
+            </p>
+            <p className="circles-modal-sub">
+              Cinemastro is a web app you can install like an app. Adding it puts an icon on your home screen so you can
+              reopen without digging through tabs.
+            </p>
+            <ul className="pwa-education-steps">
+              <li>
+                <strong>iPhone / iPad (Safari):</strong> Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>{" "}
+                → <strong>Add</strong>.
+              </li>
+              <li>
+                <strong>Android (Chrome):</strong> Tap the menu (<strong>⋮</strong>) → <strong>Install app</strong> or{" "}
+                <strong>Add to Home screen</strong> (wording may vary).
+              </li>
+            </ul>
+            <p className="circles-modal-sub circles-modal-sub--fine-print">
+              Updates roll out automatically. If something looks stuck, refresh once.
+            </p>
+            <div className="circles-sheet-actions circles-sheet-actions--pwa-education">
+              <button type="button" className="circles-btn-ghost" onClick={dismissPwaEducationRemindLater}>
+                Remind me later
+              </button>
+              <button type="button" className="circles-btn-primary" onClick={dismissPwaEducationGotIt}>
+                Got it
+              </button>
+              <button type="button" className="circles-btn-ghost" onClick={dismissPwaEducationNever}>
+                Don&apos;t show again
               </button>
             </div>
           </div>

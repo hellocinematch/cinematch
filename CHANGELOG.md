@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.58
+
+- **PWA — install hint (mobile):** On the **Circles** tab, signed-in users on typical **mobile browsers** who are **not** already in **standalone / installed** mode may see a one-shot modal (**Add Cinemastro to your home screen**) with **Safari** and **Chrome** steps. **Got it** snoozes **2 days**; **Remind me later** snoozes **1 day**; **Don’t show again** persists via **`localStorage`**. Deferred **800ms** and skipped while post-onboarding help, zero-circle modal, title detail overlay, publish/create-circle flows, etc. are active.
+
 ## 7.0.57
 
 - **Title detail — overlay navigation:** Opening title detail no longer switches `screen` to a dedicated `"detail"` route. Detail renders as a **fixed panel** below the primary nav (`detail-overlay-root`, z-index under the nav chrome). The underlying page (**Circles**, **Discover**, **Your Picks**, **watchlist**, etc.) **stays mounted**, so **horizontal strip scroll position** is preserved when the user returns from detail (same pattern as modals such as “who rated”). Duplicate **bottom nav** on underlying surfaces is suppressed while the overlay is open. Browser **back** / **`goBack`** still clears selection and history as before, without remounting strips.
