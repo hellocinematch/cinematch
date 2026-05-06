@@ -59,6 +59,17 @@
   .auth-field { margin-bottom:16px; }
   .auth-label { font-size:12px; color:#888; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; display:block; }
   .auth-input { width:100%; background:#141414; border:1px solid #2a2a2a; border-radius:8px; padding:13px 16px; font-family:'DM Sans',sans-serif; font-size:16px; color:#f0ebe0; outline:none; transition:border-color 0.2s; min-width:0; }
+  .auth-password-wrap { position:relative; }
+  .auth-input--password { padding-right:48px; }
+  .auth-password-toggle {
+    position:absolute; right:4px; top:50%; transform:translateY(-50%);
+    display:flex; align-items:center; justify-content:center;
+    width:40px; height:40px; padding:0; margin:0;
+    background:none; border:none; border-radius:6px; cursor:pointer;
+    color:#888; line-height:0;
+  }
+  .auth-password-toggle:hover { color:#e8c96a; }
+  .auth-password-toggle:focus-visible { outline:2px solid #e8c96a; outline-offset:1px; }
   .auth-input:focus { border-color:#e8c96a; }
   .auth-input::placeholder { color:#444; }
   .auth-error { font-size:13px; color:#cc4444; margin-bottom:16px; padding:10px 14px; background:#1a0808; border:1px solid #441111; border-radius:8px; overflow-wrap:anywhere; }

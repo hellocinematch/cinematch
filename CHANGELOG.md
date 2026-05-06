@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.60
+
+- **Onboarding — TMDB pools (only `obCatalogue` / rating steps):** **Hollywood / English** side uses TMDB **discover** with a rolling **~6 month** US movie **`primary_release_date`** + TV **`first_air_date`** window, **`vote_count` ≥ 200**, **`popularity.desc`**, **US** region on movies; **secondary cinema** uses **`with_original_language`**, **`vote_count` ≥ 40**, **`primary_release_date.desc`** / **`first_air_date.desc`**. Mixed prefs fetch English + regional in parallel. Falls back to main **`catalogue`** if discover fails or returns empty. **Mixed** onboarding no longer applies a **20 year** year filter so regional classics can surface. Main app catalogue / Discover unchanged.
+
+## 7.0.59
+
+- **Auth — show password:** On the **Create account**, **Sign in**, and **Reset password** screens, the password field has an **eye** control to toggle between hidden and visible text (`aria-label` **Show password** / **Hide password**). Visibility resets when switching auth mode (sign up ↔ sign in ↔ reset). **`autoComplete`** and **`name`** align with **new-password** vs **current-password** for password managers.
+
 ## 7.0.58
 
 - **PWA — install hint (mobile):** On the **Circles** tab, signed-in users on typical **mobile browsers** who are **not** already in **standalone / installed** mode may see a one-shot modal (**Add Cinemastro to your home screen**) with **Safari** and **Chrome** steps. **Got it** snoozes **2 days**; **Remind me later** snoozes **1 day**; **Don’t show again** persists via **`localStorage`**. Deferred **800ms** and skipped while post-onboarding help, zero-circle modal, title detail overlay, publish/create-circle flows, etc. are active.

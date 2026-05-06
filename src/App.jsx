@@ -1801,37 +1801,65 @@ async function fetchCatalogue() {
   return catalogueFromTmdbPages(popMovies, topMovies, popTV, topTV);
 }
 
-// Fetch regional titles for onboarding
-async function fetchRegionalTitles(langCode) {
+/** Rolling ~6-month window (UTC) for Hollywood onboarding TMDB discover `*_release_date` / `first_air_date`. */
+function onboardingHollywoodDiscoverDateRange() {
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCMonth(start.getUTCMonth() - 6);
+  return { start: formatIsoDate(start), end: formatIsoDate(end) };
+}
+
+/**
+ * Onboarding only: US recent movies + recent TV from TMDB discover, **vote_count ≥ 200**, **popularity** order.
+ * Main app `catalogue` unchanged — this fills **`obCatalogue`** for Hollywood / English side of mixed prefs.
+ */
+async function fetchOnboardingHollywoodTitles() {
+  const { start, end } = onboardingHollywoodDiscoverDateRange();
+  const movieQ =
+    `/discover/movie?language=en-US&region=US&sort_by=popularity.desc` +
+    `&primary_release_date.gte=${start}&primary_release_date.lte=${end}&vote_count.gte=200&page=1`;
+  const tvQ =
+    `/discover/tv?language=en-US&sort_by=popularity.desc` +
+    `&first_air_date.gte=${start}&first_air_date.lte=${end}&vote_count.gte=200&page=1`;
+  const [mRes, tRes] = await Promise.all([fetchTMDB(movieQ), fetchTMDB(tvQ)]);
+  if (isTmdbApiErrorPayload(mRes) || isTmdbApiErrorPayload(tRes)) return [];
+  if (mRes?.status_code || tRes?.status_code) return [];
+  const movies = filterDefaultExcludedGenres(mRes?.results || []).map((m) => normalizeCatalogueItem(m, "movie"));
+  const shows = filterDefaultExcludedGenres(tRes?.results || []).map((m) => normalizeCatalogueItem(m, "tv"));
+  const combined = [];
+  const max = Math.max(movies.length, shows.length);
+  for (let i = 0; i < max && combined.length < 80; i++) {
+    if (movies[i]) combined.push(movies[i]);
+    if (shows[i]) combined.push(shows[i]);
+  }
+  return combined;
+}
+
+/**
+ * Onboarding only: secondary-cinema **`with_original_language`**, **vote_count ≥ 40**, **newest air/release first**.
+ */
+async function fetchOnboardingRegionalTitles(langCode) {
   try {
-    const [movies, shows] = await Promise.all([
-      fetchTMDB(`/discover/movie?with_original_language=${langCode}&sort_by=popularity.desc&page=1`),
-      fetchTMDB(`/discover/tv?with_original_language=${langCode}&sort_by=popularity.desc&page=1`),
-    ]);
-    const normalize = (item, type) => ({
-      id: `${type}-${item.id}`, tmdbId: item.id, type,
-      title: item.title || item.name,
-      year: (item.release_date || item.first_air_date || "").slice(0, 4),
-      releaseDate: tmdbReleaseDateString(item),
-      genre: type === "movie" ? "Movie" : "TV Show",
-      genreIds: item.genre_ids || [],
-      synopsis: item.overview || "",
-      poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
-      backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
-      tmdbRating: Math.round(item.vote_average * 10) / 10,
-      popularity: item.popularity,
-      language: item.original_language || langCode,
-      originCountries: Array.isArray(item.origin_country)
-        ? item.origin_country.filter(c => typeof c === "string").map(c => c.toUpperCase())
-        : Array.isArray(item.production_countries)
-          ? item.production_countries.map(c => c?.iso_3166_1).filter(c => typeof c === "string").map(c => c.toUpperCase())
-          : [],
-    });
-    return [
-      ...filterDefaultExcludedGenres(movies.results || []).slice(0, 15).map(m => normalize(m, "movie")),
-      ...filterDefaultExcludedGenres(shows.results || []).slice(0, 10).map(m => normalize(m, "tv")),
-    ];
-  } catch { return []; }
+    const lang = encodeURIComponent(langCode);
+    const movieQ =
+      `/discover/movie?language=en-US&with_original_language=${lang}` +
+      `&sort_by=primary_release_date.desc&vote_count.gte=40&page=1`;
+    const tvQ =
+      `/discover/tv?language=en-US&with_original_language=${lang}` +
+      `&sort_by=first_air_date.desc&vote_count.gte=40&page=1`;
+    const [movies, shows] = await Promise.all([fetchTMDB(movieQ), fetchTMDB(tvQ)]);
+    if (isTmdbApiErrorPayload(movies) || isTmdbApiErrorPayload(shows)) return [];
+    if (movies?.status_code || shows?.status_code) return [];
+    const movieRows = filterDefaultExcludedGenres(movies.results || [])
+      .slice(0, 20)
+      .map((m) => normalizeCatalogueItem(m, "movie"));
+    const tvRows = filterDefaultExcludedGenres(shows.results || [])
+      .slice(0, 20)
+      .map((m) => normalizeCatalogueItem(m, "tv"));
+    return [...movieRows, ...tvRows];
+  } catch {
+    return [];
+  }
 }
 
 async function fetchWatchProviders(tmdbId, type) {
@@ -3315,6 +3343,8 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [authNotice, setAuthNotice] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  /** Auth password field: show/hide plaintext (eye toggle). */
+  const [authPasswordVisible, setAuthPasswordVisible] = useState(false);
   const [catalogue, setCatalogue] = useState([]);
   /** After first bootstrap attempt finishes or safety timeout — avoids infinite "Loading Cinemastro…" when TMDB hangs. */
   const [catalogueBootstrapDone, setCatalogueBootstrapDone] = useState(false);
@@ -3598,6 +3628,9 @@ export default function App() {
   const secondaryRegionRefillRevealSigRef = useRef("");
   const tvStripMetaCacheRef = useRef(new Map());
   const [tvStripMetaByTmdbId, setTvStripMetaByTmdbId] = useState({});
+  useEffect(() => {
+    setAuthPasswordVisible(false);
+  }, [authMode]);
   useEffect(() => {
     screenRef.current = screen;
   }, [screen]);
@@ -5839,8 +5872,14 @@ export default function App() {
   async function confirmPrimaryPreference() {
     if (catalogue.length === 0) return;
     if (cinemaPreference === "hollywood") {
-      // Use English catalogue only for onboarding
-      setObCatalogue(catalogue);
+      setScreen("loading-recs");
+      try {
+        const pool = await fetchOnboardingHollywoodTitles();
+        setObCatalogue(pool.length > 0 ? pool : catalogue);
+      } catch (e) {
+        console.error(e);
+        setObCatalogue(catalogue);
+      }
       setScreen("onboarding");
     } else {
       // Go to secondary screen to pick one other cinema
@@ -5852,34 +5891,51 @@ export default function App() {
   async function confirmSecondaryPreference() {
     if (!otherCinema) {
       if (catalogue.length === 0) return;
-      setObCatalogue(catalogue);
+      setScreen("loading-recs");
+      try {
+        const pool = await fetchOnboardingHollywoodTitles();
+        setObCatalogue(pool.length > 0 ? pool : catalogue);
+      } catch (e) {
+        console.error(e);
+        setObCatalogue(catalogue);
+      }
       setScreen("onboarding");
       return;
     }
     setScreen("loading-recs"); // Show loading while fetching regional titles
     const option = OTHER_CINEMA_OPTIONS.find(o => o.id === otherCinema);
     if (option) {
-      const regional = await fetchRegionalTitles(option.lang);
-      // Merge: 6 English + 6 regional for onboarding
-      const currentYear = new Date().getFullYear();
-      const engMovies = catalogue.filter(m => m.language === "en" && m.type === "movie" && m.year >= currentYear - 20).slice(0, 10);
-      const engShows = catalogue.filter(m => m.language === "en" && m.type === "tv" && m.year >= currentYear - 20).slice(0, 10);
-      const regMovies = regional.filter(m => m.type === "movie").slice(0, 10);
-      const regShows = regional.filter(m => m.type === "tv").slice(0, 10);
-      // Interleave English and regional
-      const mixed = [];
-      for (let i = 0; i < 6; i++) {
-        if (engMovies[i]) mixed.push(engMovies[i]);
-        if (regMovies[i]) mixed.push(regMovies[i]);
-        if (engShows[i]) mixed.push(engShows[i]);
-        if (regShows[i]) mixed.push(regShows[i]);
+      try {
+        const [regional, engPool] = await Promise.all([
+          fetchOnboardingRegionalTitles(option.lang),
+          fetchOnboardingHollywoodTitles(),
+        ]);
+        const engMovies = engPool.filter((m) => m.type === "movie").slice(0, 10);
+        const engShows = engPool.filter((m) => m.type === "tv").slice(0, 10);
+        const regMovies = regional.filter((m) => m.type === "movie").slice(0, 10);
+        const regShows = regional.filter((m) => m.type === "tv").slice(0, 10);
+        const mixed = [];
+        for (let i = 0; i < 6; i++) {
+          if (engMovies[i]) mixed.push(engMovies[i]);
+          if (regMovies[i]) mixed.push(regMovies[i]);
+          if (engShows[i]) mixed.push(engShows[i]);
+          if (regShows[i]) mixed.push(regShows[i]);
+        }
+        const allIds = new Set(catalogue.map((m) => m.id));
+        const newRegional = regional.filter((m) => !allIds.has(m.id));
+        const mergedCatalogue = [...catalogue, ...newRegional];
+        setCatalogue(mergedCatalogue);
+        const ob =
+          mixed.length > 0
+            ? mixed
+            : engPool.length > 0
+              ? engPool
+              : catalogue;
+        setObCatalogue(ob);
+      } catch (e) {
+        console.error(e);
+        setObCatalogue(catalogue);
       }
-      // Add regional to main catalogue too
-      const allIds = new Set(catalogue.map(m => m.id));
-      const newRegional = regional.filter(m => !allIds.has(m.id));
-      const mergedCatalogue = [...catalogue, ...newRegional];
-      setCatalogue(mergedCatalogue);
-      setObCatalogue(mixed);
     }
     setScreen("onboarding");
   }
@@ -5967,9 +6023,9 @@ export default function App() {
   const obMovies = useMemo(() => {
     if (obCatalogue.length === 0) return [];
     const currentYear = new Date().getFullYear();
-    // If mixed catalogue, use it directly (already curated)
+    // If mixed catalogue, use it directly (already curated — avoid trimming regional classics by year)
     if (otherCinema) {
-      return obCatalogue.filter(m => m.year >= currentYear - 20).slice(0, ONBOARDING_COUNT);
+      return obCatalogue.slice(0, ONBOARDING_COUNT);
     }
     // English only
     const movies = obCatalogue.filter(m => m.type === "movie" && m.year >= currentYear - 20).slice(0, 30);
@@ -9887,7 +9943,37 @@ export default function App() {
             </div>
             <div className="auth-field">
               <label className="auth-label">{authMode === "reset" ? "New password" : "Password"}</label>
-              <input className="auth-input" type="password" placeholder="Min. 6 characters" value={authPassword} onChange={e => setAuthPassword(e.target.value)} />
+              <div className="auth-password-wrap">
+                <input
+                  className="auth-input auth-input--password"
+                  type={authPasswordVisible ? "text" : "password"}
+                  name={authMode === "signup" || authMode === "reset" ? "new-password" : "password"}
+                  autoComplete={authMode === "signin" ? "current-password" : "new-password"}
+                  placeholder="Min. 6 characters"
+                  value={authPassword}
+                  onChange={e => setAuthPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="auth-password-toggle"
+                  onClick={() => setAuthPasswordVisible(v => !v)}
+                  aria-label={authPasswordVisible ? "Hide password" : "Show password"}
+                >
+                  {authPasswordVisible ? (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.215 16.44 7.292 19.5 12 19.5c.992 0 1.94-.152 2.835-.428" />
+                      <path d="M6.228 6.228A10.45 10.45 0 0112 4.5c4.708 0 8.785 3.06 10.066 7.477a10.465 10.465 0 01-2.55 4.004" />
+                      <path d="M9.53 9.53A3 3 0 0012 15a3 3 0 002.53-4.47" />
+                      <path d="M6 6L18 18" />
+                    </svg>
+                  ) : (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
             {authMode === "signin" && (
               <div className="auth-link-row">
