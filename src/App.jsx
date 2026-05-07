@@ -188,6 +188,16 @@ function writePwaEducationNeverFlag() {
 /** Upper bound for `profiles.name` on sign-up (DB backfill uses 120-char cap). */
 const PROFILE_DISPLAY_NAME_MAX = 120;
 
+/** `profiles.name` → auth metadata → email local — neutral label for share copy (not "there"). */
+function inviterDisplayNameForShare(profileName, user) {
+  if (profileName && String(profileName).trim()) return String(profileName).trim();
+  const meta = user?.user_metadata?.name;
+  if (typeof meta === "string" && meta.trim()) return meta.trim();
+  const local = user?.email?.split("@")[0];
+  if (local && String(local).trim()) return String(local).trim();
+  return "Someone";
+}
+
 /** Circle detail — visible-tab watermark poll for “New activity” (`get_circle_others_activity_watermark`). Tier advances when the server timestamp is unchanged since the last poll. */
 const CIRCLE_WATERMARK_POLL_MS = [15_000, 45_000, 60_000];
 
@@ -3531,7 +3541,7 @@ export default function App() {
   const [inviteSheetSubmitting, setInviteSheetSubmitting] = useState(false);
   const [inviteLinkBusy, setInviteLinkBusy] = useState(false);
   const [inviteSheetError, setInviteSheetError] = useState("");
-  /** `profiles.name` from `loadUserData` — unused here but kept with invite UX. */
+  /** `profiles.name` from `loadUserData` (see `inviterDisplayNameForShare` for link invites). */
   const [profileName, setProfileName] = useState("");
   const [inviteToast, setInviteToast] = useState(null);
   /** `/join/:token` flow — token from URL or {@link PENDING_CIRCLE_INVITE_TOKEN_KEY} after auth. */
@@ -8843,11 +8853,15 @@ export default function App() {
         (res?.invite && typeof res.invite.invite_token === "string" ? res.invite.invite_token : "");
       if (!tok) throw new Error("Could not create invite link.");
       const url = buildCircleInviteShareUrl(tok);
-      const msg = `Join my circle on Cinemastro 🎬 ${url}`;
+      const name = inviterDisplayNameForShare(profileName, user);
+      const body =
+        `${name} invited you to their Cinemastro Circle — Skip the ` +
+        `'what should we watch' debate, Get personalized picks you'll actually enjoy`;
+      const msg = `${body}\n\n${url}`;
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         /* Avoid `{ url }` + `{ text }` together — many targets (esp. iOS) forward only the URL and drop text. */
         await navigator.share({
-          title: "Join my circle on Cinemastro",
+          title: `${name} invited you to their Cinemastro Circle`,
           text: msg,
         });
       } else if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {

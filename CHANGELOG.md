@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.61
+
+- **Circles — share invite link copy:** Native share and clipboard use a longer message: **“[Name] invited you to their Cinemastro Circle — Skip the ‘what should we watch’ debate, Get personalized picks you'll actually enjoy”** plus the `/join/<token>` URL (blank line before link). **`[Name]`** uses **`profiles.name`**, then auth **`user_metadata.name`**, then email local part, then **“Someone”**. Share sheet **`title`** is the first clause only.
+
 ## 7.0.60
 
 - **Onboarding — TMDB pools (only `obCatalogue` / rating steps):** **Hollywood / English** side uses TMDB **discover** with a rolling **~6 month** US movie **`primary_release_date`** + TV **`first_air_date`** window, **`vote_count` ≥ 200**, **`popularity.desc`**, **US** region on movies; **secondary cinema** uses **`with_original_language`**, **`vote_count` ≥ 40**, **`primary_release_date.desc`** / **`first_air_date.desc`**. Mixed prefs fetch English + regional in parallel. Falls back to main **`catalogue`** if discover fails or returns empty. **Mixed** onboarding no longer applies a **20 year** year filter so regional classics can surface. Main app catalogue / Discover unchanged.
