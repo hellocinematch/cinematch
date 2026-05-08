@@ -3085,42 +3085,20 @@ function CircleGroupScoreIcon({ variant = "strip" }) {
 }
 
 /**
- * Circles — Recent strip: under the title — orange star (SVG)+circle score · gold ⭐+Cinemastro (row fields).
- * Omits if both scores are missing.
- * When `onWhoPublished` is set, the row is tappable to open who-published overlay (3b).
+ * Circles — Recent strip: under the title — circle aggregate only (orange ⭐ + score).
+ * Community / TMDB on title detail. Omits if no circle average.
  */
-function CircleStripRingCineBelowTitle({ groupRating, siteRating, onWhoPublished }) {
+function CircleStripRingCineBelowTitle({ groupRating, onWhoPublished }) {
   const hasGr = groupRating != null && Number.isFinite(Number(groupRating));
-  const hasSr = siteRating != null && Number.isFinite(Number(siteRating));
-  if (!hasGr && !hasSr) return null;
-  const a11y = [
-    hasGr ? `Circle ${formatScore(Number(groupRating))}` : null,
-    hasSr ? `Cinemastro ${formatScore(Number(siteRating))}` : null,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  if (!hasGr) return null;
+  const a11y = `Circle ${formatScore(Number(groupRating))}`;
   const tappable = typeof onWhoPublished === "function";
   const a11yTap = tappable ? `${a11y}. Open who rated in this circle.` : a11y;
   const inner = (
-    <>
-      {hasGr ? (
-        <span className="circle-strip-below-title-scores__seg circle-strip-below-title-scores__seg--circle">
-          <CircleGroupScoreIcon />
-          <span className="circle-strip-below-title-scores__num">{formatScore(Number(groupRating))}</span>
-        </span>
-      ) : null}
-      {hasGr && hasSr ? (
-        <span className="circle-strip-below-title-scores__dot" aria-hidden="true">
-          ·
-        </span>
-      ) : null}
-      {hasSr ? (
-        <span className="circle-strip-below-title-scores__seg circle-strip-below-title-scores__seg--cine">
-          <CirclePillStarGlyph variant="strip" />
-          <span className="circle-strip-below-title-scores__num">{formatScore(Number(siteRating))}</span>
-        </span>
-      ) : null}
-    </>
+    <span className="circle-strip-below-title-scores__seg circle-strip-below-title-scores__seg--circle">
+      <CircleGroupScoreIcon />
+      <span className="circle-strip-below-title-scores__num">{formatScore(Number(groupRating))}</span>
+    </span>
   );
   if (tappable) {
     return (
@@ -3146,30 +3124,22 @@ function CircleStripRingCineBelowTitle({ groupRating, siteRating, onWhoPublished
   );
 }
 
-/** Circle All/Top list row: orange ⭐+Circle score · gold ⭐+Cinemastro · “You”+score (order; omit when missing). */
+/** Circle All/Top list row: orange ⭐+Circle · “You” (community on title detail). */
 function CircleAllTopRatingsLine({ row, showRaterParen, onWhoPublished }) {
   const gr = row.group_rating;
   const vs = row.viewer_score;
-  const sr = row.site_rating;
   const distinctRaters = Number(row.distinct_circle_raters ?? 0);
   const hasCircle = gr != null && Number.isFinite(Number(gr));
   const hasYou = vs != null && Number.isFinite(Number(vs));
-  const hasCine = sr != null && Number.isFinite(Number(sr));
   const showParen = Boolean(showRaterParen) && hasCircle && distinctRaters > 0;
-  const canWhoPub =
-    (hasCircle || hasCine) && typeof onWhoPublished === "function";
-  const circleCineA11y = [
-    hasCircle
-      ? showParen
-        ? `Circle ${formatScore(Number(gr))}, ${distinctRaters} rated in this circle`
-        : `Circle ${formatScore(Number(gr))}`
-      : null,
-    hasCine ? `Cinemastro ${formatScore(Number(sr))}` : null,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const canWhoPub = hasCircle && typeof onWhoPublished === "function";
+  const circleA11y = hasCircle
+    ? showParen
+      ? `Circle ${formatScore(Number(gr))}, ${distinctRaters} rated in this circle`
+      : `Circle ${formatScore(Number(gr))}`
+    : null;
 
-  if (!hasCircle && !hasCine && !hasYou) {
+  if (!hasCircle && !hasYou) {
     return <div className="circle-rated-list-ratings circle-rated-list-ratings--empty">—</div>;
   }
 
@@ -3181,7 +3151,7 @@ function CircleAllTopRatingsLine({ row, showRaterParen, onWhoPublished }) {
   ) : null;
 
   if (canWhoPub) {
-    const a11yBtn = `Rated by. ${circleCineA11y}`;
+    const a11yBtn = `Rated by. ${circleA11y}`;
     return (
       <div className="circle-rated-list-ratings">
         <button
@@ -3194,33 +3164,17 @@ function CircleAllTopRatingsLine({ row, showRaterParen, onWhoPublished }) {
             onWhoPublished();
           }}
         >
-          {hasCircle ? (
-            <span
-              className="circle-list-rating circle-list-rating--circle"
-              aria-hidden={true}
-            >
-              <CircleGroupScoreIcon variant="list" />
-              <span className="circle-list-rating__num">{formatScore(Number(gr))}</span>
-              {showParen ? (
-                <span className="circle-list-rating__paren" aria-hidden="true">
-                  ({distinctRaters})
-                </span>
-              ) : null}
-            </span>
-          ) : null}
-          {hasCircle && hasCine ? (
-            <span className="circle-rated-list-ratings-sep" aria-hidden="true">
-              ·
-            </span>
-          ) : null}
-          {hasCine ? (
-            <span className="circle-list-rating circle-list-rating--cine" aria-hidden="true">
-              <CirclePillStarGlyph variant="list" />
-              <span className="circle-list-rating__num">{formatScore(Number(sr))}</span>
-            </span>
-          ) : null}
+          <span className="circle-list-rating circle-list-rating--circle" aria-hidden={true}>
+            <CircleGroupScoreIcon variant="list" />
+            <span className="circle-list-rating__num">{formatScore(Number(gr))}</span>
+            {showParen ? (
+              <span className="circle-list-rating__paren" aria-hidden="true">
+                ({distinctRaters})
+              </span>
+            ) : null}
+          </span>
         </button>
-        {hasYou && (hasCircle || hasCine) ? (
+        {hasYou && hasCircle ? (
           <span className="circle-rated-list-ratings-sep" aria-hidden="true">
             ·
           </span>
@@ -3249,14 +3203,6 @@ function CircleAllTopRatingsLine({ row, showRaterParen, onWhoPublished }) {
             ({distinctRaters})
           </span>
         ) : null}
-      </span>,
-    );
-  }
-  if (hasCine) {
-    nodes.push(
-      <span key="s" className="circle-list-rating circle-list-rating--cine">
-        <CirclePillStarGlyph variant="list" />
-        <span className="circle-list-rating__num">{formatScore(Number(sr))}</span>
       </span>,
     );
   }
@@ -10913,7 +10859,6 @@ export default function App() {
                         </div>
                         <CircleStripRingCineBelowTitle
                           groupRating={row.group_rating}
-                          siteRating={row.site_rating}
                           onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title)}
                         />
                       </div>
@@ -10955,7 +10900,7 @@ export default function App() {
                         role="group"
                         tabIndex={0}
                         className="circle-rated-list-row"
-                        aria-label={`${movie?.title || "Title"}. Open details, or use circle and Cinemastro scores to see who rated in this group.`}
+                        aria-label={`${movie?.title || "Title"}. Open details, or use the circle score row to see who rated in this group.`}
                         onClick={(e) => {
                           if (e.target?.closest?.(".circle-who-published-hit")) return;
                           openDetail(movie, predDetail);

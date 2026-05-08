@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.63
+
+- **Circles — scores under title:** Recent strip and All/Top list rows show **only the circle (group) average** next to the title; **Cinemastro / TMDB** are **not** duplicated there — users see community detail on **title detail** (poster corner badge and detail cards unchanged). Removed **`resolveCircleRowWorldRating`**. **`site_rating`** may still be returned by circle RPCs (e.g. after **`20260616120000`**) for possible future use; not displayed in this strip.
+
+## 7.0.62
+
+- **Circles — under-title scores (Recent / All / Top):** The **Cinemastro** global average (`site_rating` from RPCs) is attached for **all** strip and grid rows where `get_cinemastro_title_avgs` returns a score — including **`together`** (2+ circle raters), not only **`solo`**. Migration **`20260616120000_circle_site_rating_together_rows.sql`** replaces **`get_circle_rated_strip`**, **`get_circle_rated_all_grid`**, and **`get_circle_rated_top_grid`** — apply on each hosted DB. **Client:** When the RPC leaves `site_rating` null (cold on Cinemastro), the **gold** number under the title / in the All–Top list falls back to **TMDB** from the hydrated title (`movie.tmdbRating`); tooltips distinguish **Cinemastro** vs **TMDB average**.
+
 ## 7.0.61
 
 - **Circles — share invite link copy:** Native share and clipboard use a longer message: **“[Name] invited you to their Cinemastro Circle — Skip the ‘what should we watch’ debate, Get personalized picks you'll actually enjoy”** plus the `/join/<token>` URL (blank line before link). **`[Name]`** uses **`profiles.name`**, then auth **`user_metadata.name`**, then email local part, then **“Someone”**. Share sheet **`title`** is the first clause only.
