@@ -377,19 +377,13 @@ function genresLineFromTmdbDetail(raw) {
 /** Title detail — top billed cast names from TMDB `credits.cast` (text-only UI). */
 const DETAIL_CAST_NAME_MAX = 6;
 
-function formatPeopleNameList(names) {
-  if (!Array.isArray(names) || names.length === 0) return null;
-  if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
-
-/** Director / created-by line + comma-separated cast from TMDB `credits` (+ TV `created_by`). */
+/** Director / created-by heading + names + cast from TMDB `credits` (+ TV `created_by`). */
 function detailPeopleFromTmdbDetail(raw, mediaType) {
-  const empty = { directorOrCreatorLine: null, castLine: null };
+  const empty = { leadHeading: null, leadNamesLine: null, castLine: null };
   if (!raw || isTmdbApiErrorPayload(raw)) return empty;
   const credits = raw.credits;
-  let directorOrCreatorLine = null;
+  let leadHeading = null;
+  let leadNamesLine = null;
   if (mediaType === "tv") {
     const created = [];
     if (Array.isArray(raw.created_by)) {
@@ -398,8 +392,10 @@ function detailPeopleFromTmdbDetail(raw, mediaType) {
         if (n && !created.includes(n)) created.push(n);
       }
     }
-    const listed = formatPeopleNameList(created.slice(0, 3));
-    if (listed) directorOrCreatorLine = `Created by ${listed}`;
+    if (created.length > 0) {
+      leadHeading = "Created by";
+      leadNamesLine = created.slice(0, 3).join(", ");
+    }
   } else if (Array.isArray(credits?.crew)) {
     const directors = [];
     for (const row of credits.crew) {
@@ -407,9 +403,9 @@ function detailPeopleFromTmdbDetail(raw, mediaType) {
       const n = typeof row?.name === "string" ? row.name.trim() : "";
       if (n && !directors.includes(n)) directors.push(n);
     }
-    const listed = formatPeopleNameList(directors.slice(0, 2));
-    if (listed) {
-      directorOrCreatorLine = directors.length === 1 ? `Director ${listed}` : `Directors ${listed}`;
+    if (directors.length > 0) {
+      leadHeading = directors.length === 1 ? "Director" : "Directors";
+      leadNamesLine = directors.slice(0, 2).join(", ");
     }
   }
   const castNames = [];
@@ -421,7 +417,8 @@ function detailPeopleFromTmdbDetail(raw, mediaType) {
     }
   }
   return {
-    directorOrCreatorLine,
+    leadHeading,
+    leadNamesLine,
     castLine: castNames.length > 0 ? castNames.join(", ") : null,
   };
 }
@@ -438,7 +435,8 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
     runtimeLabel: null,
     releaseLabel: null,
     languageLabel: null,
-    directorOrCreatorLine: null,
+    leadHeading: null,
+    leadNamesLine: null,
     castLine: null,
   };
   if (!raw || isTmdbApiErrorPayload(raw)) return empty;
@@ -467,7 +465,8 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
       runtimeLabel,
       releaseLabel,
       languageLabel,
-      directorOrCreatorLine: people.directorOrCreatorLine,
+      leadHeading: people.leadHeading,
+      leadNamesLine: people.leadNamesLine,
       castLine: people.castLine,
     };
   }
@@ -482,7 +481,8 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
     runtimeLabel,
     releaseLabel,
     languageLabel,
-    directorOrCreatorLine: people.directorOrCreatorLine,
+    leadHeading: people.leadHeading,
+    leadNamesLine: people.leadNamesLine,
     castLine: people.castLine,
   };
 }
@@ -3731,7 +3731,8 @@ export default function App() {
     runtimeLabel: null,
     releaseLabel: null,
     languageLabel: null,
-    directorOrCreatorLine: null,
+    leadHeading: null,
+    leadNamesLine: null,
     castLine: null,
   });
   useEffect(() => {
@@ -3743,7 +3744,8 @@ export default function App() {
         runtimeLabel: null,
         releaseLabel: null,
         languageLabel: null,
-        directorOrCreatorLine: null,
+        leadHeading: null,
+        leadNamesLine: null,
         castLine: null,
       });
       return;
@@ -3756,7 +3758,8 @@ export default function App() {
       runtimeLabel: null,
       releaseLabel: null,
       languageLabel: null,
-      directorOrCreatorLine: null,
+      leadHeading: null,
+      leadNamesLine: null,
       castLine: null,
     });
     let cancelled = false;
@@ -13364,14 +13367,17 @@ export default function App() {
                 {detailMeta.tagline ? <p className="d-tagline">{detailMeta.tagline}</p> : null}
                 <h2 className="d-overview-heading">Overview</h2>
                 <div className="d-synopsis">{movie.synopsis}</div>
-                {detailMeta.directorOrCreatorLine ? (
-                  <p className="d-people-line">{detailMeta.directorOrCreatorLine}</p>
-                ) : null}
                 {detailMeta.castLine ? (
-                  <>
-                    <h2 className="d-overview-heading">Cast</h2>
-                    <p className="d-people-line d-people-line--cast">{detailMeta.castLine}</p>
-                  </>
+                  <div className="detail-people-panel">
+                    <h2 className="d-overview-heading d-overview-heading--panel">Cast</h2>
+                    <p className="detail-people-panel-body">{detailMeta.castLine}</p>
+                  </div>
+                ) : null}
+                {detailMeta.leadHeading && detailMeta.leadNamesLine ? (
+                  <div className="detail-people-panel">
+                    <h2 className="d-overview-heading d-overview-heading--panel">{detailMeta.leadHeading}</h2>
+                    <p className="detail-people-panel-body">{detailMeta.leadNamesLine}</p>
+                  </div>
                 ) : null}
                 <div className="detail-wtw-wrap">
                   <WhereToWatch

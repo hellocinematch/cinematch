@@ -1056,8 +1056,15 @@
   .detail .d-tagline { font-size:14px; color:#888; line-height:1.7; font-style:italic; margin:14px 0 10px; text-align:center; }
   .d-overview-heading { font-family:'DM Serif Display',serif; font-size:18px; color:#ddd7cd; margin:6px 0 8px; text-align:center; }
   .detail .d-synopsis { text-align:center; }
-  .detail .d-people-line { font-size:14px; color:#888; line-height:1.7; margin:0 0 12px; text-align:center; }
-  .detail .d-people-line--cast { margin-bottom:22px; }
+  .detail-people-panel {
+    background:rgba(22,22,22,0.75);
+    border:none;
+    border-radius:10px;
+    padding:10px 12px 12px;
+    margin:14px 0 10px;
+  }
+  .detail-people-panel .d-overview-heading--panel { margin:0 0 6px; font-size:16px; }
+  .detail-people-panel-body { font-size:14px; color:#888; line-height:1.7; margin:0; text-align:center; }
   .detail-content-wrap { width:100%; max-width:100%; margin:0 auto; box-sizing:border-box; padding-top:0; }
   .detail-rate-section { width:100%; }
   .d-overlay { position:absolute; inset:0; background:linear-gradient(to top, #0a0a0a 0%, transparent 50%); }

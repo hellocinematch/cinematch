@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.65
+
+- **Title detail — cast & crew panels:** **Cast** appears **above** **Director** / **Directors** / **Created by**. Each block uses the same heading + names layout inside a **light grey panel** (matches the movie facts bar styling).
+
 ## 7.0.64
 
 - **Title detail — cast & crew (text):** After **Overview**, detail shows **Director** / **Directors** (movies) or **Created by** (TV) plus up to **six** top-billed cast names when TMDB returns **`credits`** — text only, no headshots. Pulled via existing lazy **`/movie|tv/{id}`** fetch with **`append_to_response=credits`** (same path from Circles, Discover, Your Picks, etc.). Section omitted when data is missing.
