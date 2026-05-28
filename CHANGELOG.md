@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.64
+
+- **Title detail — cast & crew (text):** After **Overview**, detail shows **Director** / **Directors** (movies) or **Created by** (TV) plus up to **six** top-billed cast names when TMDB returns **`credits`** — text only, no headshots. Pulled via existing lazy **`/movie|tv/{id}`** fetch with **`append_to_response=credits`** (same path from Circles, Discover, Your Picks, etc.). Section omitted when data is missing.
+
 ## 7.0.63
 
 - **Circles — scores under title:** Recent strip and All/Top list rows show **only the circle (group) average** next to the title; **Cinemastro / TMDB** are **not** duplicated there — users see community detail on **title detail** (poster corner badge and detail cards unchanged). Removed **`resolveCircleRowWorldRating`**. **`site_rating`** may still be returned by circle RPCs (e.g. after **`20260616120000`**) for possible future use; not displayed in this strip.

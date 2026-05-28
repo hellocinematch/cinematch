@@ -374,6 +374,58 @@ function genresLineFromTmdbDetail(raw) {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+/** Title detail — top billed cast names from TMDB `credits.cast` (text-only UI). */
+const DETAIL_CAST_NAME_MAX = 6;
+
+function formatPeopleNameList(names) {
+  if (!Array.isArray(names) || names.length === 0) return null;
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** Director / created-by line + comma-separated cast from TMDB `credits` (+ TV `created_by`). */
+function detailPeopleFromTmdbDetail(raw, mediaType) {
+  const empty = { directorOrCreatorLine: null, castLine: null };
+  if (!raw || isTmdbApiErrorPayload(raw)) return empty;
+  const credits = raw.credits;
+  let directorOrCreatorLine = null;
+  if (mediaType === "tv") {
+    const created = [];
+    if (Array.isArray(raw.created_by)) {
+      for (const row of raw.created_by) {
+        const n = typeof row?.name === "string" ? row.name.trim() : "";
+        if (n && !created.includes(n)) created.push(n);
+      }
+    }
+    const listed = formatPeopleNameList(created.slice(0, 3));
+    if (listed) directorOrCreatorLine = `Created by ${listed}`;
+  } else if (Array.isArray(credits?.crew)) {
+    const directors = [];
+    for (const row of credits.crew) {
+      if (row?.job !== "Director") continue;
+      const n = typeof row?.name === "string" ? row.name.trim() : "";
+      if (n && !directors.includes(n)) directors.push(n);
+    }
+    const listed = formatPeopleNameList(directors.slice(0, 2));
+    if (listed) {
+      directorOrCreatorLine = directors.length === 1 ? `Director ${listed}` : `Directors ${listed}`;
+    }
+  }
+  const castNames = [];
+  if (Array.isArray(credits?.cast)) {
+    for (const row of credits.cast) {
+      if (castNames.length >= DETAIL_CAST_NAME_MAX) break;
+      const n = typeof row?.name === "string" ? row.name.trim() : "";
+      if (n) castNames.push(n);
+    }
+  }
+  return {
+    directorOrCreatorLine,
+    castLine: castNames.length > 0 ? castNames.join(", ") : null,
+  };
+}
+
 /**
  * Single `/movie/{id}` or `/tv/{id}` response (optionally with append_to_release_*).
  * Returns strings for the shaded facts bar + tagline.
@@ -386,6 +438,8 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
     runtimeLabel: null,
     releaseLabel: null,
     languageLabel: null,
+    directorOrCreatorLine: null,
+    castLine: null,
   };
   if (!raw || isTmdbApiErrorPayload(raw)) return empty;
   const tag = typeof raw.tagline === "string" ? raw.tagline.trim() : "";
@@ -405,6 +459,7 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
       if (Number.isFinite(mm) && mm > 0) runtimeLabel = `~${mm}m / ep`;
     }
     const releaseLabel = formatUsReleaseDisplay(raw.first_air_date);
+    const people = detailPeopleFromTmdbDetail(raw, "tv");
     return {
       tagline: tag || null,
       genresLine,
@@ -412,11 +467,14 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
       runtimeLabel,
       releaseLabel,
       languageLabel,
+      directorOrCreatorLine: people.directorOrCreatorLine,
+      castLine: people.castLine,
     };
   }
   const certification = usMovieCertificationFromReleaseDatesPayload(raw.release_dates);
   const runtimeLabel = formatRuntimeMinutes(raw.runtime);
   const releaseLabel = formatUsReleaseDisplay(raw.release_date);
+  const people = detailPeopleFromTmdbDetail(raw, "movie");
   return {
     tagline: tag || null,
     genresLine,
@@ -424,6 +482,8 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
     runtimeLabel,
     releaseLabel,
     languageLabel,
+    directorOrCreatorLine: people.directorOrCreatorLine,
+    castLine: people.castLine,
   };
 }
 
@@ -3663,7 +3723,7 @@ export default function App() {
     if (computeNeighborsTimerRef.current) clearTimeout(computeNeighborsTimerRef.current);
   }, []);
 
-  /** TMDB detail: tagline, genres, US certification, runtime, release — for facts bar + caption. */
+  /** TMDB detail: tagline, genres, US certification, runtime, release, cast — for facts bar + body. */
   const [detailMeta, setDetailMeta] = useState({
     tagline: null,
     genresLine: null,
@@ -3671,6 +3731,8 @@ export default function App() {
     runtimeLabel: null,
     releaseLabel: null,
     languageLabel: null,
+    directorOrCreatorLine: null,
+    castLine: null,
   });
   useEffect(() => {
     if (!selectedMovie?.movie) {
@@ -3681,6 +3743,8 @@ export default function App() {
         runtimeLabel: null,
         releaseLabel: null,
         languageLabel: null,
+        directorOrCreatorLine: null,
+        castLine: null,
       });
       return;
     }
@@ -3692,10 +3756,12 @@ export default function App() {
       runtimeLabel: null,
       releaseLabel: null,
       languageLabel: null,
+      directorOrCreatorLine: null,
+      castLine: null,
     });
     let cancelled = false;
     const type = m.type === "tv" ? "tv" : "movie";
-    const append = type === "tv" ? "content_ratings" : "release_dates";
+    const append = type === "tv" ? "content_ratings,credits" : "release_dates,credits";
     void (async () => {
       const raw = await fetchTMDB(`/${type}/${m.tmdbId}?language=en-US&append_to_response=${append}`);
       if (cancelled) return;
@@ -13298,6 +13364,15 @@ export default function App() {
                 {detailMeta.tagline ? <p className="d-tagline">{detailMeta.tagline}</p> : null}
                 <h2 className="d-overview-heading">Overview</h2>
                 <div className="d-synopsis">{movie.synopsis}</div>
+                {detailMeta.directorOrCreatorLine ? (
+                  <p className="d-people-line">{detailMeta.directorOrCreatorLine}</p>
+                ) : null}
+                {detailMeta.castLine ? (
+                  <>
+                    <h2 className="d-overview-heading">Cast</h2>
+                    <p className="d-people-line d-people-line--cast">{detailMeta.castLine}</p>
+                  </>
+                ) : null}
                 <div className="detail-wtw-wrap">
                   <WhereToWatch
                     tmdbId={movie.tmdbId}
