@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-05-28 — trust **`package.json` / `CHANGELOG.md`** (tip **7.0.65**). **Recent ship:** **title detail** **Cast** + **Director** / **Created by** (text, TMDB **`credits`**, grey panels — **7.0.64**–**7.0.65**); **staging** then **prod** pushed **2026-05-28**. **Backlog item 1 — product:** Your Picks / **For you** CF refresh & diversity (see **Master list**). **`git pull`** **`origin/main`** **and** **`origin/staging`** — both at **`2a4333f`**; **`git status`** for local drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-05-28 — trust **`package.json` / `CHANGELOG.md`** (tip **7.0.65**). **Recent ship:** **title detail** cast/crew panels (**7.0.64**–**7.0.65**). **Backlog:** **1a–1e** Your Picks CF diversity; **§1f** Your Picks **circle strips** (documented below — discussion only, not built). **`git pull`** **`origin/main`** **and** **`origin/staging`** — app **`2a4333f`**; passdown may be ahead (docs-only commits). **`git status`** for drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
 **Recent releases (high level):** **7.0.65** — detail **Cast** above **Director** / **Directors** / **Created by**, each in **facts-bar-style** panel. **7.0.64** — same blocks (text-only, **`append_to_response=credits`**). **7.0.63** — Circles strip **circle-only** under-title score. **7.0.62** — Cinemastro/TMDB under-title scores + migration **`20260616120000`**. **7.0.61** — share-invite copy. **7.0.60** onboarding **`obCatalogue`** TMDB discover; **7.0.59** auth **eye** toggle. Earlier — **`CHANGELOG`**.
 
@@ -18,7 +18,7 @@
 >
 > **`pg_net` / compute-neighbors:** **`net.http_post`** return id = **`pg_net` queue id** — read **`net._http_response`** for outcome; body `{"mode":"all","offset":N,"limit":K}` chunked until covered (**`COMPUTE-NEIGHBORS-CRON.md`**). Another user clearing a rating recomputes **their** **`user_neighbors`** only until **your** cron / rating / manual invoke.
 >
-> **Master list:** **Backlog item 1** Your Picks / **For you** diversify + labeled refresh + optional **cap/shuffle/watchlist** tweaks (**Open / follow-ups**). **Priority 2** US geo; analytics **`log_analytics_*`**; Circles §8/§9; **§18** residual; **Resend/SMTP** Auth; optional cache / version nudge; optional **Capacitor / native shell** (stores + native push/badges — **§30**).
+> **Master list:** **1a–1e** Your Picks CF diversity; **§1f** Your Picks **circle strips** (Phase 1 = your circles only; Phase 2 = other circles = new privacy/backend — **not** in repo). **P2** US geo / multi-market. Analytics; Circles §8/§9; **§18**; Resend; Capacitor **§30**.
 
 ---
 
@@ -56,6 +56,49 @@
 - [ ] **1e — Not interested + interaction design (optional, pairs with above):** Dismiss rows; tune order with **1b–1c** so strips don’t empty.
 
 **One-line priority:** Ship **labeled refresh + within-tier shuffle / diversity tie-breaks** before **decay/explainability**, which need **storage** / **payload** plumbing.
+
+---
+
+### Your Picks — circle-driven sections (§1f; discussed 2026-05-28, not built)
+
+*Today **`/your-picks`** has one strip — **🔥 For you** (`match` **`your_picks_page`** + optional **`predict_cached`**). Circles already expose per-circle feeds via **`get_circle_rated_strip`** / **`get_circle_rated_top_grid`** / **`fetchCircleRatedTitles`** (member-only, **≥2** members, group avg not individual scores). **`rating_circle_shares` RLS** = user sees **own** share rows only; other members’ activity comes through **SECURITY DEFINER** circle RPCs. **Watchlist is private** — no true “others are watching” without a new share model.*
+
+**Product copy (honest):** Prefer **“Recent in your circles”** / **“Top in your circles”** over **“watching”** unless shared watchlist ships.
+
+#### Phase 1 — Member circles only (~**medium**, ~1–2 weeks for 2–3 strips)
+
+*Reuses existing circle RPCs + strip UI; filter out titles in **`userRatings`**; optional **`predict_cached`** for circle title ids; don’t block **For you** on circle fetches.*
+
+- [ ] **1f.0 — UX decision:** **One merged strip** (“From your circles”) vs **one strip per circle** (up to **10** active) vs **single “primary” circle** only (smallest scope).
+
+- [ ] **1f.1 — Recent in your circles:** Others’ **`rating_circle_shares`** / ratings activity you **haven’t rated** — source **`get_circle_rated_strip`** (recent / **`activity_at`**). Empty when **0 circles**, **under 2 members**, or gated.
+
+- [ ] **1f.2 — Top in your circles (unrated):** High **circle average** titles you haven’t rated — source **`get_circle_rated_top_grid`** + client filter **`userRatings`**.
+
+- [ ] **1f.3 — Client:** New **Your Picks** sections under **For you** (headers, skeletons, empty states, dedupe vs **For you** pool).
+
+- [ ] **1f.4 — Performance (optional but recommended):** **`get_your_picks_circle_feed`** (or similar) **RPC** merging member circles in SQL — avoids **N×** strip RPC + simplifies caps.
+
+- [ ] **1f.5 — Cards:** Show **circle name** (which circle surfaced the title), **group avg**, **your** prediction or “rate to see” — same privacy rules as Circles strip (no other members’ individual scores).
+
+**Not in Phase 1 without new product:**
+
+- **“Watching”** from others’ **watchlist** (RLS-private today).
+- **Popular / highly rated in circles you’re not in** — see Phase 2.
+
+#### Phase 2 — “Other circles” / global circle trends (~**large–XL**)
+
+*Contradicts closed-circle model today. Needs product + legal (k-anonymity, no **`circle_id`** / member leakage) before engineering.*
+
+- [ ] **2f.0 — Policy:** Global anonymized **“Trending among Cinemastro circles”** vs **never** vs cohort (vibe/region) — **TBD**.
+
+- [ ] **2f.1 — Backend:** Materialized aggregates over **`rating_circle_shares`** / ratings (min **N** circles or **M** users per title); **`SECURITY DEFINER`** read RPC; no PII.
+
+- [ ] **2f.2 — Your Picks strip:** **Highly rated / popular** from that aggregate, excluding **`userRatings`**.
+
+- [ ] **2f.3 — Optional:** Shared **“intent to watch”** published to circle (new table + RLS) if true **“watching”** is required — **large**, separate from 1f.
+
+**Effort snapshot:** Phase **1f** = **medium**; Phase **2f** = **large–XL** + privacy review. **1f** can ship without **2f**.
 
 ---
 
@@ -123,6 +166,11 @@
 - **§29** Fonts subset / **`font-display`**.
 - **§30** PWA — **7.0.58** shipped **Circles-tab install education modal** (mobile UA); optional **service worker** still backlog unless reopened (**7.0.31** install copy only).
 - [ ] **Native shell (Capacitor / Ionic):** Ship **App Store / Play Store** builds pointing at **Vite `dist`** (or hosted origin); unlock **native push**, **badges**, haptics, etc. with minimal React changes — expect **auth / deep-link** hardening + **store review** (thin-wrapper) risk. *Parked — user asked to track; rough revisit ~**3 weeks** from **2026-05-05** (discussion).*
+
+**Your Picks (page)**
+
+- [x] **For you strip only today:** **`your_picks_page`** + batch reveal (**5**→**20**); CF / popular kinds — see **§1a–1e**.
+- [ ] **Circle strips on Your Picks:** **§1f** Phase 1 (member circles) then optional Phase 2 (global / other circles) — full checklist under **§1f** above.
 
 **Polish**
 
@@ -212,15 +260,17 @@
 
 **Last session (2026-05-28)**
 
-- **Last note:** User asked whether **git** passdown was complete for month-later resume — **no** until this commit; **region-based product** discussion captured under **P2** + above. **Passdown** committed to **`origin/main`** / **`origin/staging`** with tip **`2a4333f`**.
+- **Last note:** User asked to **document** **Your Picks × Circles** strips (recent/top in **your** circles; popular/highly rated in **other** circles) as backlog in passdown — **discussion only**, no app code. **§1f** + **§2f** added to **Master list**.
 
-- **Shipped (see `CHANGELOG`):** **7.0.64** title detail **Cast** + **Director** / **Created by** from TMDB **`credits`** (text). **7.0.65** **Cast** above director block; heading + names in **grey panels** (facts-bar style). Flow: **staging** then **prod** at **`2a4333f`**.
+- **Shipped (see `CHANGELOG`):** **7.0.64**–**7.0.65** title detail cast/crew; prod/staging app at **`2a4333f`**.
 
-- **Git:** **`origin/main`** and **`origin/staging`** at **`2a4333f`** (**7.0.65** app); passdown file tracks same tip after push.
+- **Git:** App **`2a4333f`**; passdown docs commit after this update (pull for latest passdown).
 
-- **Ops (unchanged):** Verify **`20260616120000`** + **`20260615120000`** on hosted DBs if missing; **`pg_cron`** **`platform-growth-daily-utc`**; **`COMPUTE-NEIGHBORS-CRON.md`** as MAU grows.
+- **Your Picks circles — decide before build:** **1f.0** merged vs per-circle strips; ship **Phase 1f** before **2f** (other circles need new aggregate RPC + privacy). Do **not** label **watchlist** as “watching” without shared intent feature.
 
-- **Open:** **Master list** Your Picks **1a–1e**; **P2** US geo; analytics **`log_analytics_*`**; Circles §8/§9; **§18** residual; **Resend/SMTP**; optional cache / version nudge; **Capacitor / native shell** (**§30**) — unchanged unless user reschedules.
+- **Ops (unchanged):** **`20260616120000`** + **`20260615120000`** on hosted DBs; **`COMPUTE-NEIGHBORS-CRON.md`**; analytics **`log_analytics_*`** still unwired.
+
+- **Open:** **1a–1e** CF diversity; **§1f** circle strips; **P2** US geo / multi-market; Circles §8/§9; **§18**; Resend; Capacitor **§30**.
 
 ---
 
