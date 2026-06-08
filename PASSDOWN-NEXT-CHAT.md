@@ -1,6 +1,6 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-05-28 — trust **`package.json` / `CHANGELOG.md`** (tip **7.0.65**). **Recent ship:** **title detail** cast/crew panels (**7.0.64**–**7.0.65**). **Backlog:** **1a–1e** Your Picks CF diversity; **§1f** Your Picks **circle strips** (documented below — discussion only, not built). **`git pull`** **`origin/main`** **and** **`origin/staging`** — app **`2a4333f`**; passdown may be ahead (docs-only commits). **`git status`** for drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-05-28 — trust **`package.json` / `CHANGELOG.md`** (tip **7.0.65**). **Recent ship:** **title detail** cast/crew panels (**7.0.64**–**7.0.65**). **Backlog:** **1a–1e** CF diversity; **§1f** Your Picks circle strips; **§1g** **Discover** search typos / transliteration (**user report:** e.g. **`karthavya`** missed **`Kartavya`** — TMDB literal search, no fuzzy layer). **`git pull`** **`origin/main`** **`origin/staging`** — app **`2a4333f`**; passdown docs may be ahead. **`git status`** for drift. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
 **Recent releases (high level):** **7.0.65** — detail **Cast** above **Director** / **Directors** / **Created by**, each in **facts-bar-style** panel. **7.0.64** — same blocks (text-only, **`append_to_response=credits`**). **7.0.63** — Circles strip **circle-only** under-title score. **7.0.62** — Cinemastro/TMDB under-title scores + migration **`20260616120000`**. **7.0.61** — share-invite copy. **7.0.60** onboarding **`obCatalogue`** TMDB discover; **7.0.59** auth **eye** toggle. Earlier — **`CHANGELOG`**.
 
@@ -10,15 +10,15 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (tip **7.0.65**: title detail **Cast** + **Director** / **Directors** / **Created by** — text from TMDB **`credits`**, **Cast** above director block, **grey panels** like facts bar; **7.0.64** first ship). **`git pull`** **`origin/main`** **`origin/staging`** — both at **`2a4333f`** (**7.0.65** on staging + prod). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`** (tip **7.0.65**: title detail **Cast** + **Director** / **Created by** — TMDB **`credits`**, grey panels **7.0.64**–**7.0.65**). **`git pull`** **`origin/main`** **`origin/staging`** — app **`2a4333f`**; passdown docs at tip after **`git pull`** (may be ahead of app). **`git status`** if unsure. Read **`@PASSDOWN-NEXT-CHAT.md`** + **`.cursor/rules/cinematch-discussion-first.mdc`** + **`.cursor/rules/cinematch-handoff.mdc`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
-> **Git / Vercel:** Routine ships → **`origin/staging`** only; **`origin/main`** / prod **only when the user explicitly asks**. **`staging`** → staging Vercel; **`main`** → **`www.cinemastro.com`**. **`git pull`** to sync with remote.
+> **Git / Vercel:** Routine ships → **`origin/staging`** only; **`origin/main`** / prod **only when the user explicitly asks**. **`staging`** → staging Vercel; **`main`** → **`www.cinemastro.com`**.
 >
-> **Hosted DB migrations (if behind):** **`20260615120000_platform_growth_daily.sql`** (**`platform_growth_daily`**, **`ratings.created_at`**, **`pg_cron`** **`platform-growth-daily-utc`** at **00:15 UTC** when **`cron`** exists). Plus **`20260614120000`** **`get_my_circles`**; invite / leave migrations per **`CHANGELOG`**. **`/join`:** Edge **`create-circle-invite-link`** / **`preview-circle-invite-link`** (**`verify_jwt = false`**) / **`claim-circle-invite-token`**; **`send-circle-invite`** see repo; **`VITE_PUBLIC_SITE_URL`** on staging for canonical **`/join`** URLs.
+> **Hosted DB (if behind):** **`20260616120000`** (circle **`site_rating`** on **together** rows) + **`20260615120000`** (growth + **`ratings.created_at`**) + **`20260614120000`** **`get_my_circles`** + invite/leave per **`CHANGELOG`**. **`/join`:** invite Edge suite; **`VITE_PUBLIC_SITE_URL`** on staging.
 >
-> **`pg_net` / compute-neighbors:** **`net.http_post`** return id = **`pg_net` queue id** — read **`net._http_response`** for outcome; body `{"mode":"all","offset":N,"limit":K}` chunked until covered (**`COMPUTE-NEIGHBORS-CRON.md`**). Another user clearing a rating recomputes **their** **`user_neighbors`** only until **your** cron / rating / manual invoke.
+> **`pg_net` / compute-neighbors:** chunked `{"mode":"all","offset":N,"limit":K}` — **`COMPUTE-NEIGHBORS-CRON.md`**. Scale **`jobs × limit`** as MAU grows.
 >
-> **Master list:** **1a–1e** Your Picks CF diversity; **§1f** Your Picks **circle strips** (Phase 1 = your circles only; Phase 2 = other circles = new privacy/backend — **not** in repo). **P2** US geo / multi-market. Analytics; Circles §8/§9; **§18**; Resend; Capacitor **§30**.
+> **Master list (product):** **1a–1e** Your Picks CF diversity. **§1f** Your Picks **circle strips** (Phase **1f** = your circles — **medium**; **2f** = other circles — **large**, new backend). **§1g** **Discover search** — TMDB literal only today; user report **`karthavya`** missed **Kartavya**; ship **1g.1** transliteration variant retry first. **P2** US geo / **`availability_region`**. Circles §8/§9; analytics **`log_analytics_*`**; **§18**; Resend; Capacitor **§30**.
 
 ---
 
@@ -27,7 +27,7 @@
 | Item | State |
 |------|-------|
 | **App version** | Trust **`package.json`** / **`CHANGELOG`** (**7.0.65** detail cast/crew panels; **7.0.64** TMDB credits text; **7.0.63** circle-only strip score). |
-| **Git / Vercel** | **`git pull`** **`origin/main`** & **`origin/staging`**; both at **`2a4333f`** (**7.0.65**) as of **2026-05-28**; **`main`** → **www.cinemastro.com**, **`staging`** → staging Vercel. |
+| **Git / Vercel** | App **`2a4333f`** (**7.0.65**) on **`main`** & **`staging`**; passdown file may be **docs-only commits ahead** — **`git pull`** both branches. **`main`** → **www.cinemastro.com**. |
 | **Supabase — apply if missing** | **`20260616120000`** (circle RPC **`site_rating`** on **together** rows — **7.0.62**) + **`20260615120000`** (growth stats + **`ratings.created_at`**) + **`20260614120000`** (**`get_my_circles`**) + invite / leave rows — **per env**. |
 | **Analytics instrumentation** | Client **`log_analytics_*`** — **not wired** in **`App.jsx`** yet (when DB ready). |
 | **Edge** | Invite suite **`create-circle-invite-link`** / **`preview-circle-invite-link`** / **`claim-circle-invite-token`**; **`send-circle-invite`** **1.0.3**; **`pulse-catalog`** `1.0.0`; **`compute-neighbors`** `1.0.1`; **`accept-circle-invite`** **1.0.2** unless bumped. Bump **`EDGE_FUNCTION_VERSION`** when behavior changes; redeploy. |
@@ -102,6 +102,28 @@
 
 ---
 
+### Discover — title search quality (§1g; discussed 2026-05-28, not built)
+
+*User-reported gap: misspelled or alternate **transliteration** (e.g. query **`karthavya`** for film **Kartavya**) returns wrong/empty in **Discover**; **IMDB** surfaces correct variants. Today **Discover** = TMDB **`/search/movie`** + **`/search/tv`** only (`fetchTmdbSearchPages`, **2** pages, cap **40**/type, animation filter). **No** fuzzy match, **no** “did you mean”, **no** IMDB/alt-title pass, **no** search over Cinemastro **`ratings`** or catalogue. **Your Ratings** search = local filter on rated rows only.*
+
+**Root cause:** TMDB search is **literal** on their index; Cinematch does not retry or correct queries.
+
+**Suggested fix order (stay on TMDB `tmdb_id` identity):**
+
+- [ ] **1g.0 — UX (tiny):** When few/zero results — “Try shorter spelling or poster title”; optional link to try without extra letters.
+
+- [ ] **1g.1 — Low-results retry (small–medium, best ROI):** If hits under **N**, auto-run **2–4 query variants** (transliteration heuristics: `th`→`t`, collapse doubles, common vowel variants for Indian/Latin titles); merge + dedupe TMDB results.
+
+- [ ] **1g.2 — Optional year / type** on Discover search form — disambiguation, not typos.
+
+- [ ] **1g.3 — “Did you mean”** — edit distance against corpus (catalogue + rated titles on platform) — **medium**.
+
+- [ ] **1g.4 — Hybrid IMDB / own index** — **large** (licensing, compliance); only if **1g.1** insufficient.
+
+**Not in scope for 1g:** Mood (uses **discover**, not keyword search); Circles (points users to Discover).
+
+---
+
 ### Priority 2 — US geo / availability (product)
 
 - [ ] **Geo-blocking banner or notice:** Infer location (**IP / Edge / CDN**, optional **user confirms US residency**) and show non-US users: **"Cinemastro is currently available to US users only."** Choose **warn-only (proceed at own risk)** vs **hard block** — **TBD** with Terms/privacy. *(Not implemented.)*
@@ -172,6 +194,11 @@
 - [x] **For you strip only today:** **`your_picks_page`** + batch reveal (**5**→**20**); CF / popular kinds — see **§1a–1e**.
 - [ ] **Circle strips on Your Picks:** **§1f** Phase 1 (member circles) then optional Phase 2 (global / other circles) — full checklist under **§1f** above.
 
+**Discover**
+
+- [x] **Search today:** TMDB **`/search/movie|tv`**, **2** pages, **40** cap/type, default **animation** excluded — see **§1g**.
+- [ ] **Typo / transliteration tolerance:** **§1g** — user report **`karthavya`** vs **Kartavya**; prioritize **1g.1** low-results variant retry.
+
 **Polish**
 
 - [x] **Title detail — cast & crew (7.0.64–7.0.65):** After **Overview**, **Cast** (up to **6** billed names) then **Director** / **Directors** / **Created by** (TV); text-only; lazy TMDB **`append_to_response=credits`**; **grey panels** match facts bar. **Staging + prod** **2026-05-28**.
@@ -205,7 +232,7 @@
 
 ## For the assistant (every Cinematch session)
 
-1. Read **this file** early — **Backlog item 1 / Priority 1** Your Picks / **For you** diversity; then **Priority 2** US geo then full **Master list**.
+1. Read **this file** early — **1a–1e** CF diversity; **§1f** circle strips; **§1g** Discover search; then **P2** US geo and full **Master list**.
 2. **Neighbors / MAU:** **`COMPUTE-NEIGHBORS-CRON.md`**. Audit: `select jobname, schedule from cron.job where jobname like 'compute-neighbors-w%';`
 3. **Passdown updates:** edit **this file**; **commit + push** if remote should track. On **“update passdown”**: reply must include **Tell the next chat** block (see **`.cursor/rules/cinematch-handoff.mdc`**).
 4. **Last note:** merge the session’s **final** user note into **Open / follow-ups**.
@@ -260,17 +287,19 @@
 
 **Last session (2026-05-28)**
 
-- **Last note:** User asked to **document** **Your Picks × Circles** strips (recent/top in **your** circles; popular/highly rated in **other** circles) as backlog in passdown — **discussion only**, no app code. **§1f** + **§2f** added to **Master list**.
+- **Last note:** User asked for **passdown for next chat** — **§1g** Discover typo/transliteration backlog added; **§1f** circle strips + session context consolidated. No new app code this thread after **7.0.65**.
 
-- **Shipped (see `CHANGELOG`):** **7.0.64**–**7.0.65** title detail cast/crew; prod/staging app at **`2a4333f`**.
+- **Shipped (see `CHANGELOG`):** **7.0.64**–**7.0.65** title detail cast/crew (grey panels, Cast above Director); prod + staging app **`2a4333f`**.
 
-- **Git:** App **`2a4333f`**; passdown docs commit after this update (pull for latest passdown).
+- **Git:** App **`2a4333f`**; passdown updated in this commit — **`git pull`** **`origin/main`** & **`origin/staging`** for latest **`PASSDOWN-NEXT-CHAT.md`**.
 
-- **Your Picks circles — decide before build:** **1f.0** merged vs per-circle strips; ship **Phase 1f** before **2f** (other circles need new aggregate RPC + privacy). Do **not** label **watchlist** as “watching” without shared intent feature.
+- **Discover — before build:** Prefer **§1g.1** low-results **transliteration variant** retry over IMDB hybrid; keep **`tmdb_id`** identity.
 
-- **Ops (unchanged):** **`20260616120000`** + **`20260615120000`** on hosted DBs; **`COMPUTE-NEIGHBORS-CRON.md`**; analytics **`log_analytics_*`** still unwired.
+- **Your Picks circles — before build:** **1f.0** merged vs per-circle; **Phase 1f** before **2f**.
 
-- **Open:** **1a–1e** CF diversity; **§1f** circle strips; **P2** US geo / multi-market; Circles §8/§9; **§18**; Resend; Capacitor **§30**.
+- **Ops (unchanged):** Hosted migrations per checklist; **`COMPUTE-NEIGHBORS-CRON.md`**; analytics unwired.
+
+- **Open:** **1a–1e**; **§1f**; **§1g**; **P2** US geo; Circles §8/§9; **§18**; Resend; Capacitor **§30**.
 
 ---
 
