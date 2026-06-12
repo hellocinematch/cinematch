@@ -2210,6 +2210,29 @@ const MOOD_CARDS = [
   }
 ];
 
+/**
+ * 7.0.66: "Feels" tab on the genre card — Hollywood (`en` region) only, since TMDB keyword tagging is
+ * sparse on regional cinema. Each chip ORs its TMDB keyword ids into `with_keywords`; chips combine as OR.
+ * `epic` is param-based (genres/runtime/votes) — no good keyword cluster exists. Keyword ids verified
+ * against /search/keyword + /discover spot-checks (2026-06-12); `sub` = anchor titles for fuzzy labels.
+ */
+const MOOD_FEELS = {
+  title: "What kind of ride?",
+  subtitle: "Pick a feel — or skip",
+  options: [
+    { id: "mind_bending", label: "🤯 Mind-bending", sub: "Inception, Memento", keywords: [326438, 157171, 10854, 9887, 33465] },
+    { id: "terrifying", label: "😱 Terrifying", keywords: [256183, 12339, 3358, 161261, 163053] },
+    { id: "feel_good", label: "🥰 Feel-good", keywords: [329716, 304995, 319357, 6054, 240] },
+    { id: "tearjerker", label: "💔 Tearjerker", keywords: [156924, 10614, 9872, 6564] },
+    { id: "whodunit", label: "🕵️ Whodunit", keywords: [12570, 207046, 703, 231596] },
+    { id: "adrenaline", label: "💥 Adrenaline", keywords: [10051, 3713, 10349, 4776] },
+    { id: "slow_burn", label: "🐢 Slow burn", sub: "Zodiac, Blade Runner 2049", keywords: [277551, 155800, 272553, 164186, 12565] },
+    { id: "true_story", label: "🎭 True story", keywords: [9672, 5565, 159289] },
+    { id: "epic", label: "🌌 Epic scale", sub: "Dune, Interstellar", keywords: [] },
+    { id: "laugh", label: "😂 Laugh-out-loud", keywords: [9755, 8201, 167541, 9253] },
+  ],
+};
+
 function BottomNavListIcon() {
   return (
     <svg className="bottom-nav-list-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -2297,7 +2320,7 @@ function BottomNav({
           setProfileMenuOpen(false);
           setNavTab("mood");
           setMoodStep(0);
-          setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
+          setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [], feel: [] });
           setMoodResults([]);
           setScreen("mood-picker");
         }}
@@ -3400,7 +3423,9 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [moodStep, setMoodStep] = useState(0);
-  const [moodSelections, setMoodSelections] = useState({ region: [], indian_lang: [], genre: [], vibe: [] });
+  const [moodSelections, setMoodSelections] = useState({ region: [], indian_lang: [], genre: [], vibe: [], feel: [] });
+  /** Genre card tab: "genre" | "feels" — Feels only offered when Hollywood is in the region picks. */
+  const [moodGenreTab, setMoodGenreTab] = useState("genre");
   const [moodResults, setMoodResults] = useState([]);
   const [topPickOffset, setTopPickOffset] = useState(0);
   /** Your Picks: visible count = min(pool, 20, step × YOUR_PICKS_BATCH_SIZE). */
@@ -3890,6 +3915,14 @@ export default function App() {
   const currentMoodCard = MOOD_CARDS.find(c => c.id === cardOrder[moodStep]);
   const moodCardKey = currentMoodCard?.id;
   const totalCards = cardOrder.length;
+  /** Feels tab is Hollywood-only; offered on the genre card when `en` is among the region picks. */
+  const moodFeelsAvailable = moodCardKey === "genre" && (moodSelections.region || []).includes("en");
+  const moodShowingFeels = moodFeelsAvailable && moodGenreTab === "feels";
+
+  // Entering the picker from any entry point (bottom nav, Your Picks CTA, resetMood) lands on the Genres tab.
+  useEffect(() => {
+    if (screen === "mood-picker") setMoodGenreTab("genre");
+  }, [screen]);
 
   useEffect(() => {
     function routeRecovery() {
@@ -9426,7 +9459,7 @@ export default function App() {
 
   async function computeMoodResults() {
     setScreen("loading-recs");
-    const { region, indian_lang, genre, vibe } = moodSelections;
+    const { region, indian_lang, genre, vibe, feel } = moodSelections;
     const currentYear = new Date().getFullYear();
     const params = new URLSearchParams({ language: "en-US", page: "1", sort_by: "popularity.desc" });
     const wantsAnimation = vibe.includes("animation_anime");
@@ -9485,6 +9518,26 @@ export default function App() {
     }
     if (vibe.includes("family")) params.set("with_genres", [...(genre.length ? genre : []), "10751"].join("|"));
 
+    // Feels (7.0.66): Hollywood-only keyword narrowing. Chips OR within and across; `epic` is param-based.
+    // Applied only to the English discover fetch — TMDB keyword tagging is too sparse on regional cinema.
+    const feelSelected = region.includes("en") ? (feel || []) : [];
+    const feelKeywordIds = [...new Set(
+      feelSelected.flatMap((id) => MOOD_FEELS.options.find((o) => o.id === id)?.keywords || []),
+    )];
+    const wantsEpic = feelSelected.includes("epic");
+    const applyFeelsDiscoverParams = (p) => {
+      if (feelKeywordIds.length > 0) p.set("with_keywords", feelKeywordIds.join("|"));
+      if (wantsEpic) {
+        // Epic: big-canvas genres when the user picked none; high engagement floor; long runtime
+        // unless Quick watch is also picked (Anything-special card wins, like era precedence).
+        if (!p.get("with_genres")) p.set("with_genres", "12|10752|878");
+        p.set("vote_count.gte", String(Math.max(300, Number(p.get("vote_count.gte") || "0"))));
+        if (!wantsShort) p.set("with_runtime.gte", "140");
+      }
+    };
+    /** TV episode runtimes make a 140-minute floor nonsensical — epic TV keeps genres/votes only. */
+    const stripEpicRuntimeForTv = (tvP) => { tvP.delete("with_runtime.gte"); };
+
     try {
       // If mixing English + other languages, fetch separately and interleave
       const hasEnglish = region.includes("en") || region.includes("any") || region.length === 0;
@@ -9495,10 +9548,12 @@ export default function App() {
       if (hasEnglish && nonEngLangs.length > 0) {
         const engParams = new URLSearchParams(params);
         engParams.set("with_original_language", "en");
+        applyFeelsDiscoverParams(engParams);
         const regParams = new URLSearchParams(params);
         regParams.set("with_original_language", nonEngLangs.join("|"));
 
         const engTv = tmdbTvParamsFromMovieParams(engParams);
+        stripEpicRuntimeForTv(engTv);
         const regTv = tmdbTvParamsFromMovieParams(regParams);
         if (wantsShort) {
           // Quick-watch TV: favor short episodes and ended shows.
@@ -9559,7 +9614,9 @@ export default function App() {
           }
         }
       } else {
+        applyFeelsDiscoverParams(params);
         const tvParams = tmdbTvParamsFromMovieParams(params);
+        stripEpicRuntimeForTv(tvParams);
         if (wantsShort) {
           tvParams.set("with_runtime.lte", "24");
           tvParams.set("with_status", "3");
@@ -9613,6 +9670,24 @@ export default function App() {
         ...allMovieResults.slice(0, 10).map(m => normalize(m, "movie")),
         ...allTVResults.slice(0, 10).map(m => normalize(m, "tv")),
       ];
+      if (feelSelected.length > 0 && combined.length < 6) {
+        // Feel keywords + genre + era stacked too thin — relax the keyword/runtime narrowing but keep
+        // genre/era/acclaim intent, then pad with deduped close picks.
+        const relaxed = new URLSearchParams(params);
+        relaxed.delete("with_keywords");
+        relaxed.delete("with_runtime.gte");
+        const relaxedTv = tmdbTvParamsFromMovieParams(relaxed);
+        const [mRelax, tRelax] = await Promise.all([
+          fetchTMDB(`/discover/movie?${relaxed.toString()}`),
+          fetchTMDB(`/discover/tv?${relaxedTv.toString()}`),
+        ]);
+        const seenIds = new Set(combined.map((m) => m.id));
+        const pad = [
+          ...(mRelax.results || []).slice(0, 8).map((m) => normalize(m, "movie")),
+          ...(tRelax.results || []).slice(0, 8).map((m) => normalize(m, "tv")),
+        ].filter((m) => !seenIds.has(m.id));
+        combined = [...combined, ...pad];
+      }
       if (combined.length === 0) {
         const fallbackWithoutGenres = wantsAnimation
           ? ""
@@ -9727,7 +9802,8 @@ export default function App() {
 
   function resetMood() {
     setMoodStep(0);
-    setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
+    setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [], feel: [] });
+    setMoodGenreTab("genre");
     setMoodResults([]);
     setScreen("mood-picker");
   }
@@ -12211,7 +12287,7 @@ export default function App() {
                               className="your-picks-mood-cta"
                               onClick={() => {
                                 setMoodStep(0);
-                                setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [] });
+                                setMoodSelections({ region: [], indian_lang: [], genre: [], vibe: [], feel: [] });
                                 setMoodResults([]);
                                 setNavTab("mood");
                                 setScreen("mood-picker");
@@ -12442,26 +12518,66 @@ export default function App() {
           <div className="mood-header">
             <button className="mood-back" onClick={() => { setNavTab("home"); setScreen("circles"); }}>← Back</button>
             <div className="mood-step">Card {moodStep + 1} of {totalCards}</div>
-            <div className="mood-title">{currentMoodCard.title}</div>
-            <div className="mood-subtitle">{currentMoodCard.subtitle}</div>
+            <div className="mood-title">{moodShowingFeels ? MOOD_FEELS.title : currentMoodCard.title}</div>
+            <div className="mood-subtitle">{moodShowingFeels ? MOOD_FEELS.subtitle : currentMoodCard.subtitle}</div>
           </div>
           <div className="mood-dots">
             {cardOrder.map((_, i) => <div key={i} className={`mood-dot ${i < moodStep ? "done" : i === moodStep ? "active" : ""}`} />)}
           </div>
-          <div className="mood-options">
-            {currentMoodCard.options.map(opt => (
-              <button key={opt.id}
-                className={`mood-option ${(moodSelections[moodCardKey] || []).includes(opt.id) ? "selected" : ""}`}
-                onClick={() => toggleMoodOption(moodCardKey, opt.id)}>
-                {opt.label}
+          {moodFeelsAvailable && (
+            <div className="mood-tab-row" role="tablist" aria-label="Pick by genre or by feel">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={moodGenreTab === "genre"}
+                className={`mood-tab ${moodGenreTab === "genre" ? "active" : ""}`}
+                onClick={() => setMoodGenreTab("genre")}
+              >
+                Genres{(moodSelections.genre || []).length > 0 ? ` · ${moodSelections.genre.length}` : ""}
               </button>
-            ))}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={moodGenreTab === "feels"}
+                className={`mood-tab ${moodGenreTab === "feels" ? "active" : ""}`}
+                onClick={() => setMoodGenreTab("feels")}
+              >
+                Feels{(moodSelections.feel || []).length > 0 ? ` · ${moodSelections.feel.length}` : ""}
+              </button>
+            </div>
+          )}
+          <div className="mood-options">
+            {moodShowingFeels
+              ? MOOD_FEELS.options.map(opt => (
+                <button key={opt.id}
+                  className={`mood-option mood-option--feel ${(moodSelections.feel || []).includes(opt.id) ? "selected" : ""}`}
+                  onClick={() => toggleMoodOption("feel", opt.id)}>
+                  <span className="mood-option-label">{opt.label}</span>
+                  {opt.sub && <span className="mood-option-sub">{opt.sub}</span>}
+                </button>
+              ))
+              : currentMoodCard.options.map(opt => (
+                <button key={opt.id}
+                  className={`mood-option${moodCardKey === "genre" ? " mood-option--genre" : ""} ${(moodSelections[moodCardKey] || []).includes(opt.id) ? "selected" : ""}`}
+                  onClick={() => toggleMoodOption(moodCardKey, opt.id)}>
+                  {opt.label}
+                </button>
+              ))}
           </div>
           <div className="mood-actions">
             <button className="mood-next" onClick={advanceMood}>
               {moodStep < totalCards - 1 ? "Next →" : "Find my matches 🎯"}
             </button>
-            <button className="mood-skip" onClick={() => { setMoodSelections(prev => ({ ...prev, [moodCardKey]: [] })); advanceMood(); }}>
+            <button
+              className="mood-skip"
+              onClick={() => {
+                // The genre card hosts both tabs — skipping it clears genre and feel picks together.
+                setMoodSelections(prev => (moodCardKey === "genre"
+                  ? { ...prev, genre: [], feel: [] }
+                  : { ...prev, [moodCardKey]: [] }));
+                advanceMood();
+              }}
+            >
               Skip this card
             </button>
           </div>
