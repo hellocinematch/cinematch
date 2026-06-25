@@ -20,6 +20,8 @@ function spaLegalRoutesPlugin() {
 }
 
 export default defineConfig({
+  /** Relative asset paths — required for Capacitor bundled WebView; fine on Vercel at domain root. */
+  base: './',
   plugins: [react(), spaLegalRoutesPlugin()],
   server: {
     proxy: {

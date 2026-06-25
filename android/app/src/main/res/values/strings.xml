@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cinemastro</string>
+    <string name="title_activity_main">Cinemastro</string>
+    <string name="package_name">com.cinemastro.app</string>
+    <string name="custom_url_scheme">com.cinemastro.app</string>
+</resources>

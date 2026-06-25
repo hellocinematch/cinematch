@@ -1,11 +1,15 @@
 {
   "name": "cinematch",
   "private": true,
-  "version": "7.0.66",
+  "version": "7.0.67",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:app": "vite build && cap sync",
+    "cap:sync": "cap sync",
+    "cap:ios": "cap open ios",
+    "cap:android": "cap open android",
     "lint": "eslint .",
     "preview": "vite preview",
     "ml:transform-ratings": "node SeedData/ml-32m/transform_ratings.mjs",
@@ -20,6 +24,13 @@
     "icons:pwa": "node scripts/generate-pwa-touch-icons.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/ios": "^8.4.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@supabase/supabase-js": "^2.101.1",
     "markdown-it": "^14.1.1",
     "markdown-it-anchor": "^9.2.0",

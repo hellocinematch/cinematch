@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.67
+
+- **Native app scaffold (Capacitor v1 branch):** Bundled **iOS + Android** shell via **Capacitor 8** — **`com.cinemastro.app`**, **`webDir: dist`**, no remote URL (not a thin WebView wrapper). **`vite` `base: './'`** for WebView asset paths (still fine on Vercel). **`src/capacitorShell.js`** — native-only status bar + **`appUrlOpen`** stub for future universal links. Scripts: **`npm run build:app`**, **`cap:sync`**, **`cap:ios`**, **`cap:android`**. **Production web unchanged until this branch merges to `main`.** Next: auth redirect URLs, `/join` universal links, TestFlight / Play internal.
+
 ## 7.0.66
 
 - **Mood — Feels tab (Hollywood only):** The genre card gets a **「 Genres | Feels 」** toggle when **🌍 Hollywood** is among the region picks (regional/Indian flows keep the plain genre grid). **Feels** offers **10** experiential chips — **🤯 Mind-bending**, **😱 Terrifying**, **🥰 Feel-good**, **💔 Tearjerker**, **🕵️ Whodunit**, **💥 Adrenaline**, **🐢 Slow burn**, **🎭 True story**, **🌌 Epic scale**, **😂 Laugh-out-loud** — fuzzy labels carry **anchor titles** (e.g. *Inception, Memento*). Each chip ORs a curated set of **TMDB keyword ids** into discover **`with_keywords`** (verified via `/search/keyword` + result-count spot-checks); chips combine as **OR**; cross-tab **genre + feel** picks combine as **AND** narrowing. **Epic scale** is param-based: Adventure/War/Sci-Fi when no genre picked, **`vote_count ≥ 300`**, movie **runtime ≥ 140** (dropped for TV; **⚡ Quick watch** wins the runtime slot when both are picked). Keywords apply **only to the English fetch** in mixed-region searches. **Backfill:** when keyword + genre + era stack returns under **6** titles, a keyword-relaxed re-fetch pads with close picks (genre/era/acclaim kept). **Skip** on the genre card clears both tabs' picks; tab badges show per-tab selection counts; entering the picker always lands on **Genres**.
