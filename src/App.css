@@ -8,6 +8,9 @@
   /* Shell: use % not 100vw — iOS Safari can treat 100vw wider than the paint area and allow sideways pan */
   /* Bump default when logo + Beta sit in fixed nav (~40px logo + paddings); avoids hero rows kissing divider. */
   .app { --shell:480px; --primary-nav-overlay-clearance:72px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; height:100%; min-height:0; max-height:100%; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; overflow-x:clip; overflow-y:hidden; min-width:0; position:relative; touch-action:pan-y; display:flex; flex-direction:column; }
+  /* Capacitor: edge-to-edge WebView — dark html/body so native letterbox gaps are not white. */
+  html.cap-native,
+  html.cap-native body { background:#0a0a0a; min-height:100%; }
   /* Capacitor WKWebView: root pan-y blocks nested horizontal strip scroll — relax on native only. */
   html.cap-native .app { touch-action:manipulation; }
   html.cap-native .strip,

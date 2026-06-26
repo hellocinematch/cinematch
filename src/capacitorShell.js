@@ -15,6 +15,7 @@ export async function initCapacitorShell() {
   ]);
 
   try {
+    await StatusBar.setOverlaysWebView({ overlay: true });
     await StatusBar.setStyle({ style: Style.Dark });
   } catch {
     /* StatusBar plugin not available on all platforms */

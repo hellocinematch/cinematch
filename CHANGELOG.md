@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.69
+
+- **Native (Capacitor) — full-bleed safe areas:** iOS simulator showed white bars above/below the app shell. **Cause:** **`ios.contentInset: automatic`** letterboxed the WKWebView while **`index.css` `:root`** left **`html`** white behind the frame. **Fix:** **`contentInset: never`** (CSS **`env(safe-area-inset-*)`** already handles notch/home bar); **`StatusBar.setOverlaysWebView({ overlay: true })`**; **`html.cap-native`** + **`body`** forced to **`#0a0a0a`**. Web/PWA unchanged.
+
 ## 7.0.68
 
 - **Native (Capacitor) — horizontal strip scroll:** iOS WKWebView blocked sideways swipes on title strips (Mood, Circles Recent, Your Picks, etc.). Root cause: **`touch-action: pan-y`** on **`.app`** plus the iOS viewport-drift guard treating some strip gestures as page pans. **Fix:** **`html.cap-native`** (set in **`capacitorShell.js`**) relaxes root **`touch-action`** on native only; strips use **`pan-x pan-y`** + **`overflow-x: scroll`**; touch guard skips **`.strip`** / filter rows on every **`touchmove`**. Web/PWA unchanged.
