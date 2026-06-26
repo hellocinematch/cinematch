@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.70
+
+- **Web — `/join/:token` blank on staging:** Capacitor merge set **`vite` `base: './'`** globally; deep routes resolved **`./assets/*`** to **`/join/assets/*`**, so Vercel’s join rewrite returned HTML instead of JS. **Fix:** **`base: '/'`** for normal **`npm run build`** (Vercel); **`VITE_CAPACITOR_BUILD=true`** + **`base: './'`** only for **`npm run build:app`**. Circle invite links and other SPA routes work on staging web again; native bundle unchanged.
+
 ## 7.0.69
 
 - **Native (Capacitor) — full-bleed safe areas:** iOS simulator showed white bars above/below the app shell. **Cause:** **`ios.contentInset: automatic`** letterboxed the WKWebView while **`index.css` `:root`** left **`html`** white behind the frame. **Fix:** **`contentInset: never`** (CSS **`env(safe-area-inset-*)`** already handles notch/home bar); **`StatusBar.setOverlaysWebView({ overlay: true })`**; **`html.cap-native`** + **`body`** forced to **`#0a0a0a`**. Web/PWA unchanged.

@@ -19,9 +19,11 @@ function spaLegalRoutesPlugin() {
   };
 }
 
+const capacitorBuild = process.env.VITE_CAPACITOR_BUILD === 'true'
+
 export default defineConfig({
-  /** Relative asset paths — required for Capacitor bundled WebView; fine on Vercel at domain root. */
-  base: './',
+  /** Capacitor bundled WebView needs relative paths; Vercel/web SPA needs `/` so `/join/:token` loads `/assets/*`. */
+  base: capacitorBuild ? './' : '/',
   plugins: [react(), spaLegalRoutesPlugin()],
   server: {
     proxy: {

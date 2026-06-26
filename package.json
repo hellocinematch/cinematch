@@ -1,12 +1,12 @@
 {
   "name": "cinematch",
   "private": true,
-  "version": "7.0.69",
+  "version": "7.0.70",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:app": "vite build && cap sync",
+    "build:app": "VITE_CAPACITOR_BUILD=true vite build && cap sync",
     "cap:sync": "cap sync",
     "cap:ios": "cap open ios",
     "cap:android": "cap open android",
