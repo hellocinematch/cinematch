@@ -3806,7 +3806,7 @@ export default function App() {
   // 1) prevent page-level horizontal gestures (except intended x-scrollers)
   // 2) aggressively clamp viewport/document x back to 0 after touch/scroll/layout events
   useEffect(() => {
-    const ALLOW_PAN_X_SELECTOR = ".strip, .filter-row";
+    const ALLOW_PAN_X_SELECTOR = ".strip, .filter-row, .app-primary-nav__links, .streaming-page-filter-scroll";
     let startX = 0;
     let startY = 0;
     let allowPanX = false;
@@ -3854,10 +3854,13 @@ export default function App() {
     const onTouchMove = (e) => {
       const t = e.touches?.[0];
       if (!t) return;
+      const el = toElement(e.target);
+      const inPanXZone = Boolean(el?.closest(ALLOW_PAN_X_SELECTOR));
+      if (inPanXZone) return; // horizontal title strips / filter rows
       const dx = t.clientX - startX;
       const dy = t.clientY - startY;
       if (Math.abs(dx) <= Math.abs(dy)) return; // primarily vertical gesture
-      if (allowPanX) return; // keep intended horizontal strips working
+      if (allowPanX) return;
       e.preventDefault(); // block page-level sideways pan
       scheduleClampBurst();
     };

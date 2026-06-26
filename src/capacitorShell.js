@@ -7,6 +7,8 @@ import { Capacitor } from "@capacitor/core";
 export async function initCapacitorShell() {
   if (!Capacitor.isNativePlatform()) return;
 
+  document.documentElement.classList.add("cap-native");
+
   const [{ App }, { StatusBar, Style }] = await Promise.all([
     import("@capacitor/app"),
     import("@capacitor/status-bar"),

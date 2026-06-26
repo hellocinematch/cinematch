@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.68
+
+- **Native (Capacitor) — horizontal strip scroll:** iOS WKWebView blocked sideways swipes on title strips (Mood, Circles Recent, Your Picks, etc.). Root cause: **`touch-action: pan-y`** on **`.app`** plus the iOS viewport-drift guard treating some strip gestures as page pans. **Fix:** **`html.cap-native`** (set in **`capacitorShell.js`**) relaxes root **`touch-action`** on native only; strips use **`pan-x pan-y`** + **`overflow-x: scroll`**; touch guard skips **`.strip`** / filter rows on every **`touchmove`**. Web/PWA unchanged.
+
 ## 7.0.67
 
 - **Native app scaffold (Capacitor v1 branch):** Bundled **iOS + Android** shell via **Capacitor 8** — **`com.cinemastro.app`**, **`webDir: dist`**, no remote URL (not a thin WebView wrapper). **`vite` `base: './'`** for WebView asset paths (still fine on Vercel). **`src/capacitorShell.js`** — native-only status bar + **`appUrlOpen`** stub for future universal links. Scripts: **`npm run build:app`**, **`cap:sync`**, **`cap:ios`**, **`cap:android`**. **Production web unchanged until this branch merges to `main`.** Next: auth redirect URLs, `/join` universal links, TestFlight / Play internal.
