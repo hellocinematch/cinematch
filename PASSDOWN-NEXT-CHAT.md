@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-06-16 — trust **`package.json`** / **`CHANGELOG.md`**. **Prod + staging web:** **7.0.66** (**Mood Feels** tab). **Native app:** branch **`capacitor/v1`** @ **`e076ba8`** (**7.0.67** scaffold); **local uncommitted** **7.0.68** (native horizontal strip scroll). **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-06-26 — trust **`package.json`** / **`CHANGELOG.md`**. **Staging web + native (merged):** **7.0.73** @ **`e36f340`**. **Prod web:** **7.0.66** @ **`f63d203`** (unchanged — user has **not** asked to promote). **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.66** — Mood **Genres | Feels** tab (Hollywood only; **10** feel chips + TMDB **`with_keywords`**). **7.0.65** — detail **Cast** + **Director** / **Created by** grey panels. **7.0.67** ( **`capacitor/v1`** only) — bundled **Capacitor 8** iOS/Android shell. Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.68–7.0.73** ( **`staging`** + **`capacitor/v1`**) — Capacitor native: strip scroll, safe areas, **`vite` split base** (`/` web / `./` **`build:app`**), staging **`/join`** fix, auth redirect URLs + **native password-reset deep link** (**implicit** flow, **`src/authRedirect.js`**, validated Simulator **2026-06-26**). **7.0.66** — Mood **Feels** tab ( **prod** ). Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -10,17 +10,17 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **Prod + staging web:** **7.0.66** @ **`f63d203`** (Mood **Feels** tab). **Native:** branch **`capacitor/v1`** @ **`e076ba8`** (**7.0.67** Capacitor scaffold); **local tip may be 7.0.68** (native strip scroll — **uncommitted**). **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`** + handoff rules. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **Staging (web + Capacitor merged):** **7.0.73** @ **`e36f340`**. **Prod web:** **7.0.66** @ **`f63d203`** — **do not push `main`** unless user explicitly asks. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`** + handoff rules. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
-> **Git / Vercel:** Routine web ships → **`origin/staging`** only; **`origin/main`** / prod **only when user explicitly asks**. **Capacitor** work stays on **`capacitor/v1`** until staging app + staging web pass — then **one merge/push to prod** (web); **App Store / Play** is a separate upload.
+> **Git / Vercel:** Routine web ships → **`origin/staging`** only. **Capacitor** scaffold merged into **`staging`**; **`capacitor/v1`** local may match **`staging`** — **`git push origin capacitor/v1`** if remote drift. **App Store / Play** = separate upload.
 >
-> **Hosted DB:** **staging ≠ prod** Supabase projects — match **`.env`** / Vercel env to target. Migrations checklist unchanged (**`20260616120000`** … **`20260614120000`** + invite/leave). **`VITE_PUBLIC_SITE_URL`** on staging (and local **`.env`** for **`npm run build:app`**).
+> **Hosted DB:** **staging ≠ prod** Supabase — match **`.env`** / Vercel env. **`VITE_PUBLIC_SITE_URL`** = **`https://cinematch-staging-nine-sigma.vercel.app`** (not dead **`cinematch-nine-sigma`**). Staging Supabase **Redirect URLs** + **Site URL** updated; add **`com.cinemastro.app://localhost/`** + **`…/?recovery=1`** for native reset.
 >
 > **`pg_net` / compute-neighbors:** **`COMPUTE-NEIGHBORS-CRON.md`** — scale **`jobs × limit`** as MAU grows.
 >
-> **Capacitor (§30 — in progress):** **`npm run build:app`** → **`npm run cap:ios`** (use **`open -a Xcode ios/App/App.xcodeproj`** if Cursor opens `.xcodeproj`). Staging **`.env`** for simulator. **Next:** commit **7.0.68** scroll fix → auth redirect URLs + **`/join`** universal links → TestFlight / Play internal → optional native push.
+> **Capacitor (§30 — in progress):** Native **7.0.73** validated: strips, safe areas, **`/join`** on staging Safari, **password reset** via **`com.cinemastro.app://`** deep link (Stop Xcode → Run → forgot password from **app** → paste verify link in **Simulator Safari**). **`npm run build:app`** → **`open -a Xcode ios/App/App.xcodeproj`**. **Next:** **Step 2** — **`/join/:token`** universal links (iOS AASA + Android App Links) → icons → TestFlight / Play → optional native push → **prod** when user asks.
 >
-> **Master list (product):** **1a–1e** CF diversity; **§1f** circle strips; **§1g** Discover **1g.1** transliteration; **P2** US geo. **Discussed not built:** platform **latest / highly rated** strips; Mood **similar-from-seed-titles**; **PWA / native push** for circle activity.
+> **Master list (product):** **1a–1e** CF diversity; **§1f** circle strips; **§1g.1** Discover transliteration; **P2** US geo. **Discussed not built:** platform **latest / highly rated** strips; Mood **similar-from-seed-titles**; **PWA / native push** for circles.
 
 ---
 
@@ -28,8 +28,10 @@
 
 | Item | State |
 |------|-------|
-| **Web app (prod + staging)** | **7.0.66** **`f63d203`** — Mood **Feels** tab; **`main`** → **www.cinemastro.com**. |
-| **Native app** | Branch **`capacitor/v1`** **`e076ba8`** (**7.0.67**): **Capacitor 8**, **`com.cinemastro.app`**, bundled **`dist`**, **`ios/`** + **`android/`**. **Not merged** to **`main`** / **`staging`**. Local **7.0.68** strip-scroll fix **uncommitted**. User **smoke-tested iOS simulator** (staging DB) — works. |
+| **Web app (staging)** | **7.0.73** **`e36f340`** — Capacitor merged; **`vite` `base: '/'`** on Vercel; **`/join/:token`** works on **`cinematch-staging-nine-sigma.vercel.app`**. |
+| **Web app (prod)** | **7.0.66** **`f63d203`** — Mood **Feels** tab; **`main`** → **www.cinemastro.com**. User has **not** promoted Capacitor to prod. |
+| **Native app** | Same tip as **`staging`** (**7.0.73**): **Capacitor 8**, **`com.cinemastro.app`**, **`ios/`** + **`android/`**. Simulator smoke-tested (strips, safe areas, join web, **native password reset deep link**). **`build:app`** uses **`VITE_CAPACITOR_BUILD=true`** → **`base: './'`**. |
+| **Supabase staging auth** | **Site URL** + redirect URLs → **`cinematch-staging-nine-sigma.vercel.app`**; native **`com.cinemastro.app://localhost/`** (+ **`?recovery=1`**). User fixed email send config during session. |
 | **Supabase** | **Staging and prod are separate projects** — bake **`VITE_SUPABASE_*`** at build time (web Vercel + **`npm run build:app`**). |
 | **Supabase — apply if missing** | Per-env migrations — **`20260616120000`** … **`20260614120000`** + invite/leave (see checklist below). |
 | **Analytics instrumentation** | Client **`log_analytics_*`** — **not wired** in **`App.jsx`** yet. |
@@ -40,44 +42,40 @@
 
 ---
 
-## Capacitor native app (§30 — active on `capacitor/v1`)
+## Capacitor native app (§30 — active; merged to `staging`)
 
-*Bundled shell, **same Supabase backend** (no Edge/DB rewrite). User workflow: **test on `capacitor/v1` + staging web → merge to `staging` → one prod push when ready**.*
+*Bundled shell, **same Supabase backend**. User workflow: **validate on staging → one prod push when user asks**; App Store / Play separate.*
 
-**Shipped on branch (`e076ba8`, 7.0.67):**
+**Shipped on `staging` / `capacitor/v1` (through **7.0.73**, `e36f340`):**
 
-- **Capacitor 8** — **`capacitor.config.json`**: **`webDir: dist`**, **`androidScheme: https`**, no remote URL.
-- **`vite` `base: './'`** — WebView assets (OK on Vercel at root when merged).
-- **`src/capacitorShell.js`** — status bar + **`appUrlOpen`** stub; sets **`html.cap-native`** on native.
-- Scripts: **`npm run build:app`**, **`cap:sync`**, **`cap:ios`**, **`cap:android`**.
-- **`ios/App/App.xcodeproj`** + **`android/`** committed on branch.
+- **Capacitor 8** — **`capacitor.config.json`**: **`webDir: dist`**, **`ios.contentInset: never`**, **`androidScheme: https`**.
+- **`vite` base:** **`/`** for **`npm run build`** (Vercel); **`./`** only for **`npm run build:app`** (**`VITE_CAPACITOR_BUILD=true`**).
+- **Native UX:** **7.0.68** horizontal strip scroll; **7.0.69** full-bleed safe areas (no white letterbox).
+- **Auth (Step 1B — done):** **`src/authRedirect.js`** — **`passwordRecoveryRedirectTo()`** → **`com.cinemastro.app://localhost/?recovery=1`** on native; **`appUrlOpen`** + **`getLaunchUrl()`**; **implicit** auth flow on native (**`supabase.js`**); **7.0.73** recovery → reset screen validated (Simulator Safari → Open in app; **Stop** Xcode between tests).
+- **Join links (web):** **7.0.70** fixed blank **`/join`** on staging; share URL uses **`VITE_PUBLIC_SITE_URL`** → **`https://cinematch-staging-nine-sigma.vercel.app`**.
+- **`src/capacitorShell.js`**, **`ios/`** + **`android/`**, URL scheme **`com.cinemastro.app`**.
 
-**Local uncommitted (7.0.68):**
-
-- **Native horizontal strip scroll** — **`html.cap-native`** relaxes root **`touch-action`**; touch guard skips **`.strip`** on **`touchmove`**. User reported strips OK in simulator after **click-drag** gesture (may not have rebuilt **7.0.68** yet).
-
-**Local dev (user validated):**
+**Local dev:**
 
 ```bash
 cd "<repo>"
-git checkout capacitor/v1
-# .env: staging VITE_SUPABASE_* + VITE_PUBLIC_SITE_URL
+git checkout staging   # or capacitor/v1 (same tip after pull)
+# .env: staging VITE_SUPABASE_* + VITE_PUBLIC_SITE_URL=https://cinematch-staging-nine-sigma.vercel.app
 npm run build:app
-open -a Xcode ios/App/App.xcodeproj   # not Cursor — Xcode required
-# Simulator: click-hold-drag sideways on poster rows
+open -a Xcode ios/App/App.xcodeproj
 ```
 
 **Next engineering (ordered):**
 
-- [ ] **Commit + push** **7.0.68** (and any **`capacitor/v1`** drift) to **`origin/capacitor/v1`**.
-- [ ] **Merge `capacitor/v1` → `staging`** — verify staging **Vercel** web still OK with **`base: './'`**.
-- [ ] **Supabase Auth** — redirect URLs for app (custom scheme + https); password reset **`?recovery=1`**.
-- [ ] **Universal links** — **`/join/:token`** on **cinemastro.com** (`apple-app-site-association`, Android App Links).
-- [ ] **App icons** — replace Capacitor defaults with Cinemastro assets.
-- [ ] **TestFlight** + **Play internal** — Apple/Google dev accounts.
-- [ ] **Native push** (optional v1.1) — circle activity; FCM/APNs + token table + Edge sender.
+- [ ] **Universal links (Step 2)** — **`/join/:token`** on **cinemastro.com** + staging domain if needed (`apple-app-site-association`, Android App Links); wire **`handleAppDeepLink`** for join path (auth plumbing exists).
+- [ ] **Vercel staging** — set **`VITE_PUBLIC_SITE_URL`** env if not already (user local **`.env`** done).
+- [ ] **`git push origin capacitor/v1`** if remote behind **`staging`**.
+- [ ] **App icons** — replace Capacitor defaults.
+- [ ] **TestFlight** + **Play internal**.
+- [ ] **Merge `staging` → `main` / prod** — **only when user explicitly asks** (after staging pass).
+- [ ] **Native push** (optional v1.1).
 
-**Parked / discussed:** Web Push-only PWA path (iOS limits); **“similar titles from user-named movies”** (TMDB recommendations merge); **platform latest / highly rated** strips (new RPCs).
+**Parked / discussed:** Web Push-only PWA path; **similar titles from user-named movies**; **platform latest / highly rated** strips.
 
 ---
 
@@ -231,7 +229,7 @@ open -a Xcode ios/App/App.xcodeproj   # not Cursor — Xcode required
 - **§28** Supabase hot paths.
 - **§29** Fonts subset / **`font-display`**.
 - **§30** PWA — **7.0.58** Circles-tab install education modal; service worker backlog.
-- [~] **Native shell (Capacitor):** **In progress** on **`capacitor/v1`** (**7.0.67** **`e076ba8`** pushed; local **7.0.68** uncommitted). Bundled **iOS + Android**, staging **`.env`**, simulator smoke-tested. **Not on `main`.** Next: auth redirects, **`/join`** universal links, TestFlight / Play, then native push. Full checklist — **§ Capacitor native app** above.
+- [~] **Native shell (Capacitor):** **In progress** on **`staging`** / **`capacitor/v1`** (**7.0.73** **`e36f340`**). Step **1B auth redirects + native recovery** validated. **Not on prod `main`.** Next: **Step 2** **`/join`** universal links, icons, TestFlight / Play. Full checklist — **§ Capacitor native app** above.
 
 **Your Picks (page)**
 
@@ -334,17 +332,15 @@ open -a Xcode ios/App/App.xcodeproj   # not Cursor — Xcode required
 
 ## Open / follow-ups
 
-**Last session (2026-06-16)**
+**Last session (2026-06-26)**
 
-- **Last note:** User asked **passdown for next chat**. **Capacitor:** branch **`capacitor/v1`** scaffold pushed (**7.0.67**); **iOS simulator smoke test OK** with **staging** **`.env`** (separate staging/prod Supabase). **7.0.68** native strip-scroll fix **local uncommitted** (user did not rebuild; strips worked via simulator **click-drag**). **Workflow locked:** staging first → **one prod push** when ready; **Capacitor not merged to `main`**. **Web prod:** **7.0.66** Mood Feels (**`f63d203`**).
+- **Last note:** User asked **passdown for next chat**. **Capacitor session shipped 7.0.68–7.0.73 to `origin/staging` only** — prod **`main`** still **7.0.66**. **Validated on Simulator:** strip scroll, safe areas, staging **`/join`** (Safari), **native password reset** (forgot password from app → paste Supabase verify link in Simulator Safari → Open in Cinemastro → set new password; **7.0.73**, implicit flow). **Ops fixes:** **`VITE_PUBLIC_SITE_URL`** → **`cinematch-staging-nine-sigma.vercel.app`** (old **`cinematch-nine-sigma`** dead); staging Supabase **Site URL** + redirect URLs updated; **`com.cinemastro.app://localhost/`** for native reset. **Web:** **7.0.70** split **`vite` base** fixed blank **`/join`** on staging.
 
-- **Capacitor — next:** commit **7.0.68** → merge **`capacitor/v1` → `staging`** (verify web) → auth + **`/join`** links → TestFlight / Play → push (optional).
+- **Capacitor — next:** **Step 2** universal links **`/join/:token`** → icons → TestFlight / Play → **prod promote only when user asks**.
 
-- **Product — discussed not built:** **Latest / highly rated on Cinemastro** strips (RPC); **Mood similar-from-seed-titles**; **PWA / native push** for circle re-engagement.
+- **Optional:** **`git push origin capacitor/v1`** if remote behind **`staging`**; Vercel **`VITE_PUBLIC_SITE_URL`** on staging project.
 
-- **Discover / Your Picks (unchanged):** **§1g.1** transliteration; **§1f** circle strips; **1a–1e** CF diversity.
-
-- **Ops:** Per-env migrations; **`COMPUTE-NEIGHBORS-CRON.md`**; analytics unwired; **`VITE_PUBLIC_SITE_URL`** on staging + local **`.env`**.
+- **Product (unchanged):** **§1g.1** transliteration; **§1f** circle strips; **1a–1e** CF diversity; **P2** US geo.
 
 ---
 
