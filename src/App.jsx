@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from "react";
 import packageJson from "../package.json";
 import { supabase } from "./supabase";
+import { passwordRecoveryRedirectTo } from "./authRedirect.js";
 import {
   CIRCLE_CAP,
   CIRCLE_MEMBER_CAP,
@@ -2738,13 +2739,6 @@ function urlIndicatesPasswordRecovery() {
   if (q.get("recovery") === "1") return true;
   const h = window.location.hash;
   return /type=recovery(?:&|$|#|%26)/.test(h) || /type%3[Dd]recovery/.test(window.location.search + h);
-}
-
-/** `redirectTo` for reset emails — add ?recovery=1 so PKCE landings work even if JWT shape differs (whitelist this URL in Supabase). */
-function passwordRecoveryRedirectTo() {
-  const u = new URL(window.location.origin);
-  u.searchParams.set("recovery", "1");
-  return u.toString();
 }
 
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.71
+
+- **Native (Capacitor) — auth redirect URLs (Step 1B):** Password-reset emails from the app now use custom scheme **`com.cinemastro.app://localhost/?recovery=1`** (web still uses **`VITE_PUBLIC_SITE_URL`** + **`?recovery=1`**). New **`src/authRedirect.js`**: public site origin helper, deep-link → SPA path, PKCE **`exchangeCodeForSession`** / implicit **`setSession`** on **`appUrlOpen`**. **iOS** **`CFBundleURLSchemes`** + **Android** intent-filter for **`com.cinemastro.app`**. **Ops:** add **`com.cinemastro.app://localhost/`** and **`com.cinemastro.app://localhost/?recovery=1`** to **staging Supabase → Redirect URLs** if not already.
+
 ## 7.0.70
 
 - **Web — `/join/:token` blank on staging:** Capacitor merge set **`vite` `base: './'`** globally; deep routes resolved **`./assets/*`** to **`/join/assets/*`**, so Vercel’s join rewrite returned HTML instead of JS. **Fix:** **`base: '/'`** for normal **`npm run build`** (Vercel); **`VITE_CAPACITOR_BUILD=true`** + **`base: './'`** only for **`npm run build:app`**. Circle invite links and other SPA routes work on staging web again; native bundle unchanged.
