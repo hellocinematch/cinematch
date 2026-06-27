@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from "react";
 import packageJson from "../package.json";
 import { supabase } from "./supabase";
-import { passwordRecoveryRedirectTo } from "./authRedirect.js";
+import { passwordRecoveryRedirectTo, AUTH_DEEPLINK_EVENT } from "./authRedirect.js";
 import {
   CIRCLE_CAP,
   CIRCLE_MEMBER_CAP,
@@ -3973,7 +3973,23 @@ export default function App() {
       }
       setUser(session?.user ?? null);
     });
-    return () => subscription.unsubscribe();
+    const onAuthDeepLink = (ev) => {
+      void supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) setUser(session.user);
+        const wantsRecovery =
+          Boolean(ev?.detail?.recovery) ||
+          urlIndicatesPasswordRecovery() ||
+          isPasswordRecoverySession(session);
+        if (session?.user && wantsRecovery) {
+          routeRecovery();
+        }
+      });
+    };
+    window.addEventListener(AUTH_DEEPLINK_EVENT, onAuthDeepLink);
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener(AUTH_DEEPLINK_EVENT, onAuthDeepLink);
+    };
   }, []);
 
   useEffect(() => {

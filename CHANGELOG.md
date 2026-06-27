@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.72
+
+- **Native (Capacitor) — password reset deep link → reset screen:** Cold-start recovery links opened the app on splash/sign-in instead of **Set new password**. **Fix:** **`App.getLaunchUrl()`** + deferred **`handleAppDeepLink`** (React mount); retry session from **`window.location`** after **`replaceState`**; **`cinematch-auth-deeplink`** event so **`App.jsx`** routes recovery; explicit **PKCE** + **`detectSessionInUrl`** on Supabase client.
+
 ## 7.0.71
 
 - **Native (Capacitor) — auth redirect URLs (Step 1B):** Password-reset emails from the app now use custom scheme **`com.cinemastro.app://localhost/?recovery=1`** (web still uses **`VITE_PUBLIC_SITE_URL`** + **`?recovery=1`**). New **`src/authRedirect.js`**: public site origin helper, deep-link → SPA path, PKCE **`exchangeCodeForSession`** / implicit **`setSession`** on **`appUrlOpen`**. **iOS** **`CFBundleURLSchemes`** + **Android** intent-filter for **`com.cinemastro.app`**. **Ops:** add **`com.cinemastro.app://localhost/`** and **`com.cinemastro.app://localhost/?recovery=1`** to **staging Supabase → Redirect URLs** if not already.

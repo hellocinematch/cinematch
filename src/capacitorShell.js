@@ -4,6 +4,17 @@
 import { Capacitor } from "@capacitor/core";
 import { handleAppDeepLink } from "./authRedirect.js";
 
+/** Defer until WebView + React mount so auth listeners catch recovery deep links. */
+function scheduleDeepLink(url) {
+  const run = () => void handleAppDeepLink(url);
+  const defer = () => window.setTimeout(run, 80);
+  if (document.readyState === "complete") {
+    requestAnimationFrame(defer);
+  } else {
+    window.addEventListener("load", () => requestAnimationFrame(defer), { once: true });
+  }
+}
+
 export async function initCapacitorShell() {
   if (!Capacitor.isNativePlatform()) return;
 
@@ -22,6 +33,13 @@ export async function initCapacitorShell() {
   }
 
   App.addListener("appUrlOpen", ({ url }) => {
-    void handleAppDeepLink(url);
+    if (url) scheduleDeepLink(url);
   });
+
+  try {
+    const launch = await App.getLaunchUrl();
+    if (launch?.url) scheduleDeepLink(launch.url);
+  } catch {
+    /* getLaunchUrl not available on all platforms */
+  }
 }

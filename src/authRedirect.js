@@ -8,6 +8,11 @@ import { supabase } from "./supabase";
 /** Must match CFBundleURLSchemes (iOS) and Android intent-filter; whitelist in Supabase redirect URLs. */
 export const NATIVE_APP_AUTH_SCHEME = "com.cinemastro.app";
 
+/** Dispatched after native deep link routing; App.jsx opens recovery / join when needed. */
+export const AUTH_DEEPLINK_EVENT = "cinematch-auth-deeplink";
+
+let lastHandledDeepLink = "";
+
 export function isNativeApp() {
   return Capacitor.isNativePlatform();
 }
@@ -51,11 +56,28 @@ export function appDeepLinkToBrowserPath(url) {
   return path || "/";
 }
 
-/** Apply PKCE `code` or implicit `#access_token` from a Supabase auth redirect. */
-export async function completeAuthSessionFromUrl(url) {
+/** True when Supabase redirect or SPA path marks a password-recovery landing. */
+export function deepLinkIndicatesRecovery(href) {
+  try {
+    const parsed =
+      String(href || "").startsWith(`${NATIVE_APP_AUTH_SCHEME}:`)
+        ? parseDeepLinkUrl(href)
+        : new URL(href);
+    if (parsed.searchParams.get("recovery") === "1") return true;
+    const hash = parsed.hash || "";
+    return /type=recovery(?:&|$|#|%26)/i.test(hash) || /type%3[Dd]recovery/i.test(hash + parsed.search);
+  } catch {
+    return false;
+  }
+}
+
+async function completeAuthSessionFromHref(href) {
   let parsed;
   try {
-    parsed = parseDeepLinkUrl(url);
+    parsed =
+      String(href || "").startsWith(`${NATIVE_APP_AUTH_SCHEME}:`)
+        ? parseDeepLinkUrl(href)
+        : new URL(href);
   } catch {
     return false;
   }
@@ -78,15 +100,36 @@ export async function completeAuthSessionFromUrl(url) {
   return !error;
 }
 
-/** Native `appUrlOpen` — route first, then PKCE / implicit session from Supabase redirect. */
+/** Apply PKCE `code` or implicit `#access_token` from a Supabase auth redirect. */
+export async function completeAuthSessionFromUrl(url) {
+  return completeAuthSessionFromHref(url);
+}
+
+/** Native deep link — route, complete Supabase session, notify App (recovery / join). */
 export async function handleAppDeepLink(url) {
   if (!url || typeof window === "undefined") return;
+  if (url === lastHandledDeepLink) return;
+  lastHandledDeepLink = url;
 
   const path = appDeepLinkToBrowserPath(url);
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (path !== current) {
     window.history.replaceState({}, "", path);
   }
-  await completeAuthSessionFromUrl(url);
+
+  let sessionSet = await completeAuthSessionFromHref(url);
+  if (!sessionSet) {
+    sessionSet = await completeAuthSessionFromHref(window.location.href);
+  }
+
+  const recovery =
+    deepLinkIndicatesRecovery(url) ||
+    deepLinkIndicatesRecovery(window.location.href);
+
+  window.dispatchEvent(
+    new CustomEvent(AUTH_DEEPLINK_EVENT, {
+      detail: { recovery, sessionSet, path },
+    }),
+  );
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
