@@ -2,12 +2,13 @@
  * Native shell bootstrap (Capacitor). No-op on web/Vercel; runs in bundled iOS/Android WebView.
  */
 import { Capacitor } from "@capacitor/core";
-import { handleAppDeepLink } from "./authRedirect.js";
+import { handleAppDeepLink, queueNativeDeepLink } from "./authRedirect.js";
 
 /** Defer until WebView + React mount so auth listeners catch recovery deep links. */
 function scheduleDeepLink(url) {
+  queueNativeDeepLink(url);
   const run = () => void handleAppDeepLink(url);
-  const defer = () => window.setTimeout(run, 80);
+  const defer = () => window.setTimeout(run, 200);
   if (document.readyState === "complete") {
     requestAnimationFrame(defer);
   } else {

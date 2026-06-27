@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.73
+
+- **Native (Capacitor) — recovery link → reset screen (follow-up):** Warm-start / Safari handoff still landed on sign-in. **Cause:** PKCE **`code`** exchange needs the app’s stored verifier; verify-in-Safari + app-already-running could miss session apply. **Fix:** **implicit** auth flow on native only (hash tokens in redirect); retry **`exchangeCodeForSession` / `getSession`** after deep link; queue **`takePendingDeepLink`** for React mount; show notice when **`?recovery=1`** but session missing.
+
 ## 7.0.72
 
 - **Native (Capacitor) — password reset deep link → reset screen:** Cold-start recovery links opened the app on splash/sign-in instead of **Set new password**. **Fix:** **`App.getLaunchUrl()`** + deferred **`handleAppDeepLink`** (React mount); retry session from **`window.location`** after **`replaceState`**; **`cinematch-auth-deeplink`** event so **`App.jsx`** routes recovery; explicit **PKCE** + **`detectSessionInUrl`** on Supabase client.

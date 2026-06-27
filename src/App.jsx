@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from "react";
 import packageJson from "../package.json";
 import { supabase } from "./supabase";
-import { passwordRecoveryRedirectTo, AUTH_DEEPLINK_EVENT } from "./authRedirect.js";
+import { passwordRecoveryRedirectTo, AUTH_DEEPLINK_EVENT, takePendingDeepLink, handleAppDeepLink } from "./authRedirect.js";
 import {
   CIRCLE_CAP,
   CIRCLE_MEMBER_CAP,
@@ -3974,18 +3974,56 @@ export default function App() {
       setUser(session?.user ?? null);
     });
     const onAuthDeepLink = (ev) => {
-      void supabase.auth.getSession().then(({ data: { session } }) => {
+      void (async () => {
+        const code = new URLSearchParams(window.location.search).get("code");
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+        }
+
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const { data: { session } } = await supabase.auth.getSession();
+          const wantsRecovery =
+            Boolean(ev?.detail?.recovery) ||
+            urlIndicatesPasswordRecovery() ||
+            isPasswordRecoverySession(session);
+
+          if (session?.user && wantsRecovery) {
+            setUser(session.user);
+            routeRecovery();
+            return;
+          }
+          if (session?.user && wantsRecovery === false) break;
+          await new Promise((r) => window.setTimeout(r, 120));
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) setUser(session.user);
+
         const wantsRecovery =
           Boolean(ev?.detail?.recovery) ||
           urlIndicatesPasswordRecovery() ||
           isPasswordRecoverySession(session);
-        if (session?.user && wantsRecovery) {
+
+        if (wantsRecovery && session?.user) {
           routeRecovery();
+          return;
         }
-      });
+        if (wantsRecovery && !session?.user) {
+          setScreen("auth");
+          setAuthMode("signin");
+          setAuthError("");
+          setAuthNotice(
+            ev?.detail?.authError ||
+              "Reset link expired or could not be verified. Request a new one from the app (Forgot password).",
+          );
+        }
+      })();
     };
     window.addEventListener(AUTH_DEEPLINK_EVENT, onAuthDeepLink);
+    const pending = takePendingDeepLink();
+    if (pending) {
+      window.setTimeout(() => void handleAppDeepLink(pending), 250);
+    }
     return () => {
       subscription.unsubscribe();
       window.removeEventListener(AUTH_DEEPLINK_EVENT, onAuthDeepLink);

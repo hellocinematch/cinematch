@@ -11,10 +11,18 @@ export const NATIVE_APP_AUTH_SCHEME = "com.cinemastro.app";
 /** Dispatched after native deep link routing; App.jsx opens recovery / join when needed. */
 export const AUTH_DEEPLINK_EVENT = "cinematch-auth-deeplink";
 
-let lastHandledDeepLink = "";
+let pendingDeepLinkUrl = "";
+let lastDeepLink = { url: "", at: 0 };
 
 export function isNativeApp() {
   return Capacitor.isNativePlatform();
+}
+
+/** Queued when appUrlOpen fires before React auth listeners mount. */
+export function takePendingDeepLink() {
+  const u = pendingDeepLinkUrl;
+  pendingDeepLinkUrl = "";
+  return u;
 }
 
 /** Canonical web origin for share links and web auth redirects. */
@@ -79,37 +87,41 @@ async function completeAuthSessionFromHref(href) {
         ? parseDeepLinkUrl(href)
         : new URL(href);
   } catch {
-    return false;
+    return { ok: false, error: "Invalid link." };
   }
 
   const code = parsed.searchParams.get("code");
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    return !error;
+    return error ? { ok: false, error: error.message } : { ok: true };
   }
 
   const hashRaw = parsed.hash?.startsWith("#") ? parsed.hash.slice(1) : parsed.hash || "";
-  if (!hashRaw) return false;
+  if (!hashRaw) return { ok: false, error: "" };
 
   const hashParams = new URLSearchParams(hashRaw);
   const access_token = hashParams.get("access_token");
   const refresh_token = hashParams.get("refresh_token");
-  if (!access_token || !refresh_token) return false;
+  if (!access_token || !refresh_token) return { ok: false, error: "" };
 
   const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-  return !error;
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
 /** Apply PKCE `code` or implicit `#access_token` from a Supabase auth redirect. */
 export async function completeAuthSessionFromUrl(url) {
-  return completeAuthSessionFromHref(url);
+  const res = await completeAuthSessionFromHref(url);
+  return res.ok;
 }
 
 /** Native deep link — route, complete Supabase session, notify App (recovery / join). */
 export async function handleAppDeepLink(url) {
   if (!url || typeof window === "undefined") return;
-  if (url === lastHandledDeepLink) return;
-  lastHandledDeepLink = url;
+
+  const now = Date.now();
+  if (url === lastDeepLink.url && now - lastDeepLink.at < 2500) return;
+  lastDeepLink = { url, at: now };
+  pendingDeepLinkUrl = url;
 
   const path = appDeepLinkToBrowserPath(url);
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -117,19 +129,30 @@ export async function handleAppDeepLink(url) {
     window.history.replaceState({}, "", path);
   }
 
-  let sessionSet = await completeAuthSessionFromHref(url);
+  let authError = "";
+  let sessionSet = (await completeAuthSessionFromHref(url)).ok;
   if (!sessionSet) {
-    sessionSet = await completeAuthSessionFromHref(window.location.href);
+    const retry = await completeAuthSessionFromHref(window.location.href);
+    sessionSet = retry.ok;
+    authError = retry.error || "";
   }
 
   const recovery =
     deepLinkIndicatesRecovery(url) ||
     deepLinkIndicatesRecovery(window.location.href);
 
+  pendingDeepLinkUrl = "";
+
   window.dispatchEvent(
     new CustomEvent(AUTH_DEEPLINK_EVENT, {
-      detail: { recovery, sessionSet, path },
+      detail: { recovery, sessionSet, path, authError },
     }),
   );
   window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+/** Register a deep link before React mounts (Capacitor shell). */
+export function queueNativeDeepLink(url) {
+  if (!url) return;
+  pendingDeepLinkUrl = url;
 }
