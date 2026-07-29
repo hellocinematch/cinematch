@@ -4016,6 +4016,12 @@ export default function App() {
             ev?.detail?.authError ||
               "Reset link expired or could not be verified. Request a new one from the app (Forgot password).",
           );
+          return;
+        }
+
+        const joinTok = readJoinInviteTokenFromPath(window.location.pathname);
+        if (joinTok || ev?.detail?.join) {
+          setScreen("circle-join");
         }
       })();
     };

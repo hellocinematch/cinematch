@@ -1,12 +1,21 @@
 /**
  * Auth redirect URLs + native deep-link session completion (Capacitor).
  * Web uses public site origin; native password reset uses custom scheme → appUrlOpen.
+ * Universal Links / App Links: https://…/join/:token on allowed hosts → appUrlOpen.
  */
 import { Capacitor } from "@capacitor/core";
+import { readJoinInviteTokenFromPath } from "./circles.js";
 import { supabase } from "./supabase";
 
 /** Must match CFBundleURLSchemes (iOS) and Android intent-filter; whitelist in Supabase redirect URLs. */
 export const NATIVE_APP_AUTH_SCHEME = "com.cinemastro.app";
+
+/** Hosts serving AASA + assetlinks (Associated Domains / App Links). */
+export const UNIVERSAL_LINK_HOSTS = new Set([
+  "www.cinemastro.com",
+  "cinemastro.com",
+  "cinematch-staging-nine-sigma.vercel.app",
+]);
 
 /** Dispatched after native deep link routing; App.jsx opens recovery / join when needed. */
 export const AUTH_DEEPLINK_EVENT = "cinematch-auth-deeplink";
@@ -64,6 +73,34 @@ export function appDeepLinkToBrowserPath(url) {
   return path || "/";
 }
 
+/** True when URL path is `/join/:token` (custom scheme or https universal link). */
+export function deepLinkIndicatesJoin(href) {
+  try {
+    const parsed =
+      String(href || "").startsWith(`${NATIVE_APP_AUTH_SCHEME}:`)
+        ? parseDeepLinkUrl(href)
+        : new URL(href);
+    return Boolean(readJoinInviteTokenFromPath(parsed.pathname));
+  } catch {
+    return false;
+  }
+}
+
+/** Custom scheme (auth) or https universal link on an allowed host (/join or recovery). */
+export function isHandledAppDeepLink(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return false;
+  if (raw.startsWith(`${NATIVE_APP_AUTH_SCHEME}:`)) return true;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:") return false;
+    if (!UNIVERSAL_LINK_HOSTS.has(parsed.hostname.toLowerCase())) return false;
+    return deepLinkIndicatesJoin(raw) || deepLinkIndicatesRecovery(raw);
+  } catch {
+    return false;
+  }
+}
+
 /** True when Supabase redirect or SPA path marks a password-recovery landing. */
 export function deepLinkIndicatesRecovery(href) {
   try {
@@ -117,6 +154,7 @@ export async function completeAuthSessionFromUrl(url) {
 /** Native deep link — route, complete Supabase session, notify App (recovery / join). */
 export async function handleAppDeepLink(url) {
   if (!url || typeof window === "undefined") return;
+  if (!isHandledAppDeepLink(url)) return;
 
   const now = Date.now();
   if (url === lastDeepLink.url && now - lastDeepLink.at < 2500) return;
@@ -140,12 +178,15 @@ export async function handleAppDeepLink(url) {
   const recovery =
     deepLinkIndicatesRecovery(url) ||
     deepLinkIndicatesRecovery(window.location.href);
+  const join =
+    deepLinkIndicatesJoin(url) ||
+    deepLinkIndicatesJoin(window.location.href);
 
   pendingDeepLinkUrl = "";
 
   window.dispatchEvent(
     new CustomEvent(AUTH_DEEPLINK_EVENT, {
-      detail: { recovery, sessionSet, path, authError },
+      detail: { recovery, join, sessionSet, path, authError },
     }),
   );
   window.dispatchEvent(new PopStateEvent("popstate"));

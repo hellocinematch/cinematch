@@ -1,12 +1,13 @@
 {
   "name": "cinematch",
   "private": true,
-  "version": "7.0.73",
+  "version": "7.0.74",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/generate-universal-link-files.mjs && vite build",
     "build:app": "VITE_CAPACITOR_BUILD=true vite build && cap sync",
+    "universal-links:generate": "node scripts/generate-universal-link-files.mjs",
     "cap:sync": "cap sync",
     "cap:ios": "cap open ios",
     "cap:android": "cap open android",

@@ -29,6 +29,26 @@
                 <data android:scheme="com.cinemastro.app" android:host="localhost" />
             </intent-filter>
 
+            <!-- Universal link: circle invite /join/:token -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="www.cinemastro.com" android:pathPrefix="/join/" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="cinemastro.com" android:pathPrefix="/join/" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="cinematch-staging-nine-sigma.vercel.app" android:pathPrefix="/join/" />
+            </intent-filter>
+
         </activity>
 
         <provider

@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.74
+
+- **Native (Capacitor) — Step 2: `/join/:token` universal links:** **iOS** Associated Domains (**`App.entitlements`**) for **`www.cinemastro.com`**, **`cinemastro.com`**, **`cinematch-staging-nine-sigma.vercel.app`**; **Android** App Links intent-filters with **`autoVerify`** for the same hosts. Web serves **`/.well-known/apple-app-site-association`** + **`assetlinks.json`** (generated at build via **`scripts/generate-universal-link-files.mjs`**). **`handleAppDeepLink`** accepts https join URLs on allowed hosts; **`App.jsx`** routes **`circle-join`** on warm/cold universal-link open. **Ops:** set Vercel env **`APPLE_TEAM_ID`** + **`ANDROID_SHA256_FINGERPRINT`** (release keystore; add debug fp for local verify); enable **Associated Domains** on App ID; rebuild native (**`npm run build:app`** → Xcode). **Prod AASA** ships when **`main`** is promoted.
+
 ## 7.0.73
 
 - **Native (Capacitor) — recovery link → reset screen (follow-up):** Warm-start / Safari handoff still landed on sign-in. **Cause:** PKCE **`code`** exchange needs the app’s stored verifier; verify-in-Safari + app-already-running could miss session apply. **Fix:** **implicit** auth flow on native only (hash tokens in redirect); retry **`exchangeCodeForSession` / `getSession`** after deep link; queue **`takePendingDeepLink`** for React mount; show notice when **`?recovery=1`** but session missing.
