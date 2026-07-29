@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.75
+
+- **Native (Capacitor) — app icons:** Replace default Capacitor launcher icons with the **PWA master** **`public/cinemastro-pwa-icon.svg`** (diagonal **cinemastro** on **`#0a0a0a`**). New **`npm run icons:app`** rasterizes to **`assets/icon-only.png`** and runs **`@capacitor/assets`** for **iOS** `AppIcon` + **Android** mipmaps. Re-run after SVG changes, then **`npm run build:app`**.
+
 ## 7.0.74
 
 - **Native (Capacitor) — Step 2: `/join/:token` universal links:** **iOS** Associated Domains (**`App.entitlements`**) for **`www.cinemastro.com`**, **`cinemastro.com`**, **`cinematch-staging-nine-sigma.vercel.app`**; **Android** App Links intent-filters with **`autoVerify`** for the same hosts. Web serves **`/.well-known/apple-app-site-association`** + **`assetlinks.json`** (generated at build via **`scripts/generate-universal-link-files.mjs`**). **`handleAppDeepLink`** accepts https join URLs on allowed hosts; **`App.jsx`** routes **`circle-join`** on warm/cold universal-link open. **Ops:** set Vercel env **`APPLE_TEAM_ID`** + **`ANDROID_SHA256_FINGERPRINT`** (release keystore; add debug fp for local verify); enable **Associated Domains** on App ID; rebuild native (**`npm run build:app`** → Xcode). **Prod AASA** ships when **`main`** is promoted.

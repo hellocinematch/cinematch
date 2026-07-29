@@ -1,7 +1,7 @@
 {
   "name": "cinematch",
   "private": true,
-  "version": "7.0.74",
+  "version": "7.0.75",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -22,7 +22,8 @@
     "titles:enrich-export": "node scripts/enrich-ratings-export-with-tmdb-titles.mjs",
     "titles:join-csv": "node scripts/join-csv-with-tmdb-titles.mjs",
     "titles:streaming-year": "node scripts/tmdb-streaming-releases-this-year.mjs",
-    "icons:pwa": "node scripts/generate-pwa-touch-icons.mjs"
+    "icons:pwa": "node scripts/generate-pwa-touch-icons.mjs",
+    "icons:app": "node scripts/generate-app-icons.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
@@ -39,6 +40,7 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@eslint/js": "^9.39.4",
     "@resvg/resvg-js": "^2.6.2",
     "@types/react": "^19.2.14",
