@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-06-26 — trust **`package.json`** / **`CHANGELOG.md`**. **Staging web + native (merged):** **7.0.73** @ **`e36f340`**. **Prod web:** **7.0.66** @ **`f63d203`** (unchanged — user has **not** asked to promote). **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-07-31 — trust **`package.json`** / **`CHANGELOG.md`**. **Staging web + native (merged):** **7.0.75** @ **`a28876b`**. **Prod web:** **7.0.66** @ **`f63d203`** (unchanged — user has **not** asked to promote). **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.68–7.0.73** ( **`staging`** + **`capacitor/v1`**) — Capacitor native: strip scroll, safe areas, **`vite` split base** (`/` web / `./` **`build:app`**), staging **`/join`** fix, auth redirect URLs + **native password-reset deep link** (**implicit** flow, **`src/authRedirect.js`**, validated Simulator **2026-06-26**). **7.0.66** — Mood **Feels** tab ( **prod** ). Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.74–7.0.75** (**`staging`**) — **Step 2** **`/join/:token`** universal links (AASA + Android App Links, **`handleAppDeepLink`**, Vercel **`APPLE_TEAM_ID`**); **native app icons** from **`cinemastro-pwa-icon.svg`** (**`npm run icons:app`**). **7.0.68–7.0.73** — Capacitor shell, safe areas, auth deep links. **TestFlight:** internal **1.0 (1)** **staging** build on device (**2026-07-30**). **7.0.66** — Mood **Feels** ( **prod** ). Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it.
 
@@ -10,17 +10,19 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **Staging (web + Capacitor merged):** **7.0.73** @ **`e36f340`**. **Prod web:** **7.0.66** @ **`f63d203`** — **do not push `main`** unless user explicitly asks. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`** + handoff rules. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **Staging (web + Capacitor merged):** **7.0.75** @ **`a28876b`**. **Prod web:** **7.0.66** @ **`f63d203`** — **do not push `main`** unless user explicitly asks. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`** + handoff rules. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
-> **Git / Vercel:** Routine web ships → **`origin/staging`** only. **Capacitor** scaffold merged into **`staging`**; **`capacitor/v1`** local may match **`staging`** — **`git push origin capacitor/v1`** if remote drift. **App Store / Play** = separate upload.
+> **Git / Vercel:** Routine web ships → **`origin/staging`** only. **`origin/capacitor/v1`** is **behind** **`staging`** (still **7.0.73**) — **`git push origin staging:capacitor/v1`** when native branch should match. **App Store / Play** = separate upload (not Vercel).
 >
-> **Hosted DB:** **staging ≠ prod** Supabase — match **`.env`** / Vercel env. **`VITE_PUBLIC_SITE_URL`** = **`https://cinematch-staging-nine-sigma.vercel.app`** (not dead **`cinematch-nine-sigma`**). Staging Supabase **Redirect URLs** + **Site URL** updated; add **`com.cinemastro.app://localhost/`** + **`…/?recovery=1`** for native reset.
+> **Hosted DB:** **staging ≠ prod** Supabase — match **`.env`** / Vercel env. **`VITE_PUBLIC_SITE_URL`** = **`https://cinematch-staging-nine-sigma.vercel.app`**. Native **`npm run build:app`** bakes **`.env`** at build time (TestFlight build = staging unless `.env` changed).
+>
+> **Vercel staging env:** **`APPLE_TEAM_ID`** set (Team **ADXNR3G5F8**, Cinemastro LLC). AASA live on staging. **Prod AASA** when **`main`** promoted.
 >
 > **`pg_net` / compute-neighbors:** **`COMPUTE-NEIGHBORS-CRON.md`** — scale **`jobs × limit`** as MAU grows.
 >
-> **Capacitor (§30 — in progress):** Native **7.0.73** validated: strips, safe areas, **`/join`** on staging Safari, **password reset** via **`com.cinemastro.app://`** deep link (Stop Xcode → Run → forgot password from **app** → paste verify link in **Simulator Safari**). **`npm run build:app`** → **`open -a Xcode ios/App/App.xcodeproj`**. **Next:** **Step 2** — **`/join/:token`** universal links (iOS AASA + Android App Links) → icons → TestFlight / Play → optional native push → **prod** when user asks.
+> **Capacitor (§30 — TestFlight internal):** **Done:** Step **1B** auth deep links; **Step 2** universal **`/join`** (device validated); **icons** (**7.0.75**, **`npm run icons:app`**); **Apple Developer org** Cinemastro LLC (**`dev@cinemastro.com`**); **TestFlight internal** **1.0 (1)** opens on phone (**staging** backend). **Archive:** **Product → Archive** ( **Any iOS Device** ) → **Distribute → Upload**; encryption compliance **None of the algorithms mentioned above**. **Next:** **icon badge / push** (user parked after TestFlight — reuse **`get_my_circle_unseen_counts`**; Phase 1 badge while app open vs Phase 2 APNs); **external TestFlight** / **Play internal**; optional **`ITSAppUsesNonExemptEncryption`** **`false`** in **`Info.plist`**; **prod** when user asks.
 >
-> **Master list (product):** **1a–1e** CF diversity; **§1f** circle strips; **§1g.1** Discover transliteration; **P2** US geo. **Discussed not built:** platform **latest / highly rated** strips; Mood **similar-from-seed-titles**; **PWA / native push** for circles.
+> **Master list (product):** **1a–1e** CF diversity; **§1f** circle strips; **§1g.1** Discover transliteration; **P2** US geo.
 
 ---
 
@@ -28,10 +30,11 @@
 
 | Item | State |
 |------|-------|
-| **Web app (staging)** | **7.0.73** **`e36f340`** — Capacitor merged; **`vite` `base: '/'`** on Vercel; **`/join/:token`** works on **`cinematch-staging-nine-sigma.vercel.app`**. |
+| **Web app (staging)** | **7.0.75** **`a28876b`** — universal links AASA; **`/join/:token`** on staging web + native. |
 | **Web app (prod)** | **7.0.66** **`f63d203`** — Mood **Feels** tab; **`main`** → **www.cinemastro.com**. User has **not** promoted Capacitor to prod. |
-| **Native app** | Same tip as **`staging`** (**7.0.73**): **Capacitor 8**, **`com.cinemastro.app`**, **`ios/`** + **`android/`**. Simulator smoke-tested (strips, safe areas, join web, **native password reset deep link**). **`build:app`** uses **`VITE_CAPACITOR_BUILD=true`** → **`base: './'`**. |
-| **Supabase staging auth** | **Site URL** + redirect URLs → **`cinematch-staging-nine-sigma.vercel.app`**; native **`com.cinemastro.app://localhost/`** (+ **`?recovery=1`**). User fixed email send config during session. |
+| **Native app** | **`staging`** **7.0.75**: **Capacitor 8**, **`com.cinemastro.app`**, Cinemastro icons, Associated Domains. **TestFlight internal 1.0 (1)** uploaded (**staging** `.env` at archive). Signing team **Cinemastro LLC**. |
+| **Apple / TestFlight** | Org account **`dev@cinemastro.com`**; App Store Connect app **Cinemastro**; internal testers (user + **`dev@`**). **Xcode Cloud** hooked to GitHub — optional; manual **Archive → Upload** is what shipped **1.0 (1)**. |
+| **Supabase staging auth** | **Site URL** + redirect URLs → **`cinematch-staging-nine-sigma.vercel.app`**; native **`com.cinemastro.app://localhost/`** (+ **`?recovery=1`**). |
 | **Supabase** | **Staging and prod are separate projects** — bake **`VITE_SUPABASE_*`** at build time (web Vercel + **`npm run build:app`**). |
 | **Supabase — apply if missing** | Per-env migrations — **`20260616120000`** … **`20260614120000`** + invite/leave (see checklist below). |
 | **Analytics instrumentation** | Client **`log_analytics_*`** — **not wired** in **`App.jsx`** yet. |
@@ -46,36 +49,36 @@
 
 *Bundled shell, **same Supabase backend**. User workflow: **validate on staging → one prod push when user asks**; App Store / Play separate.*
 
-**Shipped on `staging` / `capacitor/v1` (through **7.0.73**, `e36f340`):**
+**Shipped on `staging` (through **7.0.75**, `a28876b`; `capacitor/v1` remote still **7.0.73** — sync when needed):**
 
-- **Capacitor 8** — **`capacitor.config.json`**: **`webDir: dist`**, **`ios.contentInset: never`**, **`androidScheme: https`**.
-- **`vite` base:** **`/`** for **`npm run build`** (Vercel); **`./`** only for **`npm run build:app`** (**`VITE_CAPACITOR_BUILD=true`**).
-- **Native UX:** **7.0.68** horizontal strip scroll; **7.0.69** full-bleed safe areas (no white letterbox).
-- **Auth (Step 1B — done):** **`src/authRedirect.js`** — **`passwordRecoveryRedirectTo()`** → **`com.cinemastro.app://localhost/?recovery=1`** on native; **`appUrlOpen`** + **`getLaunchUrl()`**; **implicit** auth flow on native (**`supabase.js`**); **7.0.73** recovery → reset screen validated (Simulator Safari → Open in app; **Stop** Xcode between tests).
-- **Join links (web):** **7.0.70** fixed blank **`/join`** on staging; share URL uses **`VITE_PUBLIC_SITE_URL`** → **`https://cinematch-staging-nine-sigma.vercel.app`**.
-- **`src/capacitorShell.js`**, **`ios/`** + **`android/`**, URL scheme **`com.cinemastro.app`**.
+- **Capacitor 8** — **`capacitor.config.json`**, **`src/capacitorShell.js`**, **`com.cinemastro.app`**.
+- **Auth (Step 1B):** **`src/authRedirect.js`** — custom scheme + implicit recovery; **`appUrlOpen`** / **`getLaunchUrl()`**.
+- **Universal links (Step 2 — 7.0.74):** **`UNIVERSAL_LINK_HOSTS`**, **`scripts/generate-universal-link-files.mjs`**, **`public/.well-known/`**, **`App.entitlements`**, Android App Links; Vercel **`APPLE_TEAM_ID`**. Device validated: staging **`/join/…`** opens app.
+- **Icons (7.0.75):** **`npm run icons:app`** → **`@capacitor/assets`** from **`public/cinemastro-pwa-icon.svg`**.
+- **TestFlight:** **1.0 (1)** archived & uploaded **2026-07-30**; internal testing; **staging** backend.
 
-**Local dev:**
+**Local dev / re-archive:**
 
 ```bash
 cd "<repo>"
-git checkout staging   # or capacitor/v1 (same tip after pull)
+git checkout staging
 # .env: staging VITE_SUPABASE_* + VITE_PUBLIC_SITE_URL=https://cinematch-staging-nine-sigma.vercel.app
 npm run build:app
 open -a Xcode ios/App/App.xcodeproj
+# Archive: Any iOS Device (arm64) → Product → Archive → Distribute → Upload
+# Bump Build number each upload (1 → 2 → …)
 ```
 
 **Next engineering (ordered):**
 
-- [ ] **Universal links (Step 2)** — **`/join/:token`** on **cinemastro.com** + staging domain if needed (`apple-app-site-association`, Android App Links); wire **`handleAppDeepLink`** for join path (auth plumbing exists).
-- [ ] **Vercel staging** — set **`VITE_PUBLIC_SITE_URL`** env if not already (user local **`.env`** done).
-- [ ] **`git push origin capacitor/v1`** if remote behind **`staging`**.
-- [ ] **App icons** — replace Capacitor defaults.
-- [ ] **TestFlight** + **Play internal**.
-- [ ] **Merge `staging` → `main` / prod** — **only when user explicitly asks** (after staging pass).
-- [ ] **Native push** (optional v1.1).
+- [ ] **Icon badge / notifications** — user wants home-screen badge when circle members share ratings; **parked** post-TestFlight. Reuse **`get_my_circle_unseen_counts`**; Phase 1 **`@capacitor/badge`** while app alive vs Phase 2 **APNs** when killed. Discussed **2026-07-30**.
+- [ ] **`git push origin staging:capacitor/v1`** — remote behind **7.0.75**.
+- [ ] **External TestFlight** / **Play internal** (Android keystore fingerprint → **`ANDROID_SHA256_FINGERPRINT`** on Vercel when App Links matter on Play).
+- [ ] **Optional:** **`ITSAppUsesNonExemptEncryption`** **`false`** in **`Info.plist`** (skip export-compliance popup on upload).
+- [ ] **Merge `staging` → `main` / prod** — **only when user explicitly asks** (prod AASA + prod `.env` **`build:app`**).
+- [ ] **Native push** (full) — pairs with badge Phase 2.
 
-**Parked / discussed:** Web Push-only PWA path; **similar titles from user-named movies**; **platform latest / highly rated** strips.
+**Parked / discussed:** Web Push-only PWA path; simplified app icon mark (Option B) later.
 
 ---
 
@@ -229,7 +232,7 @@ open -a Xcode ios/App/App.xcodeproj
 - **§28** Supabase hot paths.
 - **§29** Fonts subset / **`font-display`**.
 - **§30** PWA — **7.0.58** Circles-tab install education modal; service worker backlog.
-- [~] **Native shell (Capacitor):** **In progress** on **`staging`** / **`capacitor/v1`** (**7.0.73** **`e36f340`**). Step **1B auth redirects + native recovery** validated. **Not on prod `main`.** Next: **Step 2** **`/join`** universal links, icons, TestFlight / Play. Full checklist — **§ Capacitor native app** above.
+- [~] **Native shell (Capacitor):** **TestFlight internal** on **`staging`** (**7.0.75** **`a28876b`**). Steps **1B**, **2**, **icons**, **internal TF** done (**staging** build). **Not on prod `main`.** Next: **icon badge**, external TF / Play, prod when user asks. **§ Capacitor native app** above.
 
 **Your Picks (page)**
 
@@ -332,13 +335,13 @@ open -a Xcode ios/App/App.xcodeproj
 
 ## Open / follow-ups
 
-**Last session (2026-06-26)**
+**Last session (2026-07-31)**
 
-- **Last note:** User asked **passdown for next chat**. **Capacitor session shipped 7.0.68–7.0.73 to `origin/staging` only** — prod **`main`** still **7.0.66**. **Validated on Simulator:** strip scroll, safe areas, staging **`/join`** (Safari), **native password reset** (forgot password from app → paste Supabase verify link in Simulator Safari → Open in Cinemastro → set new password; **7.0.73**, implicit flow). **Ops fixes:** **`VITE_PUBLIC_SITE_URL`** → **`cinematch-staging-nine-sigma.vercel.app`** (old **`cinematch-nine-sigma`** dead); staging Supabase **Site URL** + redirect URLs updated; **`com.cinemastro.app://localhost/`** for native reset. **Web:** **7.0.70** split **`vite` base** fixed blank **`/join`** on staging.
+- **Last note:** User asked **passdown** (chat full). **Shipped 7.0.74–7.0.75 to `origin/staging`**; **TestFlight internal 1.0 (1)** opens on device (**staging** Supabase from **`.env`** at **`npm run build:app`**). **Apple:** Cinemastro LLC org (**`dev@cinemastro.com`**), Team ID in Vercel **`APPLE_TEAM_ID`**, **`com.cinemastro.app`** + Associated Domains. **Validated:** universal **`/join`** on phone; Cinemastro icons; **`gh auth login`** on Mac for git push. **User parked:** **home-screen icon badge** when circle members share ratings — return after TestFlight stable (**Phase 1** badge vs **Phase 2** push — see **§ Capacitor**).
 
-- **Capacitor — next:** **Step 2** universal links **`/join/:token`** → icons → TestFlight / Play → **prod promote only when user asks**.
+- **Capacitor — next:** **Icon badge / notifications** (when user says **code now**); optional **external TestFlight** / **Play**; **`git push origin staging:capacitor/v1`**; **prod** only when user asks.
 
-- **Optional:** **`git push origin capacitor/v1`** if remote behind **`staging`**; Vercel **`VITE_PUBLIC_SITE_URL`** on staging project.
+- **Ops:** **`origin/capacitor/v1`** still **7.0.73** — sync when convenient. Xcode upload: skip **ionic-team** GitHub grant; **Continue** is fine.
 
 - **Product (unchanged):** **§1g.1** transliteration; **§1f** circle strips; **1a–1e** CF diversity; **P2** US geo.
 
