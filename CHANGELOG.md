@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.79
+
+- **Native (iOS) — fix APNs token registration:** `AppDelegate` was missing Capacitor’s required `didRegisterForRemoteNotificationsWithDeviceToken` / `didFailToRegister…` forwards, so `@capacitor/push-notifications` never received a device token and **`device_push_tokens`** stayed empty (Phase 2 badge-when-killed could not work). Also set **`PushNotifications.presentationOptions: ["badge"]`**. Re-archive TestFlight (**Build 4**); open app once logged in and confirm a row in **`device_push_tokens`**.
+
 ## 7.0.78
 
 - **Native (iOS) — Phase 2 badge-only push:** When a member publishes (or unpublishes) to a circle, Edge **`push-circle-badge`** sends an APNs payload with **`aps.badge`** only (no banner/sound) so other members’ home-screen badge updates while the app is killed. Client: **`@capacitor/push-notifications`**, **`src/nativePush.js`** (register token on login, clear on sign-out, invoke Edge after publish). DB: migration **`20260731120000_device_push_tokens_circle_badge.sql`** (`device_push_tokens`, **`register_device_push_token`**, **`get_user_circle_unseen_total`**). Entitlement **`aps-environment`** = **production** (TestFlight / App Store). **Ops (staging Supabase):** apply migration; deploy **`push-circle-badge`**; set secrets **`APNS_TEAM_ID`**, **`APNS_KEY_ID`**, **`APNS_PRIVATE_KEY`** (`.p8` PEM, `\n` ok), **`APNS_BUNDLE_ID=com.cinemastro.app`**; omit **`APNS_USE_SANDBOX`** for TestFlight (production APNs). Apple Developer: enable **Push Notifications** on App ID + create APNs key. Re-archive with bumped Build.
