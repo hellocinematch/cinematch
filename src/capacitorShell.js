@@ -37,6 +37,17 @@ export async function initCapacitorShell() {
     if (url) scheduleDeepLink(url);
   });
 
+  // Resume from background: Circles unseen refresh (and icon badge) listens via visibility/focus;
+  // also fire pageshow-equivalent so badge syncs when WebView visibility is flaky.
+  App.addListener("appStateChange", ({ isActive }) => {
+    if (!isActive) return;
+    try {
+      window.dispatchEvent(new Event("focus"));
+    } catch {
+      /* ignore */
+    }
+  });
+
   try {
     const launch = await App.getLaunchUrl();
     if (launch?.url) scheduleDeepLink(launch.url);

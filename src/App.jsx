@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, laz
 import packageJson from "../package.json";
 import { supabase } from "./supabase";
 import { passwordRecoveryRedirectTo, AUTH_DEEPLINK_EVENT, takePendingDeepLink, handleAppDeepLink } from "./authRedirect.js";
+import { syncAppIconBadgeCount, clearAppIconBadge, sumCircleUnseenOthers } from "./nativeBadge.js";
 import {
   CIRCLE_CAP,
   CIRCLE_MEMBER_CAP,
@@ -5923,6 +5924,7 @@ export default function App() {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
+    void clearAppIconBadge();
     clearCircleDetailSessionCaches();
     clearCircleTmdbHydrateSessionCache();
     setCircleTmdbHydrateTick(0);
@@ -7487,6 +7489,7 @@ export default function App() {
   const refreshCircleUnseenBadges = useCallback(async () => {
     if (!user) {
       setCircleUnseenById({});
+      void clearAppIconBadge();
       return;
     }
     try {
@@ -7496,6 +7499,7 @@ export default function App() {
         next[r.circleId] = { unseenOthers: r.unseenOthers, latest: r.latestShareAt };
       }
       setCircleUnseenById(next);
+      void syncAppIconBadgeCount(sumCircleUnseenOthers(rows));
     } catch (e) {
       console.warn("Circles: fetchMyCircleUnseenActivity failed", e);
     }

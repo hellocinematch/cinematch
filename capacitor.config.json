@@ -11,6 +11,10 @@
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 0
+    },
+    "Badge": {
+      "persist": true,
+      "autoClear": false
     }
   }
 }

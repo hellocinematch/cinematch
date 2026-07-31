@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.76
+
+- **Native (Capacitor) — home-screen icon badge (Phase 1):** App icon badge = **sum** of Circles **unseen** counts (`get_my_circle_unseen_counts` / `fetchMyCircleUnseenActivity`), same meaning as list 🔔 totals. Uses **`@capawesome/capacitor-badge`**; syncs whenever circle unseen badges refresh (login, focus/visibility, Circles list, open circle / `mark_circle_last_seen`); clears on sign-out. iOS may prompt once for notification permission (badge display). Updates while the app is alive / on resume — **not** when fully killed (needs Phase 2 APNs). **`PrivacyInfo.xcprivacy`** UserDefaults reason for the plugin. Re-archive TestFlight after **`npm run build:app`**.
+
 ## 7.0.75
 
 - **Native (Capacitor) — app icons:** Replace default Capacitor launcher icons with the **PWA master** **`public/cinemastro-pwa-icon.svg`** (diagonal **cinemastro** on **`#0a0a0a`**). New **`npm run icons:app`** rasterizes to **`assets/icon-only.png`** and runs **`@capacitor/assets`** for **iOS** `AppIcon` + **Android** mipmaps. Re-run after SVG changes, then **`npm run build:app`**.
