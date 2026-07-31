@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.78
+
+- **Native (iOS) — Phase 2 badge-only push:** When a member publishes (or unpublishes) to a circle, Edge **`push-circle-badge`** sends an APNs payload with **`aps.badge`** only (no banner/sound) so other members’ home-screen badge updates while the app is killed. Client: **`@capacitor/push-notifications`**, **`src/nativePush.js`** (register token on login, clear on sign-out, invoke Edge after publish). DB: migration **`20260731120000_device_push_tokens_circle_badge.sql`** (`device_push_tokens`, **`register_device_push_token`**, **`get_user_circle_unseen_total`**). Entitlement **`aps-environment`** = **production** (TestFlight / App Store). **Ops (staging Supabase):** apply migration; deploy **`push-circle-badge`**; set secrets **`APNS_TEAM_ID`**, **`APNS_KEY_ID`**, **`APNS_PRIVATE_KEY`** (`.p8` PEM, `\n` ok), **`APNS_BUNDLE_ID=com.cinemastro.app`**; omit **`APNS_USE_SANDBOX`** for TestFlight (production APNs). Apple Developer: enable **Push Notifications** on App ID + create APNs key. Re-archive with bumped Build.
+
+## 7.0.77
+
+- **Native (iOS) — export compliance:** Set **`ITSAppUsesNonExemptEncryption`** to **`false`** in **`Info.plist`** so App Store Connect / TestFlight skips the per-upload encryption questionnaire (standard HTTPS-only app). Next archive still needs a bumped **Build** number.
+
 ## 7.0.76
 
 - **Native (Capacitor) — home-screen icon badge (Phase 1):** App icon badge = **sum** of Circles **unseen** counts (`get_my_circle_unseen_counts` / `fetchMyCircleUnseenActivity`), same meaning as list 🔔 totals. Uses **`@capawesome/capacitor-badge`**; syncs whenever circle unseen badges refresh (login, focus/visibility, Circles list, open circle / `mark_circle_last_seen`); clears on sign-out. iOS may prompt once for notification permission (badge display). Updates while the app is alive / on resume — **not** when fully killed (needs Phase 2 APNs). **`PrivacyInfo.xcprivacy`** UserDefaults reason for the plugin. Re-archive TestFlight after **`npm run build:app`**.

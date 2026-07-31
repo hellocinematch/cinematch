@@ -3,6 +3,7 @@ import packageJson from "../package.json";
 import { supabase } from "./supabase";
 import { passwordRecoveryRedirectTo, AUTH_DEEPLINK_EVENT, takePendingDeepLink, handleAppDeepLink } from "./authRedirect.js";
 import { syncAppIconBadgeCount, clearAppIconBadge, sumCircleUnseenOthers } from "./nativeBadge.js";
+import { registerNativePush, unregisterNativePush, notifyCircleBadgePush } from "./nativePush.js";
 import {
   CIRCLE_CAP,
   CIRCLE_MEMBER_CAP,
@@ -5923,6 +5924,7 @@ export default function App() {
   }
 
   async function handleSignOut() {
+    await unregisterNativePush();
     await supabase.auth.signOut();
     void clearAppIconBadge();
     clearCircleDetailSessionCaches();
@@ -7072,6 +7074,7 @@ export default function App() {
       } else {
         await syncRatingCircleShares(ctx.movieId, selectedIds);
       }
+      notifyCircleBadgePush(selectedIds);
       const nav = ctx.pendingNavigate;
       setPublishRatingModal(null);
       setPublishModalBusy(false);
@@ -7535,6 +7538,7 @@ export default function App() {
       return;
     }
     void refreshCircleUnseenBadges();
+    void registerNativePush();
   }, [user, refreshCircleUnseenBadges]);
 
   useEffect(() => {
@@ -9264,6 +9268,7 @@ export default function App() {
       const ids = await fetchRatingCircleShareIds(movieId);
       const next = ids.filter((id) => id !== selectedCircleId);
       await syncRatingCircleShares(movieId, next);
+      notifyCircleBadgePush([selectedCircleId]);
       setCircleRecentStripMenuRowKey(null);
       setCircleRatedRefreshKey((k) => k + 1);
     } catch (e) {
