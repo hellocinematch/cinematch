@@ -3,7 +3,12 @@ import packageJson from "../package.json";
 import { supabase } from "./supabase";
 import { passwordRecoveryRedirectTo, AUTH_DEEPLINK_EVENT, takePendingDeepLink, handleAppDeepLink } from "./authRedirect.js";
 import { syncAppIconBadgeCount, clearAppIconBadge, sumCircleUnseenOthers } from "./nativeBadge.js";
-import { registerNativePush, unregisterNativePush, notifyCircleBadgePush } from "./nativePush.js";
+import {
+  registerNativePush,
+  unregisterNativePush,
+  notifyCircleBadgePush,
+  CIRCLE_PUSH_OPEN_EVENT,
+} from "./nativePush.js";
 import {
   CIRCLE_CAP,
   CIRCLE_MEMBER_CAP,
@@ -7074,7 +7079,7 @@ export default function App() {
       } else {
         await syncRatingCircleShares(ctx.movieId, selectedIds);
       }
-      notifyCircleBadgePush(selectedIds);
+      notifyCircleBadgePush(selectedIds, { alert: true });
       const nav = ctx.pendingNavigate;
       setPublishRatingModal(null);
       setPublishModalBusy(false);
@@ -7540,6 +7545,19 @@ export default function App() {
     void refreshCircleUnseenBadges();
     void registerNativePush();
   }, [user, refreshCircleUnseenBadges]);
+
+  // Tap on circle activity push → open that circle (native).
+  useEffect(() => {
+    if (!user) return;
+    const onPushOpen = (ev) => {
+      const id = ev?.detail?.circleId;
+      if (typeof id === "string" && id.trim()) openCircleDetail(id.trim());
+    };
+    window.addEventListener(CIRCLE_PUSH_OPEN_EVENT, onPushOpen);
+    return () => window.removeEventListener(CIRCLE_PUSH_OPEN_EVENT, onPushOpen);
+    // openCircleDetail is a stable-enough screen nav; rebind when user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -9268,7 +9286,7 @@ export default function App() {
       const ids = await fetchRatingCircleShareIds(movieId);
       const next = ids.filter((id) => id !== selectedCircleId);
       await syncRatingCircleShares(movieId, next);
-      notifyCircleBadgePush([selectedCircleId]);
+      notifyCircleBadgePush([selectedCircleId], { alert: false });
       setCircleRecentStripMenuRowKey(null);
       setCircleRatedRefreshKey((k) => k + 1);
     } catch (e) {

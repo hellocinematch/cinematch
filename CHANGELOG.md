@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.80
+
+- **Native (iOS) — circle push banners:** Circle publish now sends an APNs **alert** (title = circle name, body = “Someone shared a rating.”) plus **badge** and **sound**. Unpublish still updates the badge only (no banner). Tap opens that circle. Edge **`push-circle-badge` `1.1.0`** — **redeploy on staging and prod**. Client **`presentationOptions`**: badge, banner, list, sound. Rebuild TestFlight after deploy.
+
 ## 7.0.79
 
 - **Native (iOS) — fix APNs token registration:** `AppDelegate` was missing Capacitor’s required `didRegisterForRemoteNotificationsWithDeviceToken` / `didFailToRegister…` forwards, so `@capacitor/push-notifications` never received a device token and **`device_push_tokens`** stayed empty (Phase 2 badge-when-killed could not work). Also set **`PushNotifications.presentationOptions: ["badge"]`**. Re-archive TestFlight (**Build 4**); open app once logged in and confirm a row in **`device_push_tokens`**.

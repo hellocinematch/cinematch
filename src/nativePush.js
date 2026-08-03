@@ -1,10 +1,11 @@
 /**
- * Native push registration (Phase 2 badge-only). iOS first; no-op on web.
- * Registers APNs device token → register_device_push_token; after circle publish,
- * invokes push-circle-badge so recipients’ home-screen badges update when killed.
+ * Native push (iOS). Registers APNs token; after circle publish invokes
+ * push-circle-badge (banner + badge). Unpublish syncs badge only (no alert).
  */
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "./supabase";
+
+export const CIRCLE_PUSH_OPEN_EVENT = "cinematch-circle-push-open";
 
 let listenersReady = false;
 let lastToken = null;
@@ -12,6 +13,22 @@ let registerInFlight = null;
 
 function isNativeIos() {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+}
+
+function emitCirclePushOpen(circleId) {
+  const id = typeof circleId === "string" ? circleId.trim() : "";
+  if (!id) return;
+  try {
+    window.dispatchEvent(new CustomEvent(CIRCLE_PUSH_OPEN_EVENT, { detail: { circleId: id } }));
+  } catch {
+    /* ignore */
+  }
+}
+
+function circleIdFromNotificationData(data) {
+  if (!data || typeof data !== "object") return "";
+  const raw = data.circle_id ?? data.circleId;
+  return typeof raw === "string" ? raw.trim() : "";
 }
 
 async function persistToken(token) {
@@ -44,6 +61,10 @@ export async function registerNativePush() {
         });
         await PushNotifications.addListener("registrationError", (err) => {
           console.warn("Native push: registrationError", err);
+        });
+        await PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+          const id = circleIdFromNotificationData(action?.notification?.data);
+          if (id) emitCirclePushOpen(id);
         });
         listenersReady = true;
       }
@@ -89,15 +110,17 @@ export async function unregisterNativePush() {
 }
 
 /**
- * Fire-and-forget: ask Edge to APNs-badge other members of these circles.
+ * Fire-and-forget: APNs to other members of these circles.
  * @param {string[]} circleIds
+ * @param {{ alert?: boolean }} [opts] `alert: false` = badge number only (e.g. unpublish).
  */
-export function notifyCircleBadgePush(circleIds) {
+export function notifyCircleBadgePush(circleIds, opts = {}) {
   if (!Array.isArray(circleIds) || circleIds.length === 0) return;
   const ids = [...new Set(circleIds.map((x) => String(x || "").trim()).filter(Boolean))];
   if (ids.length === 0) return;
+  const alert = opts.alert !== false;
   void supabase.functions
-    .invoke("push-circle-badge", { body: { circle_ids: ids } })
+    .invoke("push-circle-badge", { body: { circle_ids: ids, alert } })
     .then(({ error }) => {
       if (error) console.warn("Native push: push-circle-badge failed", error.message);
     })

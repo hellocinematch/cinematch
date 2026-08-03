@@ -8,7 +8,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 const EDGE_FUNCTION_SLUG = "push-circle-badge";
-const EDGE_FUNCTION_VERSION = "1.0.0";
+const EDGE_FUNCTION_VERSION = "1.1.0";
 
 function jsonResponse(body: unknown, status = 200): Response {
   const payload =
@@ -65,13 +65,30 @@ async function getApnsJwt(cfg: ApnsConfig): Promise<string> {
   return token;
 }
 
-async function sendApnsBadge(
+type PushPayload = {
+  badge: number;
+  withAlert: boolean;
+  title?: string;
+  body?: string;
+  circleId?: string | null;
+};
+
+async function sendApnsPush(
   cfg: ApnsConfig,
   deviceToken: string,
-  badge: number,
+  payload: PushPayload,
 ): Promise<{ ok: boolean; status: number; body: string }> {
   const jwt = await getApnsJwt(cfg);
   const url = `https://${cfg.host}/3/device/${deviceToken}`;
+  const badge = Math.max(0, Math.floor(payload.badge));
+  const aps: Record<string, unknown> = { badge };
+  if (payload.withAlert) {
+    aps.alert = {
+      title: (payload.title || "Cinemastro").slice(0, 80),
+      body: (payload.body || "Someone shared a rating in your circle.").slice(0, 160),
+    };
+    aps.sound = "default";
+  }
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -81,7 +98,11 @@ async function sendApnsBadge(
       "apns-priority": "10",
       "content-type": "application/json",
     },
-    body: JSON.stringify({ aps: { badge: Math.max(0, Math.floor(badge)) } }),
+    body: JSON.stringify({
+      aps,
+      type: "circle_activity",
+      circle_id: payload.circleId || null,
+    }),
   });
   const body = await res.text();
   return { ok: res.ok, status: res.status, body };
@@ -136,11 +157,13 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Too many circles." }, 400);
     }
 
+    // Publish → banner; unpublish / badge sync → badge number only.
+    const withAlert = body.alert !== false;
+
     const admin = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Caller must be a member of every listed circle.
     const { data: memberships, error: memErr } = await admin
       .from("circle_members")
       .select("circle_id")
@@ -174,6 +197,33 @@ Deno.serve(async (req: Request) => {
     )];
     if (recipientIds.length === 0) {
       return jsonResponse({ ok: true, recipients: 0, pushed: 0 });
+    }
+
+    const circlesByUser = new Map<string, string[]>();
+    for (const row of otherMembers || []) {
+      const uid = String(row.user_id || "");
+      const cid = String(row.circle_id || "");
+      if (!uid || !cid) continue;
+      const list = circlesByUser.get(uid) || [];
+      if (!list.includes(cid)) list.push(cid);
+      circlesByUser.set(uid, list);
+    }
+
+    const nameByCircle = new Map<string, string>();
+    if (withAlert) {
+      const { data: circleRows, error: nameErr } = await admin
+        .from("circles")
+        .select("id, name")
+        .in("id", circleIds);
+      if (nameErr) {
+        console.warn("push-circle-badge: circle names", nameErr.message);
+      } else {
+        for (const row of circleRows || []) {
+          const id = String(row.id || "");
+          const name = typeof row.name === "string" ? row.name.trim() : "";
+          if (id && name) nameByCircle.set(id, name);
+        }
+      }
     }
 
     const { data: tokens, error: tokErr } = await admin
@@ -226,15 +276,35 @@ Deno.serve(async (req: Request) => {
       }
       const badge = Math.max(0, Math.floor(Number(totalRaw) || 0));
 
+      const userCircleIds = circlesByUser.get(uid) || [];
+      const primaryCircleId = userCircleIds[0] || null;
+      let title = "Cinemastro";
+      let alertBody = "Someone shared a rating in your circle.";
+      if (withAlert) {
+        if (userCircleIds.length === 1) {
+          const n = nameByCircle.get(userCircleIds[0]);
+          if (n) title = n;
+          alertBody = "Someone shared a rating.";
+        } else if (userCircleIds.length > 1) {
+          title = "Cinemastro";
+          alertBody = "Someone shared a rating in your circles.";
+        }
+      }
+
       for (const deviceToken of deviceTokens) {
         try {
-          const result = await sendApnsBadge(apns, deviceToken, badge);
+          const result = await sendApnsPush(apns, deviceToken, {
+            badge,
+            withAlert,
+            title,
+            body: alertBody,
+            circleId: primaryCircleId,
+          });
           if (result.ok) {
             pushed += 1;
           } else {
             failed += 1;
             console.warn("push-circle-badge: APNs fail", result.status, result.body);
-            // Gone / BadDeviceToken → drop token
             if (result.status === 410 || /BadDeviceToken|Unregistered/i.test(result.body)) {
               staleTokens.push(deviceToken);
             }
@@ -262,6 +332,8 @@ Deno.serve(async (req: Request) => {
       pushed,
       failed,
       stale_removed: staleTokens.length,
+      alert: withAlert,
+      edge_note: EDGE_FUNCTION_VERSION,
     });
   } catch (e) {
     console.error("push-circle-badge: unhandled", e);
