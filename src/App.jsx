@@ -1,7 +1,14 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from "react";
 import packageJson from "../package.json";
 import { supabase } from "./supabase";
-import { passwordRecoveryRedirectTo, AUTH_DEEPLINK_EVENT, takePendingDeepLink, handleAppDeepLink } from "./authRedirect.js";
+import {
+  passwordRecoveryRedirectTo,
+  emailConfirmRedirectTo,
+  isNativeApp,
+  AUTH_DEEPLINK_EVENT,
+  takePendingDeepLink,
+  handleAppDeepLink,
+} from "./authRedirect.js";
 import { syncAppIconBadgeCount, clearAppIconBadge, sumCircleUnseenOthers } from "./nativeBadge.js";
 import {
   registerNativePush,
@@ -4029,6 +4036,11 @@ export default function App() {
         const joinTok = readJoinInviteTokenFromPath(window.location.pathname);
         if (joinTok || ev?.detail?.join) {
           setScreen("circle-join");
+          return;
+        }
+        // Email confirm (or other non-recovery auth deep link) — session established; leave auth/splash.
+        if (session?.user) {
+          setScreen((prev) => (prev === "splash" || prev === "auth" ? "loading-catalogue" : prev));
         }
       })();
     };
@@ -5819,7 +5831,10 @@ export default function App() {
       ({ data, error } = await supabase.auth.signUp({
         email: authEmail,
         password: authPassword,
-        options: { data: { name: trimmedName } },
+        options: {
+          data: { name: trimmedName },
+          emailRedirectTo: emailConfirmRedirectTo(),
+        },
       }));
     } catch (e) {
       setAuthError(e?.message || "Sign up failed. Check your connection and try again.");
@@ -5838,9 +5853,13 @@ export default function App() {
         console.warn("profiles name after signup:", profileErr.message);
       }
     }
-    // Email confirmation: no session yet — stay on auth and ask user to confirm, then sign in.
+    // Email confirmation: no session yet — stay on auth; native confirm link opens the app via custom scheme.
     if (!data.session) {
-      setAuthNotice("Check your email to confirm your account, then sign in. Onboarding starts after your first login.");
+      setAuthNotice(
+        isNativeApp()
+          ? "Check your email and tap the confirmation link — it opens this app so you can continue. Onboarding starts after your first login."
+          : "Check your email to confirm your account, then sign in. Onboarding starts after your first login.",
+      );
       return;
     }
     setUser(data.user);

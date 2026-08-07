@@ -1,6 +1,6 @@
 /**
  * Auth redirect URLs + native deep-link session completion (Capacitor).
- * Web uses public site origin; native password reset uses custom scheme → appUrlOpen.
+ * Web uses public site origin; native email confirm + password reset use custom scheme → appUrlOpen.
  * Universal Links / App Links: https://…/join/:token on allowed hosts → appUrlOpen.
  */
 import { Capacitor } from "@capacitor/core";
@@ -45,6 +45,18 @@ export function getPublicSiteOrigin() {
     }
   }
   return String(base).trim().replace(/\/+$/, "");
+}
+
+/**
+ * Supabase `emailRedirectTo` after signup confirm.
+ * Native → custom scheme (opens app); web → public site origin.
+ * Whitelist `com.cinemastro.app://localhost/` in Supabase Auth redirect URLs (both projects).
+ */
+export function emailConfirmRedirectTo() {
+  if (isNativeApp()) {
+    return `${NATIVE_APP_AUTH_SCHEME}://localhost/`;
+  }
+  return `${getPublicSiteOrigin()}/`;
 }
 
 /** Supabase `redirectTo` for password-reset emails (`?recovery=1` for in-app reset screen). */

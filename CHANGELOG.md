@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.82
+
+- **Native (iOS) — email confirm opens the app:** Signup passes Supabase **`emailRedirectTo`** = **`com.cinemastro.app://localhost/`** on Capacitor (web still uses **`VITE_PUBLIC_SITE_URL`**). Confirm link completes the session via existing deep-link handlers and continues into the app. Auth copy updated. **Ops:** ensure **`com.cinemastro.app://localhost/`** is in Auth redirect URLs on **staging + prod** Supabase (same as recovery). Re-archive (**Build 12**).
+
+## 7.0.81
+
+- **Product — remove public Beta label:** Set **`PUBLIC_BETA_LABEL`** to **`false`** so nav / Profile / About no longer show the Beta pill; drop “(Beta)” from **`index.html`** / **`site.webmanifest`**. Rebuild web + native; re-archive iOS (**Build 11**).
+
 ## 7.0.80
 
 - **Native (iOS) — circle push banners:** Circle publish now sends an APNs **alert** (title = circle name, body = “Someone shared a rating.”) plus **badge** and **sound**. Unpublish still updates the badge only (no banner). Tap opens that circle. Edge **`push-circle-badge` `1.1.0`** — **redeploy on staging and prod**. Client **`presentationOptions`**: badge, banner, list, sound. Rebuild TestFlight after deploy.
