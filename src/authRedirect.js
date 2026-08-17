@@ -6,6 +6,10 @@
 import { Capacitor } from "@capacitor/core";
 import { readJoinInviteTokenFromPath } from "./circles.js";
 import { supabase } from "./supabase";
+import {
+  scheduleNativeShellViewportReset,
+  scrubAuthParamsFromLocation,
+} from "./nativeViewport.js";
 
 /** Must match CFBundleURLSchemes (iOS) and Android intent-filter; whitelist in Supabase redirect URLs. */
 export const NATIVE_APP_AUTH_SCHEME = "com.cinemastro.app";
@@ -185,6 +189,11 @@ export async function handleAppDeepLink(url) {
     const retry = await completeAuthSessionFromHref(window.location.href);
     sessionSet = retry.ok;
     authError = retry.error || "";
+  }
+
+  if (sessionSet) {
+    scrubAuthParamsFromLocation();
+    scheduleNativeShellViewportReset();
   }
 
   const recovery =

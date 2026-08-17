@@ -3,6 +3,7 @@
  */
 import { Capacitor } from "@capacitor/core";
 import { handleAppDeepLink, queueNativeDeepLink } from "./authRedirect.js";
+import { scheduleNativeShellViewportReset } from "./nativeViewport.js";
 
 /** Defer until WebView + React mount so auth listeners catch recovery deep links. */
 function scheduleDeepLink(url) {
@@ -46,6 +47,8 @@ export async function initCapacitorShell() {
     } catch {
       /* ignore */
     }
+    // Mail/Safari → app: visual viewport often wrong until remount; soft reset on resume.
+    scheduleNativeShellViewportReset();
   });
 
   try {

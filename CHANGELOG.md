@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.83
+
+- **Native (iOS) — fix layout after email-confirm deep link:** Returning from Mail/Safari into the app could leave Circles (and the shell) oversized until sign-out/in. After auth deep links and when landing on Circles, scrub leftover Supabase hash/query params and burst-reset scroll/viewport (also on app resume). Re-archive TestFlight after **`npm run build:app`**.
+
 ## 7.0.82
 
 - **Native (iOS) — email confirm opens the app:** Signup passes Supabase **`emailRedirectTo`** = **`com.cinemastro.app://localhost/`** on Capacitor (web still uses **`VITE_PUBLIC_SITE_URL`**). Confirm link completes the session via existing deep-link handlers and continues into the app. Auth copy updated. **Ops:** ensure **`com.cinemastro.app://localhost/`** is in Auth redirect URLs on **staging + prod** Supabase (same as recovery). Re-archive (**Build 12**).

@@ -9,6 +9,11 @@ import {
   takePendingDeepLink,
   handleAppDeepLink,
 } from "./authRedirect.js";
+import {
+  NATIVE_VIEWPORT_RESET_EVENT,
+  scheduleNativeShellViewportReset,
+  scrubAuthParamsFromLocation,
+} from "./nativeViewport.js";
 import { syncAppIconBadgeCount, clearAppIconBadge, sumCircleUnseenOthers } from "./nativeBadge.js";
 import {
   registerNativePush,
@@ -3886,6 +3891,8 @@ export default function App() {
     window.addEventListener("resize", onResize, { passive: true });
     window.addEventListener("orientationchange", onResize, { passive: true });
     window.addEventListener("pageshow", onPageShow);
+    const onNativeViewportReset = () => scheduleClampBurst();
+    window.addEventListener(NATIVE_VIEWPORT_RESET_EVENT, onNativeViewportReset);
 
     return () => {
       document.removeEventListener("touchstart", onTouchStart, { capture: true });
@@ -3895,6 +3902,7 @@ export default function App() {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onResize);
       window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener(NATIVE_VIEWPORT_RESET_EVENT, onNativeViewportReset);
       if (clampRaf != null) cancelAnimationFrame(clampRaf);
     };
   }, [screen, searching, appliedSearchQuery]);
@@ -4035,12 +4043,19 @@ export default function App() {
 
         const joinTok = readJoinInviteTokenFromPath(window.location.pathname);
         if (joinTok || ev?.detail?.join) {
+          scrubAuthParamsFromLocation();
+          scheduleNativeShellViewportReset();
           setScreen("circle-join");
           return;
         }
         // Email confirm (or other non-recovery auth deep link) — session established; leave auth/splash.
         if (session?.user) {
+          scrubAuthParamsFromLocation();
+          scheduleNativeShellViewportReset();
           setScreen((prev) => (prev === "splash" || prev === "auth" ? "loading-catalogue" : prev));
+          // Circles/home layout often mounts after catalogue load — reset again then.
+          window.setTimeout(() => scheduleNativeShellViewportReset(), 400);
+          window.setTimeout(() => scheduleNativeShellViewportReset(), 1200);
         }
       })();
     };
@@ -5454,6 +5469,7 @@ export default function App() {
         }
         setScreen("circles");
         setNavTab("home");
+        scheduleNativeShellViewportReset();
       } catch (e) {
         console.warn("Post-login routing failed:", e);
         if (!cancelled) {
