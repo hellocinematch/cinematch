@@ -1,30 +1,28 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-08-13 — trust **`package.json`** / **`CHANGELOG.md`**. **Staging + prod web:** **7.0.82** @ **`90b9b0d`**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-08-17 — trust **`package.json`** / **`CHANGELOG.md`**. **Staging web:** **7.0.83** @ **`799fbb2`**. **Prod web:** **7.0.82** @ **`90b9b0d`**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.82** — remove public Beta label; native **email confirm** → `com.cinemastro.app://localhost/` (Safari may ask Open in app). **7.0.81** Beta off / titles. **7.0.76–7.0.80** badge + APNs banners. Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.83** — native viewport reset after email-confirm deep link (**on staging; Xcode device verify still backlog**). **7.0.82** — Beta label off; email confirm → app scheme. **7.0.76–7.0.80** badge + APNs banners. Earlier — **`CHANGELOG`**.
 
-**Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). Older § breakdowns were folded into it. **Google Play:** full checklist in **§ Google Play** below (parked until user starts Android).
+**Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). **Google Play:** **§ Google Play**. **Native verify 7.0.83:** **§ Capacitor → Next engineering**.
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **Staging + prod web:** **7.0.82** @ **`90b9b0d`**. Routine ships → **`origin/staging`**; push **`main`** only when user explicitly asks. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`** + handoff rules. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **Staging web:** **7.0.83** @ **`799fbb2`**. **Prod web:** **7.0.82** @ **`90b9b0d`**. Routine ships → **`origin/staging`**; push **`main`** only when user explicitly asks. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`** + handoff rules. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
-> **CRITICAL — local `.env`:** Often left on **PROD** after native archives. **Switch back to staging** before any staging native build. Native **`npm run build:app`** bakes `.env` at build time.
+> **Local `.env`:** Prefer **staging** for day-to-day. Native **`npm run build:app`** bakes `.env` at build time — use prod only for App Store/TF archives.
 >
-> **Git / Vercel:** Web → **`origin/staging`** (routine) / **`origin/main`** (prod, when asked). App Store / Play = separate upload. **Prod + staging Vercel:** **`APPLE_TEAM_ID=ADXNR3G5F8`**. AASA live.
+> **App Store:** Submitted; Apple asked **Guideline 2.1 Information Needed**; user **replied in Resolution Center with screen recording** — **wait** (Resubmit greyed = normal). Demo **`apple.review@…`** (do not onboard). US-only, $0.00, Circles/groups listing. No in-app account delete yet (told Apple: email **support@cinemastro.com**).
 >
-> **Hosted DB:** **staging ≠ prod** Supabase. **`device_push_tokens`** + **`push-circle-badge` `1.1.0`** + **`APNS_*`** + Auth redirects **`com.cinemastro.app://localhost/`** (+ recovery) on both.
+> **Backlog — verify 7.0.83 native:** Fix is **on staging git/Vercel** (`nativeViewport.js` + deep-link scrub/reset) but user has **not finished Xcode device test** of email-confirm → Circles overflow. Next: staging `.env` → **`npm run build:app`** → Run on device → signup/confirm → confirm Circles layout OK → then optionally promote **7.0.83** to **main** / new TF if Apple needs a build.
 >
-> **App Store:** **Submitted for review** (2026-08-12). Listing = private Circles / groups positioning; US-only availability; **$0.00**; App Privacy published; age rating kept **13+** (content) while privacy copy still mentions 18+. Demo **`apple.review@…`** (recreated fresh — do not onboard). Local Xcode: **iPhone-only** (`TARGETED_DEVICE_FAMILY = 1`), Build ~**14**. Watch ASC / email for Apple.
+> **Google Play:** Not started — **§ Google Play** checklist in passdown.
 >
-> **Google Play:** **Not started.** Full phased checklist in **`PASSDOWN-NEXT-CHAT.md` § Google Play** — signing/AAB → internal test → listing/Data safety → US production; optional FCM later. ~2–3 days min without push parity.
+> **`pg_net` / compute-neighbors:** **`COMPUTE-NEIGHBORS-CRON.md`**.
 >
-> **`pg_net` / compute-neighbors:** **`COMPUTE-NEIGHBORS-CRON.md`** — scale **`jobs × limit`** as MAU grows.
->
-> **Master list (product):** **1a–1e** CF diversity; **§1f** circle strips; **§1g.1** Discover transliteration; **P2** US geo.
+> **Master list (product):** **1a–1e**; **§1f**; **§1g.1**; **P2** multi-market (CA/IN discussed — availability_region still backlog).
 
 ---
 
@@ -32,15 +30,14 @@
 
 | Item | State |
 |------|-------|
-| **Web app (staging)** | **7.0.82** **`90b9b0d`** — Beta label off; native email-confirm redirect. |
+| **Web app (staging)** | **7.0.83** **`799fbb2`** — email-confirm viewport fix. |
 | **Web app (prod)** | **7.0.82** **`90b9b0d`** — **www.cinemastro.com**. |
-| **Native app** | **Capacitor 8**, **`com.cinemastro.app`**, **iPhone-only**. Push + badge + banners. Local Build ~**14**. |
-| **Apple / App Store** | **Submitted** (Waiting for Review). Org **Cinemastro LLC** / Team **ADXNR3G5F8**. |
-| **Google Play** | Not started — see **§ Google Play** checklist. |
-| **Supabase auth** | Staging + prod: site URLs + **`com.cinemastro.app://localhost/`** (+ recovery); signup confirm uses same scheme on native. |
-| **Supabase** | Separate staging/prod projects. **`device_push_tokens`** + push RPCs on both. |
-| **Edge** | **`push-circle-badge` `1.1.0`** (+ invite suite, match, compute-neighbors, pulse-catalog). Bump version + redeploy on change. |
-| **Client deploy** | **Vercel** (web); native = Xcode / Play (not Vercel). |
+| **Native app** | **Capacitor 8**, **iPhone-only**. Local Build ~**15** after 7.0.83 bake — **device verify of 7.0.83 still backlog**. |
+| **Apple / App Store** | Info reply + video sent; **waiting on Apple**. |
+| **Google Play** | Not started — **§ Google Play**. |
+| **Supabase auth** | Staging + prod: **`com.cinemastro.app://localhost/`** (+ recovery); native signup confirm uses scheme. |
+| **Edge** | **`push-circle-badge` `1.1.0`**. Bump + redeploy on change. |
+| **Client deploy** | **Vercel** (web); native = Xcode / Play. |
 
 **Where detail lives:** **`HANDOFF.md`**, **`CHANGELOG.md`**, **`PASSDOWN-ARCHIVE.md`**.
 
@@ -50,12 +47,11 @@
 
 *Bundled shell; backend = whatever **`.env`** was at **`npm run build:app`**.*
 
-**Shipped (through **7.0.82**, `90b9b0d`; `main` / `staging` aligned):**
+**Shipped (through **7.0.83** on staging / **7.0.82** on prod web):**
 
 - **Capacitor 8** — **`com.cinemastro.app`**, **iPhone-only**, safe areas, strip scroll, auth deep links, email confirm → app scheme, universal **`/join`**, icons, export-compliance plist flag.
-- **Badge Phase 1 (7.0.76):** **`@capawesome/capacitor-badge`** — icon = sum of circle unseen; clear on sign-out.
-- **Badge Phase 2 (7.0.78–7.0.79):** APNs via **`push-circle-badge`**; **`device_push_tokens`**; **AppDelegate** APNs token handoff (required).
-- **Banners (7.0.80):** publish → alert (circle name + “Someone shared a rating.”) + badge + sound; unpublish → badge only; tap → open circle.
+- **7.0.83** — **`src/nativeViewport.js`**: scrub auth URL + burst viewport reset after email-confirm / app resume (fixes Circles oversized until re-login). **Code on staging; native device verify still TODO.**
+- **Badge Phase 1–2 + banners (7.0.76–7.0.80):** as before.
 
 **Local dev / re-archive:**
 
@@ -72,13 +68,15 @@ npm run build:app && open ios/App/App.xcodeproj
 
 **Next engineering (ordered):**
 
-- [x] **App Store** — submitted 2026-08-12 (watch review).
-- [ ] **Restore staging `.env`** after prod native bakes.
-- [ ] **Google Play** — follow **§ Google Play** below when user starts Android.
+- [ ] **Verify 7.0.83 on device (staging bake):** email confirm from Mail → Open in app → Circles layout fits (no overflow). User deferred Xcode run — **do this before promoting 7.0.83 to prod / new TF**.
+- [x] **App Store** — submitted; Resolution Center reply + video sent; waiting on Apple.
+- [ ] **Promote 7.0.83 → `origin/main`** when verified (and Apple asks for a new build, or after approval for next release).
+- [ ] **Google Play** — **§ Google Play** when user starts Android.
 - [ ] **External TestFlight** (optional).
-- [ ] Optional: staging bundle id variant to run staging+prod side-by-side (not set up).
+- [ ] Optional: in-app **Delete account** (Apple may require; currently support email only).
+- [ ] Optional: staging bundle id variant (not set up).
 
-**Parked / discussed:** Anonymous non-circle “new rating on Cinemastro” pushes; Web Push-only PWA; simplified app icon mark (Option B); OAuth / phone for multi-account (user OK with email for now on mobile).
+**Parked / discussed:** Anonymous non-circle pushes; Web Push PWA; OAuth/phone multi-account (OK for now); CA/IN store listing vs **availability_region** product work (P2).
 
 ---
 
@@ -379,13 +377,13 @@ npm run build:app && open ios/App/App.xcodeproj
 
 ## Open / follow-ups
 
-**Last session (2026-08-13)**
+**Last session (2026-08-17)**
 
-- **Last note:** User asked to **keep the Google Play checklist** in passdown for later. App Store **submitted** (2026-08-12). Play **not started**.
+- **Last note:** User asked **passdown**. **7.0.83** viewport fix is on **staging** (`799fbb2`) but **Xcode device verify deferred** — keep in backlog. App Store: replied to Apple with video; **wait**. Local `.env` = staging.
 
-- **Immediate:** Watch Apple review; restore **staging `.env`** if still prod; commit/push this passdown if not on remote.
+- **Immediate:** Wait on Apple; when free — **`npm run build:app`** (staging) → Run → test email-confirm → Circles layout.
 
-- **Next:** Google Play when user asks (**§ Google Play**); backlog **1a–1e**, **§1f**, **§1g.1**, **P2**.
+- **Next:** Promote **7.0.83** to prod when verified / needed; Google Play checklist; product **1a–1e**, **§1f**, **§1g.1**, **P2**.
 
 ---
 
