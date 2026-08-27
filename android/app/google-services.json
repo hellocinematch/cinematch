@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1028961618553",
+    "project_id": "cinemastro-b7bb4",
+    "storage_bucket": "cinemastro-b7bb4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1028961618553:android:c2714e69aa1888254822a8",
+        "android_client_info": {
+          "package_name": "com.cinemastro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDP0UEfF4NAOhTOIsmXSZycqAKVCVDXDyM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -17,7 +17,7 @@
       "autoClear": false
     },
     "PushNotifications": {
-      "presentationOptions": ["badge", "banner", "list", "sound"]
+      "presentationOptions": ["badge", "banner", "list", "sound", "alert"]
     }
   }
 }

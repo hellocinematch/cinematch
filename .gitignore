@@ -16,6 +16,9 @@ dist
 !.env.example
 APNs/
 *.p8
+*.jks
+*.keystore
+android/keystore.properties
 dist-ssr
 *.local
 

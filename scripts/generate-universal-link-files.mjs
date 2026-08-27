@@ -26,7 +26,14 @@ const multiFp = (process.env.ANDROID_SHA256_FINGERPRINTS || "")
   .filter(Boolean);
 
 function normalizeSha256(fp) {
-  return fp.replace(/:/g, "").toUpperCase();
+  const hex = fp.replace(/:/g, "").toUpperCase();
+  if (!/^[0-9A-F]{64}$/.test(hex)) {
+    throw new Error(
+      `ANDROID_SHA256 fingerprint must be 64 hex chars (got ${hex.length}): ${fp}`,
+    );
+  }
+  // Digital Asset Links requires colon-separated pairs (AA:BB:…).
+  return hex.match(/.{2}/g).join(":");
 }
 
 const androidFps = [...new Set([singleFp, ...multiFp].filter(Boolean).map(normalizeSha256))];

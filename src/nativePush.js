@@ -1,6 +1,7 @@
 /**
- * Native push (iOS). Registers APNs token; after circle publish invokes
- * push-circle-badge (banner + badge). Unpublish syncs badge only (no alert).
+ * Native push (iOS APNs + Android FCM). Registers the device token; after circle
+ * publish invokes push-circle-badge (banner + iOS badge). Unpublish syncs iOS
+ * badge only (no Android banner — Android has no reliable home-screen badge).
  */
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "./supabase";
@@ -11,8 +12,11 @@ let listenersReady = false;
 let lastToken = null;
 let registerInFlight = null;
 
-function isNativeIos() {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+function nativePushPlatform() {
+  if (!Capacitor.isNativePlatform()) return null;
+  const p = Capacitor.getPlatform();
+  if (p === "ios" || p === "android") return p;
+  return null;
 }
 
 function emitCirclePushOpen(circleId) {
@@ -31,13 +35,13 @@ function circleIdFromNotificationData(data) {
   return typeof raw === "string" ? raw.trim() : "";
 }
 
-async function persistToken(token) {
+async function persistToken(token, platform) {
   const value = typeof token === "string" ? token.trim() : "";
-  if (!value) return;
+  if (!value || (platform !== "ios" && platform !== "android")) return;
   lastToken = value;
   const { error } = await supabase.rpc("register_device_push_token", {
     p_token: value,
-    p_platform: "ios",
+    p_platform: platform,
   });
   if (error) {
     console.warn("Native push: register_device_push_token failed", error.message);
@@ -45,10 +49,11 @@ async function persistToken(token) {
 }
 
 /**
- * Request permission + register for APNs. Safe to call on every login.
+ * Request permission + register for APNs / FCM. Safe to call on every login.
  */
 export async function registerNativePush() {
-  if (!isNativeIos()) return;
+  const platform = nativePushPlatform();
+  if (!platform) return;
   if (registerInFlight) return registerInFlight;
 
   registerInFlight = (async () => {
@@ -57,7 +62,7 @@ export async function registerNativePush() {
 
       if (!listenersReady) {
         await PushNotifications.addListener("registration", (t) => {
-          void persistToken(t?.value);
+          void persistToken(t?.value, nativePushPlatform());
         });
         await PushNotifications.addListener("registrationError", (err) => {
           console.warn("Native push: registrationError", err);
@@ -88,7 +93,7 @@ export async function registerNativePush() {
 
 /** Clear tokens for this device/user on sign-out. */
 export async function unregisterNativePush() {
-  if (!isNativeIos()) return;
+  if (!nativePushPlatform()) return;
   try {
     if (lastToken) {
       const { error } = await supabase.rpc("unregister_device_push_token", {
@@ -110,9 +115,9 @@ export async function unregisterNativePush() {
 }
 
 /**
- * Fire-and-forget: APNs to other members of these circles.
+ * Fire-and-forget: APNs / FCM to other members of these circles.
  * @param {string[]} circleIds
- * @param {{ alert?: boolean }} [opts] `alert: false` = badge number only (e.g. unpublish).
+ * @param {{ alert?: boolean }} [opts] `alert: false` = iOS badge only (e.g. unpublish).
  */
 export function notifyCircleBadgePush(circleIds, opts = {}) {
   if (!Array.isArray(circleIds) || circleIds.length === 0) return;

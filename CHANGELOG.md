@@ -1,5 +1,10 @@
 # Changelog
 
+## 7.0.84
+
+- **Native (Android) — circle publish banners via FCM:** Same circle-publish event as iOS (`push-circle-badge` **`1.2.0`**). Android registers an FCM token (`device_push_tokens.platform = android`); Edge sends an FCM HTTP v1 alert (title = circle name, body = “Someone shared a rating.”). Tap opens that circle. Unpublish remains **iOS badge-only** (Android has no reliable home-screen badge). **Ops:** Firebase Android app for **`com.cinemastro.app`**; add upload + Play app-signing SHA-1/256; copy **`google-services.json`** to **`android/app/`** (see **`google-services.json.example`**); set Edge secret **`FCM_SERVICE_ACCOUNT_JSON`** (Firebase service account) on **staging + prod**; **redeploy** `push-circle-badge`; **`npm run build:app`** with the intended `.env`; new Play Internal AAB (**versionCode 2**).
+- **Web — Android App Links `assetlinks.json` format:** Digital Asset Links requires colon-separated SHA-256 (`AA:BB:…`). The build script was emitting hex with no colons, so Google rejected the file (`ERROR_CODE_MALFORMED_CONTENT`). Generator now outputs colon form. **Ops:** Vercel env **`ANDROID_SHA256_FINGERPRINT`** / **`ANDROID_SHA256_FINGERPRINTS`** already set on prod; this script fix must ship on the **production** web build (not env-only redeploy), then confirm `/.well-known/assetlinks.json`.
+
 ## 7.0.83
 
 - **Native (iOS) — fix layout after email-confirm deep link:** Returning from Mail/Safari into the app could leave Circles (and the shell) oversized until sign-out/in. After auth deep links and when landing on Circles, scrub leftover Supabase hash/query params and burst-reset scroll/viewport (also on app resume). Re-archive TestFlight after **`npm run build:app`**.

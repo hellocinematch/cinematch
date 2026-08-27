@@ -8,7 +8,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 const EDGE_FUNCTION_SLUG = "push-circle-badge";
-const EDGE_FUNCTION_VERSION = "1.1.0";
+const EDGE_FUNCTION_VERSION = "1.2.0";
 
 function jsonResponse(body: unknown, status = 200): Response {
   const payload =
@@ -49,11 +49,11 @@ function readApnsConfig(): ApnsConfig | null {
   };
 }
 
-let cachedJwt: { token: string; expMs: number } | null = null;
+let cachedApnsJwt: { token: string; expMs: number } | null = null;
 
 async function getApnsJwt(cfg: ApnsConfig): Promise<string> {
   const now = Date.now();
-  if (cachedJwt && cachedJwt.expMs > now + 60_000) return cachedJwt.token;
+  if (cachedApnsJwt && cachedApnsJwt.expMs > now + 60_000) return cachedApnsJwt.token;
   const key = await jose.importPKCS8(cfg.privateKey, "ES256");
   const token = await new jose.SignJWT({})
     .setProtectedHeader({ alg: "ES256", kid: cfg.keyId })
@@ -61,8 +61,74 @@ async function getApnsJwt(cfg: ApnsConfig): Promise<string> {
     .setIssuedAt()
     .setExpirationTime("50m")
     .sign(key);
-  cachedJwt = { token, expMs: now + 50 * 60 * 1000 };
+  cachedApnsJwt = { token, expMs: now + 50 * 60 * 1000 };
   return token;
+}
+
+type FcmConfig = {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+};
+
+function readFcmConfig(): FcmConfig | null {
+  const jsonRaw = (Deno.env.get("FCM_SERVICE_ACCOUNT_JSON") || "").trim();
+  if (jsonRaw) {
+    try {
+      const parsed = JSON.parse(jsonRaw) as {
+        project_id?: string;
+        client_email?: string;
+        private_key?: string;
+      };
+      const projectId = String(parsed.project_id || "").trim();
+      const clientEmail = String(parsed.client_email || "").trim();
+      const privateKey = String(parsed.private_key || "").replace(/\\n/g, "\n").trim();
+      if (projectId && clientEmail && privateKey) {
+        return { projectId, clientEmail, privateKey };
+      }
+    } catch {
+      console.warn("push-circle-badge: FCM_SERVICE_ACCOUNT_JSON is not valid JSON");
+    }
+  }
+  const projectId = (Deno.env.get("FCM_PROJECT_ID") || "").trim();
+  const clientEmail = (Deno.env.get("FCM_CLIENT_EMAIL") || "").trim();
+  const privateKey = (Deno.env.get("FCM_PRIVATE_KEY") || "").replace(/\\n/g, "\n").trim();
+  if (!projectId || !clientEmail || !privateKey) return null;
+  return { projectId, clientEmail, privateKey };
+}
+
+let cachedFcmAccess: { token: string; expMs: number } | null = null;
+
+async function getFcmAccessToken(cfg: FcmConfig): Promise<string> {
+  const now = Date.now();
+  if (cachedFcmAccess && cachedFcmAccess.expMs > now + 60_000) return cachedFcmAccess.token;
+  const key = await jose.importPKCS8(cfg.privateKey, "RS256");
+  const assertion = await new jose.SignJWT({
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+  })
+    .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+    .setIssuer(cfg.clientEmail)
+    .setSubject(cfg.clientEmail)
+    .setAudience("https://oauth2.googleapis.com/token")
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(key);
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+  const body = await res.json() as { access_token?: string; expires_in?: number; error?: string };
+  const access = String(body.access_token || "").trim();
+  if (!res.ok || !access) {
+    throw new Error(`FCM OAuth failed ${res.status} ${body.error || JSON.stringify(body)}`);
+  }
+  const ttlSec = Math.max(60, Number(body.expires_in) || 3600);
+  cachedFcmAccess = { token: access, expMs: now + (ttlSec - 60) * 1000 };
+  return access;
 }
 
 type PushPayload = {
@@ -104,6 +170,51 @@ async function sendApnsPush(
       circle_id: payload.circleId || null,
     }),
   });
+  const body = await res.text();
+  return { ok: res.ok, status: res.status, body };
+}
+
+function fcmTokenLooksStale(status: number, body: string): boolean {
+  if (status === 404) return true;
+  if (/UNREGISTERED|NOT_FOUND/i.test(body)) return true;
+  if (status === 400 && /not a valid FCM registration token/i.test(body)) return true;
+  return false;
+}
+
+async function sendFcmPush(
+  cfg: FcmConfig,
+  deviceToken: string,
+  payload: PushPayload,
+): Promise<{ ok: boolean; status: number; body: string }> {
+  const access = await getFcmAccessToken(cfg);
+  const title = (payload.title || "Cinemastro").slice(0, 80);
+  const alertBody = (payload.body || "Someone shared a rating in your circle.").slice(0, 160);
+  const message: Record<string, unknown> = {
+    token: deviceToken,
+    data: {
+      type: "circle_activity",
+      circle_id: payload.circleId ? String(payload.circleId) : "",
+    },
+    android: { priority: "HIGH" },
+  };
+  if (payload.withAlert) {
+    message.notification = { title, body: alertBody };
+    message.android = {
+      priority: "HIGH",
+      notification: { sound: "default" },
+    };
+  }
+  const res = await fetch(
+    `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(cfg.projectId)}/messages:send`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${access}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ message }),
+    },
+  );
   const body = await res.text();
   return { ok: res.ok, status: res.status, body };
 }
@@ -157,7 +268,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Too many circles." }, 400);
     }
 
-    // Publish → banner; unpublish / badge sync → badge number only.
+    // Publish → banner; unpublish / badge sync → iOS badge number only (no Android).
     const withAlert = body.alert !== false;
 
     const admin = createClient(supabaseUrl, serviceKey, {
@@ -229,33 +340,42 @@ Deno.serve(async (req: Request) => {
     const { data: tokens, error: tokErr } = await admin
       .from("device_push_tokens")
       .select("user_id, token, platform")
-      .in("user_id", recipientIds)
-      .eq("platform", "ios");
+      .in("user_id", recipientIds);
     if (tokErr) {
       console.error("push-circle-badge: tokens", tokErr.message);
       return jsonResponse({ error: "Could not load device tokens." }, 500);
     }
 
-    const tokensByUser = new Map<string, string[]>();
+    const iosByUser = new Map<string, string[]>();
+    const androidByUser = new Map<string, string[]>();
     for (const row of tokens || []) {
       const uid = String(row.user_id || "");
       const token = String(row.token || "").trim();
+      const platform = String(row.platform || "").trim().toLowerCase();
       if (!uid || !token) continue;
-      const list = tokensByUser.get(uid) || [];
+      const bucket = platform === "android" ? androidByUser : platform === "ios" ? iosByUser : null;
+      if (!bucket) continue;
+      const list = bucket.get(uid) || [];
       list.push(token);
-      tokensByUser.set(uid, list);
+      bucket.set(uid, list);
     }
 
     const apns = readApnsConfig();
-    if (!apns) {
-      console.warn("push-circle-badge: APNs secrets not configured; skipping send");
+    const fcm = readFcmConfig();
+    if (!apns && !fcm) {
+      console.warn("push-circle-badge: APNs and FCM secrets not configured; skipping send");
       return jsonResponse({
         ok: true,
         skipped: true,
-        reason: "apns_not_configured",
+        reason: "push_not_configured",
         recipients: recipientIds.length,
-        devices: [...tokensByUser.values()].reduce((n, t) => n + t.length, 0),
       });
+    }
+    if (!apns) {
+      console.warn("push-circle-badge: APNs secrets not configured; iOS tokens skipped");
+    }
+    if (!fcm) {
+      console.warn("push-circle-badge: FCM secrets not configured; Android tokens skipped");
     }
 
     let pushed = 0;
@@ -263,8 +383,11 @@ Deno.serve(async (req: Request) => {
     const staleTokens: string[] = [];
 
     for (const uid of recipientIds) {
-      const deviceTokens = tokensByUser.get(uid);
-      if (!deviceTokens?.length) continue;
+      const iosTokens = iosByUser.get(uid) || [];
+      const androidTokens = androidByUser.get(uid) || [];
+      const sendIos = Boolean(apns && iosTokens.length);
+      const sendAndroid = Boolean(fcm && withAlert && androidTokens.length);
+      if (!sendIos && !sendAndroid) continue;
 
       const { data: totalRaw, error: totalErr } = await admin.rpc(
         "get_user_circle_unseen_total",
@@ -291,27 +414,51 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      for (const deviceToken of deviceTokens) {
-        try {
-          const result = await sendApnsPush(apns, deviceToken, {
-            badge,
-            withAlert,
-            title,
-            body: alertBody,
-            circleId: primaryCircleId,
-          });
-          if (result.ok) {
-            pushed += 1;
-          } else {
-            failed += 1;
-            console.warn("push-circle-badge: APNs fail", result.status, result.body);
-            if (result.status === 410 || /BadDeviceToken|Unregistered/i.test(result.body)) {
-              staleTokens.push(deviceToken);
+      const payload: PushPayload = {
+        badge,
+        withAlert,
+        title,
+        body: alertBody,
+        circleId: primaryCircleId,
+      };
+
+      if (sendIos && apns) {
+        for (const deviceToken of iosTokens) {
+          try {
+            const result = await sendApnsPush(apns, deviceToken, payload);
+            if (result.ok) {
+              pushed += 1;
+            } else {
+              failed += 1;
+              console.warn("push-circle-badge: APNs fail", result.status, result.body);
+              if (result.status === 410 || /BadDeviceToken|Unregistered/i.test(result.body)) {
+                staleTokens.push(deviceToken);
+              }
             }
+          } catch (e) {
+            failed += 1;
+            console.warn("push-circle-badge: APNs error", e);
           }
-        } catch (e) {
-          failed += 1;
-          console.warn("push-circle-badge: APNs error", e);
+        }
+      }
+
+      if (sendAndroid && fcm) {
+        for (const deviceToken of androidTokens) {
+          try {
+            const result = await sendFcmPush(fcm, deviceToken, payload);
+            if (result.ok) {
+              pushed += 1;
+            } else {
+              failed += 1;
+              console.warn("push-circle-badge: FCM fail", result.status, result.body);
+              if (fcmTokenLooksStale(result.status, result.body)) {
+                staleTokens.push(deviceToken);
+              }
+            }
+          } catch (e) {
+            failed += 1;
+            console.warn("push-circle-badge: FCM error", e);
+          }
         }
       }
     }
