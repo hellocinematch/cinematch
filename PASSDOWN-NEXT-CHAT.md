@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-09-18 — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.86** on **staging** (web delete account). **7.0.85** still on **main** / prod web. Play Internal **2** still **7.0.84**. **Trademark:** **§ USPTO trademark**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-09-18 — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.86** on **staging + main / prod web** (self-service delete account). Play Internal **2** still **7.0.84**. **Trademark:** **§ USPTO trademark**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.86** — self-service **Delete account** (Profile + `/privacy#delete-account`; staging; no new AAB). **7.0.85** — web **Open in Cinemastro** on `/join` + **`/join` wins over recovery** (staging + prod; no new AAB). **7.0.84** — Android FCM circle banners; Edge **`push-circle-badge` `1.2.0`** (redeployed); **`assetlinks.json`** SHA-256 colon format for Digital Asset Links. **7.0.83** — native viewport reset after email-confirm deep link (**Xcode device verify still backlog**). Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.86** — self-service **Delete account** (Profile + `/privacy#delete-account`; **staging + prod web**; no new AAB). **7.0.85** — web **Open in Cinemastro** on `/join` + **`/join` wins over recovery** (staging + prod; no new AAB). **7.0.84** — Android FCM circle banners; Edge **`push-circle-badge` `1.2.0`** (redeployed); **`assetlinks.json`** SHA-256 colon format for Digital Asset Links. **7.0.83** — native viewport reset after email-confirm deep link (**Xcode device verify still backlog**). Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). **Google Play:** **§ Google Play**. **Native verify 7.0.83:** **§ Capacitor → Next engineering**.
 
@@ -10,15 +10,17 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.86** on **staging** (self-service Delete account). **7.0.85** still on **main** / prod web. Play Internal **2** still **7.0.84**. Routine ships → **`origin/staging`**; push **`main`** only when asked. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.86** on **staging + main / prod web** (`e93ffe0`). Play Internal **2** still **7.0.84**. Routine ships → **`origin/staging`**; push **`main`** only when asked. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
 > **Local `.env`:** Prefer **staging-only** day-to-day. Native **`npm run build:app`** bakes `.env`. No new AAB for 7.0.86.
 >
 > **App Store:** **Ready for Distribution** (auto-release, 2026-08-24). Live binary = **7.0.82** archive. Demo **`apple.review@…`** (do not onboard). Attachment 14 due **2026-10-01**.
 >
-> **Google Play:** Internal **2 (7.0.84)**. **Do not** Open/Production unless asked. Listing delete-account URL is still **`https://www.cinemastro.com/privacy`** (prod will show the new card when **7.0.86** is promoted).
+> **Google Play:** Internal **2 (7.0.84)**. **Do not** Open/Production unless asked. Listing delete-account URL **`https://www.cinemastro.com/privacy`** now matches **7.0.86** prod web.
 >
-> **Staging ops for 7.0.86:** apply **`20260918153000_prepare_account_deletion.sql`**; deploy Edge **`delete-account` `1.0.0`** on staging only. Test with a **throwaway** staging user (not Veena).
+> **Supabase refs (do not swap):** **staging** **`lovpktgeutujljltlhdl`**; **prod** **`uwexmfmkaifvddnfuvpg`**.
+>
+> **7.0.86 delete-account ops:** Edge **`delete-account` `1.0.0`**. SQL **`20260918153000_prepare_account_deletion.sql`**. **Staging already applied + Edge deployed** (throwaway user gone from Auth). **Prod still needs:** apply that SQL in **prod** SQL Editor, then `npx supabase@latest functions deploy delete-account --project-ref uwexmfmkaifvddnfuvpg`.
 >
 > **Parked:** confirm-email custom scheme / https interstitial; Discover iOS keyboard (**§1g.k**); **7.0.83** iOS device verify; Android status-bar overlap (needs AAB); product **1a–1e**, **§1f**, **§1g.1**, **P2**.
 >
@@ -32,12 +34,12 @@
 
 | Item | State |
 |------|-------|
-| **Web app (staging / prod)** | **Staging 7.0.86** — Delete account. **Prod / main still 7.0.85** until asked. |
+| **Web app (staging / prod)** | **Staging + prod / main 7.0.86** — Delete account (`e93ffe0`). |
 | **Native app** | **Capacitor 8**. App Store live **7.0.82**. Play Internal **2 (7.0.84)** **versionCode 2**. **7.0.83** iOS device verify still backlog. **7.0.86 is web-only** (no new AAB). |
 | **Apple / App Store** | **Ready for Distribution** (auto-release, 2026-08-24). |
 | **Google Play** | Internal **2 (7.0.84)**. Moto join: App Links if domain enabled; Chrome first-tap still common. **Do not** Open/Production. |
 | **Supabase auth** | Staging + prod: **`com.cinemastro.app://localhost/`** (+ recovery). |
-| **Edge** | **`push-circle-badge` `1.2.0`** staging + prod. **`delete-account` `1.0.0`** — deploy **staging** with 7.0.86. |
+| **Edge** | **`push-circle-badge` `1.2.0`** staging + prod. **`delete-account` `1.0.0`**: **staging done** (`lovpktgeutujljltlhdl`); **apply SQL + deploy on prod** (`uwexmfmkaifvddnfuvpg`). |
 | **Client deploy** | **Vercel** (web); native = Xcode / Play. |
 | **USPTO trademark** | TSDR **https://tsdr.uspto.gov** (login) → serial **99792884**. Filed **2026-04-28**. Queue as of **2026-08-28**: examining **Mar 28–Apr 5**. |
 
@@ -62,7 +64,7 @@
 
 *Bundled shell; backend = whatever **`.env`** was at **`npm run build:app`**.*
 
-**Shipped (through **7.0.86** web on staging; **7.0.85** on prod web; native binaries through **7.0.84**):**
+**Shipped (through **7.0.86** web on staging + prod; native binaries through **7.0.84**):**
 
 - **Capacitor 8** — **`com.cinemastro.app`**, **iPhone-only**, safe areas, strip scroll, auth deep links, email confirm → app scheme, universal **`/join`**, icons, export-compliance plist flag.
 - **7.0.86** — Self-service **Delete account** (Profile + Privacy). Circle transfer to next host; ratings wiped. Web-only.
@@ -92,7 +94,7 @@ npm run build:app && open ios/App/App.xcodeproj
 - [ ] **Google Play** — Internal **2 (7.0.84)** live with FCM. Retest **7.0.85** prod `/join` in Chrome (domain off) → Open in Cinemastro. Don’t Open/Production unless asked.
 - [ ] **Discover keyboard (§1g.k)** — after Play **production** submitted (not before).
 - [ ] **External TestFlight** (optional).
-- [x] **Delete account (7.0.86 staging):** Profile + `/privacy#delete-account`. Apply migration + deploy **`delete-account`** on staging; promote to prod when asked.
+- [x] **Delete account (7.0.86 staging + prod web):** Profile + `/privacy#delete-account`. Staging SQL + Edge done. **Prod:** apply **`20260918153000`** + deploy Edge **`delete-account`** on **`uwexmfmkaifvddnfuvpg`**.
 - [ ] Optional: staging bundle id variant (not set up).
 
 **Parked / discussed:** Anonymous non-circle pushes; Web Push PWA; OAuth/phone multi-account (OK for now); CA/IN store listing vs **availability_region** product work (P2).
@@ -291,7 +293,7 @@ npm run build:app && open ios/App/App.xcodeproj
 
 - [x] **Clear / delete a rating (per title):** **Shipped 7.0.42** — title detail **Clear rating** + migration.
 
-- [x] **Delete account (7.0.86 staging):** Self-service + privacy copy. Prod when asked.
+- [x] **Delete account (7.0.86 staging + prod web):** Self-service + privacy copy. Prod SQL + Edge deploy still needed on **`uwexmfmkaifvddnfuvpg`**.
 
 **Security**
 
@@ -375,7 +377,7 @@ npm run build:app && open ios/App/App.xcodeproj
 
 | Migration | Purpose |
 |-----------|---------|
-| **`20260918153000_prepare_account_deletion.sql`** | **`prepare_account_deletion()`** — leave/transfer circles, wipe public user rows before Edge **`delete-account`**. **Apply staging first; prod when 7.0.86 is promoted.** |
+| **`20260918153000_prepare_account_deletion.sql`** | **`prepare_account_deletion()`** — leave/transfer circles, wipe public user rows before Edge **`delete-account`**. **Applied staging** (`lovpktgeutujljltlhdl`). **Apply prod** (`uwexmfmkaifvddnfuvpg`). |
 | **`20260731120000_device_push_tokens_circle_badge.sql`** | **`device_push_tokens`** + register/unregister RPCs + **`get_user_circle_unseen_total`** — APNs badge/banner (**7.0.78+**). **Applied staging + prod.** |
 | **`20260616120000_circle_site_rating_together_rows.sql`** | **`site_rating`** on **together** circle strip/grid rows (**`get_circle_rated_strip`**, **all**, **top** RPCs) — **7.0.62**; apply on each hosted DB. |
 | **`20260615120000_platform_growth_daily.sql`** | **`platform_growth_daily`** UTC stats (cumulative + **`new_*`**); **`ratings.created_at`**; refresh RPCs; optional **`pg_cron`** **`platform-growth-daily-utc`**. |
@@ -414,11 +416,13 @@ npm run build:app && open ios/App/App.xcodeproj
 
 **Last session (2026-09-18)**
 
-- **Last note:** Code now: self-service delete account (support email only before). Apple/Play listing already points at privacy. Staging first. Parked: confirm-email custom scheme, §1g.k, 7.0.83 iOS verify, Android status-bar overlap (needs AAB), 1a–1e, §1f, P2. USPTO: **https://tsdr.uspto.gov** serial **99792884**.
+- **Last note:** User said **implement in prod now** — promote **7.0.86** delete-account to production. **Do not** Play Open/Production.
 
-- **Shipped this session:** **7.0.86** on **origin/staging** only. Profile → Settings → Delete account (type DELETE). Circles: solo → delete; others remain → transfer **`creator_id`** to next host (earliest remaining `joined_at`). Ratings/watchlist/auth user wiped. Privacy **`/privacy#delete-account`** works logged out (Play URL). **`/privacy`** hydrates from splash.
+- **Shipped this session:** **7.0.86** on **`origin/staging` + `origin/main`** (`e93ffe0`). Profile → Settings → Delete account (type DELETE). Circles: solo → delete; others remain → transfer **`creator_id`** to next host (earliest remaining `joined_at`). Ratings/watchlist/auth user wiped. Privacy **`/privacy#delete-account`** works logged out.
 
-- **Ops still needed on staging:** apply **`20260918153000_prepare_account_deletion.sql`**; deploy Edge **`delete-account` `1.0.0`** (`uwexmfmkaifvddnfuvpg`). Then test with a throwaway user.
+- **Supabase refs (confirmed):** **staging** **`lovpktgeutujljltlhdl`** (SQL + Edge **`delete-account` `1.0.0`** already live; throwaway user gone from Auth). **prod** **`uwexmfmkaifvddnfuvpg`**.
+
+- **Ops still needed on prod:** apply **`20260918153000_prepare_account_deletion.sql`** in prod SQL Editor; `npx supabase@latest functions deploy delete-account --project-ref uwexmfmkaifvddnfuvpg`. Then smoke with a **throwaway prod** user (not Veena).
 
 - **Parked:** confirm-email custom scheme; Discover iOS keyboard (§1g.k); **7.0.83** iOS device verify; Android status-bar overlap; **1a–1e**, **§1f**, **§1g.1**, **P2**. Don’t Open/Production.
 
