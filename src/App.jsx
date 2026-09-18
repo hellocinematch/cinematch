@@ -89,6 +89,7 @@ import {
 import { fingerprintMyCirclesList } from "./myCirclesListFingerprint.js";
 import { PUBLIC_BETA_LABEL } from "./productLabels.js";
 import { formatPublicStat } from "./formatPublicStat.js";
+import { deleteMyAccount, isDeleteAccountConfirm, DELETE_CONFIRM_WORD } from "./accountDelete.js";
 import "./App.css";
 import { PulsePage } from "./pages/PulsePage.jsx";
 import { InTheatersPage } from "./pages/InTheatersPage.jsx";
@@ -3620,6 +3621,10 @@ export default function App() {
   /** Profile → Settings: bottom sheet to edit display name (collapsed row when closed). */
   const [showProfileDisplayNameEditor, setShowProfileDisplayNameEditor] = useState(false);
   const [profileDisplayNameFormError, setProfileDisplayNameFormError] = useState("");
+  const [showDeleteAccountSheet, setShowDeleteAccountSheet] = useState(false);
+  const [deleteAccountConfirmText, setDeleteAccountConfirmText] = useState("");
+  const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState("");
   /** TMDB genre ids to include (Settings). Empty = all genres. Logged-out users ignore. */
   const [showGenreIds, setShowGenreIds] = useState([]);
   /** Region buckets to include (Settings). Empty = all regions. Logged-out users ignore. */
@@ -6029,6 +6034,46 @@ export default function App() {
     setStreamingTvReady(true);
     setCinemaPreference(null); setOtherCinema(null);
     setScreen("splash"); setNavTab("home");
+  }
+
+  function openDeleteAccountSheet() {
+    setDeleteAccountConfirmText("");
+    setDeleteAccountError("");
+    setShowDeleteAccountSheet(true);
+  }
+
+  function closeDeleteAccountSheet() {
+    if (deleteAccountBusy) return;
+    setShowDeleteAccountSheet(false);
+    setDeleteAccountConfirmText("");
+    setDeleteAccountError("");
+  }
+
+  async function confirmDeleteAccount() {
+    if (deleteAccountBusy || !isDeleteAccountConfirm(deleteAccountConfirmText)) return;
+    setDeleteAccountBusy(true);
+    setDeleteAccountError("");
+    try {
+      await deleteMyAccount();
+      setShowDeleteAccountSheet(false);
+      setDeleteAccountConfirmText("");
+      try {
+        localStorage.removeItem(PENDING_CIRCLE_INVITE_TOKEN_KEY);
+      } catch {
+        /* ignore */
+      }
+      try {
+        await handleSignOut();
+      } catch {
+        setUser(null);
+        setScreen("splash");
+        setNavTab("home");
+      }
+    } catch (e) {
+      setDeleteAccountError(e?.message || "Could not delete account.");
+    } finally {
+      setDeleteAccountBusy(false);
+    }
   }
 
   async function retryInitialCatalogueFetch() {
@@ -9323,9 +9368,9 @@ export default function App() {
       if (q && SPA_LEGAL_SCREENS.has(q)) legal = q;
     }
     if (!legal || deepLinkLegalAppliedRef.current) return;
-    if (!SPA_DEEPLINK_READY_SCREENS.has(screen)) return;
+    if (!SPA_DEEPLINK_READY_SCREENS.has(screen) && screen !== "splash") return;
     deepLinkLegalAppliedRef.current = true;
-    legalReturnScreenRef.current = "circles";
+    legalReturnScreenRef.current = SPA_DEEPLINK_READY_SCREENS.has(screen) ? "circles" : "splash";
     legalHistoryPushedRef.current = false;
     setScreen(legal);
   }, [screen]);
@@ -11964,6 +12009,76 @@ export default function App() {
         </div>
       )}
 
+      {showDeleteAccountSheet && (
+        <div
+          className="circles-sheet-root"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-sheet-title"
+        >
+          <button
+            type="button"
+            className="circles-sheet-backdrop"
+            aria-label="Cancel"
+            onClick={closeDeleteAccountSheet}
+          />
+          <div className="circles-confirm delete-account-sheet">
+            <div className="circles-confirm-title" id="delete-account-sheet-title">
+              Delete your account?
+            </div>
+            <div className="circles-confirm-text">
+              This cannot be undone.
+            </div>
+            <ul className="delete-account-bullets">
+              <li>Circles with only you are deleted.</li>
+              <li>Circles with other members stay. Hosting moves to the next host.</li>
+              <li>Your ratings and watchlist are permanently deleted. They will no longer show in circles or be used for recommendations.</li>
+            </ul>
+            <p className="delete-account-legal-note">
+              We may keep limited records if required for fraud prevention, investigations, or the law.
+            </p>
+            <label className="delete-account-confirm-label" htmlFor="delete-account-confirm-input">
+              Type {DELETE_CONFIRM_WORD} to confirm
+            </label>
+            <input
+              id="delete-account-confirm-input"
+              type="text"
+              className="auth-input"
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              value={deleteAccountConfirmText}
+              onChange={(e) => setDeleteAccountConfirmText(e.target.value)}
+              disabled={deleteAccountBusy}
+              aria-label={`Type ${DELETE_CONFIRM_WORD} to confirm`}
+            />
+            {deleteAccountError ? (
+              <div className="auth-error delete-account-sheet-error">{deleteAccountError}</div>
+            ) : null}
+            <div className="circles-sheet-actions">
+              <button
+                type="button"
+                className="circles-btn-ghost"
+                onClick={closeDeleteAccountSheet}
+                disabled={deleteAccountBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="circles-btn-danger"
+                onClick={() => {
+                  void confirmDeleteAccount();
+                }}
+                disabled={deleteAccountBusy || !isDeleteAccountConfirm(deleteAccountConfirmText)}
+              >
+                {deleteAccountBusy ? "Deleting…" : "Delete account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Zero active circles — Circles tab modal (2-day cooldown; deferred past post-onboarding help). */}
       {zeroCirclesHomeNudgeModalOpen ? (
         <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Circles and your picks">
@@ -13034,6 +13149,17 @@ export default function App() {
               </div>
               <div className="profile-settings-label" style={{ marginTop: 20 }}>Email</div>
               <div className="profile-settings-email">{user?.email || "—"}</div>
+              <div className="profile-settings-label" style={{ marginTop: 20 }}>Account</div>
+              <p className="settings-providers-hint">
+                Permanently deletes your ratings, watchlist, and sign-in. Circles with other members stay; hosting moves to the next host.
+              </p>
+              <button
+                type="button"
+                className="profile-delete-account-btn"
+                onClick={openDeleteAccountSheet}
+              >
+                Delete account
+              </button>
             </div>
             <div className="profile-app-version">
               Cinemastro
@@ -13237,7 +13363,11 @@ export default function App() {
 
       {screen === "privacy" && (
         <Suspense fallback={<LegalLazyFallback />}>
-          <LegalPagePrivacy onBack={closeLegalPage} />
+          <LegalPagePrivacy
+            onBack={closeLegalPage}
+            signedIn={Boolean(user)}
+            onDeleteAccount={user ? openDeleteAccountSheet : undefined}
+          />
         </Suspense>
       )}
       {screen === "terms" && (

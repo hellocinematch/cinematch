@@ -190,6 +190,7 @@ export function HelpFullPage({ onBack }) {
         <h2 className="legal-h2">Profile</h2>
         <p className="legal-p">
           Your name and taste controls — genres, streaming focus, Mood regions, and Secondary region shape what each surface shows.
+          To permanently delete your account, open Profile → Settings → Delete account and type DELETE to confirm.
         </p>
 
         <h2 className="legal-h2">Add to Home Screen (mobile &amp; tablet)</h2>

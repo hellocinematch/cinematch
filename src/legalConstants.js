@@ -3,5 +3,5 @@ export const LEGAL_PLACEHOLDERS = {
   entity: "[Legal entity name — placeholder]",
   contactEmail: "support@cinemastro.com",
   siteUrl: "https://cinemastro.com",
-  lastUpdated: "2026-04-06",
+  lastUpdated: "2026-09-18",
 };

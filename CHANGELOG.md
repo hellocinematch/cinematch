@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.86
+
+- **Account — self-service delete:** Profile → Settings → **Delete account** (type **DELETE**). Circles with only you are removed; circles with other members stay and **`creator_id`** moves to the next host (earliest remaining `joined_at`). Ratings, watchlist, profile, and the auth user are wiped. Privacy **`/privacy#delete-account`** / **`#data-request`** documents the same path (Play listing already points at `/privacy`) and offers the button when signed in. **Ops (staging first):** apply **`20260918153000_prepare_account_deletion.sql`**; deploy Edge **`delete-account` `1.0.0`**. Web-only — no new AAB.
+
 ## 7.0.85
 
 - **Web — Open in Cinemastro on `/join`:** Phone browsers (not the native shell) get **Open in Cinemastro** on the circle-invite screen. Android uses an `intent://` link for the current host `/join/:token` (`package=com.cinemastro.app`) so the installed app opens even when App Links are off in Open by default; if the app isn’t installed, fallback stays on this page (Play Production not live). iOS uses `com.cinemastro.app://localhost/join/:token`. Web-only — no new AAB.

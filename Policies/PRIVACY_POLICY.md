@@ -1,6 +1,6 @@
 # PRIVACY POLICY
 
-**Last updated April 27, 2026**
+**Last updated September 18, 2026**
 
 ---
 
@@ -183,8 +183,9 @@ You can unsubscribe from our marketing and promotional communications at any tim
 
 If you would at any time like to review or change the information in your account or terminate your account, you can:
 
-- Log in to your account settings and update your user account.
-- Contact us using the contact information provided.
+- Log in and open **Profile → Settings** to update your display name and preferences, or tap **Delete account** (type DELETE to confirm).
+- Visit https://cinemastro.com/privacy#delete-account for the same in-app path (Play / store listing).
+- If you cannot sign in, email us at support@cinemastro.com.
 
 Upon your request to terminate your account, we will deactivate or delete your account and information from our active databases. However, we may retain some information in our files to prevent fraud, troubleshoot problems, assist with any investigations, enforce our legal terms and/or comply with applicable legal requirements.
 
