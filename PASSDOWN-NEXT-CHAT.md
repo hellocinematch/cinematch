@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-09-18 — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.85** on **staging** (web). **7.0.84** still on **main** / Play Internal **2**. **Trademark:** **§ USPTO trademark**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-09-18 — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.85** on **staging + main** (web). Play Internal **2** still **7.0.84**. **Trademark:** **§ USPTO trademark**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.85** — web **Open in Cinemastro** on `/join` + **`/join` wins over recovery** (staging; no new AAB). **7.0.84** — Android FCM circle banners; Edge **`push-circle-badge` `1.2.0`** (redeployed); **`assetlinks.json`** SHA-256 colon format for Digital Asset Links. **7.0.83** — native viewport reset after email-confirm deep link (**Xcode device verify still backlog**). **7.0.82** — Beta label off; email confirm → app scheme. Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.85** — web **Open in Cinemastro** on `/join` + **`/join` wins over recovery** (staging + prod; no new AAB). **7.0.84** — Android FCM circle banners; Edge **`push-circle-badge` `1.2.0`** (redeployed); **`assetlinks.json`** SHA-256 colon format for Digital Asset Links. **7.0.83** — native viewport reset after email-confirm deep link (**Xcode device verify still backlog**). **7.0.82** — Beta label off; email confirm → app scheme. Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). **Google Play:** **§ Google Play**. **Native verify 7.0.83:** **§ Capacitor → Next engineering**.
 
@@ -10,13 +10,13 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.85** on **staging** (web Open in Cinemastro on `/join` + `/join` wins over recovery). **7.0.84** on **main** and Play Internal **2**. Routine ships → **`origin/staging`**; push **`main`** only when asked. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.85** on **staging + main** (web Open in Cinemastro on `/join` + `/join` wins over recovery). Play Internal **2** still **7.0.84**. Routine ships → **`origin/staging`**; push **`main`** only when asked. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
 > **Local `.env`:** Prefer **staging-only** day-to-day. Native **`npm run build:app`** bakes `.env`. No new AAB for 7.0.85.
 >
 > **App Store:** **Ready for Distribution** (auto-release, 2026-08-24). Live binary = **7.0.82** archive. Demo **`apple.review@…`** (do not onboard). Attachment 14 due **2026-10-01**.
 >
-> **Google Play:** Internal **2 (7.0.84)**. **Do not** Open/Production unless asked. Moto (`dimanicontacts@gmail.com`): App Links work if the user turns **www.cinemastro.com** on in Open by default; first tap still often lands in Chrome. **7.0.85** adds web **Open in Cinemastro** — retest in Chrome on Moto with the domain **left off**, using a **staging** `/join` URL (prod www still 7.0.84 until main).
+> **Google Play:** Internal **2 (7.0.84)**. **Do not** Open/Production unless asked. Moto (`dimanicontacts@gmail.com`): App Links work if the user turns **www.cinemastro.com** on in Open by default; first tap still often lands in Chrome. **7.0.85** is on **www.cinemastro.com** — retest `/join` in Chrome with the domain **left off**.
 >
 > **Parked:** delete account; confirm-email custom scheme / https interstitial; Discover iOS keyboard (**§1g.k**); **7.0.83** iOS device verify; product **1a–1e**, **§1f**, **§1g.1**, **P2**.
 >
@@ -30,7 +30,7 @@
 
 | Item | State |
 |------|-------|
-| **Web app (staging / prod)** | **Staging 7.0.85** — Open in Cinemastro on `/join` + join-over-recovery. **Prod / main still 7.0.84** until asked. |
+| **Web app (staging / prod)** | **7.0.85** staging + prod — Open in Cinemastro on `/join` + join-over-recovery. |
 | **Native app** | **Capacitor 8**. App Store live **7.0.82**. Play Internal **2 (7.0.84)** **versionCode 2**. **7.0.83** iOS device verify still backlog. **7.0.85 is web-only** (no new AAB). |
 | **Apple / App Store** | **Ready for Distribution** (auto-release, 2026-08-24). |
 | **Google Play** | Internal **2 (7.0.84)**. Moto join: App Links if domain enabled; Chrome first-tap still common. **Do not** Open/Production. |
@@ -60,7 +60,7 @@
 
 *Bundled shell; backend = whatever **`.env`** was at **`npm run build:app`**.*
 
-**Shipped (through **7.0.85** web on staging; native binaries through **7.0.84**):**
+**Shipped (through **7.0.85** web on staging + prod; native binaries through **7.0.84**):**
 
 - **Capacitor 8** — **`com.cinemastro.app`**, **iPhone-only**, safe areas, strip scroll, auth deep links, email confirm → app scheme, universal **`/join`**, icons, export-compliance plist flag.
 - **7.0.85** — Web **Open in Cinemastro** on `/join` (Android `intent://` + iOS custom scheme; hidden in native shell). **`/join` wins over recovery**. No new AAB.
@@ -86,7 +86,7 @@ npm run build:app && open ios/App/App.xcodeproj
 - [ ] **Verify 7.0.83 on device (staging bake):** email confirm from Mail → Open in app → Circles layout fits (no overflow). User deferred Xcode run — **do this before promoting 7.0.83 to prod / new TF**.
 - [x] **App Store** — approved; **Ready for Distribution** (auto-release). Live = **7.0.82** archive.
 - [ ] **Promote 7.0.83 → `origin/main`** when device-verified (next store/TF build).
-- [ ] **Google Play** — Internal **2 (7.0.84)** live with FCM. Retest **7.0.85** staging `/join` in Chrome (domain off) → Open in Cinemastro. Don’t Open/Production unless asked.
+- [ ] **Google Play** — Internal **2 (7.0.84)** live with FCM. Retest **7.0.85** prod `/join` in Chrome (domain off) → Open in Cinemastro. Don’t Open/Production unless asked.
 - [ ] **Discover keyboard (§1g.k)** — after Play **production** submitted (not before).
 - [ ] **External TestFlight** (optional).
 - [ ] Optional: in-app **Delete account** (Apple may require; currently support email only).
@@ -122,7 +122,7 @@ npm run build:app && open ios/App/App.xcodeproj
 - [x] Wire release signing (local; commit when user asks — no secrets)
 - [x] Set **`ANDROID_SHA256_FINGERPRINT`** / **`ANDROID_SHA256_FINGERPRINTS`** on **prod** Vercel (Play app-signing + upload). Staging project optional. Colon format requires **7.0.84** web build.
 - [x] Prod bake → **`npm run build:app`** → signed **AAB** → Internal testing
-- [ ] Smoke (Veena / Moto): auth **done**; onboarding, Discover, Circles. **7.0.85** staging `/join` Open-in-app retest with App Links **off**.
+- [ ] Smoke (Veena / Moto): auth **done**; onboarding, Discover, Circles. **7.0.85** prod `/join` Open-in-app retest with App Links **off**.
 
 ### Phase 2 — Store listing
 - [x] Short + full description (App Store copy)
@@ -147,7 +147,7 @@ npm run build:app && open ios/App/App.xcodeproj
 - [x] Prod-bake AAB **versionCode 2** / **7.0.84** (upload Internal if not yet)
 - [x] Vercel **`ANDROID_SHA256_*`** on prod; colon format in **7.0.84** generator
 
-**Next Play:** **7.0.85** staging join retest (Chrome, domain off). Promote to **main** when that works. Don’t Open/Production.
+**Next Play:** **7.0.85** is on prod web. Retest join in Chrome on Moto (domain off). Don’t Open/Production.
 
 ---
 
@@ -410,11 +410,11 @@ npm run build:app && open ios/App/App.xcodeproj
 
 **Last session (2026-09-18)**
 
-- **Last note:** Code **Open in Cinemastro** on web `/join` (Android intent + iOS custom scheme; hide in native shell) + **`/join` wins over recovery**. Web-only — no new AAB. Ship **staging**, retest join in Chrome on Moto with the domain left off. Parked: delete account, confirm-email custom scheme, §1g.k, 7.0.83 iOS verify, 1a–1e, §1f, P2. USPTO: **https://tsdr.uspto.gov** serial **99792884**. Don’t Open/Production.
+- **Last note:** Push **7.0.85** to prod (user has no staging test path). Web-only — no new AAB. Retest `/join` in Chrome on Moto with **www.cinemastro.com** left off in Open by default. Don’t Open/Production. Parked: delete account, confirm-email custom scheme, §1g.k, 7.0.83 iOS verify, 1a–1e, §1f, P2. USPTO: **https://tsdr.uspto.gov** serial **99792884**.
 
-- **Shipped this session:** **7.0.85** on **origin/staging** (not main). Circle-invite screen shows **Open in Cinemastro** in mobile browsers. Android `intent://` targets `com.cinemastro.app` for the current host `/join/:token` (works with Open by default off); iOS `com.cinemastro.app://localhost/join/:token`. Leftover recovery session no longer steals `/join`.
+- **Shipped this session:** **7.0.85** on **origin/staging** and **origin/main**. Circle-invite screen shows **Open in Cinemastro** in mobile browsers. Android `intent://` targets `com.cinemastro.app` for the current host `/join/:token` (works with Open by default off); iOS `com.cinemastro.app://localhost/join/:token`. Leftover recovery session no longer steals `/join`.
 
-- **Retest:** Staging invite URL in Chrome on Moto, **www.cinemastro.com** / staging host **left off** in Open by default. Prod www is still **7.0.84** until main.
+- **Retest:** Prod invite `https://www.cinemastro.com/join/…` in Chrome on Moto, domain **left off**. Wait for Vercel prod deploy (Profile **v7.0.85**).
 
 - **Parked:** delete account; confirm-email custom scheme; Discover iOS keyboard (§1g.k); **7.0.83** iOS device verify; **1a–1e**, **§1f**, **§1g.1**, **P2**; Circle Recent “Rated by” UI.
 
