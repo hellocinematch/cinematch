@@ -31,6 +31,49 @@ export function isNativeApp() {
   return Capacitor.isNativePlatform();
 }
 
+/** Phone/tablet browser UA — not the Capacitor WebView. */
+export function isMobileWebBrowser() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/android/i.test(ua)) return true;
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+/** Show “Open in Cinemastro” on web `/join` only (hide inside the native shell). */
+export function shouldShowOpenInNativeApp() {
+  return !isNativeApp() && isMobileWebBrowser();
+}
+
+/**
+ * Hand `/join/:token` to the installed app from Chrome/Safari.
+ * Android: explicit `intent://` (works even when App Links are off in Open by default).
+ * Fallback stays on this join page if the app is missing (Play Production not live).
+ * iOS: custom scheme already handled by {@link handleAppDeepLink}.
+ */
+export function openInNativeAppJoinHref(token) {
+  const t = String(token || "").trim();
+  if (!t) return "";
+  const path = `/join/${encodeURIComponent(t)}`;
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
+  if (/android/i.test(ua)) {
+    const origin =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : getPublicSiteOrigin();
+    const httpsUrl = `${String(origin).replace(/\/+$/, "")}${path}`;
+    let hostAndPath = path;
+    try {
+      const parsed = new URL(httpsUrl);
+      hostAndPath = `${parsed.host}${parsed.pathname}`;
+    } catch {
+      /* keep path */
+    }
+    return `intent://${hostAndPath}#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=${NATIVE_APP_AUTH_SCHEME};S.browser_fallback_url=${encodeURIComponent(httpsUrl)};end`;
+  }
+  return `${NATIVE_APP_AUTH_SCHEME}://localhost${path}`;
+}
+
 /** Queued when appUrlOpen fires before React auth listeners mount. */
 export function takePendingDeepLink() {
   const u = pendingDeepLinkUrl;

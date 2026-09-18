@@ -1,5 +1,10 @@
 # Changelog
 
+## 7.0.85
+
+- **Web — Open in Cinemastro on `/join`:** Phone browsers (not the native shell) get **Open in Cinemastro** on the circle-invite screen. Android uses an `intent://` link for the current host `/join/:token` (`package=com.cinemastro.app`) so the installed app opens even when App Links are off in Open by default; if the app isn’t installed, fallback stays on this page (Play Production not live). iOS uses `com.cinemastro.app://localhost/join/:token`. Web-only — no new AAB.
+- **Auth — `/join` wins over recovery:** A leftover password-recovery session no longer steals the invite screen when the path is `/join/:token`.
+
 ## 7.0.84
 
 - **Native (Android) — circle publish banners via FCM:** Same circle-publish event as iOS (`push-circle-badge` **`1.2.0`**). Android registers an FCM token (`device_push_tokens.platform = android`); Edge sends an FCM HTTP v1 alert (title = circle name, body = “Someone shared a rating.”). Tap opens that circle. Unpublish remains **iOS badge-only** (Android has no reliable home-screen badge). **Ops:** Firebase Android app for **`com.cinemastro.app`**; add upload + Play app-signing SHA-1/256; copy **`google-services.json`** to **`android/app/`** (see **`google-services.json.example`**); set Edge secret **`FCM_SERVICE_ACCOUNT_JSON`** (Firebase service account) on **staging + prod**; **redeploy** `push-circle-badge`; **`npm run build:app`** with the intended `.env`; new Play Internal AAB (**versionCode 2**).

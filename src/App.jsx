@@ -8,6 +8,9 @@ import {
   AUTH_DEEPLINK_EVENT,
   takePendingDeepLink,
   handleAppDeepLink,
+  deepLinkIndicatesJoin,
+  shouldShowOpenInNativeApp,
+  openInNativeAppJoinHref,
 } from "./authRedirect.js";
 import {
   NATIVE_VIEWPORT_RESET_EVENT,
@@ -2760,6 +2763,12 @@ function urlIndicatesPasswordRecovery() {
   return /type=recovery(?:&|$|#|%26)/.test(h) || /type%3[Dd]recovery/.test(window.location.search + h);
 }
 
+/** `/join/:token` in the address bar beats a leftover recovery session. */
+function urlIndicatesCircleJoin() {
+  if (typeof window === "undefined") return false;
+  return deepLinkIndicatesJoin(window.location.href);
+}
+
 
 // ---------------------------------------------------------------------------
 // Where to Watch
@@ -3956,6 +3965,10 @@ export default function App() {
     // Hydrate user; do not navigate to home here — avoids racing PASSWORD_RECOVERY (PKCE) and overwriting the reset screen.
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) setUser(session.user);
+      if (urlIndicatesCircleJoin()) {
+        setScreen("circle-join");
+        return;
+      }
       if (session?.user && (urlIndicatesPasswordRecovery() || isPasswordRecoverySession(session))) {
         routeRecovery();
       }
@@ -3964,13 +3977,21 @@ export default function App() {
       /* Safari tab resume: token refresh should not reset `user` or retrigger match/catalogue effects. */
       if (event === "TOKEN_REFRESHED") return;
       if (event === "PASSWORD_RECOVERY") {
-        routeRecovery();
         setUser(session?.user ?? null);
+        if (urlIndicatesCircleJoin()) {
+          setScreen("circle-join");
+          return;
+        }
+        routeRecovery();
         return;
       }
       if (session?.user && (urlIndicatesPasswordRecovery() || isPasswordRecoverySession(session)) && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
-        routeRecovery();
         setUser(session.user);
+        if (urlIndicatesCircleJoin()) {
+          setScreen("circle-join");
+          return;
+        }
+        routeRecovery();
         return;
       }
       if (session?.user && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
@@ -4000,6 +4021,16 @@ export default function App() {
         const code = new URLSearchParams(window.location.search).get("code");
         if (code) {
           await supabase.auth.exchangeCodeForSession(code);
+        }
+
+        const joinTokEarly = readJoinInviteTokenFromPath(window.location.pathname);
+        if (joinTokEarly || ev?.detail?.join) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) setUser(session.user);
+          scrubAuthParamsFromLocation();
+          scheduleNativeShellViewportReset();
+          setScreen("circle-join");
+          return;
         }
 
         for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -4038,14 +4069,6 @@ export default function App() {
             ev?.detail?.authError ||
               "Reset link expired or could not be verified. Request a new one from the app (Forgot password).",
           );
-          return;
-        }
-
-        const joinTok = readJoinInviteTokenFromPath(window.location.pathname);
-        if (joinTok || ev?.detail?.join) {
-          scrubAuthParamsFromLocation();
-          scheduleNativeShellViewportReset();
-          setScreen("circle-join");
           return;
         }
         // Email confirm (or other non-recovery auth deep link) — session established; leave auth/splash.
@@ -10100,6 +10123,16 @@ export default function App() {
     );
   }
 
+  const circleJoinOpenAppToken = (
+    circleJoinModel.token ||
+    (typeof window !== "undefined" ? readJoinInviteTokenFromPath(window.location.pathname) : "") ||
+    ""
+  ).trim();
+  const circleJoinOpenAppHref =
+    screen === "circle-join" && shouldShowOpenInNativeApp() && circleJoinOpenAppToken
+      ? openInNativeAppJoinHref(circleJoinOpenAppToken)
+      : "";
+
   return (
     <div className="viewport-shell">
       <div
@@ -10222,6 +10255,14 @@ export default function App() {
         <div className="auth circle-join-flow">
           <div className="auth-inner">
             <div className="auth-title">Circle invite</div>
+            {circleJoinOpenAppHref ? (
+              <>
+                <a className="auth-btn auth-open-app" href={circleJoinOpenAppHref}>
+                  Open in Cinemastro
+                </a>
+                <div className="auth-or">or continue here</div>
+              </>
+            ) : null}
             {circleJoinModel.previewLoading && (
               <div className="auth-sub">Checking your invite…</div>
             )}
