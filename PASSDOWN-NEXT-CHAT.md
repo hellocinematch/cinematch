@@ -20,7 +20,7 @@
 >
 > **Supabase refs (do not swap):** **staging** **`lovpktgeutujljltlhdl`**; **prod** **`uwexmfmkaifvddnfuvpg`**.
 >
-> **7.0.86 delete-account ops:** Edge **`delete-account` `1.0.0`**. SQL **`20260918153000_prepare_account_deletion.sql`**. **Staging already applied + Edge deployed** (throwaway user gone from Auth). **Prod still needs:** apply that SQL in **prod** SQL Editor, then `npx supabase@latest functions deploy delete-account --project-ref uwexmfmkaifvddnfuvpg`.
+> **7.0.86 delete-account ops:** Edge **`delete-account` `1.0.0`** on **staging + prod**. SQL **`20260918153000_prepare_account_deletion.sql`**. **Staging SQL + Edge done** (throwaway user gone from Auth). **Prod Edge deployed** (`uwexmfmkaifvddnfuvpg`). **Prod still needs:** apply that SQL in the **prod** SQL Editor, then smoke with a throwaway prod user (not Veena).
 >
 > **Parked:** confirm-email custom scheme / https interstitial; Discover iOS keyboard (**§1g.k**); **7.0.83** iOS device verify; Android status-bar overlap (needs AAB); product **1a–1e**, **§1f**, **§1g.1**, **P2**.
 >
@@ -39,7 +39,7 @@
 | **Apple / App Store** | **Ready for Distribution** (auto-release, 2026-08-24). |
 | **Google Play** | Internal **2 (7.0.84)**. Moto join: App Links if domain enabled; Chrome first-tap still common. **Do not** Open/Production. |
 | **Supabase auth** | Staging + prod: **`com.cinemastro.app://localhost/`** (+ recovery). |
-| **Edge** | **`push-circle-badge` `1.2.0`** staging + prod. **`delete-account` `1.0.0`**: **staging done** (`lovpktgeutujljltlhdl`); **apply SQL + deploy on prod** (`uwexmfmkaifvddnfuvpg`). |
+| **Edge** | **`push-circle-badge` `1.2.0`** staging + prod. **`delete-account` `1.0.0`** staging + prod. **Prod SQL `20260918153000` still to apply** (`uwexmfmkaifvddnfuvpg`). |
 | **Client deploy** | **Vercel** (web); native = Xcode / Play. |
 | **USPTO trademark** | TSDR **https://tsdr.uspto.gov** (login) → serial **99792884**. Filed **2026-04-28**. Queue as of **2026-08-28**: examining **Mar 28–Apr 5**. |
 
@@ -94,7 +94,7 @@ npm run build:app && open ios/App/App.xcodeproj
 - [ ] **Google Play** — Internal **2 (7.0.84)** live with FCM. Retest **7.0.85** prod `/join` in Chrome (domain off) → Open in Cinemastro. Don’t Open/Production unless asked.
 - [ ] **Discover keyboard (§1g.k)** — after Play **production** submitted (not before).
 - [ ] **External TestFlight** (optional).
-- [x] **Delete account (7.0.86 staging + prod web):** Profile + `/privacy#delete-account`. Staging SQL + Edge done. **Prod:** apply **`20260918153000`** + deploy Edge **`delete-account`** on **`uwexmfmkaifvddnfuvpg`**.
+- [x] **Delete account (7.0.86 staging + prod web):** Profile + `/privacy#delete-account`. Staging SQL + Edge done. Prod Edge **`delete-account` `1.0.0`** deployed. **Prod still:** apply **`20260918153000`** on **`uwexmfmkaifvddnfuvpg`**.
 - [ ] Optional: staging bundle id variant (not set up).
 
 **Parked / discussed:** Anonymous non-circle pushes; Web Push PWA; OAuth/phone multi-account (OK for now); CA/IN store listing vs **availability_region** product work (P2).
@@ -293,7 +293,7 @@ npm run build:app && open ios/App/App.xcodeproj
 
 - [x] **Clear / delete a rating (per title):** **Shipped 7.0.42** — title detail **Clear rating** + migration.
 
-- [x] **Delete account (7.0.86 staging + prod web):** Self-service + privacy copy. Prod SQL + Edge deploy still needed on **`uwexmfmkaifvddnfuvpg`**.
+- [x] **Delete account (7.0.86 staging + prod web):** Self-service + privacy copy. Prod Edge deployed. **Prod SQL `20260918153000` still needed** on **`uwexmfmkaifvddnfuvpg`**.
 
 **Security**
 
@@ -422,7 +422,7 @@ npm run build:app && open ios/App/App.xcodeproj
 
 - **Supabase refs (confirmed):** **staging** **`lovpktgeutujljltlhdl`** (SQL + Edge **`delete-account` `1.0.0`** already live; throwaway user gone from Auth). **prod** **`uwexmfmkaifvddnfuvpg`**.
 
-- **Ops still needed on prod:** apply **`20260918153000_prepare_account_deletion.sql`** in prod SQL Editor; `npx supabase@latest functions deploy delete-account --project-ref uwexmfmkaifvddnfuvpg`. Then smoke with a **throwaway prod** user (not Veena).
+- **Ops still needed on prod:** apply **`20260918153000_prepare_account_deletion.sql`** in the **prod** SQL Editor (`uwexmfmkaifvddnfuvpg`). Edge **`delete-account` `1.0.0`** already deployed to prod. Then smoke with a **throwaway prod** user (not Veena).
 
 - **Parked:** confirm-email custom scheme; Discover iOS keyboard (§1g.k); **7.0.83** iOS device verify; Android status-bar overlap; **1a–1e**, **§1f**, **§1g.1**, **P2**. Don’t Open/Production.
 
