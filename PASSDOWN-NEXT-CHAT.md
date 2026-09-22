@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-09-18 — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.86** on **staging + main / prod web** (delete account: SQL + Edge + throwaway smoke **both envs**). Play Internal **2** still **7.0.84**. No new AAB. **Trademark:** **§ USPTO trademark**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-09-22 — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.87** on **staging** (circle title cards). **Prod / main still 7.0.86**. Play Internal **2** still **7.0.84**. **Next:** Play **Production (US)** — then CA/IN **`availability_region`**. No new AAB. **Trademark:** **§ USPTO trademark**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.86** — self-service **Delete account** (Profile + `/privacy#delete-account`; Edge **`1.0.0`** + SQL **`20260918153000`** applied **staging + prod**; throwaway smoke both envs; no new AAB). **7.0.85** — web **Open in Cinemastro** on `/join` + **`/join` wins over recovery** (staging + prod; no new AAB). **7.0.84** — Android FCM circle banners; Edge **`push-circle-badge` `1.2.0`** (redeployed); **`assetlinks.json`** SHA-256 colon format for Digital Asset Links. **7.0.83** — native viewport reset after email-confirm deep link (**Xcode device verify still backlog**). Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.87** — Circles title cards: no poster-corner badge; **1 of 11 rated** under the orange pill (staging only; user verified locally). **7.0.86** — self-service **Delete account** (Profile + `/privacy#delete-account`; Edge **`1.0.0`** + SQL **`20260918153000`** applied **staging + prod**; throwaway smoke both envs; no new AAB). **7.0.85** — web **Open in Cinemastro** on `/join` + **`/join` wins over recovery** (staging + prod; no new AAB). **7.0.84** — Android FCM circle banners; Edge **`push-circle-badge` `1.2.0`** (redeployed); **`assetlinks.json`** SHA-256 colon format. Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). **Google Play:** **§ Google Play**. **Native verify 7.0.83:** **§ Capacitor → Next engineering**.
 
@@ -10,19 +10,19 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.86** on **staging + main / prod web** (`e93ffe0`). Play Internal **2** still **7.0.84**. Routine ships → **`origin/staging`**; push **`main`** only when asked. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.87** on **staging** (circle title cards). **Prod / main still 7.0.86**. Play Internal **2** still **7.0.84**. **Next:** Play **Production (US)**; CA/IN after that. Routine ships → **`origin/staging`**; push **`main`** only when asked. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
-> **Local `.env`:** Prefer **staging-only** day-to-day. Native **`npm run build:app`** bakes `.env`. No new AAB for 7.0.86.
+> **Local `.env`:** Prefer **staging-only** day-to-day. Native **`npm run build:app`** bakes `.env`. No new AAB for 7.0.87.
 >
 > **App Store:** **Ready for Distribution** (auto-release, 2026-08-24). Live binary = **7.0.82** archive. Demo **`apple.review@…`** (do not onboard). Attachment 14 due **2026-10-01**.
 >
-> **Google Play:** Internal **2 (7.0.84)**. **Do not** Open/Production unless asked. Listing delete-account URL **`https://www.cinemastro.com/privacy`** now matches **7.0.86** prod web.
+> **Google Play:** Internal **2 (7.0.84)**. **Next after break:** Play **Production (US first)**. CA/IN store + **`availability_region`** **after** Play. Listing delete-account URL **`https://www.cinemastro.com/privacy`** matches **7.0.86** prod web.
 >
 > **Supabase refs (do not swap):** **staging** **`lovpktgeutujljltlhdl`**; **prod** **`uwexmfmkaifvddnfuvpg`**.
 >
 > **7.0.86 delete-account:** Edge **`delete-account` `1.0.0`** on **staging + prod**. SQL **`20260918153000_prepare_account_deletion.sql`** applied **staging + prod**. Throwaway delete tested on **staging and prod** (Auth user gone).
 >
-> **Parked:** confirm-email https interstitial / custom-scheme browser path — iPhone Mail/iCloud works; Cox user “nothing on confirm” opened the link in **webmail**. Most users confirm from the Mail app; leave parked. Discover iOS keyboard (**§1g.k**); **7.0.83** iOS device verify; Android status-bar overlap (needs AAB); product **1a–1e**, **§1f**, **§1g.1**, **P2**.
+> **Parked:** CA/IN region-specific release (**`availability_region`**, store territories) until **after** Play Production. Confirm-email https interstitial / custom-scheme browser path — iPhone Mail/iCloud works; Cox miss was **webmail**. Discover iOS keyboard (**§1g.k**); **7.0.83** iOS device verify; Android status-bar overlap (needs AAB); product **1a–1e**, **§1f**, **§1g.1**, **P2**.
 >
 > **USPTO trademark:** When user asks where to check status → **https://tsdr.uspto.gov** (login) → serial **99792884**. Filed **2026-04-28**. As of **2026-08-28**, examining-attorney queue was **Mar 28–Apr 5**.
 >
@@ -34,10 +34,10 @@
 
 | Item | State |
 |------|-------|
-| **Web app (staging / prod)** | **Staging + prod / main 7.0.86** — Delete account (`e93ffe0`). |
+| **Web app (staging / prod)** | **Staging 7.0.87** — circle title cards. **Prod / main 7.0.86** — delete account. |
 | **Native app** | **Capacitor 8**. App Store live **7.0.82**. Play Internal **2 (7.0.84)** **versionCode 2**. **7.0.83** iOS device verify still backlog. **7.0.86 is web-only** (no new AAB). |
 | **Apple / App Store** | **Ready for Distribution** (auto-release, 2026-08-24). |
-| **Google Play** | Internal **2 (7.0.84)**. Moto join: App Links if domain enabled; Chrome first-tap still common. **Do not** Open/Production. |
+| **Google Play** | Internal **2 (7.0.84)**. **Next:** Production **US** (user asked 2026-09-18; take up after break). CA/IN after Play. |
 | **Supabase auth** | Staging + prod: **`com.cinemastro.app://localhost/`** (+ recovery). |
 | **Edge** | **`push-circle-badge` `1.2.0`** staging + prod. **`delete-account` `1.0.0`** staging + prod. SQL **`20260918153000`** applied **staging + prod**. |
 | **Client deploy** | **Vercel** (web); native = Xcode / Play. |
@@ -91,19 +91,19 @@ npm run build:app && open ios/App/App.xcodeproj
 - [ ] **Verify 7.0.83 on device (staging bake):** email confirm from Mail → Open in app → Circles layout fits (no overflow). User deferred Xcode run — **do this before promoting 7.0.83 to prod / new TF**.
 - [x] **App Store** — approved; **Ready for Distribution** (auto-release). Live = **7.0.82** archive.
 - [ ] **Promote 7.0.83 → `origin/main`** when device-verified (next store/TF build).
-- [ ] **Google Play** — Internal **2 (7.0.84)** live with FCM. Retest **7.0.85** prod `/join` in Chrome (domain off) → Open in Cinemastro. Don’t Open/Production unless asked.
+- [ ] **Google Play Production (US)** — user wants this **next** (after 2026-09-18 break). Internal **2 (7.0.84)** live with FCM. Retest **7.0.85** prod `/join` in Chrome (domain off) → Open in Cinemastro. New AAB only if Production needs a newer binary than **7.0.84**.
 - [ ] **Discover keyboard (§1g.k)** — after Play **production** submitted (not before).
 - [ ] **External TestFlight** (optional).
 - [x] **Delete account (7.0.86 staging + prod web):** Profile + `/privacy#delete-account`. Edge **`delete-account` `1.0.0`** + SQL **`20260918153000`** applied **staging + prod**. Throwaway delete tested both envs (Auth user gone).
 - [ ] Optional: staging bundle id variant (not set up).
 
-**Parked / discussed:** Anonymous non-circle pushes; Web Push PWA; OAuth/phone multi-account (OK for now); CA/IN store listing vs **availability_region** product work (P2).
+**Parked / discussed:** Anonymous non-circle pushes; Web Push PWA; OAuth/phone multi-account (OK for now); **CA/IN** store + **`availability_region`** until **after** Play Production (P2).
 
 ---
 
 ## Google Play (internal live — 2026-08-25)
 
-*Live Internal AAB is **7.0.84** (FCM, **versionCode 2**). **7.0.85** is **web-only**. Do **not** start Open testing / Production unless the user asks.*
+*Live Internal AAB is **7.0.84** (FCM, **versionCode 2**). **7.0.85–7.0.86** are **web-only**. **Next after break:** Production **US**. CA/IN store territories wait until after that.*
 
 **Identity:** Play login = Google account on **`dev@cinemastro.com`** (Namecheap mailbox + “use my current email”). **Organization**; **DUNS** = same as Apple. Developer name **Cinemastro, LLC**. Org contact **`support@cinemastro.com`**. Search Console owner **`tlmahesh`**; **`dev@`** extra **Owner**. Website/identity/phone **verified**.
 
@@ -141,7 +141,7 @@ npm run build:app && open ios/App/App.xcodeproj
 ### Phase 4 — Release
 - [x] Internal testing live
 - [ ] Closed (optional)
-- [ ] **Production** + Play review when user asks (US only)
+- [ ] **Production** + Play review — **next after break** (US only). Closed optional. Do not add CA/IN store countries in this first Production pass.
 
 ### Phase 5 — Push parity (7.0.84)
 - [x] Client: register FCM token on Android (`nativePush.js`)
@@ -152,7 +152,7 @@ npm run build:app && open ios/App/App.xcodeproj
 - [x] Prod-bake AAB **versionCode 2** / **7.0.84** (upload Internal if not yet)
 - [x] Vercel **`ANDROID_SHA256_*`** on prod; colon format in **7.0.84** generator
 
-**Next Play:** **7.0.85** is on prod web. Retest join in Chrome on Moto (domain off). Don’t Open/Production.
+**Next Play:** Production **US** after break. **7.0.85** is on prod web — retest join in Chrome on Moto (domain off). CA/IN later.
 
 ---
 
@@ -248,7 +248,7 @@ npm run build:app && open ios/App/App.xcodeproj
 ### Priority 2 — US geo / availability (product)
 
 - [ ] **Geo-blocking banner or notice:** Infer location (**IP / Edge / CDN**, optional **user confirms US residency**) and show non-US users: **"Cinemastro is currently available to US users only."** Choose **warn-only (proceed at own risk)** vs **hard block** — **TBD** with Terms/privacy. *(Not implemented.)*
-- [ ] **Multi-market availability (discussed 2026-05-28, not designed in passdown depth):** Today **taste** = **`show_region_keys`** + **`secondary_region_key`**; **availability** = hardcoded **US** TMDB (`region` / `watch_region`, **`fetchWatchProviders` → `results.US`**, US provider IDs). Real multi-region needs **`profiles.availability_region`** (or similar) threaded through discover, WTW, detail cert/release, provider maps; **CF/ratings** can stay global by **`tmdb_id`** (cold start in new markets). Phases: (0) policy → (1) profile market + WTW + detail → (2) strips/onboarding → (3) regional scores/CF → (4) geo gate + per-region pulse. See chat before coding.
+- [ ] **Multi-market availability — after Play Production:** Discussed 2026-09-18: **Play US first**, then CA/IN. Today **taste** = **`show_region_keys`** + **`secondary_region_key`**; **availability** = hardcoded **US** TMDB (`region` / `watch_region`, **`fetchWatchProviders` → `results.US`**, US provider IDs). Real multi-region needs **`profiles.availability_region`** (`US` \| `CA` \| `IN`) threaded through discover, WTW, detail cert/release, provider maps; **CF/ratings** stay global by **`tmdb_id`**. Phases: (0) policy / Terms (still “US only”) → (1) profile market + WTW + detail → (2) strips/onboarding → (3) regional scores/CF → (4) geo gate + per-region pulse. Canada cheaper (Crave + CA theaters); India = home OTT map, not secondary-taste reuse. See chat before coding.
 
 ### Repo / ops / parity
 
@@ -414,15 +414,15 @@ npm run build:app && open ios/App/App.xcodeproj
 
 ## Open / follow-ups
 
-**Last session (2026-09-18)**
+**Last session (2026-09-22)**
 
-- **Last note:** Leave confirm-email https interstitial / custom-scheme browser path **parked** — most users confirm from the **Mail app**. iPhone Mail/iCloud works. Cox user “nothing on confirm” had opened the link in **webmail**. **Do not** Play Open/Production.
+- **Last note:** **7.0.87** circle title cards verified locally; commit + push **`origin/staging`** only. **Do not** push **`main`** / prod until asked. **Next:** Play **Production (US)**. CA/IN after Play.
 
-- **Shipped:** **7.0.86** on **`origin/staging` + `origin/main`** (`e93ffe0`). Profile + `/privacy#delete-account`. Edge **`delete-account` `1.0.0`** + SQL **`20260918153000`** applied **staging + prod**. Throwaway delete tested **staging and prod** (Auth user gone).
+- **Shipped:** **7.0.87** on **staging** — Recent posters drop corner badge; **1 of 11 rated** under orange pill; same on All/Top; hidden for solo circles. **Prod / main still 7.0.86**.
 
 - **Supabase refs (do not swap):** **staging** **`lovpktgeutujljltlhdl`**; **prod** **`uwexmfmkaifvddnfuvpg`**.
 
-- **Parked (unchanged):** confirm-email custom scheme / https interstitial; Discover iOS keyboard (§1g.k); **7.0.83** iOS device verify; Android status-bar overlap (needs AAB); **1a–1e**, **§1f**, **§1g.1**, **P2**.
+- **Parked:** CA/IN region work; confirm-email custom scheme / https interstitial (Mail works; Cox miss was webmail); **§1g.k**; **7.0.83** iOS device verify; Android status-bar overlap (needs AAB); **1a–1e**, **§1f**, **§1g.1**.
 
 ---
 

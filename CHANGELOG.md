@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.87
+
+- **Circles — title cards:** Recent posters no longer show the corner your / predicted / community badge (title detail unchanged). **N rated** moves under the orange circle pill and reads **1 of 11 rated** (raters of members). Same line on All / Top instead of `(N)` on the pill. Hidden for solo (1-member) circles. Web-only — no new AAB.
+
 ## 7.0.86
 
 - **Account — self-service delete:** Profile → Settings → **Delete account** (type **DELETE**). Circles with only you are removed; circles with other members stay and **`creator_id`** moves to the next host (earliest remaining `joined_at`). Ratings, watchlist, profile, and the auth user are wiped. Privacy **`/privacy#delete-account`** / **`#data-request`** documents the same path (Play listing already points at `/privacy`) and offers the button when signed in. **Ops (staging first):** apply **`20260918153000_prepare_account_deletion.sql`**; deploy Edge **`delete-account` `1.0.0`**. Web-only — no new AAB.

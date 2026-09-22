@@ -3190,6 +3190,24 @@ function CircleGroupScoreIcon({ variant = "strip" }) {
   );
 }
 
+/** Circle titles: "1 of 11 rated". Hidden for solo circles (1 of 1) or when nobody rated. */
+function formatCircleRaterOutOf(rated, members) {
+  const r = Number(rated);
+  const m = Number(members);
+  if (!Number.isFinite(r) || r < 1 || !Number.isFinite(m) || m <= 1) return null;
+  return `${r} of ${m} rated`;
+}
+
+function CircleRaterOutOfLine({ rated, members, className }) {
+  const label = formatCircleRaterOutOf(rated, members);
+  if (!label) return null;
+  return (
+    <div className={className} aria-label={label}>
+      {label}
+    </div>
+  );
+}
+
 /**
  * Circles — Recent strip: under the title — circle aggregate only (orange ⭐ + score).
  * Community / TMDB on title detail. Omits if no circle average.
@@ -3231,19 +3249,13 @@ function CircleStripRingCineBelowTitle({ groupRating, onWhoPublished }) {
 }
 
 /** Circle All/Top list row: orange ⭐+Circle · “You” (community on title detail). */
-function CircleAllTopRatingsLine({ row, showRaterParen, onWhoPublished }) {
+function CircleAllTopRatingsLine({ row, onWhoPublished }) {
   const gr = row.group_rating;
   const vs = row.viewer_score;
-  const distinctRaters = Number(row.distinct_circle_raters ?? 0);
   const hasCircle = gr != null && Number.isFinite(Number(gr));
   const hasYou = vs != null && Number.isFinite(Number(vs));
-  const showParen = Boolean(showRaterParen) && hasCircle && distinctRaters > 0;
   const canWhoPub = hasCircle && typeof onWhoPublished === "function";
-  const circleA11y = hasCircle
-    ? showParen
-      ? `Circle ${formatScore(Number(gr))}, ${distinctRaters} rated in this circle`
-      : `Circle ${formatScore(Number(gr))}`
-    : null;
+  const circleA11y = hasCircle ? `Circle ${formatScore(Number(gr))}` : null;
 
   if (!hasCircle && !hasYou) {
     return <div className="circle-rated-list-ratings circle-rated-list-ratings--empty">—</div>;
@@ -3273,11 +3285,6 @@ function CircleAllTopRatingsLine({ row, showRaterParen, onWhoPublished }) {
           <span className="circle-list-rating circle-list-rating--circle" aria-hidden={true}>
             <CircleGroupScoreIcon variant="list" />
             <span className="circle-list-rating__num">{formatScore(Number(gr))}</span>
-            {showParen ? (
-              <span className="circle-list-rating__paren" aria-hidden="true">
-                ({distinctRaters})
-              </span>
-            ) : null}
           </span>
         </button>
         {hasYou && hasCircle ? (
@@ -3296,19 +3303,10 @@ function CircleAllTopRatingsLine({ row, showRaterParen, onWhoPublished }) {
       <span
         key="c"
         className="circle-list-rating circle-list-rating--circle"
-        aria-label={
-          showParen
-            ? `Circle score ${formatScore(Number(gr))}, ${distinctRaters} rated in this circle`
-            : `Circle score ${formatScore(Number(gr))}`
-        }
+        aria-label={`Circle score ${formatScore(Number(gr))}`}
       >
         <CircleGroupScoreIcon variant="list" />
         <span className="circle-list-rating__num">{formatScore(Number(gr))}</span>
-        {showParen ? (
-          <span className="circle-list-rating__paren" aria-hidden="true">
-            ({distinctRaters})
-          </span>
-        ) : null}
       </span>,
     );
   }
@@ -10962,7 +10960,6 @@ export default function App() {
                       </div>
                     );
                   }
-                  const showStripRaterCounts = mc > 2;
                   const ratingsTabs = (
                     <div className="section-header circle-detail-strip-header circle-detail-strip-header--tabs">
                       <div className="section-title">Ratings</div>
@@ -11004,16 +11001,6 @@ export default function App() {
                     const rowKey = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
                     const predDetail = circleStripPredictionForDetail(row);
                     const distinctRaters = Number(row.distinct_circle_raters ?? 0);
-                    const predictedForBadge =
-                      row.viewer_score != null && Number.isFinite(Number(row.viewer_score))
-                        ? null
-                        : row.prediction != null && typeof row.prediction.predicted === "number"
-                          ? row.prediction.predicted
-                          : null;
-                    const predictedNeighborCount =
-                      row.prediction != null
-                        ? Number(row.prediction.neighborCount ?? row.prediction.neighbor_count ?? 0)
-                        : 0;
                     if (!movie) {
                       return (
                         <div
@@ -11193,23 +11180,18 @@ export default function App() {
                           <div className="circle-strip-poster-meta" aria-hidden="true">
                             {formatCircleTypeYearShort(movie, tvStripMetaByTmdbId)}
                           </div>
-                          <StripPosterBadge
-                            movie={movie}
-                            predicted={predictedForBadge}
-                            predictedNeighborCount={predictedForBadge != null ? predictedNeighborCount : 0}
-                          />
                         </div>
-                        {showStripRaterCounts && distinctRaters > 0 ? (
-                          <div className="circle-strip-rater-count">
-                            {distinctRaters === 1 ? "1 rated" : `${distinctRaters} rated`}
-                          </div>
-                        ) : null}
                         <div className="strip-title strip-title--circle-single" title={movie.title}>
                           {movie.title}
                         </div>
                         <CircleStripRingCineBelowTitle
                           groupRating={row.group_rating}
                           onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title)}
+                        />
+                        <CircleRaterOutOfLine
+                          rated={distinctRaters}
+                          members={mc}
+                          className="circle-strip-rater-count"
                         />
                       </div>
                     );
@@ -11289,8 +11271,12 @@ export default function App() {
                           </div>
                           <CircleAllTopRatingsLine
                             row={row}
-                            showRaterParen={showStripRaterCounts}
                             onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title)}
+                          />
+                          <CircleRaterOutOfLine
+                            rated={Number(row.distinct_circle_raters ?? 0)}
+                            members={mc}
+                            className="circle-list-rater-count"
                           />
                         </div>
                       </div>
