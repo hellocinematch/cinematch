@@ -1,8 +1,8 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-09-22 — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.87** on **staging** (circle title cards). **Prod / main still 7.0.86**. Play Internal **2** still **7.0.84**. **Next:** Play **Production (US)** — then CA/IN **`availability_region`**. No new AAB. **Trademark:** **§ USPTO trademark**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-09-22 — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.87** on **staging + main / prod web** (circle title cards). Play Internal **2** still **7.0.84**. **Next:** Play **Production (US)** — then CA/IN **`availability_region`**. No new AAB. **Trademark:** **§ USPTO trademark**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
 
-**Recent releases (high level):** **7.0.87** — Circles title cards: no poster-corner badge; **1 of 11 rated** under the orange pill (staging only; user verified locally). **7.0.86** — self-service **Delete account** (Profile + `/privacy#delete-account`; Edge **`1.0.0`** + SQL **`20260918153000`** applied **staging + prod**; throwaway smoke both envs; no new AAB). **7.0.85** — web **Open in Cinemastro** on `/join` + **`/join` wins over recovery** (staging + prod; no new AAB). **7.0.84** — Android FCM circle banners; Edge **`push-circle-badge` `1.2.0`** (redeployed); **`assetlinks.json`** SHA-256 colon format. Earlier — **`CHANGELOG`**.
+**Recent releases (high level):** **7.0.87** — Circles title cards: no poster-corner badge; **1 of 11 rated** under the orange pill (staging + prod web; no new AAB). **7.0.86** — self-service **Delete account** (Profile + `/privacy#delete-account`; Edge **`1.0.0`** + SQL **`20260918153000`** applied **staging + prod**; throwaway smoke both envs; no new AAB). **7.0.85** — web **Open in Cinemastro** on `/join` + **`/join` wins over recovery** (staging + prod; no new AAB). **7.0.84** — Android FCM circle banners; Edge **`push-circle-badge` `1.2.0`** (redeployed); **`assetlinks.json`** SHA-256 colon format. Earlier — **`CHANGELOG`**.
 
 **Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). **Google Play:** **§ Google Play**. **Native verify 7.0.83:** **§ Capacitor → Next engineering**.
 
@@ -10,7 +10,7 @@
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.87** on **staging** (circle title cards). **Prod / main still 7.0.86**. Play Internal **2** still **7.0.84**. **Next:** Play **Production (US)**; CA/IN after that. Routine ships → **`origin/staging`**; push **`main`** only when asked. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.87** on **staging + main / prod web** (circle title cards). Play Internal **2** still **7.0.84**. App Store live **7.0.82** (native will not show 7.0.87 until a new archive). **Next:** Play **Production (US)**; CA/IN after that. Routine ships → **`origin/staging`**; push **`main`** only when asked. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
 >
 > **Local `.env`:** Prefer **staging-only** day-to-day. Native **`npm run build:app`** bakes `.env`. No new AAB for 7.0.87.
 >
@@ -34,8 +34,8 @@
 
 | Item | State |
 |------|-------|
-| **Web app (staging / prod)** | **Staging 7.0.87** — circle title cards. **Prod / main 7.0.86** — delete account. |
-| **Native app** | **Capacitor 8**. App Store live **7.0.82**. Play Internal **2 (7.0.84)** **versionCode 2**. **7.0.83** iOS device verify still backlog. **7.0.86 is web-only** (no new AAB). |
+| **Web app (staging / prod)** | **Staging + prod / main 7.0.87** — circle title cards. |
+| **Native app** | **Capacitor 8**. App Store live **7.0.82**. Play Internal **2 (7.0.84)** **versionCode 2**. **7.0.83** iOS device verify still backlog. **7.0.87 is web-only** (no new AAB). |
 | **Apple / App Store** | **Ready for Distribution** (auto-release, 2026-08-24). |
 | **Google Play** | Internal **2 (7.0.84)**. **Next:** Production **US** (user asked 2026-09-18; take up after break). CA/IN after Play. |
 | **Supabase auth** | Staging + prod: **`com.cinemastro.app://localhost/`** (+ recovery). |
@@ -416,9 +416,9 @@ npm run build:app && open ios/App/App.xcodeproj
 
 **Last session (2026-09-22)**
 
-- **Last note:** **7.0.87** circle title cards verified locally; commit + push **`origin/staging`** only. **Do not** push **`main`** / prod until asked. **Next:** Play **Production (US)**. CA/IN after Play.
+- **Last note:** **7.0.87** on **staging + prod web**. App Store **7.0.82** / Play Internal **7.0.84** do not include this until a new native bake. **Next:** Play **Production (US)**. CA/IN after Play.
 
-- **Shipped:** **7.0.87** on **staging** — Recent posters drop corner badge; **1 of 11 rated** under orange pill; same on All/Top; hidden for solo circles. **Prod / main still 7.0.86**.
+- **Shipped:** **7.0.87** on **`origin/staging` + `origin/main`** — Recent posters drop corner badge; **1 of 11 rated** under orange pill; same on All/Top; hidden for solo circles. Web-only.
 
 - **Supabase refs (do not swap):** **staging** **`lovpktgeutujljltlhdl`**; **prod** **`uwexmfmkaifvddnfuvpg`**.
 
