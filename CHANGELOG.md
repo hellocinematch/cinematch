@@ -1,5 +1,10 @@
 # Changelog
 
+## 7.0.143
+
+- **Circles — Rated by:** The list is the name and the score only. TV rows no longer include a poster, season overview, or episode line. If one window lists more than one season, the name carries **S1** so the scores stay distinct.
+- **Posters — no title under the art:** Streaming, Your Picks, Pulse, In Theaters, the other-cinema strip, Discover, and New this week no longer put the title or the old info line under the poster. A TV poster carries that on the art, top left, as **TV · 2024 · S2** (the season on that card, or how many seasons the show has). Circle recent posters use the same line. Circle scores and “1 of N rated” stay under those posters. All, Top, and Your Ratings keep the title beside the thumbnail, with the season written as **S1** next to the year.
+
 ## 7.0.142
 
 - **New this week — feature score:** The featured title uses the same score badge as the other posters, on the lower right of its poster. It is a number, not a TMDB percent. The percent line under the title is gone.

@@ -3878,25 +3878,31 @@ function stripBadgeDisplay(
   return { text: "—", title: "", color: "#e8c96a", pillClass: "", cinemastroCount: null };
 }
 
-function formatMovieReleaseLine(movie) {
-  const rd = movie?.releaseDate;
-  if (rd && /^\d{4}-\d{2}-\d{2}$/.test(rd)) {
-    const d = new Date(`${rd}T12:00:00`);
-    if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    }
-  }
-  return movie?.year || "—";
+/**
+ * Label drawn on a TV poster: "TV · 2024 · S2".
+ * `seasonHint` is one season (a circle season card, or the season on a Streaming series poster).
+ * Otherwise the number is how many seasons TMDB lists, when that detail has loaded.
+ * Movies return null. Their old line under the poster is not moved onto the art.
+ */
+function posterInsideTypeYear(movie, tvMetaByTmdbId, seasonHint) {
+  if (movie?.type !== "tv") return null;
+  const meta = movie?.tmdbId != null ? tvMetaByTmdbId?.[movie.tmdbId] : null;
+  const hinted = Number(seasonHint?.seasonNumber);
+  const hasHint = Number.isInteger(hinted) && hinted > 0;
+  const counted = Number(meta?.seasonCount);
+  const seasonNumber = hasHint
+    ? hinted
+    : (Number.isFinite(counted) && counted > 0 ? counted : null);
+  const year = (hasHint ? seasonHint?.airYear : null) || meta?.latestYear || movie?.year || null;
+  const yearBit = year != null && String(year).trim() !== "" ? String(year) : "—";
+  if (seasonNumber != null) return `TV · ${yearBit} · S${seasonNumber}`;
+  return `TV · ${yearBit}`;
 }
 
-function formatStripMediaMeta(movie, tvMetaByTmdbId) {
-  if (movie?.type !== "tv") return `Movie · ${formatMovieReleaseLine(movie)}`;
-  const meta = movie?.tmdbId != null ? tvMetaByTmdbId?.[movie.tmdbId] : null;
-  const latestYear = meta?.latestYear || movie?.year || "—";
-  if (Number.isFinite(Number(meta?.seasonCount)) && Number(meta.seasonCount) > 0) {
-    return `TV · ${latestYear} · S${Number(meta.seasonCount)}`;
-  }
-  return `TV · ${latestYear}`;
+function PosterInsideMeta({ movie, tvMetaByTmdbId, seasonHint }) {
+  const label = posterInsideTypeYear(movie, tvMetaByTmdbId, seasonHint);
+  if (!label) return null;
+  return <div className="poster-inside-meta">{label}</div>;
 }
 
 /** TMDB `original_language` (ISO 639-1) → human-readable for strip meta (e.g. secondary Region). */
@@ -3917,13 +3923,6 @@ function formatOriginalLanguageDisplay(iso639_1) {
     }
   }
   return raw;
-}
-
-/** Secondary Region page: same as {@link formatStripMediaMeta} plus original-language label. */
-function formatSecondaryRegionStripMeta(movie, tvMetaByTmdbId) {
-  const base = formatStripMediaMeta(movie, tvMetaByTmdbId);
-  const lang = formatOriginalLanguageDisplay(movie?.language);
-  return lang ? `${base} · ${lang}` : base;
 }
 
 /** Circle All/Top list: year segment for `Title · YYYY` (matches strip year rules). */
@@ -8170,6 +8169,35 @@ export default function App() {
     });
   }, [catalogue, appliedSearchQuery, searchResults, activeFilter]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const missingTmdbIds = [...new Set(
+      discoverItems
+        .filter((m) => m?.type === "tv" && Number.isFinite(Number(m?.tmdbId)))
+        .map((m) => Number(m.tmdbId)),
+    )]
+      .filter((id) => !tvStripMetaCacheRef.current.has(id))
+      .slice(0, 30);
+    if (missingTmdbIds.length === 0) return undefined;
+    const hydrateDiscoverTv = async () => {
+      const details = await fetchTvDetailsById(missingTmdbIds);
+      for (const id of missingTmdbIds) {
+        const detail = details.get(id);
+        const latestYear = String(detail?.last_air_date || detail?.first_air_date || "").slice(0, 4) || null;
+        const seasonCount = Number(detail?.number_of_seasons || 0) || null;
+        tvStripMetaCacheRef.current.set(id, { latestYear, seasonCount });
+        if (detail && !isTmdbApiErrorPayload(detail)) rememberTvSeasons(id, detail);
+      }
+      if (!cancelled) {
+        const next = {};
+        tvStripMetaCacheRef.current.forEach((v, k) => { next[k] = v; });
+        setTvStripMetaByTmdbId(next);
+      }
+    };
+    void hydrateDiscoverTv();
+    return () => { cancelled = true; };
+  }, [discoverItems]);
+
   /** `predict_cached` overlay for Discover grid (cap keeps Edge bounded); merged into `recMap` below. */
   const discoverRecsResolved = useMemo(() => {
     const fromMatch = matchData?.discoverRecs;
@@ -8252,8 +8280,6 @@ export default function App() {
             <div className="skel-poster">
               {showKind && <div className="skel-kind-icon" />}
             </div>
-            <div className="skel-line skel-line-title" />
-            <div className="skel-line skel-line-meta" />
           </div>
         ))}
       </div>
@@ -11589,18 +11615,24 @@ export default function App() {
   }
 
   function renderStreamingSeriesStrip(recs) {
+    const today = new Date();
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     return (
       <div className="strip">
         {recs.map((rec) => {
           const poster = streamingSeriesPosterSrc(rec.movie);
+          const current = currentAiredSeason(tvSeasonsByTmdbId[Number(rec.movie?.tmdbId)], todayIso);
           return (
             <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
               <div className="strip-poster">
                 {poster ? <img src={poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                <PosterInsideMeta
+                  movie={rec.movie}
+                  tvMetaByTmdbId={tvStripMetaByTmdbId}
+                  seasonHint={current ? { seasonNumber: current.seasonNumber, airYear: current.airYear } : null}
+                />
                 <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
               </div>
-              <div className="strip-title">{rec.movie.title}</div>
-              <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
             </div>
           );
         })}
@@ -12795,7 +12827,6 @@ export default function App() {
                           <div className="strip-poster strip-poster--circle-recent">
                             <div className="strip-poster-fallback">🎬</div>
                           </div>
-                          <div className="strip-title strip-title--circle-single">Loading…</div>
                         </div>
                       );
                     }
@@ -12969,18 +13000,15 @@ export default function App() {
                           ) : (
                             <div className="strip-poster-fallback">🎬</div>
                           )}
-                          <div className="circle-strip-poster-meta" aria-hidden="true">
-                            {seasonNumber != null && season?.airYear
-                              ? `TV · ${season.airYear}`
+                          <div className="poster-inside-meta">
+                            {seasonNumber != null
+                              ? posterInsideTypeYear(movie, tvStripMetaByTmdbId, {
+                                seasonNumber,
+                                airYear: season?.airYear,
+                              })
                               : formatCircleTypeYearShort(movie, tvStripMetaByTmdbId)}
                           </div>
                         </div>
-                        <div className="strip-title strip-title--circle-single" title={movie.title}>
-                          {movie.title}
-                        </div>
-                        {seasonNumber != null ? (
-                          <div className="circle-strip-season">Season {seasonNumber}</div>
-                        ) : null}
                         <CircleStripRingCineBelowTitle
                           groupRating={row.group_rating}
                           onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title, movie?.poster)}
@@ -13026,9 +13054,9 @@ export default function App() {
                         ? season.airYear
                         : formatCircleListYear(movie, tvStripMetaByTmdbId);
                     const kind = movie.type === "tv" ? "TV" : "Movie";
-                    const titleLineFull = `${movie.title}${
-                      seasonNumber != null ? ` · Season ${seasonNumber}` : ""
-                    } · ${kind} · ${year}`;
+                    const titleLineFull = `${movie.title} · ${
+                      seasonNumber != null ? `TV · ${year} · S${seasonNumber}` : `${kind} · ${year}`
+                    }`;
                     const listPosterSrc =
                       seasonNumber != null
                         ? seasonRowPosterSrc(season, movie.poster)
@@ -13077,11 +13105,8 @@ export default function App() {
                           <div className="wl-list-title circle-list-all-top__title" title={titleLineFull}>
                             {movie.title}
                           </div>
-                          {seasonNumber != null ? (
-                            <div className="circle-list-all-top__season">Season {seasonNumber}</div>
-                          ) : null}
                           <div className="circle-list-all-top__type-year" aria-label="Type and year">
-                            {kind} · {year}
+                            {seasonNumber != null ? `TV · ${year} · S${seasonNumber}` : `${kind} · ${year}`}
                           </div>
                           <CircleAllTopRatingsLine
                             row={row}
@@ -13223,7 +13248,6 @@ export default function App() {
                                         )}
                                       </div>
                                       <div className="strip-title">Earlier</div>
-                                      <div className="strip-genre strip-genre--spacer" aria-hidden>&nbsp;</div>
                                     </button>
                                   )}
                                   {stripTitlesOrdered.map((row, i) =>
@@ -13244,9 +13268,6 @@ export default function App() {
                                         </button>
                                       </div>
                                       <div className="strip-title strip-title--circle-new-activity">Activity</div>
-                                      <div className="strip-genre strip-genre--spacer" aria-hidden="true">
-                                        &nbsp;
-                                      </div>
                                     </div>
                                   ) : null}
                                   {circleDetailData.status === "active" && (
@@ -13260,8 +13281,6 @@ export default function App() {
                                       <div className="strip-poster strip-poster--circle-add-rate-slot" aria-hidden="true">
                                         <span className="circle-add-rate-bubble">+</span>
                                       </div>
-                                      <div className="strip-title">&nbsp;</div>
-                                      <div className="strip-genre strip-genre--spacer" aria-hidden>&nbsp;</div>
                                     </button>
                                   )}
                                 </div>
@@ -13501,34 +13520,13 @@ export default function App() {
                     : (r.member_name || "").trim() || "Member";
                   const sn = r.season_number != null ? Number(r.season_number) : null;
                   const rowKey = `${r.user_id}-${sn ?? "show"}`;
-                  if (whoPublishedModal.mediaType !== "tv") {
-                    return (
-                      <li key={rowKey} className="who-published-modal-row">
-                        <span className="who-published-modal-name">{name}</span>
-                        <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
-                      </li>
-                    );
-                  }
-                  const season =
-                    sn != null
-                      ? (tvSeasonsByTmdbId[whoPublishedModal.tmdbId] || []).find((s) => s.seasonNumber === sn) || null
-                      : null;
+                  const titleNamesSeason = sn != null
+                    && String(whoPublishedModal.displayTitle || "").includes(`Season ${sn}`);
+                  const label = sn != null && !titleNamesSeason ? `${name} · S${sn}` : name;
                   return (
-                    <li key={rowKey} className="who-published-modal-row who-published-modal-row--season">
-                      <SeasonRow
-                        posterSrc={
-                          sn != null
-                            ? seasonRowPosterSrc(season, whoPublishedModal.showPoster)
-                            : whoPublishedModal.showPoster
-                              ? posterSrcThumb(whoPublishedModal.showPoster)
-                              : null
-                        }
-                        title={name}
-                        label={sn != null ? `Season ${sn}` : null}
-                        meta={sn != null ? seasonYearEpisodesLine(season) : ""}
-                        overview={sn != null ? season?.overview : ""}
-                        aside={<span className="who-published-modal-score">{formatScore(Number(r.score))}</span>}
-                      />
+                    <li key={rowKey} className="who-published-modal-row">
+                      <span className="who-published-modal-name">{label}</span>
+                      <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
                     </li>
                   );
                 })}
@@ -14167,7 +14165,8 @@ export default function App() {
           pulsePopularRecsResolved={pulsePopularRecsResolved}
           openDetail={openDetail}
           posterSrcThumb={posterSrcThumb}
-          formatStripMeta={(movie) => formatStripMediaMeta(movie, tvStripMetaByTmdbId)}
+          PosterInsideMeta={PosterInsideMeta}
+          tvStripMetaByTmdbId={tvStripMetaByTmdbId}
           recNeighborCount={recNeighborCount}
           userRatings={userRatings}
           startDefaultRateMore={startDefaultRateMore}
@@ -14187,7 +14186,8 @@ export default function App() {
           showLanguageFirst={showLanguageFirst}
           openDetail={openDetail}
           posterSrcThumb={posterSrcThumb}
-          formatStripMeta={(movie) => formatStripMediaMeta(movie, tvStripMetaByTmdbId)}
+          PosterInsideMeta={PosterInsideMeta}
+          tvStripMetaByTmdbId={tvStripMetaByTmdbId}
           recNeighborCount={recNeighborCount}
           userRatings={userRatings}
           startDefaultRateMore={startDefaultRateMore}
@@ -14274,10 +14274,9 @@ export default function App() {
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
                         {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                        <PosterInsideMeta movie={rec.movie} tvMetaByTmdbId={tvStripMetaByTmdbId} />
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
-                      <div className="strip-title">{rec.movie.title}</div>
-                      <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
                     </div>
                   ))}
                 </div>
@@ -14314,10 +14313,9 @@ export default function App() {
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
                         {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                        <PosterInsideMeta movie={rec.movie} tvMetaByTmdbId={tvStripMetaByTmdbId} />
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
-                      <div className="strip-title">{rec.movie.title}</div>
-                      <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
                     </div>
                   ))}
                 </div>
@@ -14379,6 +14377,7 @@ export default function App() {
                           >
                             {row.kind === "pick" ? "✨" : "📈"}
                           </span>
+                          <PosterInsideMeta movie={row.rec.movie} tvMetaByTmdbId={tvStripMetaByTmdbId} />
                           <StripPosterBadge
                             movie={row.rec.movie}
                             predicted={row.rec.predicted}
@@ -14386,8 +14385,6 @@ export default function App() {
                             preferPersonalPredicted
                           />
                         </div>
-                        <div className="strip-title">{row.rec.movie.title}</div>
-                        <div className="strip-genre">{formatStripMediaMeta(row.rec.movie, tvStripMetaByTmdbId)}</div>
                       </div>
                     ))}
                     {hasYourPicksStripSource &&
@@ -14406,7 +14403,6 @@ export default function App() {
                           <span className="circle-strip-more-arrow" aria-hidden>→</span>
                         </div>
                         <div className="strip-title">More</div>
-                        <div className="strip-genre strip-genre--spacer" aria-hidden>&nbsp;</div>
                       </button>
                     )}
                     {hasYourPicksStripSource &&
@@ -14436,8 +14432,6 @@ export default function App() {
                             </button>
                           </div>
                         </div>
-                        <div className="strip-title">&nbsp;</div>
-                        <div className="strip-genre strip-genre--spacer" aria-hidden>&nbsp;</div>
                       </div>
                     )}
                   </div>
@@ -14489,7 +14483,8 @@ export default function App() {
           secondaryStripRecsVisible={secondaryStripRecsVisible}
           openDetail={openDetail}
           posterSrcThumb={posterSrcThumb}
-          formatStripMeta={(movie) => formatSecondaryRegionStripMeta(movie, tvStripMetaByTmdbId)}
+          PosterInsideMeta={PosterInsideMeta}
+          tvStripMetaByTmdbId={tvStripMetaByTmdbId}
           recNeighborCount={recNeighborCount}
           userRatings={userRatings}
           startDefaultRateMore={startDefaultRateMore}
@@ -14615,7 +14610,11 @@ export default function App() {
                   <div className="disc-card" key={m.id} onClick={() => openDetail(m, rec)}>
                     <div className="disc-poster">
                       {m.poster ? <img src={posterSrcThumb(m.poster)} alt={m.title} loading="lazy" decoding="async" /> : <div className="disc-poster-fallback">🎬</div>}
-                      <div className="disc-type">{m.type === "movie" ? "Movie" : "TV"}</div>
+                      {m.type === "movie" ? (
+                        <div className="disc-type">Movie</div>
+                      ) : (
+                        <PosterInsideMeta movie={m} tvMetaByTmdbId={tvStripMetaByTmdbId} />
+                      )}
                       <div className="disc-badge">
                         {myRating ? <span className="disc-rated-badge">★ {myRating}</span>
                           : discBd.text === "—"
@@ -14632,10 +14631,6 @@ export default function App() {
                               </span>
                             )}
                       </div>
-                    </div>
-                    <div className="disc-title">{m.title}</div>
-                    <div className="disc-meta">
-                      {m.type === "movie" ? `Movie · ${formatMovieReleaseLine(m)}` : `TV · ${m.year}`}
                     </div>
                   </div>
                 );
@@ -14833,7 +14828,10 @@ export default function App() {
                   {filteredRatedMovies.map(({ lineKey, movie, score, seasonNumber, season }) => {
                     const isSeason = seasonNumber != null;
                     const thumb = isSeason ? seasonRowPosterSrc(season, movie.poster) : (movie.poster ? posterSrcThumb(movie.poster) : null);
-                    const seasonMeta = isSeason ? seasonYearEpisodesLine(season) : "";
+                    const seasonYear = isSeason ? (season?.airYear || movie.year || "—") : null;
+                    const seasonEp = isSeason && season?.episodeCount
+                      ? ` · ${season.episodeCount} Episode${season.episodeCount === 1 ? "" : "s"}`
+                      : "";
                     return (
                       <div className="rated-list-item" key={lineKey} onClick={() => openDetail(movie, recMap[movie.id])}>
                         <div className="rated-thumb">
@@ -14841,10 +14839,9 @@ export default function App() {
                         </div>
                         <div className="rated-info">
                           <div className="rated-info-title">{movie.title}</div>
-                          {isSeason ? <div className="rated-info-season">Season {seasonNumber}</div> : null}
                           <div className="rated-info-meta">
                             {isSeason
-                              ? (seasonMeta ? `TV · ${seasonMeta}` : "TV")
+                              ? `TV · ${seasonYear} · S${seasonNumber}${seasonEp}`
                               : `${movie.type === "movie" ? "Movie" : "TV"} · ${movie.year}`}
                           </div>
                         </div>

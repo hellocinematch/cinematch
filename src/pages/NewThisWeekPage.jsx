@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import {
-  arrivalPhrase,
   chooseFeature,
   displayRow,
   formatWeekendRange,
@@ -17,7 +16,7 @@ function regionName(region) {
   return "United States";
 }
 
-function Poster({ title, src, hero, badge, logo }) {
+function Poster({ title, src, hero, badge, logo, insideLabel }) {
   const url = src ? src(title.poster) : title.poster;
   return (
     <div className={hero ? "ntw-hero-poster" : "strip-poster ntw-poster"}>
@@ -26,6 +25,7 @@ function Poster({ title, src, hero, badge, logo }) {
       ) : (
         <div className="strip-poster-fallback">🎬</div>
       )}
+      {insideLabel ? <div className="poster-inside-meta">{insideLabel}</div> : null}
       {logo ? (
         <span className="ntw-service-logo">
           <img src={logo} alt="" />
@@ -34,6 +34,16 @@ function Poster({ title, src, hero, badge, logo }) {
       {badge || null}
     </div>
   );
+}
+
+/** "TV · 2024 · S2" on the poster. Season count fills in after the show detail loads. */
+function tvPosterLabel(title, seasonById) {
+  if (title?.type !== "tv") return null;
+  const extra = seasonById?.[title.tmdbId];
+  const year = extra?.year || title.year || "—";
+  const n = Number(extra?.season);
+  if (Number.isFinite(n) && n > 0) return `TV · ${year} · S${n}`;
+  return `TV · ${year}`;
 }
 
 /**
@@ -57,6 +67,8 @@ export function NewThisWeekPage({
 }) {
   const [pack, setPack] = useState(null);
   const [failed, setFailed] = useState(false);
+  const [tvSeasonById, setTvSeasonById] = useState({});
+  const tvSeasonRequested = useRef(new Set());
   const [picked, setPicked] = useState(null);
   const closeRef = useRef(null);
   const titleId = useId();
@@ -111,6 +123,35 @@ export function NewThisWeekPage({
   }, [region, signedIn, viewerKey, fetchTmdb, services, languageKey]);
 
   useEffect(() => {
+    if (!pack || typeof fetchTmdb !== "function") return undefined;
+    const ids = [pack.feature, ...(pack.streaming || []), ...(pack.theaters || [])]
+      .filter((title) => title?.type === "tv" && title.tmdbId != null)
+      .map((title) => title.tmdbId)
+      .filter((id) => !tvSeasonRequested.current.has(id));
+    if (ids.length === 0) return undefined;
+    for (const id of ids) tvSeasonRequested.current.add(id);
+    let cancelled = false;
+    (async () => {
+      const patch = {};
+      await Promise.all(ids.map(async (id) => {
+        try {
+          const detail = await fetchTmdb(`/tv/${id}?language=en-US`);
+          const n = Number(detail?.number_of_seasons);
+          const year = String(detail?.last_air_date || detail?.first_air_date || "").slice(0, 4);
+          patch[id] = {
+            season: Number.isFinite(n) && n > 0 ? n : null,
+            year: year || null,
+          };
+        } catch {
+          patch[id] = { season: null, year: null };
+        }
+      }));
+      if (!cancelled) setTvSeasonById((prev) => ({ ...prev, ...patch }));
+    })();
+    return () => { cancelled = true; };
+  }, [pack, fetchTmdb]);
+
+  useEffect(() => {
     if (!picked) return undefined;
     const onKey = (ev) => {
       if (ev.key === "Escape") setPicked(null);
@@ -162,8 +203,6 @@ export function NewThisWeekPage({
       {!failed && pack == null && (
         <div className="ntw-hero" aria-hidden="true">
           <div className="ntw-hero-poster ntw-skeleton" />
-          <div className="ntw-skeleton-line" />
-          <div className="ntw-skeleton-line ntw-skeleton-line--short" />
         </div>
       )}
 
@@ -172,18 +211,14 @@ export function NewThisWeekPage({
       )}
 
       {pack?.feature && (
-        <button type="button" className="ntw-hero" onClick={() => openTitle(pack.feature)}>
-          <Poster title={pack.feature} src={posterHeroSrc || posterSrc} hero badge={posterBadge?.(pack.feature)} />
-          <div className="ntw-hero-copy">
-            <div className="ntw-hero-where">
-              {pack.feature.where}
-              {arrivalPhrase(pack.feature.releaseDate, pack.todayIso, pack.feature.row)
-                ? ` · ${arrivalPhrase(pack.feature.releaseDate, pack.todayIso, pack.feature.row)}`
-                : ""}
-            </div>
-            <div className="ntw-hero-title">{pack.feature.title}</div>
-            {pack.feature.synopsis ? <p className="ntw-hero-overview">{pack.feature.synopsis}</p> : null}
-          </div>
+        <button type="button" className="ntw-hero" aria-label={pack.feature.title} onClick={() => openTitle(pack.feature)}>
+          <Poster
+            title={pack.feature}
+            src={posterHeroSrc || posterSrc}
+            hero
+            badge={posterBadge?.(pack.feature)}
+            insideLabel={tvPosterLabel(pack.feature, tvSeasonById)}
+          />
         </button>
       )}
 
@@ -195,6 +230,7 @@ export function NewThisWeekPage({
         openTitle={openTitle}
         posterSrc={posterSrc}
         posterBadge={posterBadge}
+        tvSeasonById={tvSeasonById}
       />
       {pack?.streaming?.length > 0 && pack?.theaters?.length > 0 ? <div className="ntw-rule" /> : null}
       <Group
@@ -205,6 +241,7 @@ export function NewThisWeekPage({
         openTitle={openTitle}
         posterSrc={posterSrc}
         posterBadge={posterBadge}
+        tvSeasonById={tvSeasonById}
       />
 
       <div className="ntw-close">
@@ -250,7 +287,7 @@ export function NewThisWeekPage({
   );
 }
 
-function Group({ heading, note, items, loading, openTitle, posterSrc, posterBadge }) {
+function Group({ heading, note, items, loading, openTitle, posterSrc, posterBadge, tvSeasonById }) {
   if (!loading && (!items || items.length === 0)) return null;
   return (
     <section className="ntw-group" aria-label={heading}>
@@ -276,7 +313,13 @@ function Group({ heading, note, items, loading, openTitle, posterSrc, posterBadg
                 aria-label={logo && where && where !== "Streaming" && where !== "In theaters" ? `${title.title}, ${where}` : title.title}
                 onClick={() => openTitle(title)}
               >
-                <Poster title={title} src={posterSrc} badge={posterBadge?.(title)} logo={logo} />
+                <Poster
+                  title={title}
+                  src={posterSrc}
+                  badge={posterBadge?.(title)}
+                  logo={logo}
+                  insideLabel={tvPosterLabel(title, tvSeasonById)}
+                />
               </button>
             );
           })}

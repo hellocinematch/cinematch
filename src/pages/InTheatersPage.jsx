@@ -10,7 +10,8 @@ export function InTheatersPage(props) {
     showLanguageFirst,
     openDetail,
     posterSrcThumb,
-    formatStripMeta,
+    PosterInsideMeta,
+    tvStripMetaByTmdbId,
     recNeighborCount,
     userRatings,
     startDefaultRateMore,
@@ -75,10 +76,9 @@ export function InTheatersPage(props) {
                     ) : (
                       <div className="strip-poster-fallback">🎬</div>
                     )}
+                    <PosterInsideMeta movie={rec.movie} tvMetaByTmdbId={tvStripMetaByTmdbId} />
                     <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                   </div>
-                  <div className="strip-title">{rec.movie.title}</div>
-                  <div className="strip-genre">{formatStripMeta(rec.movie)}</div>
                 </div>
               ))}
             </div>
@@ -109,10 +109,9 @@ export function InTheatersPage(props) {
                     ) : (
                       <div className="strip-poster-fallback">🎬</div>
                     )}
+                    <PosterInsideMeta movie={rec.movie} tvMetaByTmdbId={tvStripMetaByTmdbId} />
                     <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                   </div>
-                  <div className="strip-title">{rec.movie.title}</div>
-                  <div className="strip-genre">{formatStripMeta(rec.movie)}</div>
                 </div>
               ))}
             </div>
