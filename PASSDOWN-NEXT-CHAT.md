@@ -1,28 +1,32 @@
 # Passdown for next chat (Cinematch)
 
-**Last updated:** 2026-09-22 — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.87** on **staging + main / prod web** (circle title cards). Play Internal **2** still **7.0.84**. **Next:** Play **Production (US)** — then CA/IN **`availability_region`**. No new AAB. **Trademark:** **§ USPTO trademark**. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**.
+**Last updated:** 2026-10-08 — trust **`package.json`** / **`CHANGELOG.md`**. Local **7.0.129** (not committed, not shipped). Live App Store and public Play listing verified **7.0.87** (the older “live binary is **7.0.82**” note is stale). Store CA/IN only after this build is live. **Trademark:** **§ USPTO trademark**. India filing is the user’s own next step (agent in India); not required to release. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. **Deep history:** **`PASSDOWN-ARCHIVE.md`**. **Stable product depth:** **`HANDOFF.md`**. **§ Priority 2 multi-market paragraph is updated below** (local catalogs for CA/IN are in **7.0.89–7.0.113**; prod SQL for those columns is in).
 
 **Recent releases (high level):** **7.0.87** — Circles title cards: no poster-corner badge; **1 of 11 rated** under the orange pill (staging + prod web; no new AAB). **7.0.86** — self-service **Delete account** (Profile + `/privacy#delete-account`; Edge **`1.0.0`** + SQL **`20260918153000`** applied **staging + prod**; throwaway smoke both envs; no new AAB). **7.0.85** — web **Open in Cinemastro** on `/join` + **`/join` wins over recovery** (staging + prod; no new AAB). **7.0.84** — Android FCM circle banners; Edge **`push-circle-badge` `1.2.0`** (redeployed); **`assetlinks.json`** SHA-256 colon format. Earlier — **`CHANGELOG`**.
 
-**Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). **Google Play:** **§ Google Play**. **Native verify 7.0.83:** **§ Capacitor → Next engineering**.
+**Single checklist:** Use **§ Master list (maintained)** below as the one place to track next work (product + ops + analytics). **Google Play:** **§ Google Play**. **7.0.83:** iOS confirm→Circles was already fine (**7.0.82**). Overflow after confirm was **Android-only** (user 2026-09-22); code is Capacitor-wide. Next native = new archive/AAB for delete + circle cards.
 
 ---
 
 ## Tell the next chat (copy from here)
 
-> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. **7.0.87** on **staging + main / prod web** (circle title cards). Play Internal **2** still **7.0.84**. App Store live **7.0.82** (native will not show 7.0.87 until a new archive). **Next:** Play **Production (US)**; CA/IN after that. Routine ships → **`origin/staging`**; push **`main`** only when asked. **`git pull`** **`origin/main`** **`origin/staging`** **`origin/capacitor/v1`**. Read **`@PASSDOWN-NEXT-CHAT.md`**. **Don't change app code** unless *code now* / *implement* / *fix* / *do it*.
+> Cinematch — trust **`package.json`** / **`CHANGELOG.md`**. Local **7.0.129**, not committed, not shipped. Remotes **`origin/staging`** and **`origin/main`** are still **7.0.87**. User is on local **`main`** with that uncommitted work. Live App Store binary verified **7.0.87** (released **2026-09-25**; archive **7.0.87 (16)** uploaded **2026-09-24**). Public Play listing verified **7.0.87**, updated **2026-09-24** (“first Android prod build”, listing still says **US only**). The older “live binary is **7.0.82**” note is stale. User leaves for India in 3 days from **2026-10-08** and wants this local version released before they go. Do not commit or push unless asked. Routine ships → **`origin/staging`** only. Production web and a new store build only when they explicitly ask. Do not add Canada or India as store countries until this build is live. Next native upload needs marketing **7.0.129**, an iOS build above **16**, and Android **versionCode** above **3**. Read **`@PASSDOWN-NEXT-CHAT.md`**.
 >
-> **Local `.env`:** Prefer **staging-only** day-to-day. Native **`npm run build:app`** bakes `.env`. No new AAB for 7.0.87.
+> **Local `.env`:** Prefer **staging-only** day-to-day. Play AAB on disk is still **versionCode 3** / **7.0.87**. Archive already uploaded: `~/Library/Developer/Xcode/Archives/2026-09-24/Cinemastro 7.0.87 (16).xcarchive`. Xcode project **MARKETING_VERSION 7.0.87** / **CURRENT_PROJECT_VERSION 16** (local, not committed). Android Gradle **versionCode 3** / **versionName 7.0.87**.
 >
-> **App Store:** **Ready for Distribution** (auto-release, 2026-08-24). Live binary = **7.0.82** archive. Demo **`apple.review@…`** (do not onboard). Attachment 14 due **2026-10-01**.
+> **App Store:** Live **7.0.87** (id **6796027034**). Store text still says “Currently intended for users in the United States.” Demo **`apple.review@…`** (do not onboard).
 >
-> **Google Play:** Internal **2 (7.0.84)**. **Next after break:** Play **Production (US first)**. CA/IN store + **`availability_region`** **after** Play. Listing delete-account URL **`https://www.cinemastro.com/privacy`** matches **7.0.86** prod web.
+> **Google Play:** Public listing **7.0.87**, updated **2026-09-24**, text says **US only**. Delete-account URL **`https://www.cinemastro.com/privacy`**. CA/IN store countries after the **7.0.129** build is live.
 >
 > **Supabase refs (do not swap):** **staging** **`lovpktgeutujljltlhdl`**; **prod** **`uwexmfmkaifvddnfuvpg`**.
 >
 > **7.0.86 delete-account:** Edge **`delete-account` `1.0.0`** on **staging + prod**. SQL **`20260918153000_prepare_account_deletion.sql`** applied **staging + prod**. Throwaway delete tested on **staging and prod** (Auth user gone).
 >
-> **Parked:** CA/IN region-specific release (**`availability_region`**, store territories) until **after** Play Production. Confirm-email https interstitial / custom-scheme browser path — iPhone Mail/iCloud works; Cox miss was **webmail**. Discover iOS keyboard (**§1g.k**); **7.0.83** iOS device verify; Android status-bar overlap (needs AAB); product **1a–1e**, **§1f**, **§1g.1**, **P2**.
+> **Prod backend (user, 2026-10-08, project `uwexmfmkaifvddnfuvpg`):** SQL **`20260924120000`** (profile Where you watch), **`20260924130000`** + **`20260924140000`** (Pulse India/Canada), **`20260925120000`** (season ratings) — user said none of these failed. Edge redeployed: **`pulse-catalog` `1.2.0`**, **`match` `1.0.1`**, **`compute-neighbors` `1.0.2`**. Confirm signup and Reset password templates include **`{{ .Token }}`**. Staging was not re-checked tonight.
+>
+> **Local 7.0.124–7.0.129 (uncommitted):** About says available to users in the **US, India, and Canada**. Terms §5 lists **United States, India, and Canada**; Terms “Last updated” **October 8, 2026**. Title screen **From your circles** card (final **7.0.129**): green label matching **Your rating saved**, text like **2 ratings from your circles** (**circle** if the user belongs to one circle; **1 rating** if one other person), second line **Click to view**. Count and list exclude the current user. Hidden when nobody else has published. Window keeps the film title and **X** fixed; list scrolls; TV uses the same season lines as **Rated by**. Store listing copy in App Store Connect and Play Console is still US-only.
+>
+> **Parked — next is Profile text size.** Do not build unless asked. **Text size** (2026-10-05): Small = today, Medium, Large; reading text only; do not follow the phone setting. **Confirm password** (2026-10-04, reconfirmed 2026-10-08): signup only, local match check, both at least 6 characters, no server change; sign-in stays one field. Circle rating notifications that name the rater (2026-09-26). **New this week** landing (2026-09-26, mock only). Startup login flash (2026-09-26). Also still parked: confirm-email https interstitial; Discover iOS keyboard (**§1g.k**); Android status-bar overlap (needs AAB); product **1a–1e**, **§1f**, **§1g.1**. Store CA/IN territories wait until **7.0.129** is live. India trademark is the user’s own errand; not a release blocker. US serial **99792884**, filed **2026-04-28**; India priority window about **2026-10-28**.
 >
 > **USPTO trademark:** When user asks where to check status → **https://tsdr.uspto.gov** (login) → serial **99792884**. Filed **2026-04-28**. As of **2026-08-28**, examining-attorney queue was **Mar 28–Apr 5**.
 >
@@ -34,12 +38,12 @@
 
 | Item | State |
 |------|-------|
-| **Web app (staging / prod)** | **Staging + prod / main 7.0.87** — circle title cards. |
-| **Native app** | **Capacitor 8**. App Store live **7.0.82**. Play Internal **2 (7.0.84)** **versionCode 2**. **7.0.83** iOS device verify still backlog. **7.0.87 is web-only** (no new AAB). |
-| **Apple / App Store** | **Ready for Distribution** (auto-release, 2026-08-24). |
-| **Google Play** | Internal **2 (7.0.84)**. **Next:** Production **US** (user asked 2026-09-18; take up after break). CA/IN after Play. |
+| **Web app (staging / prod)** | Remotes **7.0.87**. Local uncommitted **7.0.129**. |
+| **Native app** | **Capacitor 8**. Live App Store **7.0.87 (16)**. Xcode project still **7.0.87 / 16**. Play public listing **7.0.87**. Gradle still **versionCode 3 / 7.0.87**. |
+| **Apple / App Store** | Live **7.0.87**, current-version date **2026-09-25**. Listing still “United States.” |
+| **Google Play** | Public listing **7.0.87**, updated **2026-09-24**, text **US only**. CA/IN after **7.0.129** is live. |
 | **Supabase auth** | Staging + prod: **`com.cinemastro.app://localhost/`** (+ recovery). |
-| **Edge** | **`push-circle-badge` `1.2.0`** staging + prod. **`delete-account` `1.0.0`** staging + prod. SQL **`20260918153000`** applied **staging + prod**. |
+| **Edge** | Prod **2026-10-08**: **`pulse-catalog` `1.2.0`**, **`match` `1.0.1`**, **`compute-neighbors` `1.0.2`**. **`push-circle-badge` `1.2.0`** and **`delete-account` `1.0.0`** already staging + prod. |
 | **Client deploy** | **Vercel** (web); native = Xcode / Play. |
 | **USPTO trademark** | TSDR **https://tsdr.uspto.gov** (login) → serial **99792884**. Filed **2026-04-28**. Queue as of **2026-08-28**: examining **Mar 28–Apr 5**. |
 
@@ -70,7 +74,7 @@
 - **7.0.86** — Self-service **Delete account** (Profile + Privacy). Circle transfer to next host; ratings wiped. Web-only.
 - **7.0.85** — Web **Open in Cinemastro** on `/join` (Android `intent://` + iOS custom scheme; hidden in native shell). **`/join` wins over recovery**. No new AAB.
 - **7.0.84** — Android FCM circle-publish banners; Edge **`1.2.0`** redeployed; **`assetlinks.json`** colon SHA-256. Play Internal AAB **versionCode 2**.
-- **7.0.83** — **`src/nativeViewport.js`**: scrub auth URL + burst viewport reset after email-confirm / app resume. **Native device verify still TODO.**
+- **7.0.83** — **`src/nativeViewport.js`**: scrub auth URL + burst viewport reset after email-confirm / app resume. Changelog said iOS; **user: overflow was Android-only**. Code is **Capacitor-wide** (not iOS-gated). iOS confirm→Circles already worked in **7.0.82**. Play Internal **7.0.84** bake should already include this file.
 - **Badge Phase 1–2 + banners (7.0.76–7.0.80):** as before.
 
 **Local dev / re-archive:**
@@ -88,10 +92,10 @@ npm run build:app && open ios/App/App.xcodeproj
 
 **Next engineering (ordered):**
 
-- [ ] **Verify 7.0.83 on device (staging bake):** email confirm from Mail → Open in app → Circles layout fits (no overflow). User deferred Xcode run — **do this before promoting 7.0.83 to prod / new TF**.
+- [x] **7.0.83 overflow:** **Android-only** (user 2026-09-22). iOS confirm→Circles already OK on live **7.0.82**. No separate iOS verify gate.
 - [x] **App Store** — approved; **Ready for Distribution** (auto-release). Live = **7.0.82** archive.
-- [ ] **Promote 7.0.83 → `origin/main`** when device-verified (next store/TF build).
-- [ ] **Google Play Production (US)** — user wants this **next** (after 2026-09-18 break). Internal **2 (7.0.84)** live with FCM. Retest **7.0.85** prod `/join` in Chrome (domain off) → Open in Cinemastro. New AAB only if Production needs a newer binary than **7.0.84**.
+- [ ] **New App Store archive** — local **7.0.87 (16)** prod bake done 2026-09-24 (`Cinemastro 7.0.87 (16).xcarchive`). Upload from Organizer. ASC needs a **new version 7.0.87** (live store version is **1.0**). Then TF / store. Web already on **`origin/main`**.
+- [ ] **Google Play** — local AAB **7.0.87** / **versionCode 3** ready. Upload Internal, smoke, then Production **US** (first public version). Do not promote **7.0.84**.
 - [ ] **Discover keyboard (§1g.k)** — after Play **production** submitted (not before).
 - [ ] **External TestFlight** (optional).
 - [x] **Delete account (7.0.86 staging + prod web):** Profile + `/privacy#delete-account`. Edge **`delete-account` `1.0.0`** + SQL **`20260918153000`** applied **staging + prod**. Throwaway delete tested both envs (Auth user gone).
@@ -103,13 +107,13 @@ npm run build:app && open ios/App/App.xcodeproj
 
 ## Google Play (internal live — 2026-08-25)
 
-*Live Internal AAB is **7.0.84** (FCM, **versionCode 2**). **7.0.85–7.0.86** are **web-only**. **Next after break:** Production **US**. CA/IN store territories wait until after that.*
+*Local signed AAB **7.0.87** (**versionCode 3**) baked 2026-09-22 (prod `.env`). **Not uploaded yet.** Live Internal is still **2 (7.0.84)** until Console upload. Then Production **US**. CA/IN later.*
 
 **Identity:** Play login = Google account on **`dev@cinemastro.com`** (Namecheap mailbox + “use my current email”). **Organization**; **DUNS** = same as Apple. Developer name **Cinemastro, LLC**. Org contact **`support@cinemastro.com`**. Search Console owner **`tlmahesh`**; **`dev@`** extra **Owner**. Website/identity/phone **verified**.
 
 **Signing (never commit secrets):** upload keystore **`~/cinemastro-upload.jks`**, alias **`cinemastro`**. Local **`android/keystore.properties`** (gitignored). Gradle release signing is **wired locally** (`android/app/build.gradle` **versionCode 2** / **versionName 7.0.84**) — **not pushed** to `origin/staging` yet. Back up `.jks` + password off this Mac.
 
-**AAB:** `android/app/release/app-release.aab` (also gitignored). Internal testing **Active**, release **2 (7.0.84)**, **Available to internal testers**, not Play-reviewed. Temporary name **`com.cinemastro.app (unreviewed)`** is normal.
+**AAB:** `android/app/release/app-release.aab` (gitignored). **New local file:** **7.0.87** / **versionCode 3** (4.3 MB, 2026-09-22). Console Internal still **2 (7.0.84)** until you upload. Temporary name **`com.cinemastro.app (unreviewed)`** is normal.
 
 **Testers:** **Veena** downloaded + logged in (2026-08-26). **Moto** (`dimanicontacts@gmail.com`, 2026-09-18): Internal worked after Publishing overview drafts (same “not invited” as Ramesh). `/join` first opened Chrome; Open by default had supported links **off**; enabling **www.cinemastro.com** opened the app and they joined. New users will still land in Chrome → **7.0.85** web button.
 
@@ -248,7 +252,7 @@ npm run build:app && open ios/App/App.xcodeproj
 ### Priority 2 — US geo / availability (product)
 
 - [ ] **Geo-blocking banner or notice:** Infer location (**IP / Edge / CDN**, optional **user confirms US residency**) and show non-US users: **"Cinemastro is currently available to US users only."** Choose **warn-only (proceed at own risk)** vs **hard block** — **TBD** with Terms/privacy. *(Not implemented.)*
-- [ ] **Multi-market availability — after Play Production:** Discussed 2026-09-18: **Play US first**, then CA/IN. Today **taste** = **`show_region_keys`** + **`secondary_region_key`**; **availability** = hardcoded **US** TMDB (`region` / `watch_region`, **`fetchWatchProviders` → `results.US`**, US provider IDs). Real multi-region needs **`profiles.availability_region`** (`US` \| `CA` \| `IN`) threaded through discover, WTW, detail cert/release, provider maps; **CF/ratings** stay global by **`tmdb_id`**. Phases: (0) policy / Terms (still “US only”) → (1) profile market + WTW + detail → (2) strips/onboarding → (3) regional scores/CF → (4) geo gate + per-region pulse. Canada cheaper (Crave + CA theaters); India = home OTT map, not secondary-taste reuse. See chat before coding.
+- [x] **Multi-market availability (local 7.0.88–7.0.113, prod SQL 2026-10-08):** Profile **Where you watch** (`US` / `CA` / `IN`) and, for India, **Languages to show first**. Catalogs, certs, dates, and where-to-watch follow that setting. Prod has **`20260924120000`**, Pulse **`20260924130000`** + **`20260924140000`**, and **`pulse-catalog` `1.2.0`**. About (local **7.0.124**) says users in the **US, India, and Canada**. Terms §5 lists those three countries. Store countries still wait until the **7.0.129** build is live. **CF/ratings** stay global by **`tmdb_id`**.
 
 ### Repo / ops / parity
 
@@ -272,6 +276,16 @@ npm run build:app && open ios/App/App.xcodeproj
 
 - [x] **`onboarding`** + **`rate-more`** poster tile (**~2:3**, **`contain`**, tighter height) — **shipped 7.0.36**.
 - [x] **Onboarding title pool (TMDB only for `obCatalogue`):** **7.0.60** — Hollywood/side **discover ~6 mo**, **`vote_count` ≥ 200**, popularity; secondary cinema **`vote_count` ≥ 40**, **release / first-air desc**; English side uses same Hollywood discover in mixed path; main **`catalogue`** still popular + top_rated + theaters.
+- [ ] **Sign-up — confirm password (agreed 2026-10-04, reconfirmed 2026-10-08, not built):** Create account has one password field. Add a second field on **signup only**. Before `signUp`, both must match and each must be at least 6 characters. A mismatch shows an error and does not create the account or send the email. Sign in stays one field. Local check only. No server change. *Do not implement until user asks.*
+
+**Profile**
+
+- [ ] **Text size — Small, Medium, Large (agreed 2026-10-05, not built):** Profile choice. **Small** is today’s size (do not go smaller). **Medium** is about a twelfth larger and **Large** about a sixth larger, on the words people read (titles, scores, names, overview, circle labels). Poster sizes, pill grids, the bottom menu, and button boxes stay the same on all three, so screens do not reflow; a long line may wrap once at Large. Do not follow the phone’s own text-size setting (`text-size-adjust: 100%` stays). *Do not implement until user asks.*
+
+**Home / landing**
+
+- [ ] **Weekend landing page — “New this week” (agreed 2026-09-26, not built):** Shown as the home page **Thursday night through Sunday**; **Monday–Wednesday** keep the usual home. Elegant and sparse: **one featured title**, then a **Just arrived** (streaming) row, then an **In theaters** row (streaming row sits **above** in theaters). **Feature pick:** a new release in the user's **Where you watch** region that someone in their circle already rated; if none, the biggest streaming premiere this week; if none, the widest theatrical opening. The same feature stays up Thursday night through Sunday. Talk and news never qualify. **Ratings are secondary:** small circle score when one exists, no big empty score, TMDB percent (if shown) stays small. **Logged-out visitors** see the page too: no circle, so the feature is the biggest streaming premiere; default region **United States**; no circle scores; a small **Get Started** link; the list is visible before sign-in. **Mock only, not in the app:** `canvases/new-this-week-landing-mock.canvas.tsx` (Cursor project canvases folder, outside the repo; do not move it into the repo). *Do not implement until user asks.*
+- [ ] **Startup — no login flash; one rotating Cinemastro icon (agreed 2026-09-26, not built):** Today opening Cinemastro shows the **login screen for a quick second**, then a **circle loading icon** for a while, then **Circles**. *Goal:* don't show the login screen while the app is still checking the saved session; **one rotating Cinemastro icon** covers the whole wait (session check + the following load) until Circles opens. If the person is **actually signed out**, the icon stops and the real login screen appears. It **must not spin forever**. *Do not implement until user asks.*
 
 **Circles**
 
@@ -280,6 +294,8 @@ npm run build:app && open ios/App/App.xcodeproj
 - [x] **Zero active circles nudge (returning raters):** **Shipped 7.0.56** — Circles banner + modal (**2-day** modal cooldown); resets when user has an active circle.
 - **§8 — Invites at max circles:** Today **`auto_declined`** — recipient never sees invite. *Goal:* muted row (“at cap”) + creator pending until resolved.
 - **§9 / 4b — Remove member:** Hosts remove another member (**`circle_members` DELETE`** is **self-only** today).
+- [ ] **Circle rating notifications — name the rater (agreed 2026-09-26, not built):** Alert should say who rated, e.g. **“Alex rated Reacher, Season 1”** (today it only says a title was rated, so with 3+ raters the new person isn't obvious); opening that title's ratings should show the **newest rating first**; a repeat save from someone who already rated that title stays quiet or folds into the same line, so the circle isn't pinged on every score edit. *Do not implement until user asks.*
+- [x] **Title screen — From your circles (shipped locally 7.0.125–7.0.129, not committed):** Card when at least one *other* person in a shared circle has published the title. Green label matches **Your rating saved**. Text is **2 ratings from your circles** (**circle** if the viewer belongs to one circle; **1 rating** if one other person). Second line **Click to view**. The current user’s rating is excluded from the count and the list. **X** closes the window and leaves the title open. List scrolls; film title and **X** stay fixed. Circle name on a line when the viewer belongs to more than one circle. TV uses the same season lines as **Rated by**. Hidden when nobody else has published.
 
 **Watchlist / invites / ratings**
 
@@ -377,6 +393,10 @@ npm run build:app && open ios/App/App.xcodeproj
 
 | Migration | Purpose |
 |-----------|---------|
+| **`20260925120000_season_ratings.sql`** | Season scores, `ratings_effective`, circle publisher lines. **User: applied prod 2026-10-08.** Redeploy **`match` `1.0.1`** and **`compute-neighbors` `1.0.2`** (done on prod that night). |
+| **`20260924140000_pulse_catalog_daily_region_ca.sql`** | Pulse region check allows **CA**. **User: applied prod 2026-10-08** after **`20260924130000`**. |
+| **`20260924130000_pulse_catalog_daily_region.sql`** | Pulse key **`(utc_date, region)`**, regions **US** / **IN**. **User: applied prod 2026-10-08.** |
+| **`20260924120000_profiles_availability_region.sql`** | **`profiles.availability_region`** + **`show_language_first`**. **User: applied prod 2026-10-08** (column check had returned no rows before the run). |
 | **`20260918153000_prepare_account_deletion.sql`** | **`prepare_account_deletion()`** — leave/transfer circles, wipe public user rows before Edge **`delete-account`**. **Applied staging + prod.** |
 | **`20260731120000_device_push_tokens_circle_badge.sql`** | **`device_push_tokens`** + register/unregister RPCs + **`get_user_circle_unseen_total`** — APNs badge/banner (**7.0.78+**). **Applied staging + prod.** |
 | **`20260616120000_circle_site_rating_together_rows.sql`** | **`site_rating`** on **together** circle strip/grid rows (**`get_circle_rated_strip`**, **all**, **top** RPCs) — **7.0.62**; apply on each hosted DB. |
@@ -414,15 +434,29 @@ npm run build:app && open ios/App/App.xcodeproj
 
 ## Open / follow-ups
 
-**Last session (2026-09-22)**
+**Last session (2026-10-08)**
 
-- **Last note:** **7.0.87** on **staging + prod web**. App Store **7.0.82** / Play Internal **7.0.84** do not include this until a new native bake. **Next:** Play **Production (US)**. CA/IN after Play.
+- **Last note (2026-10-08):** Local **7.0.129** is not committed. Circle card is accepted: green label like **Your rating saved**, first line **2 ratings from your circles**, second line **Click to view**, current user excluded. User reconfirmed **confirm password** is a local check only; it stays parked. **Next backlog item is Profile text size.** They still want this local version released before leaving for India (about **2026-10-11**). Ship only when they ask. Do not add Canada/India store countries until that build is live. Prod SQL and the three Edge functions are in; email templates have **`{{ .Token }}`**. India trademark they will start themselves; not required to release. US serial **99792884**, filed **2026-04-28**, priority window about **2026-10-28**.
+
+- **Last note (2026-10-05):** User asked to **park** (not build) a Profile **text size** choice: **Small** (today’s size), **Medium**, **Large**. Reading text only; posters, pills, bottom menu, and button boxes stay put. Do not follow the phone text-size setting. Logged under **§ Master list → Product — prioritized next builds → Profile**.
+
+- **Last note (2026-10-05), shipped locally 2026-10-08:** **In your circles** was parked, then built and revised through **7.0.129**. See the **2026-10-08** last note. Do not rebuild it.
+
+- **Last note (2026-10-04):** User asked to **park** (not build) a **confirm password** field on Create account. Logged under **§ Master list → Product — prioritized next builds → Onboarding / first-run**. Profile “saved” confirmation was discussed and left as-is.
+
+- **Last note (2026-09-26):** User asked to **park** (not build) the startup **login flash** fix — one rotating Cinemastro icon instead of login flash + circle spinner, login only if actually signed out, never spins forever. Logged under **§ Master list → Product — prioritized next builds → Home / landing**.
+
+- **Last note (2026-09-26):** User asked to **park** (not build) the **New this week** weekend landing page (Thu night–Sun home; feature + Just arrived + In theaters). Logged under **§ Master list → Product — prioritized next builds → Home / landing**; mock is in the Cursor canvases folder only.
+
+- **Last note (2026-09-26):** User asked to **park** (not build) the circle rating notification idea — name the rater, newest rating first, quiet repeat saves. Logged under **§ Master list → Product — prioritized next builds → Circles**.
+
+- **Last note (2026-09-24):** **7.0.89** local — India In Theaters + title cert/date/where-to-watch. Streaming and Pulse not switched yet. SQL **`20260924120000`** applied on staging. Not committed. iOS **7.0.87 (16)** in review. Play **Production in review**. Store CA/IN after Play is live. Check **`COMPUTE-NEIGHBORS-CRON.md`** if MAU jumps after approval.
 
 - **Shipped:** **7.0.87** on **`origin/staging` + `origin/main`** — Recent posters drop corner badge; **1 of 11 rated** under orange pill; same on All/Top; hidden for solo circles. Web-only.
 
 - **Supabase refs (do not swap):** **staging** **`lovpktgeutujljltlhdl`**; **prod** **`uwexmfmkaifvddnfuvpg`**.
 
-- **Parked:** CA/IN region work; confirm-email custom scheme / https interstitial (Mail works; Cox miss was webmail); **§1g.k**; **7.0.83** iOS device verify; Android status-bar overlap (needs AAB); **1a–1e**, **§1f**, **§1g.1**.
+- **Parked:** CA/IN region work; confirm-email custom scheme / https interstitial (Mail works; Cox miss was webmail); **§1g.k**; Android status-bar overlap (needs AAB); **1a–1e**, **§1f**, **§1g.1**.
 
 ---
 
