@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.147
+
+- **New this week — row titles:** **Just arrived** is **New to Streaming**. **In theaters** is **New in Theaters**. The lines under those titles are gone.
+
+## 7.0.146
+
+- **New this week — signed out:** The line under the title is gone. **Get started** is no longer a bare link under the title. After the weekend list, **Cinemastro lets you…** explains the app, and **Get started — it’s free** sits under those boxes. Signed-in members do not see that block.
+
 ## 7.0.145
 
 - **New this week — featured title:** The top picture runs the width of the screen again, with where it is playing, the title, and a short overview underneath. On a phone the picture is a wide frame that follows the screen width, so the art is not cropped into a tall box.

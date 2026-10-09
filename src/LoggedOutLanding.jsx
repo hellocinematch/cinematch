@@ -80,6 +80,28 @@ function FeatureGlyph({ icon }) {
   );
 }
 
+/** The eight things Cinemastro does, then the signup button. */
+export function CinemastroLetsYou({ onGetStarted, showButton = false }) {
+  return (
+    <section className="logged-out-section">
+      <h2 className="logged-out-kicker">Cinemastro lets you…</h2>
+      <div className="logged-out-features">
+        {FEATURES.map((feature) => (
+          <div key={feature.text} className="logged-out-feature">
+            <FeatureGlyph icon={feature.icon} />
+            <p>{feature.text}</p>
+          </div>
+        ))}
+      </div>
+      {showButton ? (
+        <button type="button" className="logged-out-cta logged-out-cta--after" onClick={onGetStarted}>
+          Get started — it’s free
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
 /** Dim city-and-marquee still behind the pitch. Decorative only. */
 function FilmStill() {
   const wall = "#1a1a1a";
@@ -218,17 +240,7 @@ export default function LoggedOutLanding({ onSignIn, onGetStarted, loadPosterRow
         </section>
       )}
 
-      <section className="logged-out-section">
-        <h2 className="logged-out-kicker">Cinemastro lets you…</h2>
-        <div className="logged-out-features">
-          {FEATURES.map((feature) => (
-            <div key={feature.text} className="logged-out-feature">
-              <FeatureGlyph icon={feature.icon} />
-              <p>{feature.text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <CinemastroLetsYou onGetStarted={onGetStarted} />
 
       {picked && (
         <div className="logged-out-dialog-root">

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { CinemastroLetsYou } from "../LoggedOutLanding.jsx";
 import {
   arrivalPhrase,
   chooseFeature,
@@ -49,7 +50,7 @@ function tvPosterLabel(title, seasonById) {
 
 /**
  * Weekend home. Members get the bottom menu from the parent.
- * Guests get Sign in and a small Get started. A poster tap for a guest
+ * Guests get Sign in, and after the list an explanation with Get started. A poster tap for a guest
  * stays on this page: overview, then sign up.
  */
 export function NewThisWeekPage({
@@ -189,12 +190,6 @@ export function NewThisWeekPage({
           <div className="ntw-region">{regionName(region)}</div>
         </div>
         <h1 className="ntw-title">New this week</h1>
-        <p className="ntw-blurb">What opened in theaters and started streaming near you.</p>
-        {!signedIn && (
-          <button type="button" className="ntw-start" onClick={onGetStarted}>
-            Get started
-          </button>
-        )}
       </div>
 
       {failed && (
@@ -237,8 +232,7 @@ export function NewThisWeekPage({
       )}
 
       <Group
-        heading="Just arrived"
-        note={region === "IN" ? "Recently started streaming" : "Started streaming this week"}
+        heading="New to Streaming"
         items={pack?.streaming}
         loading={pack == null && !failed}
         openTitle={openTitle}
@@ -248,8 +242,7 @@ export function NewThisWeekPage({
       />
       {pack?.streaming?.length > 0 && pack?.theaters?.length > 0 ? <div className="ntw-rule" /> : null}
       <Group
-        heading="In theaters"
-        note="Opened this week"
+        heading="New in Theaters"
         items={pack?.theaters}
         loading={pack == null && !failed}
         openTitle={openTitle}
@@ -262,6 +255,8 @@ export function NewThisWeekPage({
         <div className="ntw-close-title">That’s what’s new.</div>
         <div className="ntw-close-note">A fresh list arrives Thursday night.</div>
       </div>
+
+      {!signedIn && <CinemastroLetsYou onGetStarted={onGetStarted} showButton />}
 
       {picked && (
         <div className="logged-out-dialog-root">
@@ -307,7 +302,7 @@ function Group({ heading, note, items, loading, openTitle, posterSrc, posterBadg
     <section className="ntw-group" aria-label={heading}>
       <div className="ntw-group-head">
         <h2 className="ntw-group-title">{heading}</h2>
-        <div className="ntw-group-note">{note}</div>
+        {note ? <div className="ntw-group-note">{note}</div> : null}
       </div>
       <div className="strip ntw-strip">
         {loading
