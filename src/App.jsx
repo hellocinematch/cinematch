@@ -762,8 +762,10 @@ function spaUrlWithoutOverlays() {
   return `${u.pathname}${u.search}${u.hash}`;
 }
 
-/** First TMDB catalogue fetch: post-login routing waits for this (or safety timeout), not for catalogue.length > 0. */
+/** First TMDB catalogue fetch starts after the home list is on screen (or this safety timeout). */
 const CATALOGUE_BOOTSTRAP_SAFETY_MS = 22_000;
+/** If the home list never reports back, start the other title lists anyway. */
+const HOME_FEED_RELEASE_MS = 20_000;
 /** Startup logo + circle must stop if the session check or the following load never finishes. */
 const STARTUP_COVER_MAX_MS = 15_000;
 /** Defer non-critical home fetches so first paint / post-login routing wins on slow mobile networks. */
@@ -4203,6 +4205,10 @@ export default function App() {
   const [catalogue, setCatalogue] = useState([]);
   /** After first bootstrap attempt finishes or safety timeout — avoids infinite "Loading Cinemastro…" when TMDB hangs. */
   const [catalogueBootstrapDone, setCatalogueBootstrapDone] = useState(false);
+  /** Other title lists wait until the home screen has finished its own fetch. */
+  const [homeFeedReady, setHomeFeedReady] = useState(false);
+  const onboardingRouteRef = useRef(null);
+  const releaseHomeFeed = useCallback(() => setHomeFeedReady(true), []);
   const [catalogueRetryBusy, setCatalogueRetryBusy] = useState(false);
   /** True after the first `getSession()` returns, so an empty auth event cannot flash the signed-out page. */
   const startupSessionSettledRef = useRef(false);
@@ -5110,6 +5116,23 @@ export default function App() {
   }, [screen]);
 
   useEffect(() => {
+    if (homeFeedReady) return undefined;
+    const onHome = screen === "new-this-week"
+      || screen === "circles"
+      || (screen === "splash" && publicLandingReady);
+    if (!onHome) return undefined;
+    const t = setTimeout(() => setHomeFeedReady(true), HOME_FEED_RELEASE_MS);
+    return () => clearTimeout(t);
+  }, [homeFeedReady, screen, publicLandingReady]);
+
+  useEffect(() => {
+    if (homeFeedReady) return undefined;
+    if (screen === "circles" && circlesLoaded) setHomeFeedReady(true);
+    return undefined;
+  }, [homeFeedReady, screen, circlesLoaded]);
+
+  useEffect(() => {
+    if (!homeFeedReady) return undefined;
     let cancelled = false;
     const safety = setTimeout(() => {
       if (!cancelled) setCatalogueBootstrapDone(true);
@@ -5150,14 +5173,14 @@ export default function App() {
       cancelled = true;
       clearTimeout(safety);
     };
-  }, []);
+  }, [homeFeedReady]);
 
   /**
    * In Theaters. US keeps `fetchInTheaters`. India uses `fetchIndiaInTheaters`
    * (language-first row, other films in the second strip). Canada uses `fetchCanadaInTheaters` (`region=CA`).
    */
   useEffect(() => {
-    if (!user) return;
+    if (!user || !homeFeedReady) return;
     let cancelled = false;
     const theatersRequestId = ++inTheatersFetchGenRef.current;
     (async () => {
@@ -5178,7 +5201,7 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, showRegionKeys, availabilityRegion, showLanguageFirst]);
+  }, [user, showRegionKeys, availabilityRegion, showLanguageFirst, homeFeedReady]);
 
   /**
    * Main **Streaming** page — All services: separate **now** and **popular** pools (B + D for movies, flatrate+date
@@ -5267,9 +5290,11 @@ export default function App() {
   }, [availabilityRegion, streamingPageProviderId]);
 
   useEffect(() => {
-    if (!user) {
-      setWhatsHot([]);
-      setWhatsHotReady(false);
+    if (!user || !homeFeedReady) {
+      if (!user) {
+        setWhatsHot([]);
+        setWhatsHotReady(false);
+      }
       return;
     }
     let cancelled = false;
@@ -5292,7 +5317,7 @@ export default function App() {
       cancelled = true;
       clearTimeout(defer);
     };
-  }, [user]);
+  }, [user, homeFeedReady]);
 
   /**
    * Pulse page — one shared catalog per UTC day and region (`pulse_catalog_daily`, Edge `pulse-catalog`).
@@ -5452,6 +5477,7 @@ export default function App() {
       setSecondaryStripReady(true);
       return;
     }
+    if (!homeFeedReady) return;
     let cancelled = false;
     setSecondaryStripReady(false);
     const defer = setTimeout(() => {
@@ -5497,7 +5523,7 @@ export default function App() {
       cancelled = true;
       clearTimeout(defer);
     };
-  }, [user, activeSecondaryRegionKey]);
+  }, [user, activeSecondaryRegionKey, homeFeedReady]);
 
   useEffect(() => {
     if (availabilityRegion !== "IN" || screen !== "secondary-region") return;
@@ -6523,7 +6549,7 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    if (screen !== "loading-catalogue" || !user || !catalogueBootstrapDone) return;
+    if (screen !== "loading-catalogue" || !user) return;
     let cancelled = false;
     (async () => {
       try {
@@ -6536,14 +6562,8 @@ export default function App() {
         const flaggedDone = raw === true || raw === "true";
         const onboardingDone = flaggedDone || ratingCount > 0; /* ratings = legacy accounts */
         if (!onboardingDone) {
-          setObStep(0);
-          setCinemaPreference(null);
-          setOtherCinema(null);
-          setObCuratedDeck(false);
-          setObCatalogue(catalogue);
-          setObRegion(savedRegion);
-          setObLangFirst(savedRegion === "IN" ? savedLangFirst : []);
-          setScreen("pref-region");
+          onboardingRouteRef.current = { savedRegion, savedLangFirst };
+          setHomeFeedReady(true);
           return;
         }
         setScreen(weekendHomeScreen());
@@ -6552,15 +6572,28 @@ export default function App() {
       } catch (e) {
         console.warn("Post-login routing failed:", e);
         if (!cancelled) {
-          setObCatalogue(catalogue);
-          setObRegion("US");
-          setObLangFirst([]);
-          setScreen("pref-region");
+          onboardingRouteRef.current = { savedRegion: "US", savedLangFirst: [] };
+          setHomeFeedReady(true);
         }
       }
     })();
     return () => { cancelled = true; };
-  }, [screen, catalogue, user, catalogueBootstrapDone]);
+  }, [screen, user]);
+
+  useEffect(() => {
+    if (screen !== "loading-catalogue" || !user || !homeFeedReady || !catalogueBootstrapDone) return;
+    const route = onboardingRouteRef.current;
+    if (!route) return;
+    onboardingRouteRef.current = null;
+    setObStep(0);
+    setCinemaPreference(null);
+    setOtherCinema(null);
+    setObCuratedDeck(false);
+    setObCatalogue(catalogue);
+    setObRegion(route.savedRegion);
+    setObLangFirst(route.savedRegion === "IN" ? route.savedLangFirst : []);
+    setScreen("pref-region");
+  }, [screen, user, homeFeedReady, catalogueBootstrapDone, catalogue]);
 
   useEffect(() => {
     if (!user) {
@@ -6619,7 +6652,7 @@ export default function App() {
    * Profile "Rated N" and visible rated titles stay in sync across sessions.
    */
   useEffect(() => {
-    if (!user) return;
+    if (!user || !homeFeedReady) return;
     const known = new Set(catalogue.map((m) => m.id));
     const missing = Object.keys(userRatings).filter((id) => (
       !known.has(id) && !attemptedRatedHydrationRef.current.has(id)
@@ -6654,7 +6687,7 @@ export default function App() {
       });
     })();
     return () => { cancelled = true; };
-  }, [user, userRatings, catalogue]);
+  }, [user, userRatings, catalogue, homeFeedReady]);
 
   async function invokeMatch(body) {
     function decodeJwtPayload(token) {
@@ -11766,10 +11799,12 @@ export default function App() {
                 setAuthNotice("");
                 setScreen("auth");
               }}
+              onSettled={releaseHomeFeed}
             />
           ) : (
           <LoggedOutLanding
             loadPosterRow={loadLoggedOutPosterRow}
+            onSettled={releaseHomeFeed}
             onSignIn={() => {
               authResumeScreenRef.current = "splash";
               setAuthMode("signin");
@@ -12375,6 +12410,7 @@ export default function App() {
               <StripPosterBadge movie={movie} predicted={null} predictedNeighborCount={0} />
             )}
             onOpenTitle={(movie) => openDetail(movie, null)}
+            onSettled={releaseHomeFeed}
           />
           <BottomNav {...navProps} />
         </div>

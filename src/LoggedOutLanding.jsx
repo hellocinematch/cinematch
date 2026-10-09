@@ -159,11 +159,13 @@ function FilmStill() {
  * Logged-out homepage. Poster taps stay here: overview, then sign up.
  * `loadPosterRow` returns `{ id, title, overview, poster }[]`.
  */
-export default function LoggedOutLanding({ onSignIn, onGetStarted, loadPosterRow }) {
+export default function LoggedOutLanding({ onSignIn, onGetStarted, loadPosterRow, onSettled }) {
   const [posters, setPosters] = useState(null);
   const [picked, setPicked] = useState(null);
   const closeRef = useRef(null);
   const titleId = useId();
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
 
   useEffect(() => {
     let cancelled = false;
@@ -173,6 +175,9 @@ export default function LoggedOutLanding({ onSignIn, onGetStarted, loadPosterRow
       })
       .catch(() => {
         if (!cancelled) setPosters([]);
+      })
+      .finally(() => {
+        if (!cancelled) onSettledRef.current?.();
       });
     return () => {
       cancelled = true;

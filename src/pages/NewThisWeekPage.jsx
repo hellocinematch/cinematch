@@ -66,7 +66,10 @@ export function NewThisWeekPage({
   onOpenTitle,
   onGetStarted,
   onSignIn,
+  onSettled,
 }) {
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
   const [pack, setPack] = useState(null);
   const [failed, setFailed] = useState(false);
   const [tvSeasonById, setTvSeasonById] = useState({});
@@ -117,6 +120,8 @@ export function NewThisWeekPage({
         }
       } catch {
         if (!cancelled) setFailed(true);
+      } finally {
+        if (!cancelled) onSettledRef.current?.();
       }
     })();
     return () => {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.148
+
+- **Home first:** New this week (or the Monday–Wednesday welcome, or Circles) finishes loading before the other title lists start. In Theaters, What’s Hot, rated-title lookups, and the rest run after that list is on screen.
+
 ## 7.0.147
 
 - **New this week — row titles:** **Just arrived** is **New to Streaming**. **In theaters** is **New in Theaters**. The lines under those titles are gone.
