@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.144
+
+- **New this week — featured poster:** The featured picture keeps the poster shape. On a phone it is a small full poster, so the art is not cropped. On a wider screen it is a larger full poster.
+
 ## 7.0.143
 
 - **Circles — Rated by:** The list is the name and the score only. TV rows no longer include a poster, season overview, or episode line. If one window lists more than one season, the name carries **S1** so the scores stay distinct.
