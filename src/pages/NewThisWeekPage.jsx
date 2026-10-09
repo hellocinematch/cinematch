@@ -17,21 +17,7 @@ function regionName(region) {
   return "United States";
 }
 
-function Scores({ circle, tmdb }) {
-  if (circle == null && tmdb == null) return null;
-  return (
-    <div className="ntw-scores">
-      {circle != null && (
-        <span className="ntw-score-circle">
-          Circle <span className="ntw-score-num">{Number(circle).toFixed(1)}</span>
-        </span>
-      )}
-      {tmdb != null && <span className="ntw-score-tmdb">TMDB {tmdb}%</span>}
-    </div>
-  );
-}
-
-function Poster({ title, src, hero }) {
+function Poster({ title, src, hero, badge, logo }) {
   const url = src ? src(title.poster) : title.poster;
   return (
     <div className={hero ? "ntw-hero-poster" : "strip-poster ntw-poster"}>
@@ -40,6 +26,12 @@ function Poster({ title, src, hero }) {
       ) : (
         <div className="strip-poster-fallback">🎬</div>
       )}
+      {logo ? (
+        <span className="ntw-service-logo">
+          <img src={logo} alt="" />
+        </span>
+      ) : null}
+      {badge || null}
     </div>
   );
 }
@@ -58,6 +50,7 @@ export function NewThisWeekPage({
   languageFirst = [],
   posterSrc,
   posterHeroSrc,
+  posterBadge,
   onOpenTitle,
   onGetStarted,
   onSignIn,
@@ -135,15 +128,6 @@ export function NewThisWeekPage({
     onOpenTitle?.(title);
   };
 
-  const scoreFor = (title) => {
-    if (!signedIn || !pack) return { circle: null, tmdb: title.tmdbPercent };
-    const circle = pack.circleScores.get(title.id);
-    return {
-      circle: circle ? circle.score : null,
-      tmdb: title.tmdbPercent,
-    };
-  };
-
   const range = edition ? formatWeekendRange(edition.start, edition.end) : "";
 
   return (
@@ -189,7 +173,7 @@ export function NewThisWeekPage({
 
       {pack?.feature && (
         <button type="button" className="ntw-hero" onClick={() => openTitle(pack.feature)}>
-          <Poster title={pack.feature} src={posterHeroSrc || posterSrc} hero />
+          <Poster title={pack.feature} src={posterHeroSrc || posterSrc} hero badge={posterBadge?.(pack.feature)} />
           <div className="ntw-hero-copy">
             <div className="ntw-hero-where">
               {pack.feature.where}
@@ -199,7 +183,6 @@ export function NewThisWeekPage({
             </div>
             <div className="ntw-hero-title">{pack.feature.title}</div>
             {pack.feature.synopsis ? <p className="ntw-hero-overview">{pack.feature.synopsis}</p> : null}
-            <Scores {...scoreFor(pack.feature)} />
           </div>
         </button>
       )}
@@ -211,7 +194,7 @@ export function NewThisWeekPage({
         loading={pack == null && !failed}
         openTitle={openTitle}
         posterSrc={posterSrc}
-        scoreFor={scoreFor}
+        posterBadge={posterBadge}
       />
       {pack?.streaming?.length > 0 && pack?.theaters?.length > 0 ? <div className="ntw-rule" /> : null}
       <Group
@@ -221,7 +204,7 @@ export function NewThisWeekPage({
         loading={pack == null && !failed}
         openTitle={openTitle}
         posterSrc={posterSrc}
-        scoreFor={scoreFor}
+        posterBadge={posterBadge}
       />
 
       <div className="ntw-close">
@@ -267,7 +250,7 @@ export function NewThisWeekPage({
   );
 }
 
-function Group({ heading, note, items, loading, openTitle, posterSrc, scoreFor }) {
+function Group({ heading, note, items, loading, openTitle, posterSrc, posterBadge }) {
   if (!loading && (!items || items.length === 0)) return null;
   return (
     <section className="ntw-group" aria-label={heading}>
@@ -283,21 +266,17 @@ function Group({ heading, note, items, loading, openTitle, posterSrc, scoreFor }
             </div>
           ))
           : items.map((title) => {
-            const scores = scoreFor(title);
+            const logo = title.serviceLogo || "";
+            const where = String(title.where || "").trim();
             return (
               <button
                 key={title.id}
                 type="button"
                 className="strip-card ntw-card"
+                aria-label={logo && where && where !== "Streaming" && where !== "In theaters" ? `${title.title}, ${where}` : title.title}
                 onClick={() => openTitle(title)}
               >
-                <Poster title={title} src={posterSrc} />
-                <div className="strip-title">{title.title}</div>
-                <div className="strip-genre">
-                  {title.where}
-                  {title.type === "tv" ? " · Series" : ""}
-                </div>
-                <Scores circle={scores.circle} tmdb={scores.tmdb} />
+                <Poster title={title} src={posterSrc} badge={posterBadge?.(title)} logo={logo} />
               </button>
             );
           })}

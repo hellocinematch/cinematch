@@ -247,8 +247,11 @@ async function attachStreamingServices(titles, region, services, fetchTmdb) {
     const flat = data?.results?.[region]?.flatrate;
     if (!Array.isArray(flat) || flat.length === 0) return;
     const match = flat.find((p) => known.has(Number(p.provider_id)));
-    const name = match ? known.get(Number(match.provider_id)) : (flat[0].provider_name || "");
+    const provider = match || flat[0];
+    const name = match ? known.get(Number(match.provider_id)) : (provider?.provider_name || "");
     if (name) title.where = name;
+    const logoPath = typeof provider?.logo_path === "string" ? provider.logo_path : "";
+    if (logoPath.startsWith("/")) title.serviceLogo = `https://image.tmdb.org/t/p/w92${logoPath}`;
   }));
 }
 

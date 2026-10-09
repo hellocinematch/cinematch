@@ -11717,6 +11717,9 @@ export default function App() {
               services={streamingPageServicesForRegion("US")}
               posterSrc={posterSrcThumb}
               posterHeroSrc={posterSrcDetail}
+              posterBadge={(movie) => (
+                <StripPosterBadge movie={movie} predicted={null} predictedNeighborCount={0} />
+              )}
               onSignIn={() => {
                 authResumeScreenRef.current = "splash";
                 setAuthMode("signin");
@@ -12336,6 +12339,9 @@ export default function App() {
             languageFirst={availabilityRegion === "IN" ? showLanguageFirst : EMPTY_LANGUAGE_FIRST}
             posterSrc={posterSrcThumb}
             posterHeroSrc={posterSrcDetail}
+            posterBadge={(movie) => (
+              <StripPosterBadge movie={movie} predicted={null} predictedNeighborCount={0} />
+            )}
             onOpenTitle={(movie) => openDetail(movie, null)}
           />
           <BottomNav {...navProps} />

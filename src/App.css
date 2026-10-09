@@ -3098,6 +3098,7 @@
     cursor:pointer;
   }
   .ntw-hero-poster {
+    position:relative;
     width:100%;
     height:min(400px, 62vh);
     border-radius:12px;
@@ -3129,10 +3130,6 @@
     -webkit-box-orient:vertical;
     overflow:hidden;
   }
-  .ntw-scores { display:flex; gap:10px; align-items:baseline; font-size:11.5px; }
-  .ntw-score-circle { color:#e8c96a; letter-spacing:0.02em; }
-  .ntw-score-num { font-family:'DM Serif Display', Georgia, serif; font-size:calc(13px * var(--cm-read)); }
-  .ntw-score-tmdb { color:#5c5850; }
   .ntw-group { display:flex; flex-direction:column; gap:14px; margin-top:36px; }
   .ntw-group-head { padding:0 24px; display:flex; flex-direction:column; gap:4px; }
   .ntw-group-title {
@@ -3146,6 +3143,9 @@
   .ntw-group-note { font-size:calc(12.5px * var(--cm-read)); color:#8a857c; }
   .ntw-strip { padding-bottom:4px; }
   .ntw-card {
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
     border:none;
     background:transparent;
     padding:0;
@@ -3153,6 +3153,29 @@
     color:inherit;
     text-align:left;
     cursor:pointer;
+  }
+  .ntw-service-logo {
+    position:absolute;
+    left:6px;
+    bottom:6px;
+    z-index:2;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:26px;
+    max-width:54px;
+    padding:3px 4px;
+    box-sizing:border-box;
+    border-radius:6px;
+    background:rgba(0,0,0,0.82);
+  }
+  .ntw-service-logo img {
+    display:block;
+    max-width:46px;
+    max-height:18px;
+    width:auto;
+    height:auto;
+    object-fit:contain;
   }
   .ntw-card:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:8px; }
   .ntw-poster { background:#141414; }

@@ -1,5 +1,21 @@
 # Changelog
 
+## 7.0.142
+
+- **New this week — feature score:** The featured title uses the same score badge as the other posters, on the lower right of its poster. It is a number, not a TMDB percent. The percent line under the title is gone.
+
+## 7.0.141
+
+- **New this week — service logo:** Just arrived shows the streaming service as a small logo on the lower left of the poster, opposite the score. If that service has no logo, nothing is shown there and the name is not written under the poster. The title screen still lists where to watch.
+
+## 7.0.140
+
+- **New this week — poster score:** Just arrived and In theaters use the same score badge as the other poster rows, on the lower right of the poster. The order is your rating, then a predicted score, then the Cinemastro average, then the TMDB number. The service name stays under the poster. The featured title still shows its score under the name.
+
+## 7.0.139
+
+- **New this week — poster rows:** Just arrived and In theaters no longer put the title under the poster. One line under the poster shows the service name on the left, when there is one, and the rating on the right, when there is one. Streaming and In theaters are not repeated under the poster. The featured title at the top still shows its name.
+
 ## 7.0.138
 
 - **Mood — same header as the other screens:** The vibe steps and Tonight's picks no longer show a second Cinemastro logo, community counts, or profile initial under the top menu. They open on the step title or Tonight's picks, the same way Circles and Streaming do. Profile stays in the bottom menu.
