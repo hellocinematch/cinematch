@@ -12,14 +12,16 @@ export function tvSeasonsFromTmdbDetail(raw) {
   for (const s of list) {
     const n = Number(s?.season_number);
     if (!Number.isInteger(n) || n < 1) continue;
-    const airDate = typeof s?.air_date === "string" ? s.air_date : "";
+    const airRaw = typeof s?.air_date === "string" ? s.air_date : "";
+    const airDate = /^\d{4}-\d{2}-\d{2}/.test(airRaw) ? airRaw.slice(0, 10) : "";
     const ep = Number(s?.episode_count);
     const vote = Number(s?.vote_average);
     out.push({
       seasonNumber: n,
       name: typeof s?.name === "string" && s.name.trim() ? s.name.trim() : `Season ${n}`,
       posterPath: typeof s?.poster_path === "string" && s.poster_path ? s.poster_path : null,
-      airYear: /^\d{4}/.test(airDate) ? airDate.slice(0, 4) : null,
+      airDate: airDate || null,
+      airYear: airDate ? airDate.slice(0, 4) : null,
       episodeCount: Number.isFinite(ep) && ep > 0 ? ep : null,
       overview: typeof s?.overview === "string" ? s.overview.trim() : "",
       voteAverage: Number.isFinite(vote) && vote > 0 ? vote : null,
@@ -27,6 +29,24 @@ export function tvSeasonsFromTmdbDetail(raw) {
   }
   out.sort((a, b) => a.seasonNumber - b.seasonNumber);
   return out;
+}
+
+/**
+ * Latest season whose premiere is on or before `todayIso` (YYYY-MM-DD).
+ * A later season that has not started yet is skipped. No aired season → null.
+ */
+export function currentAiredSeason(seasons, todayIso) {
+  const today = String(todayIso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) return null;
+  let best = null;
+  for (const s of Array.isArray(seasons) ? seasons : []) {
+    const d = typeof s?.airDate === "string" ? s.airDate.slice(0, 10) : "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d > today) continue;
+    const n = Number(s?.seasonNumber);
+    if (!Number.isInteger(n) || n < 1) continue;
+    if (!best || n > best.seasonNumber) best = s;
+  }
+  return best;
 }
 
 /** `{ [seasonNumber]: score }` → mean, or null when there are no valid season scores. */

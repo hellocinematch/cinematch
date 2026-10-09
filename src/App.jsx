@@ -92,10 +92,13 @@ import {
 import { fingerprintMyCirclesList } from "./myCirclesListFingerprint.js";
 import { PUBLIC_BETA_LABEL } from "./productLabels.js";
 import LoggedOutLanding from "./LoggedOutLanding.jsx";
+import { weekendHomeScreen } from "./newThisWeek.js";
+import { NewThisWeekPage } from "./pages/NewThisWeekPage.jsx";
 import { formatPublicStat } from "./formatPublicStat.js";
 import { deleteMyAccount, isDeleteAccountConfirm, DELETE_CONFIRM_WORD } from "./accountDelete.js";
 import {
   tvSeasonsFromTmdbDetail,
+  currentAiredSeason,
   effectiveTitleScore,
   seasonRatingsMapFromRows,
   buildEffectiveRatingsMap,
@@ -105,6 +108,7 @@ import {
   expandCircleRowBySeason,
 } from "./seasonRatings.js";
 import "./App.css";
+import { TEXT_SIZE_OPTIONS, readTextSize, writeTextSize } from "./textSize.js";
 import { PulsePage } from "./pages/PulsePage.jsx";
 import { InTheatersPage } from "./pages/InTheatersPage.jsx";
 import { SecondaryRegionPage } from "./pages/SecondaryRegionPage.jsx";
@@ -116,6 +120,7 @@ const AboutPage = lazy(() => import("./aboutPage.jsx").then((m) => ({ default: m
 
 // Shown on Profile as "Cinemastro v…". Version from package.json / CHANGELOG.md (v3.5.0: precomputed neighbors + faster match predict; v3.4.0: detail card copy/chips refresh; v3.3.0: detail hero + 2 score cards; v3.2.1: predict skeleton; v3.2.0: Rate now overlap+TMDB; v3.1.2: Discover clear; v3.1.0: rating_count + meter).
 const APP_VERSION = packageJson.version;
+const EMPTY_LANGUAGE_FIRST = [];
 
 /** Cap “no circles yet” nudge after title-detail first submit or Save new; counter resets when user has an active circle. */
 const NO_CIRCLES_DETAIL_RATING_NUDGE_MAX = 2;
@@ -717,7 +722,7 @@ const SPA_QS_DETAIL = "detail";
 const SPA_QS_LEGAL = "legal";
 const SPA_LEGAL_SCREENS = new Set(["privacy", "terms", "about", "help"]);
 /** Only hydrate `?detail=` / `?legal=` after primary nav is up — avoids racing splash/auth/onboarding. */
-const SPA_DEEPLINK_READY_SCREENS = new Set(["circles", "pulse", "in-theaters", "streaming-page", "secondary-region", "your-picks", "discover", "profile", "watchlist", "rated", "mood-results"]);
+const SPA_DEEPLINK_READY_SCREENS = new Set(["circles", "new-this-week", "pulse", "in-theaters", "streaming-page", "secondary-region", "your-picks", "discover", "profile", "watchlist", "rated", "mood-results"]);
 
 /** Legal routes use path URLs `/privacy`, `/terms`, `/about` (legacy `?legal=` still read on load). */
 function pathnameLegalSegment(pathname) {
@@ -759,6 +764,8 @@ function spaUrlWithoutOverlays() {
 
 /** First TMDB catalogue fetch: post-login routing waits for this (or safety timeout), not for catalogue.length > 0. */
 const CATALOGUE_BOOTSTRAP_SAFETY_MS = 22_000;
+/** Startup logo + circle must stop if the session check or the following load never finishes. */
+const STARTUP_COVER_MAX_MS = 15_000;
 /** Defer non-critical home fetches so first paint / post-login routing wins on slow mobile networks. */
 const WHATS_HOT_FETCH_DEFER_MS = 450;
 const SECONDARY_STRIP_FETCH_DEFER_MS = 550;
@@ -3450,6 +3457,27 @@ function AppBrand({ variant = "header", onPress }) {
   return splash ? img : cluster;
 }
 
+/** Cold open: logo in the middle, small circle under it. Login stays hidden until the session check finishes. */
+function StartupCover({ stalled, onRetry }) {
+  return (
+    <div
+      className="startup-cover"
+      role="status"
+      aria-live="polite"
+      aria-busy={stalled ? "false" : "true"}
+      aria-label={stalled ? "Couldn't open Cinemastro" : "Opening Cinemastro"}
+    >
+      <AppBrand variant="splash" />
+      <div className={`startup-cover__circle${stalled ? " startup-cover__circle--stopped" : ""}`} aria-hidden="true" />
+      {stalled ? (
+        <button type="button" className="startup-cover__retry" onClick={onRetry}>
+          Try again
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 /** Phase C circle strip: resolve poster row from catalogue, in-flight hydrate map, or session TMDB cache. */
 function circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies) {
   const id = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
@@ -3696,7 +3724,7 @@ function SeasonScoreControl({ value, onSave, onClear, canRate, seasonLabel }) {
 }
 
 /**
- * Title screen + Streaming: every season (1+) of a show as {@link SeasonRow}s, each with the user's
+ * Title screen: every season (1+) of a show as {@link SeasonRow}s, each with the user's
  * own {@link SeasonScoreControl}. Long-running shows show the latest `initialMax` until expanded.
  */
 function TvSeasonRowsList({ seasons, showPoster, seasonScores, canRate, onSave, onClear, initialMax = 0 }) {
@@ -4177,7 +4205,10 @@ export default function App() {
   /** After first bootstrap attempt finishes or safety timeout — avoids infinite "Loading Cinemastro…" when TMDB hangs. */
   const [catalogueBootstrapDone, setCatalogueBootstrapDone] = useState(false);
   const [catalogueRetryBusy, setCatalogueRetryBusy] = useState(false);
-  const [loadingCatalogueSlowHint, setLoadingCatalogueSlowHint] = useState(false);
+  /** True after the first `getSession()` returns, so an empty auth event cannot flash the signed-out page. */
+  const startupSessionSettledRef = useRef(false);
+  /** Startup cover stops turning after {@link STARTUP_COVER_MAX_MS}. */
+  const [startupStalled, setStartupStalled] = useState(false);
   const [matchData, setMatchData] = useState(null);
   /** True while a `match` invoke is in flight (after debounce). Avoids “rate more” empty state during load. */
   const [matchLoading, setMatchLoading] = useState(false);
@@ -4198,7 +4229,7 @@ export default function App() {
   useEffect(() => {
     userSeasonRatingsRef.current = userSeasonRatings;
   }, [userSeasonRatings]);
-  /** TMDB seasons (1+) per TV tmdb id — title screen, Streaming season rows, rated list, circle "Rated by". */
+  /** TMDB seasons (1+) per TV tmdb id — title screen, Streaming current-season posters, rated list, circle "Rated by". */
   const [tvSeasonsByTmdbId, setTvSeasonsByTmdbId] = useState({});
   const tvSeasonsByTmdbIdRef = useRef({});
   const tvSeasonsInflightRef = useRef(new Set());
@@ -4438,6 +4469,8 @@ export default function App() {
   /** Where auth “← Back” returns: splash vs circle-join. */
   const authResumeScreenRef = useRef("splash");
   const [profileSettingsError, setProfileSettingsError] = useState("");
+  /** Profile text size. Small is today’s size. Device only; does not follow the phone setting. */
+  const [textSize, setTextSize] = useState(() => readTextSize());
   /** Profile screen — display name input; synced when opening Profile or when `profileName` loads. */
   const [profileNameDraft, setProfileNameDraft] = useState("");
   const [profileNameSaveBusy, setProfileNameSaveBusy] = useState(false);
@@ -4847,8 +4880,9 @@ export default function App() {
     function goAppFromSplash() {
       setScreen(prev => (prev === "splash" || prev === "auth" ? "loading-catalogue" : prev));
     }
-    // Hydrate user; do not navigate to home here — avoids racing PASSWORD_RECOVERY (PKCE) and overwriting the reset screen.
+    // First session read: a saved session continues under the startup cover; no session reveals the signed-out page.
     supabase.auth.getSession().then(({ data: { session } }) => {
+      startupSessionSettledRef.current = true;
       if (session?.user) setUser(session.user);
       if (urlIndicatesCircleJoin()) {
         setScreen("circle-join");
@@ -4856,7 +4890,13 @@ export default function App() {
       }
       if (session?.user && (urlIndicatesPasswordRecovery() || isPasswordRecoverySession(session))) {
         routeRecovery();
+        return;
       }
+      if (session?.user) {
+        goAppFromSplash();
+        return;
+      }
+      setPublicLandingReady(true);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       /* Safari tab resume: token refresh should not reset `user` or retrigger match/catalogue effects. */
@@ -4901,7 +4941,9 @@ export default function App() {
         return;
       }
       setUser(session?.user ?? null);
-      if (!session?.user) setPublicLandingReady(true);
+      if (!session?.user && (event === "SIGNED_OUT" || startupSessionSettledRef.current)) {
+        setPublicLandingReady(true);
+      }
     });
     const onAuthDeepLink = (ev) => {
       void (async () => {
@@ -6505,7 +6547,7 @@ export default function App() {
           setScreen("pref-region");
           return;
         }
-        setScreen("circles");
+        setScreen(weekendHomeScreen());
         setNavTab("home");
         scheduleNativeShellViewportReset();
       } catch (e) {
@@ -6538,7 +6580,7 @@ export default function App() {
       meta.onboarding_complete === "true" ||
       Object.keys(userRatings).length > 0;
     if (!onboardingDone) return;
-    if (screen !== "circles") return;
+    if (screen !== "circles" && screen !== "new-this-week") return;
     if (offeredPostOnboardingHelpRef.current) return;
     offeredPostOnboardingHelpRef.current = true;
     setPostOnboardingHelpStep(1);
@@ -6546,13 +6588,16 @@ export default function App() {
   }, [user, screen, userRatings]);
 
   useEffect(() => {
-    if (screen !== "loading-catalogue") {
-      setLoadingCatalogueSlowHint(false);
+    const waiting =
+      screen === "loading-catalogue" ||
+      (screen === "splash" && !(publicLandingReady && !user));
+    if (!waiting) {
+      setStartupStalled(false);
       return;
     }
-    const t = setTimeout(() => setLoadingCatalogueSlowHint(true), 10_000);
+    const t = setTimeout(() => setStartupStalled(true), STARTUP_COVER_MAX_MS);
     return () => clearTimeout(t);
-  }, [screen]);
+  }, [screen, publicLandingReady, user]);
 
   /** Re-merge watchlist when catalogue grows (streaming, search) so posters resolve from full movie rows. */
   useEffect(() => {
@@ -7731,7 +7776,7 @@ export default function App() {
     (streamingTab === "tv" && !streamingTvReady) ||
     showStreamingRefillEmptySkeleton;
 
-  /** Streaming → Series lists every season of each show as its own row. */
+  /** Streaming → Series needs each show's seasons so the card can use the current season poster. */
   const streamingTvSeasonIdsSig = useMemo(() => {
     if (streamingTab !== "tv") return "";
     const ids = [...streamingDisplayNowRecs, ...streamingDisplayPopularRecs]
@@ -8817,7 +8862,7 @@ export default function App() {
       }
     }
     setNavTab("home");
-    setScreen("circles");
+    setScreen(weekendHomeScreen());
   }
 
   function advanceOb() {
@@ -8829,7 +8874,7 @@ export default function App() {
       if (screen === "rate-more") {
         exitRateMoreFlow();
       }
-      else { setScreen("loading-recs"); setTimeout(() => { setNavTab("home"); setScreen("circles"); }, 2200); }
+      else { setScreen("loading-recs"); setTimeout(() => { setNavTab("home"); setScreen(weekendHomeScreen()); }, 2200); }
     }
   }
 
@@ -8957,7 +9002,7 @@ export default function App() {
     history.replaceState(null, "", spaUrlWithoutOverlays());
     const ret = legalReturnScreenRef.current;
     legalReturnScreenRef.current = null;
-    setScreen(ret ?? "circles");
+    setScreen(ret ?? weekendHomeScreen());
   }
 
   async function dismissPostOnboardingHelpTour() {
@@ -8979,7 +9024,7 @@ export default function App() {
     detailHistoryPushedRef.current = false;
     legalHistoryPushedRef.current = false;
     setNavTab("home");
-    setScreen("circles");
+    setScreen(weekendHomeScreen());
     setSelected(null);
     setDetailEditRating(false);
     setDetailClearRatingConfirm(false);
@@ -10596,6 +10641,7 @@ export default function App() {
    *  nothing. */
   const primaryNavScreens = new Set([
     "circles",
+    "new-this-week",
     "circle-detail",
     "pulse",
     "in-theaters",
@@ -11532,51 +11578,29 @@ export default function App() {
     ? ratedMovies.filter(({ movie }) => (movie.title || "").toLowerCase().includes(ratedSearchLower))
     : ratedMovies;
 
-  /** Streaming → Series: show header (opens title) + one {@link SeasonRow} per season with the user's score. */
-  function renderStreamingTvSeasonGroups(recs) {
+  /** Streaming → Series: one horizontal card per show. Poster is the current season, then the show poster. */
+  function streamingSeriesPosterSrc(movie) {
+    const seasons = tvSeasonsByTmdbId[Number(movie?.tmdbId)];
+    const today = new Date();
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const current = currentAiredSeason(seasons, todayIso);
+    if (current?.posterPath) return posterSrcThumb(current.posterPath);
+    return movie?.poster ? posterSrcThumb(movie.poster) : null;
+  }
+
+  function renderStreamingSeriesStrip(recs) {
     return (
-      <div className="streaming-tv-seasons">
+      <div className="strip">
         {recs.map((rec) => {
-          const m = rec.movie;
-          const seasons = tvSeasonsByTmdbId[Number(m.tmdbId)];
+          const poster = streamingSeriesPosterSrc(rec.movie);
           return (
-            <div className="streaming-tv-show" key={m.id}>
-              <div
-                className="streaming-tv-show__head"
-                role="button"
-                tabIndex={0}
-                onClick={() => openDetail(m, rec)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openDetail(m, rec);
-                  }
-                }}
-              >
-                <div className="strip-poster streaming-tv-show__thumb">
-                  {m.poster ? <img src={posterSrcThumb(m.poster)} alt="" loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
-                </div>
-                <div className="streaming-tv-show__info">
-                  <div className="streaming-tv-show__title">{m.title}</div>
-                  <div className="streaming-tv-show__meta">{formatStripMediaMeta(m, tvStripMetaByTmdbId)}</div>
-                </div>
-                <div className="streaming-tv-show__badge">
-                  <StripPosterBadge movie={m} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
-                </div>
+            <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
+              <div className="strip-poster">
+                {poster ? <img src={poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
               </div>
-              {seasons === undefined ? (
-                <div className="season-rows__loading">Loading seasons…</div>
-              ) : seasons.length === 0 ? null : (
-                <TvSeasonRowsList
-                  seasons={seasons}
-                  showPoster={m.poster}
-                  seasonScores={userSeasonRatings[m.id]}
-                  canRate={Boolean(user)}
-                  initialMax={6}
-                  onSave={(n, score) => saveSeasonRating(m, n, score)}
-                  onClear={(n) => clearSeasonRating(m, n)}
-                />
-              )}
+              <div className="strip-title">{rec.movie.title}</div>
+              <div className="strip-genre">{formatStripMediaMeta(rec.movie, tvStripMetaByTmdbId)}</div>
             </div>
           );
         })}
@@ -11684,6 +11708,31 @@ export default function App() {
       {/* LOGGED-OUT HOMEPAGE — hidden until auth confirms there is no session. */}
       {screen === "splash" && (
         publicLandingReady && !user ? (
+          weekendHomeScreen() === "new-this-week" ? (
+            <NewThisWeekPage
+              region="US"
+              signedIn={false}
+              viewerKey="guest"
+              fetchTmdb={fetchTMDB}
+              services={streamingPageServicesForRegion("US")}
+              posterSrc={posterSrcThumb}
+              posterHeroSrc={posterSrcDetail}
+              onSignIn={() => {
+                authResumeScreenRef.current = "splash";
+                setAuthMode("signin");
+                setAuthError("");
+                setAuthNotice("");
+                setScreen("auth");
+              }}
+              onGetStarted={() => {
+                authResumeScreenRef.current = "splash";
+                setAuthMode("signup");
+                setAuthError("");
+                setAuthNotice("");
+                setScreen("auth");
+              }}
+            />
+          ) : (
           <LoggedOutLanding
             loadPosterRow={loadLoggedOutPosterRow}
             onSignIn={() => {
@@ -11701,11 +11750,9 @@ export default function App() {
               setScreen("auth");
             }}
           />
+          )
         ) : (
-          <div className="loading">
-            <div className="loading-ring" />
-            <div className="loading-title">Loading Cinemastro…</div>
-          </div>
+          <StartupCover stalled={startupStalled} onRetry={() => window.location.reload()} />
         )
       )}
 
@@ -12197,16 +12244,7 @@ export default function App() {
 
       {/* LOADING CATALOGUE */}
       {screen === "loading-catalogue" && (
-        <div className="loading">
-          <div className="loading-ring" />
-          <div className="loading-title">Loading Cinemastro…</div>
-          <div className="loading-sub">Fetching your profile</div>
-          {loadingCatalogueSlowHint && (
-            <div className="loading-sub" style={{ marginTop: 14, maxWidth: 280, textAlign: "center", lineHeight: 1.45 }}>
-              This is taking longer than usual — often a slow network. It should continue automatically; you can also close and reopen the app.
-            </div>
-          )}
-        </div>
+        <StartupCover stalled={startupStalled} onRetry={() => window.location.reload()} />
       )}
 
       {/* FETCHING */}
@@ -12284,6 +12322,23 @@ export default function App() {
           <div className="loading-ring" />
           <div className="loading-title">Using your tastometer to predict</div>
           <div className="loading-sub">Scoring titles for you</div>
+        </div>
+      )}
+
+      {screen === "new-this-week" && (
+        <div className="home">
+          <NewThisWeekPage
+            region={availabilityRegion === "IN" || availabilityRegion === "CA" ? availabilityRegion : "US"}
+            signedIn
+            viewerKey={user?.id || "guest"}
+            fetchTmdb={fetchTMDB}
+            services={streamingPageServicesForRegion(availabilityRegion)}
+            languageFirst={availabilityRegion === "IN" ? showLanguageFirst : EMPTY_LANGUAGE_FIRST}
+            posterSrc={posterSrcThumb}
+            posterHeroSrc={posterSrcDetail}
+            onOpenTitle={(movie) => openDetail(movie, null)}
+          />
+          <BottomNav {...navProps} />
         </div>
       )}
 
@@ -14193,7 +14248,7 @@ export default function App() {
               </div>
               <div className="section-header">
                 <div className="section-title">Now Streaming</div>
-                <div className="section-meta">Newest {streamingTab === "movie" ? "releases" : "series & seasons"}</div>
+                <div className="section-meta">Newest {streamingTab === "movie" ? "releases" : "series"}</div>
               </div>
               {showStreamingStripsSkeleton ? (
                 <SkeletonStrip />
@@ -14206,7 +14261,7 @@ export default function App() {
                   </div>
                 </div>
               ) : streamingTab === "tv" ? (
-                renderStreamingTvSeasonGroups(streamingDisplayNowRecs)
+                renderStreamingSeriesStrip(streamingDisplayNowRecs)
               ) : (
                 <div className="strip">
                   {streamingDisplayNowRecs.map((rec) => (
@@ -14246,7 +14301,7 @@ export default function App() {
                   </div>
                 </div>
               ) : streamingTab === "tv" ? (
-                renderStreamingTvSeasonGroups(streamingDisplayPopularRecs)
+                renderStreamingSeriesStrip(streamingDisplayPopularRecs)
               ) : (
                 <div className="strip">
                   {streamingDisplayPopularRecs.map((rec) => (
@@ -14588,13 +14643,8 @@ export default function App() {
       {/* MOOD PICKER */}
       {screen === "mood-picker" && currentMoodCard && (
         <div className="mood">
-          <div className="page-topbar">
-            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-            <div />
-            <AccountAvatarMenu />
-          </div>
           <div className="mood-header">
-            <button className="mood-back" onClick={() => { setNavTab("home"); setScreen("circles"); }}>← Back</button>
+            <button className="mood-back" onClick={() => { setNavTab("home"); setScreen(weekendHomeScreen()); }}>← Back</button>
             <div className="mood-step">Card {moodStep + 1} of {totalCards}</div>
             <div className="mood-title">{moodShowingFeels ? MOOD_FEELS.title : currentMoodCard.title}</div>
             <div className="mood-subtitle">{moodShowingFeels ? MOOD_FEELS.subtitle : currentMoodCard.subtitle}</div>
@@ -14666,11 +14716,6 @@ export default function App() {
       {/* MOOD RESULTS */}
       {screen === "mood-results" && (
         <div className="mood-results">
-          <div className="page-topbar">
-            <TopbarBrandCluster onPress={goHome} community={siteStats?.community} ratings={siteStats?.ratings} />
-            <div />
-            <AccountAvatarMenu />
-          </div>
           <div className="mood-results-header">
             <button className="mood-results-back" onClick={resetMood}>←</button>
             <div className="mood-results-title">Tonight's picks</div>
@@ -14853,6 +14898,23 @@ export default function App() {
             <div className="profile-settings-title">Account settings</div>
             {profileSettingsError && <div className="auth-error" style={{ marginBottom: 12 }}>{profileSettingsError}</div>}
             <div className="profile-settings-stack">
+            <section className="profile-settings-card">
+              <h3 className="profile-settings-label profile-settings-heading">Text size</h3>
+              <p className="settings-providers-hint">Small is the size you see now. Medium and Large enlarge titles, scores, names, overviews, and circle names. Posters, pills, the bottom menu, and buttons stay the same.</p>
+              <div className="settings-provider-grid" role="group" aria-label="Text size">
+                {TEXT_SIZE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`settings-provider-pill ${textSize === opt.id ? "selected" : ""}`}
+                    aria-pressed={textSize === opt.id}
+                    onClick={() => setTextSize(writeTextSize(opt.id))}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </section>
             <section className="profile-settings-card">
               <h3 className="profile-settings-label profile-settings-heading">Where you watch</h3>
               <p className="settings-providers-hint">Selecting this shows titles for your region in <span className="region-hint-section">In Theaters</span>, <span className="region-hint-section">Pulse</span>, and <span className="region-hint-section">Streaming</span> sections.</p>

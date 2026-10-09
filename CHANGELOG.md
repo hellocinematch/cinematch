@@ -1,5 +1,33 @@
 # Changelog
 
+## 7.0.138
+
+- **Mood — same header as the other screens:** The vibe steps and Tonight's picks no longer show a second Cinemastro logo, community counts, or profile initial under the top menu. They open on the step title or Tonight's picks, the same way Circles and Streaming do. Profile stays in the bottom menu.
+
+## 7.0.137
+
+- **Streaming — Series posters:** Series is a horizontal poster row again, the same shape as Movies. Each card uses the poster for the season that is already airing (the latest one whose premiere date is today or earlier). A season that has not started yet stays off the card. If that season has no poster yet, the card uses the show poster until it does. The show name stays under the poster. Seasons, overviews, and Rate Season stay on the title screen. Movies are unchanged.
+
+## 7.0.136
+
+- **New this week — India streaming:** Just arrived was empty because Indian premieres this calendar week were not in the streaming data. For Where you watch India, that row now includes Indian-language titles that started streaming in the last two weeks. In theaters stays this week’s openings.
+
+## 7.0.135
+
+- **New this week — Where you watch India:** The weekend list follows India. Just arrived and In theaters are Indian-language releases (Hindi, Tamil, Telugu, and the other languages already used on In Theaters). Languages to show first still lead. Hollywood and other US streaming titles no longer fill the page when Where you watch is India.
+
+## 7.0.134
+
+- **Home — New this week:** Thursday 6:00pm through Sunday, the app opens on **New this week** instead of Circles. Monday through Wednesday still open on Circles. It is the home, not a new tab: one featured title, then **Just arrived**, then **In theaters**. The feature is a new release in Where you watch that someone else in a circle already rated; otherwise the biggest streaming premiere this week; otherwise the widest theatrical opening. That feature stays the same for the rest of the weekend. Talk and news are left out. A circle score, when one exists, stays small, and so does the TMDB percent. Someone who is signed out sees the same page for the United States, without circle scores, and a small **Get started**. Circles stays in the bottom menu.
+
+## 7.0.133
+
+- **Startup — logo, then a small circle:** Opening Cinemastro shows the logo in the middle and a small circle under it. The sign-in page stays hidden while a saved session is still being checked, and that same screen stays up through the load until Circles opens. If there is no saved session, the circle stops and the signed-out page appears. If the open never finishes, the circle stops after a short wait and **Try again** appears.
+
+## 7.0.132
+
+- **Profile — text size:** Account settings has **Text size** with **Small**, **Medium**, and **Large**. Small is the size the app already uses. Medium is about a twelfth larger and Large about a sixth larger, on titles, scores, names, overviews, and circle names. Posters, pill grids, the bottom menu, and button boxes stay the same. The choice is saved on this device. It does not follow the phone’s text-size setting.
+
 ## 7.0.131
 
 - **Onboarding — India taste:** After Where you watch is India, the next step asks **What other cinema do you watch?** The choices are **Hollywood / English**, **Other cinemas**, and **Skip**. Indian titles are always in the ratings that follow, using the languages chosen on the previous step, or all seven if none were chosen. Hollywood adds English titles. Skip stays with Indian cinema only, and the Skip choice shows the word Skip alone. Other cinemas asks which one (Korean, Spanish / Latin, Japanese, European — not Indian), then adds that to the Indian titles. The United States and Canada still ask **What do you mainly watch?**, then one other cinema, including Indian. These setup screens scroll when the choices do not fit.

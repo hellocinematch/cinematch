@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { initCapacitorShell } from './capacitorShell.js'
+import { applyStoredTextSize } from './textSize.js'
 
+applyStoredTextSize()
 void initCapacitorShell()
 
 createRoot(document.getElementById('root')).render(
