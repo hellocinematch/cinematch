@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import {
+  arrivalPhrase,
   chooseFeature,
   displayRow,
   formatWeekendRange,
@@ -16,8 +17,8 @@ function regionName(region) {
   return "United States";
 }
 
-function Poster({ title, src, hero, badge, logo, insideLabel }) {
-  const url = src ? src(title.poster) : title.poster;
+function Poster({ title, src, hero, badge, logo, insideLabel, image }) {
+  const url = image || (src ? src(title.poster) : title.poster);
   return (
     <div className={hero ? "ntw-hero-poster" : "strip-poster ntw-poster"}>
       {url ? (
@@ -203,6 +204,8 @@ export function NewThisWeekPage({
       {!failed && pack == null && (
         <div className="ntw-hero" aria-hidden="true">
           <div className="ntw-hero-poster ntw-skeleton" />
+          <div className="ntw-skeleton-line" />
+          <div className="ntw-skeleton-line ntw-skeleton-line--short" />
         </div>
       )}
 
@@ -211,14 +214,25 @@ export function NewThisWeekPage({
       )}
 
       {pack?.feature && (
-        <button type="button" className="ntw-hero" aria-label={pack.feature.title} onClick={() => openTitle(pack.feature)}>
+        <button type="button" className="ntw-hero" onClick={() => openTitle(pack.feature)}>
           <Poster
             title={pack.feature}
             src={posterHeroSrc || posterSrc}
             hero
+            image={pack.feature.backdrop || null}
             badge={posterBadge?.(pack.feature)}
             insideLabel={tvPosterLabel(pack.feature, tvSeasonById)}
           />
+          <div className="ntw-hero-copy">
+            <div className="ntw-hero-where">
+              {pack.feature.where}
+              {arrivalPhrase(pack.feature.releaseDate, pack.todayIso, pack.feature.row)
+                ? ` · ${arrivalPhrase(pack.feature.releaseDate, pack.todayIso, pack.feature.row)}`
+                : ""}
+            </div>
+            <div className="ntw-hero-title">{pack.feature.title}</div>
+            {pack.feature.synopsis ? <p className="ntw-hero-overview">{pack.feature.synopsis}</p> : null}
+          </div>
         </button>
       )}
 

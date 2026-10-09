@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.145
+
+- **New this week — featured title:** The top picture runs the width of the screen again, with where it is playing, the title, and a short overview underneath. On a phone the picture is a wide frame that follows the screen width, so the art is not cropped into a tall box.
+
 ## 7.0.144
 
 - **New this week — featured poster:** The featured picture keeps the poster shape. On a phone it is a small full poster, so the art is not cropped. On a wider screen it is a larger full poster.
