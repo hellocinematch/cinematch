@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.131
+
+- **Onboarding — India taste:** After Where you watch is India, the next step asks **What other cinema do you watch?** The choices are **Hollywood / English**, **Other cinemas**, and **Skip**. Indian titles are always in the ratings that follow, using the languages chosen on the previous step, or all seven if none were chosen. Hollywood adds English titles. Skip stays with Indian cinema only, and the Skip choice shows the word Skip alone. Other cinemas asks which one (Korean, Spanish / Latin, Japanese, European — not Indian), then adds that to the Indian titles. The United States and Canada still ask **What do you mainly watch?**, then one other cinema, including Indian. These setup screens scroll when the choices do not fit.
+
+## 7.0.130
+
+- **Create account — confirm password:** Create account has a second password field. Both must match and each must be at least 6 characters before the account is created. If they do not match, an error is shown and no email is sent. Sign in still has one password field. The check is in the app only.
+
 ## 7.0.129
 
 - **Title screen — circle ratings card:** The first line uses the same green label as **Your rating saved**. **Click to view** stays on the line below.

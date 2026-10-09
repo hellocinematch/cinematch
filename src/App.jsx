@@ -2566,6 +2566,91 @@ const SHOW_LANGUAGE_FIRST_OPTIONS = [
   { id: "mr", label: "Marathi" },
 ];
 
+/** Languages for the India onboarding rating deck. None selected means all of them, in this order. */
+function onboardingIndianLangCodes(selected) {
+  const chosen = new Set(Array.isArray(selected) ? selected : []);
+  const source = chosen.size
+    ? SHOW_LANGUAGE_FIRST_OPTIONS.filter((o) => chosen.has(o.id))
+    : SHOW_LANGUAGE_FIRST_OPTIONS;
+  return source.map((o) => o.id);
+}
+
+/**
+ * India onboarding rating deck. Indian titles are always included.
+ * `hollywood` adds recent English titles. `other` adds one non-Indian cinema. `skip` is Indian only.
+ */
+async function buildIndiaOnboardingPool(kind, langFirst, otherLang) {
+  const indian = await fetchOnboardingIndianTitles(langFirst);
+  if (kind === "hollywood") {
+    const english = await fetchOnboardingHollywoodTitles();
+    const mixed = interleaveHollywoodAndIndian(indian, english);
+    return mixed.length > 0 ? mixed : indian;
+  }
+  if (kind === "other" && otherLang) {
+    const regional = await fetchOnboardingRegionalTitles(otherLang);
+    const mixed = interleaveHollywoodAndIndian(indian, regional);
+    return mixed.length > 0 ? mixed : indian;
+  }
+  return indian;
+}
+
+/** Onboarding rating deck for India: movies and shows, round-robin across the chosen languages. */
+async function fetchOnboardingIndianTitles(selected) {
+  const codes = onboardingIndianLangCodes(selected);
+  const pools = await Promise.all(codes.map(async (code) => {
+    const rows = await fetchOnboardingRegionalTitles(code);
+    return {
+      movies: rows.filter((m) => m.type === "movie"),
+      shows: rows.filter((m) => m.type === "tv"),
+    };
+  }));
+  const out = [];
+  const seen = new Set();
+  for (let i = 0; i < 8 && out.length < 24; i++) {
+    for (const pool of pools) {
+      const movie = pool.movies[i];
+      if (movie && !seen.has(movie.id)) {
+        seen.add(movie.id);
+        out.push(movie);
+      }
+      const show = pool.shows[i];
+      if (show && !seen.has(show.id)) {
+        seen.add(show.id);
+        out.push(show);
+      }
+      if (out.length >= 24) break;
+    }
+  }
+  return out;
+}
+
+function interleaveHollywoodAndIndian(englishPool, indianPool) {
+  const engMovies = (englishPool || []).filter((m) => m.type === "movie");
+  const engShows = (englishPool || []).filter((m) => m.type === "tv");
+  const indMovies = (indianPool || []).filter((m) => m.type === "movie");
+  const indShows = (indianPool || []).filter((m) => m.type === "tv");
+  const mixed = [];
+  const seen = new Set();
+  const push = (item) => {
+    if (!item || seen.has(item.id)) return;
+    seen.add(item.id);
+    mixed.push(item);
+  };
+  for (let i = 0; i < 8 && mixed.length < 24; i++) {
+    push(engMovies[i]);
+    push(indMovies[i]);
+    push(engShows[i]);
+    push(indShows[i]);
+  }
+  return mixed;
+}
+
+function onboardingLanguageFlag(lang) {
+  const code = String(lang || "").toLowerCase();
+  if (ALL_INDIAN_LANGS.includes(code)) return "🇮🇳";
+  return OTHER_CINEMA_OPTIONS.find((o) => o.lang === code)?.flag || "🌏";
+}
+
 const PROFILE_REGION_OPTIONS = [
   { id: "hollywood", label: "🌍 Hollywood", languages: ["en"] },
   { id: "indian", label: "🎭 Indian", languages: ALL_INDIAN_LANGS },
@@ -4072,6 +4157,8 @@ export default function App() {
   const [authMode, setAuthMode] = useState("signup");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  /** Signup only. Compared locally to `authPassword` before `signUp`; sign-in stays one field. */
+  const [authPasswordConfirm, setAuthPasswordConfirm] = useState("");
   const [authName, setAuthName] = useState("");
   const [authError, setAuthError] = useState("");
   const [authNotice, setAuthNotice] = useState("");
@@ -4084,6 +4171,8 @@ export default function App() {
   const otpRecoveryInFlightRef = useRef(false);
   /** Auth password field: show/hide plaintext (eye toggle). */
   const [authPasswordVisible, setAuthPasswordVisible] = useState(false);
+  /** Signup confirm-password field: its own show/hide, reset with the password eye on mode change. */
+  const [authPasswordConfirmVisible, setAuthPasswordConfirmVisible] = useState(false);
   const [catalogue, setCatalogue] = useState([]);
   /** After first bootstrap attempt finishes or safety timeout — avoids infinite "Loading Cinemastro…" when TMDB hangs. */
   const [catalogueBootstrapDone, setCatalogueBootstrapDone] = useState(false);
@@ -4446,6 +4535,7 @@ export default function App() {
   const [tvStripMetaByTmdbId, setTvStripMetaByTmdbId] = useState({});
   useEffect(() => {
     setAuthPasswordVisible(false);
+    setAuthPasswordConfirmVisible(false);
   }, [authMode]);
   useEffect(() => {
     screenRef.current = screen;
@@ -4721,8 +4811,10 @@ export default function App() {
   }, []);
 
   // Pre-onboarding cinema preference state
-  const [cinemaPreference, setCinemaPreference] = useState(null); // "hollywood" | "mix"
+  const [cinemaPreference, setCinemaPreference] = useState(null); // US/CA: "hollywood" | "mix". India: "hollywood" | "other" | "skip"
   const [otherCinema, setOtherCinema] = useState(null); // cinema option id
+  /** India Indian/Both decks are already ordered. Skip the English-only year trim. */
+  const [obCuratedDeck, setObCuratedDeck] = useState(false);
   const [obCatalogue, setObCatalogue] = useState([]);   // merged catalogue for onboarding
   /** Onboarding draft for Where you watch / Languages to show first; saved on Continue. */
   const [obRegion, setObRegion] = useState("US");
@@ -6406,6 +6498,7 @@ export default function App() {
           setObStep(0);
           setCinemaPreference(null);
           setOtherCinema(null);
+          setObCuratedDeck(false);
           setObCatalogue(catalogue);
           setObRegion(savedRegion);
           setObLangFirst(savedRegion === "IN" ? savedLangFirst : []);
@@ -6865,6 +6958,14 @@ export default function App() {
       setAuthError(`Display name must be at most ${PROFILE_DISPLAY_NAME_MAX} characters.`);
       return;
     }
+    if (authPassword.length < 6 || authPasswordConfirm.length < 6) {
+      setAuthError("Password must be at least 6 characters.");
+      return;
+    }
+    if (authPassword !== authPasswordConfirm) {
+      setAuthError("Passwords do not match.");
+      return;
+    }
     setAuthLoading(true);
     let data;
     let error;
@@ -7158,7 +7259,7 @@ export default function App() {
     setInTheatersPopularRanked([]);
     setStreamingMoviesReady(true);
     setStreamingTvReady(true);
-    setCinemaPreference(null); setOtherCinema(null);
+    setCinemaPreference(null); setOtherCinema(null); setObCuratedDeck(false);
     setPublicLandingReady(true);
     setScreen("splash"); setNavTab("home");
   }
@@ -7230,6 +7331,7 @@ export default function App() {
   function selectOnboardingRegion(region) {
     setObRegion(region);
     if (region !== "IN") setObLangFirst([]);
+    setCinemaPreference(null);
   }
 
   function toggleOnboardingLangFirst(code) {
@@ -7251,7 +7353,28 @@ export default function App() {
   // Handle cinema preference confirmation
   async function confirmPrimaryPreference() {
     if (catalogue.length === 0) return;
+    if (obRegion === "IN") {
+      if (cinemaPreference !== "hollywood" && cinemaPreference !== "other" && cinemaPreference !== "skip") return;
+      if (cinemaPreference === "other") {
+        setOtherCinema(null);
+        setScreen("pref-secondary");
+        return;
+      }
+      setOtherCinema(null);
+      setObCuratedDeck(true);
+      setScreen("loading-recs");
+      try {
+        const pool = await buildIndiaOnboardingPool(cinemaPreference, obLangFirst);
+        setObCatalogue(pool.length > 0 ? pool : catalogue);
+      } catch (e) {
+        console.error(e);
+        setObCatalogue(catalogue);
+      }
+      setScreen("onboarding");
+      return;
+    }
     if (cinemaPreference === "hollywood") {
+      setObCuratedDeck(false);
       setScreen("loading-recs");
       try {
         const pool = await fetchOnboardingHollywoodTitles();
@@ -7262,6 +7385,7 @@ export default function App() {
       }
       setScreen("onboarding");
     } else {
+      setObCuratedDeck(false);
       // Go to secondary screen to pick one other cinema
       setScreen("pref-secondary");
     }
@@ -7269,6 +7393,21 @@ export default function App() {
 
   // Handle secondary cinema selection and build mixed onboarding catalogue
   async function confirmSecondaryPreference() {
+    if (obRegion === "IN") {
+      const option = OTHER_CINEMA_OPTIONS.find((o) => o.id === otherCinema && o.id !== "hi");
+      if (!option || catalogue.length === 0) return;
+      setObCuratedDeck(true);
+      setScreen("loading-recs");
+      try {
+        const pool = await buildIndiaOnboardingPool("other", obLangFirst, option.lang);
+        setObCatalogue(pool.length > 0 ? pool : catalogue);
+      } catch (e) {
+        console.error(e);
+        setObCatalogue(catalogue);
+      }
+      setScreen("onboarding");
+      return;
+    }
     if (!otherCinema) {
       if (catalogue.length === 0) return;
       setScreen("loading-recs");
@@ -7404,7 +7543,7 @@ export default function App() {
     if (obCatalogue.length === 0) return [];
     const currentYear = new Date().getFullYear();
     // If mixed catalogue, use it directly (already curated — avoid trimming regional classics by year)
-    if (otherCinema) {
+    if (otherCinema || obCuratedDeck) {
       return obCatalogue.slice(0, ONBOARDING_COUNT);
     }
     // English only
@@ -7413,7 +7552,7 @@ export default function App() {
     const mixed = [];
     for (let i = 0; i < 6; i++) { if (movies[i]) mixed.push(movies[i]); if (shows[i]) mixed.push(shows[i]); }
     return mixed.slice(0, ONBOARDING_COUNT);
-  }, [obCatalogue, otherCinema]);
+  }, [obCatalogue, otherCinema, obCuratedDeck]);
 
   /** When `matchData.recommendations` is `[]`, we must use it — not fall back to sticky (that hid empty CF and broke “predicted first” sort). */
   const rawRecommendations = matchData?.recommendations;
@@ -11677,6 +11816,42 @@ export default function App() {
               </div>
             </div>
             )}
+            {authMode === "signup" && (
+            <div className="auth-field">
+              <label className="auth-label">Confirm password</label>
+              <div className="auth-password-wrap">
+                <input
+                  className="auth-input auth-input--password"
+                  type={authPasswordConfirmVisible ? "text" : "password"}
+                  name="confirm-password"
+                  autoComplete="new-password"
+                  placeholder="Min. 6 characters"
+                  value={authPasswordConfirm}
+                  onChange={e => setAuthPasswordConfirm(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="auth-password-toggle"
+                  onClick={() => setAuthPasswordConfirmVisible(v => !v)}
+                  aria-label={authPasswordConfirmVisible ? "Hide password" : "Show password"}
+                >
+                  {authPasswordConfirmVisible ? (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.215 16.44 7.292 19.5 12 19.5c.992 0 1.94-.152 2.835-.428" />
+                      <path d="M6.228 6.228A10.45 10.45 0 0112 4.5c4.708 0 8.785 3.06 10.066 7.477a10.465 10.465 0 01-2.55 4.004" />
+                      <path d="M9.53 9.53A3 3 0 0012 15a3 3 0 002.53-4.47" />
+                      <path d="M6 6L18 18" />
+                    </svg>
+                  ) : (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+            )}
             {authMode === "signin" && (
               <div className="auth-link-row">
                 <button type="button" className="auth-link-btn" onClick={handleForgotPassword} disabled={authLoading}>Forgot password?</button>
@@ -11853,7 +12028,7 @@ export default function App() {
       {/* WHERE YOU WATCH — before cinema preference */}
       {screen === "pref-region" && (
         <div className="pref">
-          <div className="pref-step">Step 1 of 3</div>
+          <div className="pref-step">Step 1 of {obRegion === "IN" ? 2 : 3}</div>
           <div className="pref-title">Where you watch</div>
           <div className="pref-sub">Selecting this shows titles for your region in <span className="region-hint-section">In Theaters</span>, <span className="region-hint-section">Pulse</span>, and <span className="region-hint-section">Streaming</span> sections.</div>
           <div className="settings-provider-grid">
@@ -11897,26 +12072,80 @@ export default function App() {
       {/* CINEMA PREFERENCE — PRIMARY */}
       {screen === "pref-primary" && (
         <div className="pref">
-          <div className="pref-step">Step 2 of 3</div>
-          <div className="pref-title">What do you mainly watch?</div>
-          <div className="pref-sub">This helps us pick the right titles for you to rate</div>
+          <div className="pref-step">Step 2 of {obRegion === "IN" ? 2 : 3}</div>
+          <div className="pref-title">{obRegion === "IN" ? "What other cinema do you watch?" : "What do you mainly watch?"}</div>
+          <div className="pref-sub">{obRegion === "IN" ? "Indian cinema is already included. Add one, or skip." : "This helps us pick the right titles for you to rate"}</div>
           <div className="pref-options">
-            <div className={`pref-option ${cinemaPreference === "hollywood" ? "selected" : ""}`}
-              onClick={() => setCinemaPreference("hollywood")}>
-              <div className="pref-option-icon">🌍</div>
-              <div className="pref-option-text">
-                <div className="pref-option-label">Mainly Hollywood / English</div>
-                <div className="pref-option-desc">US & UK films and TV shows</div>
-              </div>
-            </div>
-            <div className={`pref-option ${cinemaPreference === "mix" ? "selected" : ""}`}
-              onClick={() => setCinemaPreference("mix")}>
-              <div className="pref-option-icon">🌏</div>
-              <div className="pref-option-text">
-                <div className="pref-option-label">A mix of languages</div>
-                <div className="pref-option-desc">I also enjoy other world cinema</div>
-              </div>
-            </div>
+            {obRegion === "IN" ? (
+              <>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className={`pref-option ${cinemaPreference === "hollywood" ? "selected" : ""}`}
+                  onClick={() => setCinemaPreference("hollywood")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCinemaPreference("hollywood"); } }}
+                >
+                  <div className="pref-option-icon">🌍</div>
+                  <div className="pref-option-text">
+                    <div className="pref-option-label">Hollywood / English</div>
+                    <div className="pref-option-desc">US & UK films and TV shows</div>
+                  </div>
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className={`pref-option ${cinemaPreference === "other" ? "selected" : ""}`}
+                  onClick={() => setCinemaPreference("other")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCinemaPreference("other"); } }}
+                >
+                  <div className="pref-option-icon">🌏</div>
+                  <div className="pref-option-text">
+                    <div className="pref-option-label">Other cinemas</div>
+                    <div className="pref-option-desc">Asian, Korean, and more</div>
+                  </div>
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className={`pref-option ${cinemaPreference === "skip" ? "selected" : ""}`}
+                  onClick={() => setCinemaPreference("skip")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCinemaPreference("skip"); } }}
+                >
+                  <div className="pref-option-text">
+                    <div className="pref-option-label">Skip</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className={`pref-option ${cinemaPreference === "hollywood" ? "selected" : ""}`}
+                  onClick={() => setCinemaPreference("hollywood")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCinemaPreference("hollywood"); } }}
+                >
+                  <div className="pref-option-icon">🌍</div>
+                  <div className="pref-option-text">
+                    <div className="pref-option-label">Mainly Hollywood / English</div>
+                    <div className="pref-option-desc">US & UK films and TV shows</div>
+                  </div>
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className={`pref-option ${cinemaPreference === "mix" ? "selected" : ""}`}
+                  onClick={() => setCinemaPreference("mix")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCinemaPreference("mix"); } }}
+                >
+                  <div className="pref-option-icon">🌏</div>
+                  <div className="pref-option-text">
+                    <div className="pref-option-label">A mix of languages</div>
+                    <div className="pref-option-desc">I also enjoy other world cinema</div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           {catalogue.length === 0 && (
             <p className="pref-sub" style={{ marginTop: 16, color: "#888" }}>
@@ -11947,11 +12176,11 @@ export default function App() {
       {/* CINEMA PREFERENCE — SECONDARY */}
       {screen === "pref-secondary" && (
         <div className="pref">
-          <div className="pref-step">Step 3 of 3</div>
-          <div className="pref-title">Which other cinema do you love?</div>
-          <div className="pref-sub">Pick one — you can always explore more later</div>
+          {obRegion === "IN" ? null : <div className="pref-step">Step 3 of 3</div>}
+          <div className="pref-title">{obRegion === "IN" ? "Which other cinema?" : "Which other cinema do you love?"}</div>
+          <div className="pref-sub">{obRegion === "IN" ? "Indian cinema is already included. Pick one more." : "Pick one — you can always explore more later"}</div>
           <div className="pref-grid">
-            {OTHER_CINEMA_OPTIONS.map(opt => (
+            {(obRegion === "IN" ? OTHER_CINEMA_OPTIONS.filter((opt) => opt.id !== "hi") : OTHER_CINEMA_OPTIONS).map(opt => (
               <div key={opt.id}
                 className={`pref-grid-option ${otherCinema === opt.id ? "selected" : ""}`}
                 onClick={() => setOtherCinema(opt.id)}>
@@ -12022,7 +12251,7 @@ export default function App() {
                 <div className="card-type-badge">{obMovie.type === "movie" ? "Movie" : "TV Show"}</div>
                 {obMovie.language !== "en" && (
                   <div className="card-lang-badge">
-                    {OTHER_CINEMA_OPTIONS.find(o => o.lang === obMovie.language)?.flag || "🌏"}
+                    {onboardingLanguageFlag(obMovie.language)}
                   </div>
                 )}
               </div>
