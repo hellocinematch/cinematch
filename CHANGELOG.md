@@ -1,8 +1,197 @@
 # Changelog
 
+## 7.0.129
+
+- **Title screen — circle ratings card:** The first line uses the same green label as **Your rating saved**. **Click to view** stays on the line below.
+
+## 7.0.128
+
+- **Title screen — circle ratings card:** The card’s first line is the count and the place, for example **2 ratings from your circles** (or **1 rating from your circle** when there is one of either). The second line is **Click to view**.
+
+## 7.0.127
+
+- **Title screen — From your Circle / Circles:** The card title is **From your Circle** when you belong to one circle, and **From your Circles** when you belong to more than one. The count reads **1 rating** or **2 ratings**, in a larger size. Your own published rating is left out of the count and out of the list.
+
+## 7.0.126
+
+- **Title screen — Ratings from your circles:** The card matches the “Your rating saved” box. The title is **Ratings from your circles**. Names are not listed on the card. The line under the title is how many other people published the title, for example **4 rated**. Your own published rating is not included in that number. The card stays hidden when nobody else has published it. Opening the card still lists each person, including you.
+
+## 7.0.125
+
+- **Title screen — In your circles:** On a movie or show opened from anywhere, an **In your circles** card appears when at least one person in a circle you share has published that title. The card is hidden when nobody has. A tap opens a window on top of the title; **X** (or the dimmed page behind it) closes the window and leaves the title open. The list scrolls inside the window; the title and **X** stay put. Each person appears once, with their score. When you are in more than one circle, the line also names the circle (or circles) they published it in. A private rating stays hidden. A TV show uses the same season lines as **Rated by**: one line per season a person rated, plus a whole-show line when they rated the show without a season.
+
+## 7.0.124
+
+- **About — where the app is available:** The Legal & compliance line now reads “Cinemastro is currently available to users in the US, India, and Canada.”
+- **Terms — country order:** Section 5 now lists the United States, India, and Canada, in that order. “Last updated” is October 8, 2026. The Where you watch sentence is unchanged.
+
+## 7.0.123
+
+- **Title screen — full watchlist:** **+ Watchlist** stays tappable when the list already has 30 titles. The tap shows “Watchlist is full (30 titles). Remove one to add more.” The title is not added. **Submit Rating** is unchanged.
+
+## 7.0.122
+
+- **Logged-out homepage:** Someone without a session now sees a public page: the Cinemastro logo, **Sign in**, the lines “Rate what you watch.”, “See what your circle loves.”, and “Discover what’s made for your taste.”, a gold **Get started — it’s free** button, the quieter line “Your ratings. Your circle. Your perfect next watch.”, a row of posters, and **Cinemastro lets you…** with the eight feature boxes. Tapping a poster opens a popup with that title’s overview and asks them to sign up. It does not open the full title page. **Get started** opens create-account; **Sign in** opens the existing sign-in screen, and Back returns to this page. A signed-in member never sees this page — they get the app and the bottom menu. Someone who has an account but is signed out still sees this page until they tap **Sign in**.
+
+## 7.0.121
+
+- **Title screen — rating card width:** On wider screens, the rating card is now as wide as the facts card above it and the **Overview** card below it. It was capped at 380px before.
+
+## 7.0.120
+
+- **Title screen — rating in a card:** When you have not rated a title yet, "Select your rating and submit", the 1–10 chips, the **.5** chip, **Submit Rating**, and **+ Watchlist** now sit together in the same dark rounded card as **Overview**, **Cast**, and **Director** / **Created by**. The **For you** / **TMDB** scores and the facts card (certification, date, runtime, language, genres) stay where they were. The circle "Rate this title" orange strip is unchanged.
+- **Title screen — dim text one step brighter:** Same warm step as Where to watch in 7.0.118. "Select your rating and submit" `#666` → `#959088`. **For you** / **TMDB** labels `#8f8f8f` → `#beb9b1`. "Rate more to predict." (and the range / "No score yet" lines) `#8a8a8a` → `#b9b4ac`. The large **TBD** / **—** `#555` → `#847f77`. Facts line (date, runtime, language) `#b0b0a8` → `#dfdaca`, its `·` separators `#444` → `#736e66`, genres `#888` → `#b7b2aa`. On the title screen only, chip numerals `#c8c4bc` → `#ddd7cd`, the **.5** chip `#6a6a6a` → `#99948c`, and the disabled **.5** `#555` → `#847f77`. The gold TMDB score, the gold selected chip, the Submit Rating and Watchlist buttons, the certification badge, Overview text, and gold headings are unchanged. Chips on onboarding and Rate more are unchanged.
+
+## 7.0.119
+
+- **Title screen — Overview in a card, gold headings:** **Overview** now sits in the same dark rounded card as **Cast**, **Director** / **Created by**, and **Where to watch**. The tagline (e.g. "Desire what is forbidden.") moves inside that card, between the **Overview** heading and the overview text, and is slightly larger (14px → 15.5px, still italic gray). The **Overview**, **Cast**, **Director** / **Created by**, and **Where to Watch** headings are now the app's light gold (`#e8c96a`) so they match. Body text, scores, the Where to watch service list and links, and the **Seasons** block are unchanged.
+
+## 7.0.118
+
+- **Title screen — Where to watch is easier to read:** The dim gray text in the **Where to watch** box is one step brighter, in a warm gray that is still dimmer than the cream **Overview** text. This covers the **Where to Watch** heading (`#666` → `#959088`), the **Free** / **Subscription** / **Rent** / **Buy** labels and the showtimes hint (`#555` → `#847f77`), and the "Checking availability…", "Availability not found", and "Not currently available for streaming" lines (`#444` → `#736e66`). Service names (already light), provider logos, the gold links, the title, scores, and Overview are unchanged.
+
+## 7.0.117
+
+- **Title screen — easier-to-read text:** On a movie or show's title screen, the **Overview** text and the names in the **Cast** and **Director** / **Created by** panels are now the cream color (`#ddd7cd`) used for readable headings elsewhere, instead of muted gray. The title, scores, tagline, poster, and the rest of the app are unchanged.
+
+## 7.0.116
+
+- **Circles — one card per rated season:** In a circle's **Recent** strip and **All** / **Top** lists, a TV show that members rated by season now appears as a separate card for each rated season, not one card for the whole show. Each season card shows the season poster (the show poster if TMDB has none), the show title, **Season N**, and that season's circle score (the average of members' scores for that season). The **You** score on All / Top is your score for that season, and the rater count is how many members rated that season. Rating only Season 1 of a show shows one **Season 1** card and no whole-show card. A whole-show rating (no season) stays one card with the show poster and no season label. If a show has both, the whole-show card comes first, followed by its season cards. Tapping the circle score on a season card opens **Rated by** filtered to that season. Movies, Search, Your Picks, In Theaters, and Pulse are unchanged, and matching still uses one score per person per show.
+- **No database change:** Season cards come from the `get_circle_title_publisher_lines` RPC added in 7.0.115 (migration `20260925120000_season_ratings.sql`). Before that migration is applied, circles show one card per show as before.
+
+## 7.0.115
+
+- **TV seasons — rate each season:** A TV show's title screen now has a **Seasons** block under Where to watch. Each season (Season 1 and up; specials are skipped) is one row laid out like TMDB's season list: the season poster (or a placeholder), **Season N**, TMDB's own season score as a small star and percent when TMDB has one, the year and episode count ("2022 • 8 Episodes"), and a short overview. Each row has **Rate Season N**, which opens the same 1–10 and .5 chips the app uses for titles, with Save, Cancel, and Clear. The show's own rating control and score stay where they were. If you have season scores, the screen notes that your show score is their average, and **Publish to circles…** is available from the Seasons block.
+- **Streaming — Series lists seasons:** On **Streaming → Series**, each show is no longer a single poster card. Each show has a header (poster, title, score badge; tap it to open the title), followed by one season row per season in the same layout, each with its own rating. For long-running shows the latest 6 seasons are shown, with **Show all N seasons** to expand. **Streaming → Movies** is unchanged. Search, Your Picks, In Theaters, Pulse, and the second-region page still show one card per show.
+- **Your Ratings — one line per season:** The rated list shows a separate line for each season you rated: the show title, **Season N**, that season's poster (the show poster if TMDB has none), and that season's score only. Three rated seasons make three lines. An older whole-show rating stays one line with the show poster and no season label. **Rerate** on a season line opens the title screen.
+- **Circles — Rated by shows season rows:** In a circle, **Rated by** for a TV show lists one row per season each member rated: season poster, member name, **Season N**, that member's score for the season, the year and episode count, and a short overview. A whole-show rating stays one row with the show poster and no season label. Movies are unchanged.
+- **One number per person per show:** Matches, neighbors, predictions, circle averages, the circle "You" score, community (Cinemastro) averages, and the Profile **Avg** all use one score per person per show: the average of that person's season scores when they rated any seasons, otherwise their whole-show score. Four season scores never count as four people. Existing ratings are not changed or deleted.
+- **Database:** New migration `20260925120000_season_ratings.sql` adds the `season_ratings` table (show TMDB id plus season number, season 1 and up), the `ratings_effective` view, and the `get_circle_title_publisher_lines` RPC. It also updates the circle strip, All, Top, and Rated by RPCs, community averages, and the match RPCs to read one averaged score per person. It must be applied (staging first) before season scores can be saved. Until then the app works as before and season saves show an error. Edge functions **match** 1.0.1 and **compute-neighbors** 1.0.2 average season scores per person the same way. Redeploy them after the migration.
+
+## 7.0.114
+
+- **Streaming services — hint text:** The hint under **Streaming services** in Profile now reads “Selecting any below will show titles only for those services. Select none to show all streaming services titles.” It applies to US, Canada, and India. The service pills, colors, and other hints are unchanged.
+
+## 7.0.113
+
+- **India — streaming services match India:** When **Where you watch** is India, Profile **Streaming services** now shows only services available in India: Netflix, Prime Video, JioHotstar, Sony LIV, Zee5, Aha, MX Player, and Mubi (TMDB India ids 8, 119, 2336, 237, 232, 532, 1898, 11). JioHotstar is the merged Disney+ Hotstar and JioCinema service, so there are no separate Hotstar or JioCinema pills. Before, India showed the US set (Hulu, Disney+, Peacock, Max, and others). The Streaming page filter uses the same India list, so it now offers Aha, MX Player, and Mubi too, and it still clears a US-only selection back to **All services**. Your Picks in India now checks India availability against the India services you saved, the same way Canada does. US-only ids you saved earlier stay in your profile but are hidden and ignored while India is selected, so switching back to US brings them back. US and Canada pills are unchanged. Onboarding has no streaming step and is unchanged.
+
+## 7.0.112
+
+- **Talk and News out of browsing catalogs:** TV titles tagged Talk (10767) or News (10763) no longer appear in Your Picks, Streaming (movies and series, all services and per service), Pulse (US, Canada, India, including the cached daily catalog), In Theaters, the secondary-region page, or mood picks. Late-night shows such as *Watch What Happens Live* and *The Late Show with Stephen Colbert* are gone from Your Picks. One shared exclusion replaces the per-fetch copies. Titles you already rated stay in your rated list and Profile stats. Search and circle member ratings still show them. **Genres to show** and **Regions to show** are unchanged.
+- **India hides the second region:** When **Where you watch** is India, Profile hides **Home — second region** and the top nav drops the secondary-region tab (Indian / Asian / Latin / European). Opening that page while India is selected goes to Circles. The saved `secondary_region_key` is not cleared, so switching back to US or Canada shows your choice again.
+
+## 7.0.111
+
+- **Where you watch — hint colors:** The hint under **Where you watch** in Profile and in onboarding step 1 now reads “Selecting this shows titles for your region in In Theaters, Pulse, and Streaming sections.” The names **In Theaters**, **Pulse**, and **Streaming** are shown in the app’s gold accent (the same color as selected pills); the rest of the hint keeps its usual color. Region pills and other settings are unchanged.
+
+## 7.0.110
+
+- **Where you watch — hint text:** The hint under **Where you watch** in Profile and in onboarding step 1 now reads “Selecting this shows titles for your region in In Theaters, Streaming, and Pulse.” It no longer lists the countries (the pills already show them). The region pills, secondary region, and other settings are unchanged.
+
+## 7.0.109
+
+- **Auth — email codes for sign-up confirmation and password reset:** After you create an account that needs email confirmation, the app now shows a **Confirm your email** screen with your email, a code field, **Confirm**, and **Resend code**. Entering the 6-digit code from the email signs you in and continues to onboarding, the same as tapping the confirmation link. After **Forgot password?**, the app shows one **Reset password** screen with the email code and your new password. **Update Password** verifies the code, saves the new password, and signs you in, without opening the email link. This fixes Android, where the reset link opened the website while the app stayed stuck on the password screen. A wrong or expired code shows a clear error, and **Resend code** sends a fresh email. Tapping the links in the email still works as before. Sign-in, magic links, and Profile password change are unchanged. The staging **Confirm signup** and **Reset password** email templates must include `{{ .Token }}` for the code to appear.
+
+## 7.0.108
+
+- **Privacy and Terms — table of contents links:** Tapping a table-of-contents link now stays on the Privacy (or Terms) page and scrolls to that section, and the address bar hash updates (for example `#9-what-are-your-privacy-rights`). Before, the in-page jump was treated as Back, so it returned to About (or wherever you opened the page from), and the policy headings had ids that did not match the table-of-contents links. Policy text is unchanged.
+
+## 7.0.107
+
+- **Privacy page — Delete your account centered:** The “Delete your account” card at the top of the Privacy page (public `/privacy`, the in-app Privacy screen, and `#delete-account`) is now centered in the same column as the policy, with its heading, instructions, and Delete account button (or the email fallback) center-aligned. A thin divider line now separates the card from the “PRIVACY POLICY” heading. Account deletion, the policy text, Terms, About, and Profile’s Delete account button are unchanged.
+
+## 7.0.106
+
+- **Legal — Terms arbitration and liability wording:** Section 17 (Binding Arbitration) now opens with “You agree to resolve disputes via binding arbitration in Arizona, to the extent permitted by the laws of your jurisdiction.” The JAMS/AAA rules, Maricopa County venue, class-action waiver, and notice steps are unchanged. Section 20’s zero-dollar cap now reads “OUR LIABILITY IS LIMITED TO ZERO DOLLARS, TO THE EXTENT PERMITTED BY THE LAWS OF YOUR JURISDICTION.” The rest of the limitation language is unchanged. “Last updated” stays September 24, 2026.
+
+## 7.0.105
+
+- **Legal — Privacy and Terms:** The Privacy Policy no longer says we may request or track device location (the Geolocation Information bullet and its Application Data intro are removed; the app does not track location). Terms section 5 now says the service is available in the United States, Canada, and India, and that your **Where you watch** setting (a saved preference, not location tracking, unchanged when you travel) decides theaters, streaming, and Pulse. Both “Last updated” dates are September 24, 2026.
+
+## 7.0.104
+
+- **Profile — Account settings title centered:** The “Account settings” heading is now centered. It keeps the same serif font, size, and color as the Watchlist page title. The Watchlist title stays left-aligned, and the settings cards are unchanged.
+
+## 7.0.103
+
+- **Profile — Account settings, no Watchlist strip:** Removed the Watchlist section from Profile (the poster strip, its “Save titles from detail to watch later” empty state, and the “0 / 30 titles” count). The Watchlist screen, the bottom-menu Watchlist tab, and saving/removing titles are unchanged. The “Settings” heading is renamed “Account settings” and now uses the same font as the Watchlist page title (left-aligned serif, same size and color). The settings cards, About, and other screens are unchanged.
+
+## 7.0.102
+
+- **Profile — Settings title:** The “Settings” heading above the settings cards is now centered, larger, and white (the same color as the card headings), so it reads as a section title instead of a small muted gray label. The cards, Watchlist, and other screens are unchanged.
+
+## 7.0.101
+
+- **Profile — clearer Settings sections:** Each Settings section now sits in its own card: Where you watch (with Languages to show first when India is selected), Streaming services, Genres to show, Regions to show, Home — second region, Email, and Account. The section headings are now white (the same color as the Watchlist title) and slightly larger, instead of small muted gray labels. The hints, controls, and how each setting works are unchanged. Watchlist, the bottom menu, About, and onboarding are unchanged.
+
+## 7.0.100
+
+- **About — tidier header and version row:** The “About” title is now left-aligned like In Theaters, Streaming, and Pulse. Under the logo, one row shows the version on the left (just “v7.0.100”, no “Cinemastro” before it) and the community users / ratings counts on the right. Removed the “Your Personal Film Maestro” tagline. The logo, intro, legal links, and credits are unchanged.
+
+## 7.0.99
+
+- **About — bottom menu:** When signed in, About now shows the same bottom menu as the other screens (Circles, Mood, Watchlist, Profile). No bottom icon is highlighted on About; About stays highlighted in the top nav with Circles, Pulse, In Theaters, and the rest. Signed-out About is unchanged (no bottom menu, same as other signed-out pages). The centered layout, the version and counts under the logo, and the legal copy are unchanged.
+
+## 7.0.98
+
+- **About — version and counts under the logo:** The app version (“Cinemastro v…”) and the community users / ratings counts now sit directly under the centered Cinemastro logo, above the tagline. The About header is just “About” again, with no users / ratings subtitle.
+- **Profile — slimmer header and footer:** Removed the community users / ratings line under the personal stats and the “Cinemastro v…” version line at the bottom of Settings. Rated, Avg, and Matches are unchanged.
+
+## 7.0.97
+
+- **About — centered again:** The About page keeps the 7.0.96 shared header (no sticky “← Back | About” bar), but the title, users / ratings subtitle, and body (logo, tagline, version, legal links, credits) are centered in the same 640px column as before, instead of left-aligned. Other screens are unchanged.
+
+## 7.0.96
+
+- **About — shared page header:** About now uses the same page header as In Theaters, Streaming, Pulse, and Circles (large “About” title with the users / ratings counts as the grey subtitle) instead of its own sticky “← Back | About” bar. The body content is unchanged. When signed in, the top nav is the way back, so there is no Back button; signed-out visitors (no top nav) still get a small “← Back” link above the title.
+
+## 7.0.95
+
+- **Canada — ICI TOU.TV:** Added **ICI TOU.TV** (TMDB provider 146, the only ICI TOU.TV id TMDB lists for `watch_region=CA`; there is no separate Extra id) to the Canada Streaming page service filter and Profile **Streaming services** pills. It returns Canadian subscription movies and series through the same `watch_region=CA` path. US and India lists are unchanged.
+
+## 7.0.94
+
+- **Canada catalog:** When Profile **Where you watch** is Canada, the app uses Canadian availability instead of the US lists. US and India are unchanged.
+  - **In Theaters:** Now Playing is TMDB `now_playing` with `region=CA` (all pages, up to 4), newest release first, with the 14-day limited-release gate checked against Canadian release dates. **Popular in theaters** is the same Canadian pool ordered by popularity, so it only shows films playing in Canada (the US row stays on the weekly trending list). Copy says “in Canada”. No language ordering; “Regions to show” still applies, same as the US.
+  - **Streaming:** Now Streaming and What’s popular use `watch_region=CA` (plus `region=CA` on movies). All services **popular** is in-Canada subscription popularity instead of the global trending week. The service filter lists Canada services, all checked against TMDB `watch/providers` for `watch_region=CA` and non-empty for movies and series: Netflix (8), Prime Video (119), Disney+ (337), Apple TV+ (350), Crave (230), Paramount+ (531). A US-only service left selected resets to All services. Only the latest service selection can write the rows (same fix as India).
+  - **Profile — Streaming services:** Canada users see the same six Canada services. US keeps the US pills; India keeps the US pills.
+  - **Your Picks:** With streaming services selected, Canada checks each title’s Canadian subscription providers (`watch_region=CA`) against the Canada services saved on the profile (US-only saved ids are ignored). Match scores are unchanged. US and India stay on the US provider check.
+  - **Pulse:** Canada gets a Canada-market list, not the worldwide list and not Canadian-made titles only. **Trending** is movies released in Canada in the last 90 days plus series with a new episode in the last 30 days on Canadian subscription; **Popular** is movies released in Canada plus series on Canadian subscription, both with at least 50 TMDB votes. TMDB popularity order, movies and series interleaved, 18 each. US Pulse stays worldwide; India Pulse is unchanged.
+  - **Title detail:** Certificate, theatrical date, and Where to Watch already follow Where you watch; Canada uses CA ratings, the CA theatrical date (falling back to the primary date tagged US when there is none), and CA providers.
+- **Ops:** Edge **`pulse-catalog` `1.2.0`** accepts `region: "CA"`. Apply **`20260924140000_pulse_catalog_daily_region_ca.sql`** on staging (after `20260924130000_pulse_catalog_daily_region.sql`) so the Canada row can be cached, then deploy `pulse-catalog`. Until then, Canada users get the same Canada list fetched from TMDB in the browser (1.2.0 without the SQL returns it uncached).
+
+## 7.0.93
+
+- **Onboarding — Where you watch:** New first setup step (Step 1 of 3, before “What do you mainly watch?”) asks **Where you watch**: United States, Canada, or India, single choice, United States preselected. Choosing India shows **Languages to show first** (Hindi, Tamil, Telugu, Malayalam, Kannada, Bengali, Marathi; multi-select, none selected means all together). Continue saves `availability_region` and `show_language_first` on the profile through the same save path as Profile. Switching away from India clears the language picks. Accounts that already finished onboarding (flag set or any ratings) are not sent through it again; Profile stays the place to change it.
+- **Profile — Where you watch:** Choosing United States or Canada now also clears saved **Languages to show first**, same rule as onboarding (previously they were only hidden).
+- **No more install / Add to Home Screen prompts:** Removed the Circles-tab “Add Cinemastro to your home screen” modal (with its remind-later / never timers), the “Add Cinemastro to your Home Screen” card in the post-onboarding tour (tour is now 3 cards on every screen size), and the “Add to Home Screen (mobile & tablet)” section on the Help page. The service worker, manifest, and installability are unchanged; people can still install from the browser menu, they just aren’t asked.
+
+## 7.0.92
+
+- **Pulse — India catalog:** When Profile **Where you watch** is India, Pulse is an India list instead of the worldwide TMDB trending week (which had no Kannada and almost no Indian titles in its 18). **Trending** is India-origin popularity (TMDB discover `with_origin_country=IN`, Indian original languages, released titles, movies and TV interleaved). **Popular** is the same with `vote_count ≥ 50` (established titles). Each catalog also carries the top 6 movies and top 6 series per Profile language, so any choice has titles to lead with. **Languages to show first** is applied when the list is read, not when it is cached: selected languages lead (in saved order), then the other Indian languages, 18 per strip. One shared India catalog per UTC day serves every language preference. “Regions to show” no longer hides India Pulse rows (genres still apply), same as India theaters and streaming. US and Canada Pulse are unchanged (worldwide trending week + popular). Your Picks, Streaming, and In Theaters are unchanged.
+- **Ops:** Edge **`pulse-catalog` `1.1.0`** accepts `region` (`US` default, `IN`) and caches one row per (`utc_date`, `region`). Apply **`20260924130000_pulse_catalog_daily_region.sql`** on staging (adds `region`, default `US`; primary key becomes (`utc_date`, `region`)), then deploy `pulse-catalog`. Until both are live, India users get the same India list fetched from TMDB in the browser; US Pulse keeps working before and after the SQL.
+
+## 7.0.91
+
+- **Streaming — service filter no longer goes blank on switch-back:** Picking one service, then another, then the first again (for example Netflix → Prime Video → Netflix on India Streaming) could leave Now Streaming and What’s popular empty while All services still worked. The row reveal remembered the previous service’s list, and when the new list had the same number of titles it was treated as already shown and stayed hidden. Each service’s rows now reveal every time they load, and on India only the latest service selection can write the rows. TMDB India queries are unchanged (Netflix 8, Prime Video 119, JioHotstar 2336, Sony LIV 237, Zee5 232, all non-empty with `watch_region=IN`). US and Canada queries, Your Picks, profile **Streaming services** pills, and Pulse are unchanged.
+
+## 7.0.90
+
+- **Streaming — India catalog:** When Profile **Where you watch** is India, the Streaming page uses India subscription availability (TMDB discover `watch_region=IN`, plus `region=IN` on movies) for Now Streaming and What’s popular, movies and series. **Languages to show first** lead each row (in saved order), then the other Indian languages, then non-Indian titles streaming in India (a few slots are kept for them). Popular in India is in-region popularity instead of the global TMDB trending week. The service filter lists India services: Netflix, Prime Video (TMDB 119), JioHotstar (2336), Sony LIV (237), Zee5 (232); a US-only service left selected resets to All services. “Regions to show” no longer hides rows on India Streaming (same as India theaters; genres still apply). US and Canada Streaming are unchanged. Your Picks, match, profile **Streaming services** pills, and Pulse stay on the US / worldwide lists.
+
+## 7.0.89
+
+- **In Theaters — India catalog:** When Profile **Where you watch** is India, Now Playing is Indian-language films from TMDB `now_playing` (`region=IN`), with **Languages to show first** leading that row and the other Indian languages after. **Also in theaters** is the rest of that India window (mostly Hollywood). A slower US catalog bootstrap no longer overwrites that list. US theaters are unchanged. Title detail uses the India certificate, India theatrical date, and India where-to-watch (no US fallback). Streaming and Pulse are still the US / worldwide lists.
+
+## 7.0.88
+
+- **Profile — where you watch, and languages to show first:** Settings gains **Where you watch** (United States, Canada, or India) and, when India is selected, **Languages to show first** (Hindi, Tamil, Telugu, Malayalam, Kannada, Bengali, Marathi). None selected means all of those languages together. Choices are saved on the profile and do not change when someone travels. The old streaming-services block is labeled **Streaming services**. Theaters and streaming catalogs still use the United States until a later change reads these fields. **Ops:** apply **`20260924120000_profiles_availability_region.sql`** on staging before exercising save.
+
 ## 7.0.87
 
-- **Circles — title cards:** Recent posters no longer show the corner your / predicted / community badge (title detail unchanged). **N rated** moves under the orange circle pill and reads **1 of 11 rated** (raters of members). Same line on All / Top instead of `(N)` on the pill. Hidden for solo (1-member) circles. Web-only — no new AAB.
+- **Circles — title cards:** Recent posters no longer show the corner your / predicted / community badge (title detail unchanged). **N rated** moves under the orange circle pill and reads **1 of 11 rated** (raters of members). Same line on All / Top instead of `(N)` on the pill. Hidden for solo (1-member) circles.
+- **Play — Internal AAB versionCode 3 / 7.0.87:** Prod-bake (`www.cinemastro.com`) includes delete account + circle cards. Upload Internal, then Production **US** when asked. Not App Store.
 
 ## 7.0.86
 

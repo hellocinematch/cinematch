@@ -1,9 +1,12 @@
 /**
- * Pulse — trending & popular strips. Presentational only; state and effects stay in `App.jsx`.
+ * Pulse — trending & popular strips (worldwide, or India / Canada per Where you watch).
+ * Presentational only; state and effects stay in `App.jsx`.
  */
 export function PulsePage(props) {
   const {
     pulseCatalogReady,
+    pulseIndia = false,
+    pulseCanada = false,
     pulseTrendingRecsResolved,
     pulsePopularRecsResolved,
     openDetail,
@@ -19,16 +22,25 @@ export function PulsePage(props) {
   const BottomNav = props.BottomNav;
   const SkeletonStrip = props.SkeletonStrip;
   const StripPosterBadge = props.StripPosterBadge;
+  const trendingMeta = pulseIndia ? "Now in India" : pulseCanada ? "Now in Canada" : "This week";
+  const subtitle = pulseIndia
+    ? "Trending & popular in India — scored for your taste"
+    : pulseCanada
+      ? "Trending & popular in Canada — scored for your taste"
+      : "Trending & popular worldwide — scored for your taste";
 
   return (
     <div className="home">
-      <PageShell title="Pulse" subtitle="Trending & popular worldwide — scored for your taste">
+      <PageShell
+        title="Pulse"
+        subtitle={subtitle}
+      >
         {!pulseCatalogReady ? (
           <>
             <div className="section">
               <div className="section-header">
                 <div className="section-title">Trending</div>
-                <div className="section-meta">This week</div>
+                <div className="section-meta">{trendingMeta}</div>
               </div>
               <SkeletonStrip />
             </div>
@@ -45,7 +57,7 @@ export function PulsePage(props) {
             <div className="section">
               <div className="section-header">
                 <div className="section-title">Trending</div>
-                <div className="section-meta">This week</div>
+                <div className="section-meta">{trendingMeta}</div>
               </div>
               {pulseTrendingRecsResolved.length === 0 ? (
                 <div className="empty-box">

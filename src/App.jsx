@@ -47,7 +47,10 @@ import {
   fetchRatingCircleShareIds,
   syncRatingCircleShares,
   addRatingCircleShares,
-  fetchCircleTitlePublishers,
+  fetchCircleTitlePublisherLines,
+  fetchPublishedLinesAcrossMyCircles,
+  titleCircleShareOthersCount,
+  titleCircleShareHeading,
   fetchCirclePendingInviteLabels,
   fetchCircleRatedTitles,
   readJoinInviteTokenFromPath,
@@ -88,8 +91,19 @@ import {
 } from "./circleTmdbHydrateSessionCache.js";
 import { fingerprintMyCirclesList } from "./myCirclesListFingerprint.js";
 import { PUBLIC_BETA_LABEL } from "./productLabels.js";
+import LoggedOutLanding from "./LoggedOutLanding.jsx";
 import { formatPublicStat } from "./formatPublicStat.js";
 import { deleteMyAccount, isDeleteAccountConfirm, DELETE_CONFIRM_WORD } from "./accountDelete.js";
+import {
+  tvSeasonsFromTmdbDetail,
+  effectiveTitleScore,
+  seasonRatingsMapFromRows,
+  buildEffectiveRatingsMap,
+  buildRatedLines,
+  formatSeasonVotePercent,
+  seasonYearEpisodesLine,
+  expandCircleRowBySeason,
+} from "./seasonRatings.js";
 import "./App.css";
 import { PulsePage } from "./pages/PulsePage.jsx";
 import { InTheatersPage } from "./pages/InTheatersPage.jsx";
@@ -145,65 +159,6 @@ function readZeroCirclesHomeModalLastAtMs() {
 function writeZeroCirclesHomeModalLastAtMs(nowMs) {
   try {
     localStorage.setItem(ZERO_CIRCLES_HOME_MODAL_LAST_AT_MS_KEY, String(nowMs));
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Circles tab — mobile install hint (`readPwaEducation*` / `writePwaEducation*` below). */
-const PWA_EDUCATION_NEVER_KEY = "cinemastro_pwa_education_never";
-const PWA_EDUCATION_NEXT_SHOW_AT_MS_KEY = "cinemastro_pwa_education_next_show_at_ms";
-const PWA_EDUCATION_GOT_IT_DELAY_MS = 2 * 24 * 60 * 60 * 1000;
-const PWA_EDUCATION_REMIND_LATER_DELAY_MS = 24 * 60 * 60 * 1000;
-
-function isRunningAsInstalledPwa() {
-  if (typeof window === "undefined") return false;
-  try {
-    if (window.matchMedia("(display-mode: standalone)").matches) return true;
-    if (window.matchMedia("(display-mode: minimal-ui)").matches) return true;
-  } catch {
-    /* ignore */
-  }
-  return typeof navigator !== "undefined" && navigator.standalone === true;
-}
-
-function isLikelyMobileTouchInstallerBrowser() {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-}
-
-function readPwaEducationNeverFlag() {
-  try {
-    return localStorage.getItem(PWA_EDUCATION_NEVER_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function readPwaEducationNextShowAtMs() {
-  try {
-    const raw = localStorage.getItem(PWA_EDUCATION_NEXT_SHOW_AT_MS_KEY);
-    if (raw == null || raw === "") return null;
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  } catch {
-    return null;
-  }
-}
-
-function writePwaEducationNextShowAtMs(ms) {
-  try {
-    localStorage.setItem(PWA_EDUCATION_NEXT_SHOW_AT_MS_KEY, String(ms));
-  } catch {
-    /* ignore */
-  }
-}
-
-function writePwaEducationNeverFlag() {
-  try {
-    localStorage.setItem(PWA_EDUCATION_NEVER_KEY, "1");
-    localStorage.removeItem(PWA_EDUCATION_NEXT_SHOW_AT_MS_KEY);
   } catch {
     /* ignore */
   }
@@ -306,6 +261,55 @@ const STREAMING_SERVICES = [
 ];
 
 /**
+ * Where you watch **India** (`watch_region=IN` ids; Prime Video is 119 in IN, not US 9).
+ * JioHotstar (2336) replaces separate Hotstar / JioCinema. MX Player uses TMDB “Amazon MX Player” (1898), not legacy 515.
+ * Used for the Streaming page filter, profile **Streaming services** pills, and Your Picks availability.
+ */
+const INDIA_STREAMING_SERVICES = [
+  { id: 8, label: "Netflix" },
+  { id: 119, label: "Prime Video" },
+  { id: 2336, label: "JioHotstar" },
+  { id: 237, label: "Sony LIV" },
+  { id: 232, label: "Zee5" },
+  { id: 532, label: "Aha" },
+  { id: 1898, label: "MX Player" },
+  { id: 11, label: "Mubi" },
+];
+
+/**
+ * Where you watch **Canada** (`watch_region=CA` ids from TMDB `watch/providers`; Prime Video is 119 in CA, not US 9).
+ * Used for the Streaming page filter, profile **Streaming services** pills, and Your Picks availability.
+ */
+const CANADA_STREAMING_SERVICES = [
+  { id: 8, label: "Netflix" },
+  { id: 119, label: "Prime Video" },
+  { id: 337, label: "Disney+" },
+  { id: 350, label: "Apple TV+" },
+  { id: 230, label: "Crave" },
+  { id: 531, label: "Paramount+" },
+  { id: 146, label: "ICI TOU.TV" },
+];
+
+/** Streaming page service filter options. */
+function streamingPageServicesForRegion(availabilityRegion) {
+  if (availabilityRegion === "IN") return INDIA_STREAMING_SERVICES;
+  if (availabilityRegion === "CA") return CANADA_STREAMING_SERVICES;
+  return STREAMING_SERVICES;
+}
+
+/** Profile **Streaming services** pills — only services that exist in the Where you watch country. */
+function profileStreamingServicesForRegion(availabilityRegion) {
+  return streamingPageServicesForRegion(availabilityRegion);
+}
+
+/** Country name for Streaming / theaters copy. */
+function availabilityRegionLabel(availabilityRegion) {
+  if (availabilityRegion === "IN") return "India";
+  if (availabilityRegion === "CA") return "Canada";
+  return "US";
+}
+
+/**
  * Secondary Region → **Streaming** when profile secondary is **Indian**: same top three majors, then India-catalog SVOD.
  * Per-provider discover uses **US** `watch_region` for Netflix / Prime / Hulu (dense TMDB data) and **IN** for JioHotstar, Sony Liv, etc.
  * Primary Streaming page and profile “Where you watch” still use {@link STREAMING_SERVICES}.
@@ -339,6 +343,42 @@ async function fetchTMDB(path) {
   return res.json();
 }
 
+/** Talk and News never sit on the public poster row. */
+const LOGGED_OUT_SKIP_GENRES = new Set([10763, 10767]);
+const LOGGED_OUT_POSTER_COUNT = 6;
+
+function loggedOutPosterFromItem(item, type) {
+  const overview = String(item?.overview || "").trim();
+  const title = item?.title || item?.name;
+  if (!item?.poster_path || !overview || !title) return null;
+  const genres = Array.isArray(item.genre_ids) ? item.genre_ids : [];
+  if (genres.some((id) => LOGGED_OUT_SKIP_GENRES.has(Number(id)))) return null;
+  return {
+    id: `${type}-${item.id}`,
+    title,
+    overview,
+    poster: `${TMDB_IMG_HOST}/t/p/w342${item.poster_path}`,
+  };
+}
+
+/** Six trending films and shows for the logged-out poster row. Overview is included for the popup. */
+async function loadLoggedOutPosterRow() {
+  const [movies, shows] = await Promise.all([
+    fetchTMDB("/trending/movie/week?language=en-US"),
+    fetchTMDB("/trending/tv/week?language=en-US"),
+  ]);
+  const movieRows = (movies?.results || []).map((item) => loggedOutPosterFromItem(item, "movie")).filter(Boolean);
+  const showRows = (shows?.results || []).map((item) => loggedOutPosterFromItem(item, "tv")).filter(Boolean);
+  const out = [];
+  const n = Math.max(movieRows.length, showRows.length);
+  for (let i = 0; i < n && out.length < LOGGED_OUT_POSTER_COUNT; i += 1) {
+    if (movieRows[i]) out.push(movieRows[i]);
+    if (out.length >= LOGGED_OUT_POSTER_COUNT) break;
+    if (showRows[i]) out.push(showRows[i]);
+  }
+  return out;
+}
+
 /** TMDB search returns ~20 hits per page; preserve order, drop duplicate ids across pages. */
 function dedupeTmdbSearchRows(ordered) {
   const seen = new Set();
@@ -366,26 +406,47 @@ function formatRuntimeMinutes(total) {
   return `${h}h ${r}m`;
 }
 
-/** TMDB `YYYY-MM-DD` → `MM/DD/YYYY (US)` for detail facts bar. */
-function formatUsReleaseDisplay(isoDate) {
+/** TMDB `YYYY-MM-DD` → `MM/DD/YYYY (US|CA|IN)` for the detail facts bar. */
+function formatMarketReleaseDisplay(isoDate, regionCode) {
   if (!isoDate || typeof isoDate !== "string") return null;
   const d = isoDate.slice(0, 10);
   const parts = d.split("-").map((x) => Number(x));
   if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return null;
   const [y, mo, day] = parts;
-  return `${String(mo).padStart(2, "0")}/${String(day).padStart(2, "0")}/${y} (US)`;
+  const tag = regionCode === "IN" ? "IN" : regionCode === "CA" ? "CA" : "US";
+  return `${String(mo).padStart(2, "0")}/${String(day).padStart(2, "0")}/${y} (${tag})`;
 }
 
-function usMovieCertificationFromReleaseDatesPayload(releasePayload) {
-  if (!releasePayload || !Array.isArray(releasePayload.results)) return null;
-  const us = releasePayload.results.find((r) => r?.iso_3166_1 === "US");
-  const dates = us?.release_dates;
-  if (!Array.isArray(dates)) return null;
+function formatUsReleaseDisplay(isoDate) {
+  return formatMarketReleaseDisplay(isoDate, "US");
+}
+
+function releaseDatesForMarket(releasePayload, regionCode) {
+  if (!releasePayload || !Array.isArray(releasePayload.results)) return [];
+  const code = regionCode === "IN" || regionCode === "CA" ? regionCode : "US";
+  const row = releasePayload.results.find((r) => r?.iso_3166_1 === code);
+  return Array.isArray(row?.release_dates) ? row.release_dates : [];
+}
+
+function movieCertificationFromReleaseDatesPayload(releasePayload, regionCode) {
+  const dates = releaseDatesForMarket(releasePayload, regionCode);
   const withCert = dates.filter((x) => typeof x?.certification === "string" && x.certification.trim());
   if (withCert.length === 0) return null;
   const theatrical = withCert.find((x) => Number(x.type) === 3);
   const pick = theatrical || withCert[0];
   return pick.certification.trim() || null;
+}
+
+function usMovieCertificationFromReleaseDatesPayload(releasePayload) {
+  return movieCertificationFromReleaseDatesPayload(releasePayload, "US");
+}
+
+/** Theatrical (type 3) or limited (type 2) date for a watch-market. No primary-date fallback. */
+function movieReleaseIsoForMarket(raw, regionCode) {
+  const dates = releaseDatesForMarket(raw?.release_dates, regionCode);
+  const theatrical = dates.find((x) => Number(x?.type) === 3 && typeof x?.release_date === "string")
+    || dates.find((x) => Number(x?.type) === 2 && typeof x?.release_date === "string");
+  return theatrical?.release_date ? theatrical.release_date.slice(0, 10) : null;
 }
 
 function genresLineFromTmdbDetail(raw) {
@@ -451,7 +512,7 @@ function detailPeopleFromTmdbDetail(raw, mediaType) {
  * Single `/movie/{id}` or `/tv/{id}` response (optionally with append_to_release_*).
  * Returns strings for the shaded facts bar + tagline.
  */
-function detailMetaFromTmdbDetail(raw, mediaType) {
+function detailMetaFromTmdbDetail(raw, mediaType, regionCode = "US") {
   const empty = {
     tagline: null,
     genresLine: null,
@@ -470,9 +531,10 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
   if (mediaType === "tv") {
     let certification = null;
     const cr = raw.content_ratings?.results;
+    const marketCode = regionCode === "IN" || regionCode === "CA" ? regionCode : "US";
     if (Array.isArray(cr)) {
-      const us = cr.find((r) => r?.iso_3166_1 === "US");
-      if (us?.rating) certification = String(us.rating).trim() || null;
+      const market = cr.find((r) => r?.iso_3166_1 === marketCode);
+      if (market?.rating) certification = String(market.rating).trim() || null;
     }
     let runtimeLabel = null;
     const ert = raw.episode_run_time;
@@ -480,7 +542,7 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
       const mm = Number(ert[0]);
       if (Number.isFinite(mm) && mm > 0) runtimeLabel = `~${mm}m / ep`;
     }
-    const releaseLabel = formatUsReleaseDisplay(raw.first_air_date);
+    const releaseLabel = formatMarketReleaseDisplay(raw.first_air_date, marketCode);
     const people = detailPeopleFromTmdbDetail(raw, "tv");
     return {
       tagline: tag || null,
@@ -494,9 +556,14 @@ function detailMetaFromTmdbDetail(raw, mediaType) {
       castLine: people.castLine,
     };
   }
-  const certification = usMovieCertificationFromReleaseDatesPayload(raw.release_dates);
+  const marketCode = regionCode === "IN" || regionCode === "CA" ? regionCode : "US";
+  const certification = movieCertificationFromReleaseDatesPayload(raw.release_dates, marketCode);
   const runtimeLabel = formatRuntimeMinutes(raw.runtime);
-  const releaseLabel = formatUsReleaseDisplay(raw.release_date);
+  const primaryReleaseIso = typeof raw.release_date === "string" ? raw.release_date.slice(0, 10) : null;
+  const marketReleaseIso = movieReleaseIsoForMarket(raw, marketCode);
+  const releaseLabel = marketCode === "US"
+    ? formatMarketReleaseDisplay(primaryReleaseIso, "US")
+    : formatMarketReleaseDisplay(marketReleaseIso || primaryReleaseIso, marketReleaseIso ? marketCode : "US");
   const people = detailPeopleFromTmdbDetail(raw, "movie");
   return {
     tagline: tag || null,
@@ -867,7 +934,11 @@ function normalizeTMDBItem(item, type) {
     year: (item.release_date || item.first_air_date || "").slice(0, 4),
     releaseDate: tmdbReleaseDateString(item),
     genre: type === "movie" ? "Movie" : "TV Show",
-    genreIds: item.genre_ids || [],
+    genreIds: Array.isArray(item.genre_ids)
+      ? item.genre_ids
+      : Array.isArray(item.genres)
+        ? item.genres.map((g) => Number(g?.id)).filter((n) => Number.isFinite(n))
+        : [],
     synopsis: item.overview || "",
     poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
     backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
@@ -890,6 +961,29 @@ function filterDefaultExcludedGenres(items, allowAnimation = false) {
   return (items || []).filter((item) => !hasExcludedGenre(item));
 }
 
+/**
+ * TMDB TV **Talk** (10767) and **News** (10763). Never offered in browsing catalogs (Your Picks, Streaming, Pulse,
+ * In Theaters, secondary region, mood picks). Rated history, Profile stats, search, and circle member ratings keep them.
+ */
+const CATALOG_EXCLUDED_GENRE_IDS = Object.freeze([10767, 10763]);
+
+/** Reads raw TMDB `genre_ids`, normalized `genreIds`, or detail `genres: [{ id }]`. */
+function isCatalogExcludedTitle(item) {
+  if (hasExcludedGenre(item, CATALOG_EXCLUDED_GENRE_IDS)) return true;
+  const genres = item?.genres;
+  if (!Array.isArray(genres) || genres.length === 0) return false;
+  return genres.some((g) => CATALOG_EXCLUDED_GENRE_IDS.includes(Number(g?.id ?? g)));
+}
+
+function filterCatalogExcludedTitles(items) {
+  return (items || []).filter((item) => item && !isCatalogExcludedTitle(item));
+}
+
+/** Browsing catalogs: default exclusions (Animation) plus {@link CATALOG_EXCLUDED_GENRE_IDS}. */
+function filterBrowseCatalogGenres(items) {
+  return filterCatalogExcludedTitles(filterDefaultExcludedGenres(items));
+}
+
 /** Main **Streaming** page only: hidden by default unless user includes them via the Genres control. Family (10751) is not excluded. */
 const STREAMING_PAGE_HIDABLE_GENRE_IDS = Object.freeze([16, 99, 10764, 10762]); // Animation, Documentary, Reality, Kids
 
@@ -910,7 +1004,7 @@ function streamingPageExcludedGenreIds(includedHidableIds) {
 
 function filterStreamingPageExcludedGenres(items, includedHidableIds) {
   const excluded = streamingPageExcludedGenreIds(includedHidableIds);
-  return (items || []).filter((item) => !hasExcludedGenre(item, excluded));
+  return filterCatalogExcludedTitles(items).filter((item) => !hasExcludedGenre(item, excluded));
 }
 
 function formatIsoDate(date) {
@@ -950,12 +1044,12 @@ function formatCircleListLastActivity(isoOrString) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
-/** US limited theatrical (TMDB release type 2): newest type-2 date within `maxDays`, or pass if no US type-2 row. */
-function passesUsTheatricalLimitedWindow(releasePayload, maxDays) {
-  const usDates = Array.isArray(releasePayload?.results)
-    ? releasePayload.results.find((r) => r?.iso_3166_1 === "US")?.release_dates || []
+/** Limited theatrical (TMDB release type 2) in `regionCode`: newest type-2 date within `maxDays`, or pass if no type-2 row there. */
+function passesTheatricalLimitedWindow(releasePayload, maxDays, regionCode) {
+  const marketDates = Array.isArray(releasePayload?.results)
+    ? releasePayload.results.find((r) => r?.iso_3166_1 === regionCode)?.release_dates || []
     : [];
-  const limitedDates = usDates
+  const limitedDates = marketDates
     .filter((r) => Number(r?.type) === 2 && typeof r?.release_date === "string")
     .map((r) => r.release_date.slice(0, 10))
     .filter(Boolean)
@@ -963,6 +1057,10 @@ function passesUsTheatricalLimitedWindow(releasePayload, maxDays) {
   if (limitedDates.length === 0) return true;
   const newestLimited = limitedDates[limitedDates.length - 1];
   return withinPastDays(newestLimited, maxDays);
+}
+
+function passesUsTheatricalLimitedWindow(releasePayload, maxDays) {
+  return passesTheatricalLimitedWindow(releasePayload, maxDays, "US");
 }
 
 async function fetchTvDetailsById(ids = []) {
@@ -1085,7 +1183,7 @@ async function fetchInTheaters(regionKeys = []) {
       item.release_date <= now &&
       (langCodes.length > 0 ? langCodes.includes(String(item?.original_language || "").toLowerCase()) : true);
 
-    const mergedNp = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || [])]).filter(filterLangAndReleased);
+    const mergedNp = filterBrowseCatalogGenres([...(p1.results || []), ...(p2.results || [])]).filter(filterLangAndReleased);
 
     const dedupedNp = [...new Map(mergedNp.map((item) => [item.id, item])).values()];
     const releaseDatesMapNp = await fetchMovieReleaseDatesById(dedupedNp.map((item) => item.id));
@@ -1097,7 +1195,7 @@ async function fetchInTheaters(regionKeys = []) {
 
     const trendingMerged = [...(w1.results || []), ...(w2.results || [])];
     const trendingDeduped = [...new Map(trendingMerged.map((item) => [item.id, item])).values()];
-    const trendingPreGate = filterDefaultExcludedGenres(trendingDeduped).filter(filterLangAndReleased);
+    const trendingPreGate = filterBrowseCatalogGenres(trendingDeduped).filter(filterLangAndReleased);
     const releaseDatesMapTrend = await fetchMovieReleaseDatesById(trendingPreGate.map((item) => item.id));
     const trendingGated = trendingPreGate.filter((item) =>
       passesUsTheatricalLimitedWindow(releaseDatesMapTrend.get(item.id), LIMITED_THEATRICAL_MAX_DAYS),
@@ -1110,6 +1208,112 @@ async function fetchInTheaters(regionKeys = []) {
   } catch {
     return { nowPlaying: [], popularInTheaters: [] };
   }
+}
+
+/** Languages that belong on the India in-theaters row. Preferred codes lead; the rest follow. */
+const INDIA_THEATER_LANGS = new Set(["hi", "ta", "te", "ml", "kn", "bn", "mr", "pa", "gu", "or", "as", "ur"]);
+
+/**
+ * India theatrical: `now_playing?region=IN`, paged. Main row is Indian languages
+ * (`languageFirst` order, then the others by popularity). Second row is everything else
+ * playing in India (mostly Hollywood). No US release-window gate.
+ */
+async function fetchIndiaInTheaters(languageFirst = []) {
+  try {
+    const now = formatIsoDate(new Date());
+    const first = (languageFirst || []).map((code) => String(code).toLowerCase());
+    const collected = [];
+    let totalPages = 1;
+    for (let page = 1; page <= totalPages && page <= 8; page += 1) {
+      const data = await fetchTMDB(`/movie/now_playing?language=en-US&region=IN&page=${page}`);
+      if (isTmdbApiErrorPayload(data)) break;
+      if (page === 1) totalPages = Math.min(Number(data?.total_pages) || 1, 8);
+      collected.push(...(data?.results || []));
+    }
+    const deduped = [...new Map(
+      filterBrowseCatalogGenres(collected)
+        .filter((item) => item?.id != null && item?.release_date && item.release_date <= now)
+        .map((item) => [item.id, item]),
+    ).values()];
+    const indian = [];
+    const other = [];
+    for (const item of deduped) {
+      const lang = String(item?.original_language || "").toLowerCase();
+      if (INDIA_THEATER_LANGS.has(lang)) indian.push(item);
+      else other.push(item);
+    }
+    const byPopularity = (a, b) => (Number(b?.popularity) || 0) - (Number(a?.popularity) || 0);
+    indian.sort((a, b) => {
+      const ra = first.indexOf(String(a?.original_language || "").toLowerCase());
+      const rb = first.indexOf(String(b?.original_language || "").toLowerCase());
+      const ga = ra === -1 ? 99 : ra;
+      const gb = rb === -1 ? 99 : rb;
+      if (ga !== gb) return ga - gb;
+      return byPopularity(a, b);
+    });
+    other.sort(byPopularity);
+    return {
+      nowPlaying: indian.slice(0, IN_THEATERS_PAGE_STRIP_CAP).map((item) => normalizeTMDBItem(item, "movie")),
+      popularInTheaters: other.slice(0, IN_THEATERS_PAGE_STRIP_CAP).map((item) => normalizeTMDBItem(item, "movie")),
+    };
+  } catch {
+    return { nowPlaying: [], popularInTheaters: [] };
+  }
+}
+
+/**
+ * Canada theatrical: `now_playing?region=CA` (all pages, up to 4), released, “Regions to show” languages, and the
+ * 14-day limited-release gate on **CA** release dates. **Now** = newest release first; **Popular** = same pool by
+ * TMDB popularity (what is playing in Canada, not the global trending week).
+ */
+async function fetchCanadaInTheaters(regionKeys = []) {
+  try {
+    const LIMITED_THEATRICAL_MAX_DAYS = 14;
+    const MAX_PAGES = 4;
+    const langCodes = getRegionLanguageCodes(regionKeys);
+    const now = formatIsoDate(new Date());
+    const first = await fetchTMDB("/movie/now_playing?language=en-US&region=CA&page=1");
+    if (isTmdbApiErrorPayload(first)) return { nowPlaying: [], popularInTheaters: [] };
+    const totalPages = Math.min(Number(first?.total_pages) || 1, MAX_PAGES);
+    const rest = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) =>
+        fetchTMDB(`/movie/now_playing?language=en-US&region=CA&page=${i + 2}`),
+      ),
+    );
+    const collected = [first, ...rest.filter((p) => !isTmdbApiErrorPayload(p))].flatMap((p) => p?.results || []);
+    const deduped = [...new Map(
+      filterBrowseCatalogGenres(collected)
+        .filter((item) =>
+          item?.id != null &&
+          item?.release_date &&
+          item.release_date <= now &&
+          (langCodes.length > 0 ? langCodes.includes(String(item?.original_language || "").toLowerCase()) : true),
+        )
+        .map((item) => [item.id, item]),
+    ).values()];
+    const ids = deduped.map((item) => item.id);
+    const releaseChunks = [];
+    for (let i = 0; i < ids.length; i += 40) releaseChunks.push(ids.slice(i, i + 40));
+    const releaseMaps = await Promise.all(releaseChunks.map((chunk) => fetchMovieReleaseDatesById(chunk)));
+    const releaseDatesMap = new Map(releaseMaps.flatMap((m) => [...m.entries()]));
+    const gated = deduped
+      .filter((item) => passesTheatricalLimitedWindow(releaseDatesMap.get(item.id), LIMITED_THEATRICAL_MAX_DAYS, "CA"))
+      .map((item) => normalizeTMDBItem(item, "movie"));
+    const byPopularity = [...gated].sort((a, b) => Number(b.popularity ?? 0) - Number(a.popularity ?? 0));
+    return {
+      nowPlaying: sortTheatricalMoviesByReleaseDateDesc(gated).slice(0, IN_THEATERS_PAGE_STRIP_CAP),
+      popularInTheaters: byPopularity.slice(0, IN_THEATERS_PAGE_STRIP_CAP),
+    };
+  } catch {
+    return { nowPlaying: [], popularInTheaters: [] };
+  }
+}
+
+/** In Theaters catalog for Profile **Where you watch** (US default). */
+function fetchInTheatersForAvailabilityRegion(availabilityRegion, regionKeys = [], languageFirst = []) {
+  if (availabilityRegion === "IN") return fetchIndiaInTheaters(languageFirst);
+  if (availabilityRegion === "CA") return fetchCanadaInTheaters(regionKeys);
+  return fetchInTheaters(regionKeys);
 }
 
 /** Dedupe by id for catalogue / predict: **Now** first, then **Popular** titles not already listed. */
@@ -1127,7 +1331,6 @@ function mergeInTheatersStripsForCatalogue(nowPlaying, popularInTheaters) {
 /** Now Playing — trending movies + TV (day), interleaved; not deduped against other strips. */
 async function fetchWhatsHotCatalog() {
   try {
-    const excludedTrendingGenres = new Set([10767, 10763]); // Talk + News
     const [m1, m2, t1, t2] = await Promise.all([
       fetchTMDB("/trending/movie/day?language=en-US"),
       fetchTMDB("/trending/movie/day?language=en-US&page=2"),
@@ -1135,11 +1338,8 @@ async function fetchWhatsHotCatalog() {
       fetchTMDB("/trending/tv/day?language=en-US&page=2"),
     ]);
     if ([m1, m2, t1, t2].some(isTmdbApiErrorPayload)) return [];
-    const movieRaw = filterDefaultExcludedGenres([...(m1.results || []), ...(m2.results || [])]);
-    const tvRaw = filterDefaultExcludedGenres([...(t1.results || []), ...(t2.results || [])]).filter((item) => {
-      const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
-      return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
-    });
+    const movieRaw = filterBrowseCatalogGenres([...(m1.results || []), ...(m2.results || [])]);
+    const tvRaw = filterBrowseCatalogGenres([...(t1.results || []), ...(t2.results || [])]);
     const dedupeNorm = (normList) => [...new Map(normList.map((m) => [m.id, m])).values()];
     const movies = dedupeNorm(movieRaw.map((item) => normalizeTMDBItem(item, "movie")));
     const shows = dedupeNorm(tvRaw.map((item) => normalizeTMDBItem(item, "tv")));
@@ -1160,7 +1360,6 @@ async function fetchWhatsHotCatalog() {
 /** Pulse — trending movies + TV (week), interleaved; global discovery (not Home “today” strip). */
 async function fetchPulseTrendingCatalog() {
   try {
-    const excludedTrendingGenres = new Set([10767, 10763]); // Talk + News
     const [m1, m2, t1, t2] = await Promise.all([
       fetchTMDB("/trending/movie/week?language=en-US"),
       fetchTMDB("/trending/movie/week?language=en-US&page=2"),
@@ -1168,11 +1367,8 @@ async function fetchPulseTrendingCatalog() {
       fetchTMDB("/trending/tv/week?language=en-US&page=2"),
     ]);
     if ([m1, m2, t1, t2].some(isTmdbApiErrorPayload)) return [];
-    const movieRaw = filterDefaultExcludedGenres([...(m1.results || []), ...(m2.results || [])]);
-    const tvRaw = filterDefaultExcludedGenres([...(t1.results || []), ...(t2.results || [])]).filter((item) => {
-      const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
-      return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
-    });
+    const movieRaw = filterBrowseCatalogGenres([...(m1.results || []), ...(m2.results || [])]);
+    const tvRaw = filterBrowseCatalogGenres([...(t1.results || []), ...(t2.results || [])]);
     const dedupeNorm = (normList) => [...new Map(normList.map((m) => [m.id, m])).values()];
     const movies = dedupeNorm(movieRaw.map((item) => normalizeTMDBItem(item, "movie")));
     const shows = dedupeNorm(tvRaw.map((item) => normalizeTMDBItem(item, "tv")));
@@ -1193,7 +1389,6 @@ async function fetchPulseTrendingCatalog() {
 /** Pulse — popular movies + TV, interleaved. */
 async function fetchPulsePopularCatalog() {
   try {
-    const excludedTrendingGenres = new Set([10767, 10763]);
     const [m1, m2, t1, t2] = await Promise.all([
       fetchTMDB("/movie/popular?language=en-US&page=1"),
       fetchTMDB("/movie/popular?language=en-US&page=2"),
@@ -1201,11 +1396,8 @@ async function fetchPulsePopularCatalog() {
       fetchTMDB("/tv/popular?language=en-US&page=2"),
     ]);
     if ([m1, m2, t1, t2].some(isTmdbApiErrorPayload)) return [];
-    const movieRaw = filterDefaultExcludedGenres([...(m1.results || []), ...(m2.results || [])]);
-    const tvRaw = filterDefaultExcludedGenres([...(t1.results || []), ...(t2.results || [])]).filter((item) => {
-      const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
-      return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
-    });
+    const movieRaw = filterBrowseCatalogGenres([...(m1.results || []), ...(m2.results || [])]);
+    const tvRaw = filterBrowseCatalogGenres([...(t1.results || []), ...(t2.results || [])]);
     const dedupeNorm = (normList) => [...new Map(normList.map((m) => [m.id, m])).values()];
     const movies = dedupeNorm(movieRaw.map((item) => normalizeTMDBItem(item, "movie")));
     const shows = dedupeNorm(tvRaw.map((item) => normalizeTMDBItem(item, "tv")));
@@ -1223,6 +1415,158 @@ async function fetchPulsePopularCatalog() {
   }
 }
 
+const PULSE_STRIP_CAP = 18;
+/** India Pulse pool: main India-origin popularity rows kept per type (before read-time language order). */
+const PULSE_INDIA_MAIN_PER_TYPE = 18;
+/** India Pulse pool: top titles per Profile language and type, so any Languages to show first choice has titles to lead with. */
+const PULSE_INDIA_LANG_SLICE = 6;
+/** India **Popular**: established titles (TMDB `vote_count.gte`). Slices gate movies only — Indian TV vote counts are too thin. */
+const PULSE_INDIA_POPULAR_MIN_VOTES = 50;
+const PULSE_INDIA_POPULAR_SLICE_MIN_VOTES = 20;
+
+function interleaveMoviesAndShows(movies, shows, cap = Infinity) {
+  const mixed = [];
+  const max = Math.max(movies.length, shows.length);
+  for (let i = 0; i < max && mixed.length < cap; i++) {
+    if (movies[i]) mixed.push(movies[i]);
+    if (mixed.length >= cap) break;
+    if (shows[i]) mixed.push(shows[i]);
+  }
+  return mixed;
+}
+
+/**
+ * One India Pulse strip pool (not capped for display): India-origin discover (`with_origin_country=IN`, Indian
+ * original languages, popularity order, released, with poster), then per-language slices for {@link ALL_INDIAN_LANGS}.
+ * Mirrors Edge `pulse-catalog` `region: "IN"`.
+ */
+async function fetchPulseIndiaStripPool({ mainMinVotes = 0, sliceMovieMinVotes = 0 } = {}) {
+  const today = formatIsoDate(new Date());
+  const collect = async (type, langCodes, minVotes, pages) => {
+    const votes = minVotes > 0 ? `&vote_count.gte=${minVotes}` : "";
+    const payloads = await Promise.all(
+      pages.map((page) =>
+        fetchTMDB(
+          `/discover/${type}?language=en-US&sort_by=popularity.desc&page=${page}&with_origin_country=IN&watch_region=IN&region=IN&with_original_language=${langCodes.join("|")}${votes}`,
+        ),
+      ),
+    );
+    const out = [];
+    for (const data of payloads) {
+      if (isTmdbApiErrorPayload(data)) break;
+      for (const item of data?.results || []) {
+        if (item?.id == null || !item.poster_path) continue;
+        if (hasExcludedGenre(item) || isCatalogExcludedTitle(item)) continue;
+        const date = String(item.release_date || item.first_air_date || "").slice(0, 10);
+        if (date.length < 10 || date > today) continue;
+        out.push(normalizeTMDBItem(item, type));
+      }
+    }
+    return dedupeMediaRowsById(out);
+  };
+  const indianLangs = [...INDIA_THEATER_LANGS];
+  const [mainMovies, mainShows, ...slices] = await Promise.all([
+    collect("movie", indianLangs, mainMinVotes, [1, 2]),
+    collect("tv", indianLangs, mainMinVotes, [1, 2]),
+    ...ALL_INDIAN_LANGS.flatMap((lang) => [
+      collect("movie", [lang], sliceMovieMinVotes, [1]),
+      collect("tv", [lang], 0, [1]),
+    ]),
+  ]);
+  const sliceMovies = slices.filter((_, i) => i % 2 === 0).flatMap((rows) => rows.slice(0, PULSE_INDIA_LANG_SLICE));
+  const sliceShows = slices.filter((_, i) => i % 2 === 1).flatMap((rows) => rows.slice(0, PULSE_INDIA_LANG_SLICE));
+  return dedupeMediaRowsById([
+    ...interleaveMoviesAndShows(
+      mainMovies.slice(0, PULSE_INDIA_MAIN_PER_TYPE),
+      mainShows.slice(0, PULSE_INDIA_MAIN_PER_TYPE),
+    ),
+    ...interleaveMoviesAndShows(sliceMovies, sliceShows),
+  ]);
+}
+
+/** Client fallback for India Pulse when the Edge cache has no India row yet (same pools as Edge `region: "IN"`). */
+async function fetchPulseIndiaCatalog() {
+  try {
+    const [trending, popular] = await Promise.all([
+      fetchPulseIndiaStripPool(),
+      fetchPulseIndiaStripPool({
+        mainMinVotes: PULSE_INDIA_POPULAR_MIN_VOTES,
+        sliceMovieMinVotes: PULSE_INDIA_POPULAR_SLICE_MIN_VOTES,
+      }),
+    ]);
+    return { trending, popular };
+  } catch {
+    return { trending: [], popular: [] };
+  }
+}
+
+/** Canada **Popular**: established titles (TMDB `vote_count.gte`). */
+const PULSE_CANADA_POPULAR_MIN_VOTES = 50;
+
+/**
+ * Canada Pulse (Canada market, not Canadian-origin only): TMDB popularity, movies and TV interleaved, 18 each.
+ * **Trending** = movies released in Canada in the last 90 days (`region=CA` release dates) + series with an episode in
+ * the last 30 days on Canadian subscription (`watch_region=CA`). **Popular** = movies released in Canada + series on
+ * Canadian subscription, both `vote_count ≥ 50`. Mirrors Edge `pulse-catalog` `region: "CA"`.
+ */
+async function fetchPulseCanadaCatalog() {
+  try {
+    const today = formatIsoDate(new Date());
+    const collect = async (type, query) => {
+      const payloads = await Promise.all(
+        [1, 2].map((page) => fetchTMDB(`/discover/${type}?language=en-US&sort_by=popularity.desc&page=${page}${query}`)),
+      );
+      const out = [];
+      for (const data of payloads) {
+        if (isTmdbApiErrorPayload(data)) break;
+        for (const item of data?.results || []) {
+          if (item?.id == null || !item.poster_path) continue;
+          if (hasExcludedGenre(item) || isCatalogExcludedTitle(item)) continue;
+          const date = String(item.release_date || item.first_air_date || "").slice(0, 10);
+          if (date.length < 10 || date > today) continue;
+          out.push(normalizeTMDBItem(item, type));
+        }
+      }
+      return dedupeMediaRowsById(out);
+    };
+    const votes = `&vote_count.gte=${PULSE_CANADA_POPULAR_MIN_VOTES}`;
+    const [trendMovies, trendShows, popMovies, popShows] = await Promise.all([
+      collect("movie", `&region=CA&release_date.gte=${dateDaysAgo(90)}&release_date.lte=${today}`),
+      collect("tv", `&watch_region=CA&with_watch_monetization_types=flatrate&air_date.gte=${dateDaysAgo(30)}&air_date.lte=${today}`),
+      collect("movie", `&region=CA&with_release_type=2|3|4|5&release_date.lte=${today}${votes}`),
+      collect("tv", `&watch_region=CA&with_watch_monetization_types=flatrate${votes}`),
+    ]);
+    return {
+      trending: interleaveMoviesAndShows(trendMovies, trendShows, PULSE_STRIP_CAP),
+      popular: interleaveMoviesAndShows(popMovies, popShows, PULSE_STRIP_CAP),
+    };
+  } catch {
+    return { trending: [], popular: [] };
+  }
+}
+
+/**
+ * India Pulse read path: Languages to show first lead (array order), then other Indian languages, then the rest;
+ * movies and TV interleave inside each language group; capped to {@link PULSE_STRIP_CAP}.
+ */
+function orderPulseIndiaRowsForDisplay(rows, languageFirst = [], cap = PULSE_STRIP_CAP) {
+  const first = [...new Set((languageFirst || []).map((c) => String(c).toLowerCase()))];
+  const groups = new Map();
+  for (const m of rows || []) {
+    if (m?.id == null) continue;
+    const rank = indiaStreamingLanguageRank(m.language, first);
+    if (!groups.has(rank)) groups.set(rank, { movies: [], shows: [] });
+    groups.get(rank)[m.type === "tv" ? "shows" : "movies"].push(m);
+  }
+  const out = [];
+  for (const rank of [...groups.keys()].sort((a, b) => a - b)) {
+    const { movies, shows } = groups.get(rank);
+    out.push(...interleaveMoviesAndShows(movies, shows));
+    if (out.length >= cap) break;
+  }
+  return out.slice(0, cap);
+}
+
 function filterRowsByProfileLanguageCodes(rows, langCodes) {
   if (!Array.isArray(rows) || rows.length === 0) return rows;
   if (!Array.isArray(langCodes) || langCodes.length === 0) return rows;
@@ -1230,15 +1574,18 @@ function filterRowsByProfileLanguageCodes(rows, langCodes) {
   return rows.filter((m) => allow.has(String(m?.language || "").toLowerCase()));
 }
 
-/** Main **Streaming** page — All services: movies **now** = US `flatrate`, **90d** release window, newest date first (B). */
-async function fetchStreamingPageMoviesNowAllServices(regionKeys, includedHidableGenreIds = []) {
+/**
+ * Main **Streaming** page — All services: movies **now** = `flatrate` in `market` (US default; `CA` for Canada),
+ * **90d** release window, newest date first (B).
+ */
+async function fetchStreamingPageMoviesNowAllServices(regionKeys, includedHidableGenreIds = [], market = "US") {
   const fill = async (langSuffix) => {
     const gte = dateDaysAgo(90);
     const lte = formatIsoDate(new Date());
     const out = [];
     const seen = new Set();
     for (let page = 1; page <= 5 && out.length < STREAMING_PAGE_STRIP_CAP; page++) {
-      const path = `/discover/movie?language=en-US&sort_by=primary_release_date.desc&page=${page}&region=US&watch_region=US&with_watch_monetization_types=flatrate&primary_release_date.gte=${gte}&primary_release_date.lte=${lte}${langSuffix}`;
+      const path = `/discover/movie?language=en-US&sort_by=primary_release_date.desc&page=${page}&region=${market}&watch_region=${market}&with_watch_monetization_types=flatrate&primary_release_date.gte=${gte}&primary_release_date.lte=${lte}${langSuffix}`;
       const data = await fetchTMDB(path);
       if (isTmdbApiErrorPayload(data)) break;
       for (const item of filterStreamingPageExcludedGenres(data?.results || [], includedHidableGenreIds)) {
@@ -1262,8 +1609,31 @@ async function fetchStreamingPageMoviesNowAllServices(regionKeys, includedHidabl
   }
 }
 
-/** All services: movies **popular** = TMDB **trending** week (D). */
-async function fetchStreamingPageMoviesPopularAllServices(regionKeys, includedHidableGenreIds = []) {
+/**
+ * Non-US All services **popular** (Canada): TMDB popularity among `flatrate` titles in `market`
+ * (`watch_region`, plus `region` on movies) instead of the global trending week.
+ */
+async function fetchStreamingPagePopularForMarket(type, regionKeys, includedHidableGenreIds, market) {
+  try {
+    const langCodes = getRegionLanguageCodes(regionKeys);
+    const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+    const regionQuery = type === "movie" ? `&region=${market}` : "";
+    const pages = await Promise.all([1, 2].map((p) =>
+      fetchTMDB(`/discover/${type}?language=en-US&sort_by=popularity.desc&page=${p}${regionQuery}&watch_region=${market}&with_watch_monetization_types=flatrate${langQuery}`),
+    ));
+    if (pages.some(isTmdbApiErrorPayload)) return [];
+    const merged = filterStreamingPageExcludedGenres(pages.flatMap((p) => p.results || []), includedHidableGenreIds);
+    const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
+    const normalized = deduped.slice(0, STREAMING_PAGE_STRIP_CAP).map((m) => normalizeTMDBItem(m, type));
+    return filterRowsByProfileLanguageCodes(normalized, langCodes);
+  } catch {
+    return [];
+  }
+}
+
+/** All services: movies **popular** = TMDB **trending** week (D); non-US markets use {@link fetchStreamingPagePopularForMarket}. */
+async function fetchStreamingPageMoviesPopularAllServices(regionKeys, includedHidableGenreIds = [], market = "US") {
+  if (market !== "US") return fetchStreamingPagePopularForMarket("movie", regionKeys, includedHidableGenreIds, market);
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
     const pages = await Promise.all([1, 2].map((p) => fetchTMDB(`/trending/movie/week?language=en-US&page=${p}`)));
@@ -1277,13 +1647,13 @@ async function fetchStreamingPageMoviesPopularAllServices(regionKeys, includedHi
   }
 }
 
-/** All services: TV **now** = US `flatrate`, `first_air_date` desc (new to SVOD; no 90d). */
-async function fetchStreamingPageTvNowAllServices(regionKeys, includedHidableGenreIds = []) {
+/** All services: TV **now** = `flatrate` in `market` (US default), `first_air_date` desc (new to SVOD; no 90d). */
+async function fetchStreamingPageTvNowAllServices(regionKeys, includedHidableGenreIds = [], market = "US") {
   const fill = async (langSuffix) => {
     const out = [];
     const seen = new Set();
     for (let page = 1; page <= 5 && out.length < STREAMING_PAGE_STRIP_CAP; page++) {
-      const path = `/discover/tv?language=en-US&sort_by=first_air_date.desc&page=${page}&watch_region=US&with_watch_monetization_types=flatrate${langSuffix}`;
+      const path = `/discover/tv?language=en-US&sort_by=first_air_date.desc&page=${page}&watch_region=${market}&with_watch_monetization_types=flatrate${langSuffix}`;
       const data = await fetchTMDB(path);
       if (isTmdbApiErrorPayload(data)) break;
       for (const item of filterStreamingPageExcludedGenres(data?.results || [], includedHidableGenreIds)) {
@@ -1307,26 +1677,114 @@ async function fetchStreamingPageTvNowAllServices(regionKeys, includedHidableGen
   }
 }
 
-/** All services: TV **popular** = `trending/tv/week` (excl. talk/news like elsewhere). */
-async function fetchStreamingPageTvPopularAllServices(regionKeys, includedHidableGenreIds = []) {
+/** All services: TV **popular** = `trending/tv/week` (excl. talk/news like elsewhere); non-US markets use {@link fetchStreamingPagePopularForMarket}. */
+async function fetchStreamingPageTvPopularAllServices(regionKeys, includedHidableGenreIds = [], market = "US") {
+  if (market !== "US") return fetchStreamingPagePopularForMarket("tv", regionKeys, includedHidableGenreIds, market);
   try {
     const langCodes = getRegionLanguageCodes(regionKeys);
-    const excludedTrendingGenres = new Set([10767, 10763]);
     const pages = await Promise.all([1, 2].map((p) => fetchTMDB(`/trending/tv/week?language=en-US&page=${p}`)));
     if (pages.some(isTmdbApiErrorPayload)) return [];
-    const merged = filterStreamingPageExcludedGenres(
-      pages.flatMap((p) => p.results || []).filter((item) => {
-        const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
-        return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
-      }),
-      includedHidableGenreIds,
-    );
+    const merged = filterStreamingPageExcludedGenres(pages.flatMap((p) => p.results || []), includedHidableGenreIds);
     const deduped = [...new Map(merged.map((item) => [item.id, item])).values()];
     const normalized = deduped.slice(0, STREAMING_PAGE_STRIP_CAP).map((m) => normalizeTMDBItem(m, "tv"));
     return filterRowsByProfileLanguageCodes(normalized, langCodes);
   } catch {
     return [];
   }
+}
+
+/** India strips keep up to this many slots for non-Indian titles so the Indian lead does not crowd them out. */
+const INDIA_STREAMING_NON_INDIAN_MIN = 5;
+
+/** 0…n-1 = `languageFirst` position, then other Indian languages, then everything else. */
+function indiaStreamingLanguageRank(language, first) {
+  const lang = String(language || "").toLowerCase();
+  const i = first.indexOf(lang);
+  if (i !== -1) return i;
+  return INDIA_THEATER_LANGS.has(lang) ? first.length : first.length + 1;
+}
+
+/** Stable regroup by {@link indiaStreamingLanguageRank}; incoming order is kept inside each group. */
+function orderIndiaStreamingRowsByLanguage(rows, languageFirst = []) {
+  const first = (languageFirst || []).map((c) => String(c).toLowerCase());
+  return (rows || [])
+    .map((m, i) => ({ m, i, r: indiaStreamingLanguageRank(m?.language, first) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((x) => x.m);
+}
+
+/** One India subscription discover pool (`region=IN` on movies, `watch_region=IN`), optionally one provider / language set. */
+async function discoverIndiaStreamingPool(
+  type,
+  { providerId = null, sort = "date", langCodes = null, excludedGenreIds = DEFAULT_EXCLUDED_GENRE_IDS, maxPage = 3 } = {},
+) {
+  const sortBy =
+    sort === "popularity" ? "popularity.desc" : (type === "movie" ? "primary_release_date.desc" : "first_air_date.desc");
+  const regionQuery = type === "movie" ? "&region=IN" : "";
+  const movie90dWindow =
+    type === "movie" && sort === "date"
+      ? `&primary_release_date.gte=${dateDaysAgo(90)}&primary_release_date.lte=${formatIsoDate(new Date())}`
+      : "";
+  const providerQuery = providerId != null ? `&with_watch_providers=${providerId}` : "";
+  const langQuery = Array.isArray(langCodes) && langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
+  const out = [];
+  const seen = new Set();
+  for (let page = 1; page <= maxPage && out.length < STREAMING_PAGE_STRIP_CAP; page++) {
+    const path = `/discover/${type}?language=en-US&sort_by=${sortBy}&page=${page}${regionQuery}&watch_region=IN&with_watch_monetization_types=flatrate${providerQuery}${langQuery}${movie90dWindow}`;
+    const data = await fetchTMDB(path);
+    if (isTmdbApiErrorPayload(data)) break;
+    const results = data?.results || [];
+    for (const item of results) {
+      if (out.length >= STREAMING_PAGE_STRIP_CAP) break;
+      if (item?.id == null || seen.has(item.id)) continue;
+      if (hasExcludedGenre(item, excludedGenreIds) || isCatalogExcludedTitle(item)) continue;
+      seen.add(item.id);
+      out.push(normalizeTMDBItem(item, type));
+    }
+    if (results.length < 1 || page >= (Number(data?.total_pages) || 1)) break;
+  }
+  return out;
+}
+
+/**
+ * Main **Streaming** page when Where you watch is India (all services or one `providerId`).
+ * Like {@link fetchIndiaInTheaters}: `languageFirst` titles lead (array order), then other Indian languages,
+ * then non-Indian titles streaming in India (at least {@link INDIA_STREAMING_NON_INDIAN_MIN} kept when available).
+ */
+async function fetchIndiaStreamingStrip(
+  type,
+  { providerId = null, sort = "date", languageFirst = [], excludedGenreIds = DEFAULT_EXCLUDED_GENRE_IDS } = {},
+) {
+  try {
+    const first = [...new Set((languageFirst || []).map((c) => String(c).toLowerCase()))];
+    const otherIndian = [...INDIA_THEATER_LANGS].filter((c) => !first.includes(c));
+    const opts = { providerId, sort, excludedGenreIds };
+    const [preferred, indian, general] = await Promise.all([
+      first.length > 0 ? discoverIndiaStreamingPool(type, { ...opts, langCodes: first }) : Promise.resolve([]),
+      discoverIndiaStreamingPool(type, { ...opts, langCodes: otherIndian }),
+      discoverIndiaStreamingPool(type, opts),
+    ]);
+    const merged = dedupeMediaRowsById([...preferred, ...indian, ...general]);
+    const sorted = sort === "popularity" ? sortStreamingByPopularityDesc(merged) : sortStreamingByReleaseDateDesc(merged);
+    const ordered = orderIndiaStreamingRowsByLanguage(sorted, first);
+    const isIndian = (m) => INDIA_THEATER_LANGS.has(String(m?.language || "").toLowerCase());
+    const indianRows = ordered.filter(isIndian);
+    const otherRows = ordered.filter((m) => !isIndian(m));
+    const indianTake = STREAMING_PAGE_STRIP_CAP - Math.min(otherRows.length, INDIA_STREAMING_NON_INDIAN_MIN);
+    return [...indianRows.slice(0, indianTake), ...otherRows].slice(0, STREAMING_PAGE_STRIP_CAP);
+  } catch {
+    return [];
+  }
+}
+
+/** India Streaming page rows ignore “Regions to show” (catalog is India; order comes from Languages to show first), like India theaters. */
+function filterStreamingPageRowsForProfile(rows, showGenreIds, showRegionKeys, availabilityRegion) {
+  if (availabilityRegion === "IN") {
+    if (showGenreIds.length === 0) return rows;
+    return rows.filter((m) => passesShowGenresFilter(m, showGenreIds));
+  }
+  if (!showGenreIds.length && !showRegionKeys.length) return rows;
+  return rows.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
 }
 
 /* ─── V1.3.0: Secondary “Region” home strip (Hollywood / US remains primary Now Playing + Streaming). ─── */
@@ -1395,7 +1853,7 @@ async function fetchInTheatersForMarket(tmdbRegionIso, langCodes = []) {
       return Date.parse(b?.release_date || "1970-01-01") - Date.parse(a?.release_date || "1970-01-01");
     });
 
-    const merged = filterDefaultExcludedGenres([...(p1.results || []), ...(p2.results || [])])
+    const merged = filterBrowseCatalogGenres([...(p1.results || []), ...(p2.results || [])])
       .filter((item) => item?.release_date && item.release_date <= now)
       .filter((item) => {
         if (langCodes.length === 0) return true;
@@ -1449,7 +1907,7 @@ async function fetchDiscoverMovieUsSubscriptionFlatrateBroad(
     const path = `/discover/movie?language=en-US&sort_by=primary_release_date.desc&page=${page}&region=${reg}&watch_region=${reg}&with_watch_monetization_types=flatrate`;
     const data = await fetchTMDB(path);
     if (isTmdbApiErrorPayload(data)) break;
-    const results = filterDefaultExcludedGenres(data?.results || []);
+    const results = filterBrowseCatalogGenres(data?.results || []);
     for (const item of results) {
       if (out.length >= maxCollect) break;
       if (seen.has(item.id)) continue;
@@ -1480,7 +1938,7 @@ async function fetchDiscoverMovieUsFlatrateBroadWithLangSuffix(
     const path = `/discover/movie?language=en-US&sort_by=primary_release_date.desc&page=${page}&region=${reg}&watch_region=${reg}&with_watch_monetization_types=flatrate${suff}`;
     const data = await fetchTMDB(path);
     if (isTmdbApiErrorPayload(data)) break;
-    const results = filterDefaultExcludedGenres(data?.results || []);
+    const results = filterBrowseCatalogGenres(data?.results || []);
     for (const item of results) {
       if (out.length >= maxCollect) break;
       if (seen.has(item.id)) continue;
@@ -1591,7 +2049,7 @@ async function fetchDiscoverTvUsSubscriptionFlatrateBroad(
     const path = `/discover/tv?language=en-US&sort_by=first_air_date.desc&page=${page}&watch_region=${reg}&with_watch_monetization_types=flatrate`;
     const data = await fetchTMDB(path);
     if (isTmdbApiErrorPayload(data)) break;
-    const results = filterDefaultExcludedGenres(data?.results || []);
+    const results = filterBrowseCatalogGenres(data?.results || []);
     for (const item of results) {
       if (out.length >= maxCollect) break;
       if (seen.has(item.id)) continue;
@@ -1641,7 +2099,6 @@ async function fetchStreamingTVTightPoolForMarket(
 ) {
   const reg = encodeURIComponent(tmdbRegionIso);
   const tvNewSeriesStart = dateDaysAgo(180);
-  const excludedTrendingGenres = new Set([10767, 10763]);
   const tvNewSeriesBase = `/discover/tv?language=en-US&region=${reg}&sort_by=popularity.desc&first_air_date.gte=${tvNewSeriesStart}&first_air_date.lte=${formatIsoDate(new Date())}${tmdbLangSuffix}`;
   const trendingTvBase = "/trending/tv/day?language=en-US";
 
@@ -1650,13 +2107,8 @@ async function fetchStreamingTVTightPoolForMarket(
     Promise.all([1, 2].map((page) => fetchTMDB(`${trendingTvBase}&page=${page}`))),
   ]);
 
-  const tvNewSeriesCandidates = tvSeriesPages.flatMap((page) => page.results || []);
-  const tvTrendingCandidates = tvTrendingPages
-    .flatMap((page) => page.results || [])
-    .filter((item) => {
-      const genreIds = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
-      return !genreIds.some((g) => excludedTrendingGenres.has(Number(g)));
-    });
+  const tvNewSeriesCandidates = filterCatalogExcludedTitles(tvSeriesPages.flatMap((page) => page.results || []));
+  const tvTrendingCandidates = filterCatalogExcludedTitles(tvTrendingPages.flatMap((page) => page.results || []));
 
   const tvCandidates = [...new Map(
     [...tvNewSeriesCandidates, ...tvTrendingCandidates].map((item) => [item.id, item]),
@@ -1679,7 +2131,7 @@ async function fetchStreamingTVTightPoolForMarket(
   }
 
   const dedupeByTmdbId = (arr) => [...new Map(arr.map((item) => [item.id, item])).values()];
-  return filterDefaultExcludedGenres(dedupeByTmdbId(tvResults)).map((m) => normalizeTMDBItem(m, "tv"));
+  return filterBrowseCatalogGenres(dedupeByTmdbId(tvResults)).map((m) => normalizeTMDBItem(m, "tv"));
 }
 
 /**
@@ -1711,14 +2163,14 @@ async function fetchStreamingMoviesForMarket(tmdbRegionIso, langQuery, clientOri
     const discoverToMovies = async (pathNoPage) => {
       const moviePages = await Promise.all([1, 2].map((page) => fetchTMDB(`${pathNoPage}&page=${page}`)));
       if (moviePages.some(isTmdbApiErrorPayload)) return [];
-      const movieResults = filterDefaultExcludedGenres(moviePages.flatMap((page) => page.results || []));
+      const movieResults = filterBrowseCatalogGenres(moviePages.flatMap((page) => page.results || []));
       return dedupeByTmdbId(movieResults).slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => normalizeTMDBItem(m, "movie"));
     };
 
     const trendingToMovies = async () => {
       const trendPages = await Promise.all([1, 2].map((page) => fetchTMDB(`/trending/movie/week?language=en-US&page=${page}`)));
       if (trendPages.some(isTmdbApiErrorPayload)) return [];
-      const rows = filterDefaultExcludedGenres(trendPages.flatMap((p) => p.results || []));
+      const rows = filterBrowseCatalogGenres(trendPages.flatMap((p) => p.results || []));
       return dedupeByTmdbId(rows).slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => normalizeTMDBItem(m, "movie"));
     };
 
@@ -1837,12 +2289,12 @@ function normalizeCatalogueItem(item, type) {
 /** Build interleaved catalogue from any subset of TMDB list responses (missing lists treated as empty). */
 function catalogueFromTmdbPages(popMovies, topMovies, popTV, topTV) {
   const movies = [
-    ...filterDefaultExcludedGenres(popMovies?.results || []).map(m => normalizeCatalogueItem(m, "movie")),
-    ...filterDefaultExcludedGenres(topMovies?.results || []).map(m => normalizeCatalogueItem(m, "movie")),
+    ...filterBrowseCatalogGenres(popMovies?.results || []).map(m => normalizeCatalogueItem(m, "movie")),
+    ...filterBrowseCatalogGenres(topMovies?.results || []).map(m => normalizeCatalogueItem(m, "movie")),
   ];
   const shows = [
-    ...filterDefaultExcludedGenres(popTV?.results || []).map(m => normalizeCatalogueItem(m, "tv")),
-    ...filterDefaultExcludedGenres(topTV?.results || []).map(m => normalizeCatalogueItem(m, "tv")),
+    ...filterBrowseCatalogGenres(popTV?.results || []).map(m => normalizeCatalogueItem(m, "tv")),
+    ...filterBrowseCatalogGenres(topTV?.results || []).map(m => normalizeCatalogueItem(m, "tv")),
   ];
   const unique = (arr) => [...new Map(arr.map(m => [m.id, m])).values()].slice(0, 40);
   const allMovies = unique(movies), allShows = unique(shows);
@@ -1918,8 +2370,8 @@ async function fetchOnboardingHollywoodTitles() {
   const [mRes, tRes] = await Promise.all([fetchTMDB(movieQ), fetchTMDB(tvQ)]);
   if (isTmdbApiErrorPayload(mRes) || isTmdbApiErrorPayload(tRes)) return [];
   if (mRes?.status_code || tRes?.status_code) return [];
-  const movies = filterDefaultExcludedGenres(mRes?.results || []).map((m) => normalizeCatalogueItem(m, "movie"));
-  const shows = filterDefaultExcludedGenres(tRes?.results || []).map((m) => normalizeCatalogueItem(m, "tv"));
+  const movies = filterBrowseCatalogGenres(mRes?.results || []).map((m) => normalizeCatalogueItem(m, "movie"));
+  const shows = filterBrowseCatalogGenres(tRes?.results || []).map((m) => normalizeCatalogueItem(m, "tv"));
   const combined = [];
   const max = Math.max(movies.length, shows.length);
   for (let i = 0; i < max && combined.length < 80; i++) {
@@ -1944,10 +2396,10 @@ async function fetchOnboardingRegionalTitles(langCode) {
     const [movies, shows] = await Promise.all([fetchTMDB(movieQ), fetchTMDB(tvQ)]);
     if (isTmdbApiErrorPayload(movies) || isTmdbApiErrorPayload(shows)) return [];
     if (movies?.status_code || shows?.status_code) return [];
-    const movieRows = filterDefaultExcludedGenres(movies.results || [])
+    const movieRows = filterBrowseCatalogGenres(movies.results || [])
       .slice(0, 20)
       .map((m) => normalizeCatalogueItem(m, "movie"));
-    const tvRows = filterDefaultExcludedGenres(shows.results || [])
+    const tvRows = filterBrowseCatalogGenres(shows.results || [])
       .slice(0, 20)
       .map((m) => normalizeCatalogueItem(m, "tv"));
     return [...movieRows, ...tvRows];
@@ -1956,22 +2408,25 @@ async function fetchOnboardingRegionalTitles(langCode) {
   }
 }
 
-async function fetchWatchProviders(tmdbId, type) {
+async function fetchWatchProviders(tmdbId, type, regionCode = "US") {
   try {
     const data = await fetchTMDB(`/${type}/${tmdbId}/watch/providers`);
     const results = data.results || {};
-    const region = results.US || results[Object.keys(results)[0]];
-    if (!region) return null;
+    const code = regionCode === "IN" || regionCode === "CA" ? regionCode : "US";
+    const region = results[code];
+    if (!region) {
+      return { flatrate: [], rent: [], buy: [], free: [], link: null };
+    }
     return { flatrate: region.flatrate || [], rent: region.rent || [], buy: region.buy || [], free: region.free || [], link: region.link || null };
   } catch { return null; }
 }
 
-/** US `flatrate` provider IDs; shares cache map with Your Picks (`worthProviderCacheRef`). */
-async function getOrFetchFlatrateProviderIds(movie, cacheMap) {
+/** `flatrate` provider IDs in `regionCode` (US default); shares cache map with Your Picks (`worthProviderCacheRef`). */
+async function getOrFetchFlatrateProviderIds(movie, cacheMap, regionCode = "US") {
   if (!movie || movie.tmdbId == null) return [];
-  const key = `${movie.type}-${movie.tmdbId}`;
+  const key = regionCode === "US" ? `${movie.type}-${movie.tmdbId}` : `${regionCode}:${movie.type}-${movie.tmdbId}`;
   if (cacheMap.has(key)) return cacheMap.get(key);
-  const data = await fetchWatchProviders(movie.tmdbId, movie.type);
+  const data = await fetchWatchProviders(movie.tmdbId, movie.type, regionCode);
   const ids = Array.isArray(data?.flatrate)
     ? data.flatrate.map((p) => Number(p?.provider_id)).filter((n) => Number.isFinite(n))
     : [];
@@ -2055,7 +2510,7 @@ async function fetchStreamingPageProviderRefillPool(
     for (const item of results) {
       if (all.length >= resultCap) break;
       if (seen.has(item.id)) continue;
-      if (hasExcludedGenre(item, excludedGenreIds)) continue;
+      if (hasExcludedGenre(item, excludedGenreIds) || isCatalogExcludedTitle(item)) continue;
       const norm = normalizeTMDBItem(item, type);
       if (allow) {
         const okLang = allow.has(String(norm.language || "").toLowerCase());
@@ -2093,6 +2548,24 @@ const ALL_INDIAN_LANGS = ["hi", "ta", "te", "ml", "kn", "bn", "mr"];
  * Region buckets for profile recommendations settings.
  * Empty profile array = no region filter (all languages/regions).
  */
+/** Catalog country. Saved on the profile; does not follow travel. */
+const AVAILABILITY_REGION_OPTIONS = [
+  { id: "US", label: "United States" },
+  { id: "CA", label: "Canada" },
+  { id: "IN", label: "India" },
+];
+
+/** Languages that can lead the India catalog. Empty selection = all of these, none forced first. */
+const SHOW_LANGUAGE_FIRST_OPTIONS = [
+  { id: "hi", label: "Hindi" },
+  { id: "ta", label: "Tamil" },
+  { id: "te", label: "Telugu" },
+  { id: "ml", label: "Malayalam" },
+  { id: "kn", label: "Kannada" },
+  { id: "bn", label: "Bengali" },
+  { id: "mr", label: "Marathi" },
+];
+
 const PROFILE_REGION_OPTIONS = [
   { id: "hollywood", label: "🌍 Hollywood", languages: ["en"] },
   { id: "indian", label: "🎭 Indian", languages: ALL_INDIAN_LANGS },
@@ -2781,12 +3254,19 @@ function googleTheatricalShowtimesSearchUrl(title, year) {
   return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
 }
 
-function WhereToWatch({ tmdbId, type, movieTitle, movieYear, showTheatricalShowtimesFallback }) {
+function WhereToWatch({ tmdbId, type, movieTitle, movieYear, showTheatricalShowtimesFallback, watchRegion = "US" }) {
   const [providers, setProviders] = useState(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    fetchWatchProviders(tmdbId, type).then(data => { setProviders(data); setLoading(false); });
-  }, [tmdbId, type]);
+    let cancelled = false;
+    setLoading(true);
+    fetchWatchProviders(tmdbId, type, watchRegion).then((data) => {
+      if (cancelled) return;
+      setProviders(data);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [tmdbId, type, watchRegion]);
 
   const theatricalHref =
     type === "movie" &&
@@ -2893,6 +3373,11 @@ function circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies) {
   );
 }
 
+/** Season-lines cache key: changes whenever the circle row's activity, average, or rater count changes. */
+function circleSeasonLinesCacheKey(circleId, row) {
+  return `${circleId}|tv-${Number(row.tmdb_id)}|${row.last_activity_at ?? ""}|${row.group_rating ?? ""}|${row.distinct_circle_raters ?? ""}`;
+}
+
 /** `openDetail` prediction payload from Edge `prediction` object (null if user already rated). */
 function circleStripPredictionForDetail(row) {
   if (row.viewer_score != null && Number.isFinite(Number(row.viewer_score))) return null;
@@ -2976,6 +3461,192 @@ function RatingScoreChips({ value, touched, onPick, variant = "default" }) {
           .5
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One TV season as a row (TMDB season-list layout): poster · title · optional "Season N" label ·
+ * TMDB season vote · "2022 • 8 Episodes" · short overview. `aside` sits right of the text (e.g. a
+ * member's score); `children` render under the text (e.g. {@link SeasonScoreControl}).
+ */
+function SeasonRow({ posterSrc, title, label, tmdbVotePct, meta, overview, aside, children, onPosterClick }) {
+  return (
+    <div className="season-row">
+      <div
+        className={`season-row__poster${onPosterClick ? " season-row__poster--tap" : ""}`}
+        onClick={onPosterClick}
+        aria-hidden
+      >
+        {posterSrc ? (
+          <img src={posterSrc} alt="" loading="lazy" decoding="async" />
+        ) : (
+          <div className="season-row__poster-fallback">🎬</div>
+        )}
+      </div>
+      <div className="season-row__main">
+        <div className="season-row__head">
+          <div className="season-row__text">
+            <div className="season-row__title">{title}</div>
+            {label ? <div className="season-row__label">{label}</div> : null}
+            {tmdbVotePct || meta ? (
+              <div className="season-row__meta">
+                {tmdbVotePct ? (
+                  <span className="season-row__tmdb-vote" title="TMDB season rating">
+                    ★ {tmdbVotePct}
+                  </span>
+                ) : null}
+                {tmdbVotePct && meta ? <span className="season-row__meta-sep" aria-hidden>·</span> : null}
+                {meta ? <span>{meta}</span> : null}
+              </div>
+            ) : null}
+          </div>
+          {aside != null ? <div className="season-row__aside">{aside}</div> : null}
+        </div>
+        {overview ? <p className="season-row__overview">{overview}</p> : null}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function seasonRowPosterSrc(season, fallbackPoster) {
+  if (season?.posterPath) return posterSrcThumb(season.posterPath);
+  return fallbackPoster ? posterSrcThumb(fallbackPoster) : null;
+}
+
+/**
+ * The user's score for one season: same chip picker as the title score, collapsed until tapped so
+ * many seasons fit. `onSave` / `onClear` return promises; errors show inline.
+ */
+function SeasonScoreControl({ value, onSave, onClear, canRate, seasonLabel }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(7);
+  const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const hasValue = value != null && Number.isFinite(Number(value));
+
+  function begin() {
+    setErr("");
+    setDraft(hasValue ? Number(value) : 7);
+    setTouched(hasValue);
+    setOpen(true);
+  }
+
+  async function run(fn) {
+    setBusy(true);
+    setErr("");
+    try {
+      await fn();
+      setOpen(false);
+    } catch (e) {
+      setErr(e?.message || "Could not save.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!canRate) {
+    return <div className="season-score season-score--hint">Sign in to rate {seasonLabel}.</div>;
+  }
+
+  if (!open) {
+    return (
+      <div className="season-score">
+        {hasValue ? (
+          <>
+            <span className="season-score__lbl">Your score</span>
+            <span className="season-score__val">{formatScore(Number(value))}</span>
+            <button type="button" className="season-score__btn" onClick={begin}>
+              Change
+            </button>
+          </>
+        ) : (
+          <button type="button" className="season-score__btn season-score__btn--rate" onClick={begin}>
+            Rate {seasonLabel}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="season-score season-score--open">
+      <RatingScoreChips
+        variant="season"
+        value={draft}
+        touched={touched}
+        onPick={(v) => {
+          setDraft(v);
+          setTouched(true);
+        }}
+      />
+      <div className="season-score__actions">
+        <button
+          type="button"
+          className="season-score__btn season-score__btn--save"
+          disabled={!touched || busy}
+          onClick={() => void run(() => onSave(draft))}
+        >
+          {busy ? "Saving…" : "Save"}
+        </button>
+        <button type="button" className="season-score__btn" disabled={busy} onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+        {hasValue ? (
+          <button
+            type="button"
+            className="season-score__btn season-score__btn--clear"
+            disabled={busy}
+            onClick={() => void run(() => onClear())}
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
+      {err ? <div className="season-score__err" role="alert">{err}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Title screen + Streaming: every season (1+) of a show as {@link SeasonRow}s, each with the user's
+ * own {@link SeasonScoreControl}. Long-running shows show the latest `initialMax` until expanded.
+ */
+function TvSeasonRowsList({ seasons, showPoster, seasonScores, canRate, onSave, onClear, initialMax = 0 }) {
+  const [expanded, setExpanded] = useState(false);
+  const list = Array.isArray(seasons) ? seasons : [];
+  const capped = initialMax > 0 && !expanded && list.length > initialMax;
+  const shown = capped ? list.slice(list.length - initialMax) : list;
+  return (
+    <div className="season-rows">
+      {capped ? (
+        <button type="button" className="season-rows__more" onClick={() => setExpanded(true)}>
+          Show all {list.length} seasons
+        </button>
+      ) : null}
+      {shown.map((s) => {
+        const label = `Season ${s.seasonNumber}`;
+        return (
+          <SeasonRow
+            key={s.seasonNumber}
+            posterSrc={seasonRowPosterSrc(s, showPoster)}
+            title={label}
+            tmdbVotePct={formatSeasonVotePercent(s.voteAverage)}
+            meta={seasonYearEpisodesLine(s)}
+            overview={s.overview}
+          >
+            <SeasonScoreControl
+              value={seasonScores?.[s.seasonNumber]}
+              canRate={canRate}
+              seasonLabel={label}
+              onSave={(score) => onSave(s.seasonNumber, score)}
+              onClear={() => onClear(s.seasonNumber)}
+            />
+          </SeasonRow>
+        );
+      })}
     </div>
   );
 }
@@ -3396,6 +4067,8 @@ export default function App() {
   const [screen, setScreen] = useState("splash");
   const [navTab, setNavTab] = useState("home");
   const [user, setUser] = useState(null);
+  /** True once auth reports no session, so the marketing page is not painted for a signed-in member. */
+  const [publicLandingReady, setPublicLandingReady] = useState(false);
   const [authMode, setAuthMode] = useState("signup");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -3403,6 +4076,12 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [authNotice, setAuthNotice] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  /** Emailed code (`{{ .Token }}`) for `confirm-signup` / `reset-code` auth modes; never logged. */
+  const [authOtp, setAuthOtp] = useState("");
+  /** Email the code was sent to (fixed while entering the code). */
+  const [authOtpEmail, setAuthOtpEmail] = useState("");
+  /** True while `reset-code` runs verifyOtp + updateUser, so PASSWORD_RECOVERY does not swap to the link-style reset screen mid-submit. */
+  const otpRecoveryInFlightRef = useRef(false);
   /** Auth password field: show/hide plaintext (eye toggle). */
   const [authPasswordVisible, setAuthPasswordVisible] = useState(false);
   const [catalogue, setCatalogue] = useState([]);
@@ -3416,7 +4095,59 @@ export default function App() {
   const [obStep, setObStep] = useState(0);
   const [sliderVal, setSliderVal] = useState(7);
   const [sliderTouched, setSliderTouched] = useState(false);
+  /** One score per title (TV: mean of season scores when any, else whole-show score) — match, badges, "You rated". */
   const [userRatings, setUserRatings] = useState({});
+  /** Whole-title scores the user set (movies + whole-show TV). Excludes season-only anchor rows. */
+  const [userShowRatings, setUserShowRatings] = useState({});
+  /** `{ "tv-<id>": { [seasonNumber]: score } }` from `season_ratings`. */
+  const [userSeasonRatings, setUserSeasonRatings] = useState({});
+  const userShowRatingsRef = useRef({});
+  const userSeasonRatingsRef = useRef({});
+  useEffect(() => {
+    userShowRatingsRef.current = userShowRatings;
+  }, [userShowRatings]);
+  useEffect(() => {
+    userSeasonRatingsRef.current = userSeasonRatings;
+  }, [userSeasonRatings]);
+  /** TMDB seasons (1+) per TV tmdb id — title screen, Streaming season rows, rated list, circle "Rated by". */
+  const [tvSeasonsByTmdbId, setTvSeasonsByTmdbId] = useState({});
+  const tvSeasonsByTmdbIdRef = useRef({});
+  const tvSeasonsInflightRef = useRef(new Set());
+
+  function rememberTvSeasons(tmdbId, rawDetail) {
+    const id = Number(tmdbId);
+    if (!Number.isFinite(id)) return;
+    const seasons = tvSeasonsFromTmdbDetail(rawDetail);
+    tvSeasonsByTmdbIdRef.current = { ...tvSeasonsByTmdbIdRef.current, [id]: seasons };
+    setTvSeasonsByTmdbId((prev) => ({ ...prev, [id]: seasons }));
+  }
+
+  /** Fetch TMDB `/tv/{id}` for shows whose seasons are not cached yet (30 per batch). */
+  const ensureTvSeasons = useCallback(async (ids) => {
+    const need = [...new Set((ids || []).map(Number).filter(Number.isFinite))].filter(
+      (id) => !(id in tvSeasonsByTmdbIdRef.current) && !tvSeasonsInflightRef.current.has(id),
+    );
+    if (need.length === 0) return;
+    for (const id of need) tvSeasonsInflightRef.current.add(id);
+    try {
+      for (let i = 0; i < need.length; i += 30) {
+        const chunk = need.slice(i, i + 30);
+        const details = await fetchTvDetailsById(chunk);
+        const patch = {};
+        for (const id of chunk) {
+          const d = details.get(id);
+          if (d && !isTmdbApiErrorPayload(d)) patch[id] = tvSeasonsFromTmdbDetail(d);
+        }
+        if (Object.keys(patch).length > 0) {
+          tvSeasonsByTmdbIdRef.current = { ...tvSeasonsByTmdbIdRef.current, ...patch };
+          setTvSeasonsByTmdbId((prev) => ({ ...prev, ...patch }));
+        }
+      }
+    } finally {
+      for (const id of need) tvSeasonsInflightRef.current.delete(id);
+    }
+  }, []);
+
   const [watchlist, setWatchlist] = useState([]);
   /** Open ⋯ menu row id on Watchlist screen (single flyout). */
   const [watchlistRowMenuId, setWatchlistRowMenuId] = useState(null);
@@ -3454,6 +4185,8 @@ export default function App() {
   /** `predict_cached` over popular unrated catalogue rows (neighbor-backed preds merged into For you). */
   const [yourPicksCatalogPredictions, setYourPicksCatalogPredictions] = useState({});
   const [inTheaters, setInTheaters] = useState([]);
+  /** Latest in-theaters fetch. A slower US bootstrap must not overwrite India. */
+  const inTheatersFetchGenRef = useRef(0);
   /** Merged `now ∪ popular` for match / catalogue (deduped). */
   const [streamingMovies, setStreamingMovies] = useState([]);
   const [streamingTV, setStreamingTV] = useState([]);
@@ -3469,8 +4202,10 @@ export default function App() {
   const [pulseTrending, setPulseTrending] = useState([]);
   const [pulsePopular, setPulsePopular] = useState([]);
   const [pulseCatalogReady, setPulseCatalogReady] = useState(false);
-  /** `YYYY-MM-DD` (UTC) for the last successful Pulse load — same-day revisits skip fetch + skeleton. */
-  const pulseLoadedUtcDateRef = useRef(null);
+  /** Region of the rows in `pulseTrending` / `pulsePopular` (`"IN"` = India pool, ordered at read time). */
+  const [pulseCatalogRegion, setPulseCatalogRegion] = useState("US");
+  /** `YYYY-MM-DD:REGION` (UTC day) of the last successful Pulse load — same-day revisits skip fetch + skeleton. */
+  const pulseLoadedKeyRef = useRef(null);
   /** In Theaters page second strip: weekly trending + same theatrical gates as Now ({@link fetchInTheaters}). */
   const [inTheatersPopularRanked, setInTheatersPopularRanked] = useState([]);
   const [streamingTab, setStreamingTab] = useState("tv"); // "movie" | "tv"
@@ -3549,9 +4284,6 @@ export default function App() {
   /** Circles list banner: session dismiss + “never” from localStorage (synced on login / reset). */
   const [zeroCirclesBannerNever, setZeroCirclesBannerNever] = useState(false);
   const [zeroCirclesBannerSessionDismissed, setZeroCirclesBannerSessionDismissed] = useState(false);
-  /** Mobile web — Add to Home Screen / install (see {@link PWA_EDUCATION_* } keys). */
-  const [pwaEducationModalOpen, setPwaEducationModalOpen] = useState(false);
-  const [pwaEducationScheduleEpoch, setPwaEducationScheduleEpoch] = useState(0);
   const [publishModalBusy, setPublishModalBusy] = useState(false);
   const [publishModalError, setPublishModalError] = useState("");
   const [publishModalSelection, setPublishModalSelection] = useState(() => new Set());
@@ -3572,6 +4304,10 @@ export default function App() {
   const [showCircleInfoSheet, setShowCircleInfoSheet] = useState(false);
   /** Rated-by modal (3b): null | { status, displayTitle?, rows?, message? } */
   const [whoPublishedModal, setWhoPublishedModal] = useState(null);
+  /** `get_circle_title_publisher_lines` per circle TV row, keyed by {@link circleSeasonLinesCacheKey}. */
+  const [circleSeasonLines, setCircleSeasonLines] = useState({});
+  const circleSeasonLinesRef = useRef({});
+  const circleSeasonLinesInflightRef = useRef(new Set());
   /** Pending in-app invites (moderators) for Circle info — refetched when sheet opens. */
   const [circleInfoPendingInvites, setCircleInfoPendingInvites] = useState([]);
   const [circleInfoPendingInvitesLoading, setCircleInfoPendingInvitesLoading] = useState(false);
@@ -3632,6 +4368,12 @@ export default function App() {
    * Persisted in `profiles.secondary_region_key`. Hollywood / US stays primary for main strips.
    */
   const [secondaryRegionKey, setSecondaryRegionKey] = useState(null);
+  /** Catalog country: US, CA, or IN. Default US until the profile row loads. */
+  const [availabilityRegion, setAvailabilityRegion] = useState("US");
+  /** India has no secondary region (nav, page, Profile). The saved `secondaryRegionKey` stays for US / Canada. */
+  const activeSecondaryRegionKey = availabilityRegion === "IN" ? null : secondaryRegionKey;
+  /** Indian language codes to show first. Empty = all Indian languages together. */
+  const [showLanguageFirst, setShowLanguageFirst] = useState([]);
   /** V1.3.2: Secondary market — split pools (tabs); union goes to catalogue via {@link dedupeMediaRowsById}. */
   const [secondaryTheaterRows, setSecondaryTheaterRows] = useState([]);
   const [secondaryStreamingMovieRows, setSecondaryStreamingMovieRows] = useState([]);
@@ -3688,9 +4430,17 @@ export default function App() {
   const computeNeighborsInFlightRef = useRef(false);
   const attemptedRatedHydrationRef = useRef(new Set());
   const worthProviderCacheRef = useRef(new Map());
-  /** Deduplicate main Streaming page stagger for **Now** and **Popular** rows (all services + per-provider). */
+  /** Deduplicate main Streaming page stagger for **Now** and **Popular** rows (all services). */
   const streamingPageNowRevealSigRef = useRef("");
   const streamingPagePopularRevealSigRef = useRef("");
+  /**
+   * Per-service stagger keys on the exact rows array revealed. A provider/tab/count string collided when the
+   * previous service's rows (same count) were still in state during the switch commit → new rows never revealed.
+   */
+  const streamingPageProviderNowRevealRowsRef = useRef(null);
+  const streamingPageProviderPopularRevealRowsRef = useRef(null);
+  /** Only the latest per-service selection may write refill strips. */
+  const streamingPageRefillGenRef = useRef(0);
   const secondaryRegionRefillRevealSigRef = useRef("");
   const tvStripMetaCacheRef = useRef(new Map());
   const [tvStripMetaByTmdbId, setTvStripMetaByTmdbId] = useState({});
@@ -3818,13 +4568,49 @@ export default function App() {
     void (async () => {
       const raw = await fetchTMDB(`/${type}/${m.tmdbId}?language=en-US&append_to_response=${append}`);
       if (cancelled) return;
-      setDetailMeta(detailMetaFromTmdbDetail(raw, type));
+      setDetailMeta(detailMetaFromTmdbDetail(raw, type, availabilityRegion));
+      if (type === "tv") {
+        if (raw && !isTmdbApiErrorPayload(raw)) rememberTvSeasons(m.tmdbId, raw);
+        else void ensureTvSeasons([m.tmdbId]);
+      }
     })();
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when detail title id changes
-  }, [selectedMovie?.movie?.id]);
+  }, [selectedMovie?.movie?.id, availabilityRegion, ensureTvSeasons]);
+
+  /** Published scores from circles the viewer shares. Hidden on the title until at least one exists. */
+  const [titleCircleShares, setTitleCircleShares] = useState(null);
+  const [titleCirclesWindowOpen, setTitleCirclesWindowOpen] = useState(false);
+  useEffect(() => {
+    setTitleCirclesWindowOpen(false);
+  }, [user?.id, selectedMovie?.movie?.id]);
+  useEffect(() => {
+    const movie = selectedMovie?.movie;
+    if (!user || movie?.tmdbId == null) {
+      setTitleCircleShares(null);
+      return;
+    }
+    const movieId = movie.id;
+    let cancelled = false;
+    setTitleCircleShares((prev) => (prev?.movieId === movieId ? prev : null));
+    void (async () => {
+      try {
+        const result = await fetchPublishedLinesAcrossMyCircles({
+          tmdbId: movie.tmdbId,
+          mediaType: movie.type === "tv" ? "tv" : "movie",
+        });
+        if (cancelled) return;
+        setTitleCircleShares({ movieId, ...result });
+      } catch (e) {
+        console.warn("In your circles: could not load", e?.message || e);
+        if (!cancelled) setTitleCircleShares((prev) => (prev?.movieId === movieId ? null : prev));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, selectedMovie?.movie?.id, selectedMovie?.movie?.tmdbId, selectedMovie?.movie?.type, circleRatedRefreshKey]);
 
   // iOS Safari can keep horizontal viewport drift even when overflow-x is hidden.
   // Guard in two layers:
@@ -3938,6 +4724,10 @@ export default function App() {
   const [cinemaPreference, setCinemaPreference] = useState(null); // "hollywood" | "mix"
   const [otherCinema, setOtherCinema] = useState(null); // cinema option id
   const [obCatalogue, setObCatalogue] = useState([]);   // merged catalogue for onboarding
+  /** Onboarding draft for Where you watch / Languages to show first; saved on Continue. */
+  const [obRegion, setObRegion] = useState("US");
+  const [obLangFirst, setObLangFirst] = useState([]);
+  const [obRegionSaving, setObRegionSaving] = useState(false);
 
   const indianSelected = (moodSelections.region || []).includes("indian");
   const cardOrder = indianSelected
@@ -3981,6 +4771,7 @@ export default function App() {
       if (event === "TOKEN_REFRESHED") return;
       if (event === "PASSWORD_RECOVERY") {
         setUser(session?.user ?? null);
+        if (otpRecoveryInFlightRef.current) return;
         if (urlIndicatesCircleJoin()) {
           setScreen("circle-join");
           return;
@@ -4018,6 +4809,7 @@ export default function App() {
         return;
       }
       setUser(session?.user ?? null);
+      if (!session?.user) setPublicLandingReady(true);
     });
     const onAuthDeepLink = (ev) => {
       void (async () => {
@@ -4191,6 +4983,7 @@ export default function App() {
     }, CATALOGUE_BOOTSTRAP_SAFETY_MS);
     (async () => {
       try {
+        const theatersRequestId = ++inTheatersFetchGenRef.current;
         const [data, th] = await Promise.all([fetchCataloguePhasePopular(), fetchInTheaters([])]);
         if (cancelled) return;
         const seen = new Set(data.map(m => m.id));
@@ -4199,8 +4992,10 @@ export default function App() {
         const merged = [...data, ...addedTheaters];
         setCatalogue(merged);
         setObCatalogue(data);
-        setInTheaters(th.nowPlaying);
-        setInTheatersPopularRanked(th.popularInTheaters);
+        if (inTheatersFetchGenRef.current === theatersRequestId) {
+          setInTheaters(th.nowPlaying);
+          setInTheatersPopularRanked(th.popularInTheaters);
+        }
         void (async () => {
           try {
             const enrich = await fetchCataloguePhaseTopRated();
@@ -4225,16 +5020,17 @@ export default function App() {
   }, []);
 
   /**
-   * In Theaters should react to region settings (e.g., Indian languages in US theatrical release window).
-   * We keep the data source US-specific and enrich candidates via discover movie when regions are selected.
+   * In Theaters. US keeps `fetchInTheaters`. India uses `fetchIndiaInTheaters`
+   * (language-first row, other films in the second strip). Canada uses `fetchCanadaInTheaters` (`region=CA`).
    */
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    const theatersRequestId = ++inTheatersFetchGenRef.current;
     (async () => {
       try {
-        const th = await fetchInTheaters(showRegionKeys);
-        if (cancelled) return;
+        const th = await fetchInTheatersForAvailabilityRegion(availabilityRegion, showRegionKeys, showLanguageFirst);
+        if (cancelled || inTheatersFetchGenRef.current !== theatersRequestId) return;
         setInTheaters(th.nowPlaying);
         setInTheatersPopularRanked(th.popularInTheaters);
         setCatalogue((prev) => {
@@ -4249,7 +5045,7 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, showRegionKeys]);
+  }, [user, showRegionKeys, availabilityRegion, showLanguageFirst]);
 
   /**
    * Main **Streaming** page — All services: separate **now** and **popular** pools (B + D for movies, flatrate+date
@@ -4260,6 +5056,12 @@ export default function App() {
     let cancelled = false;
     setStreamingMoviesReady(false);
     setStreamingTvReady(false);
+    const india = availabilityRegion === "IN";
+    const market = availabilityRegion === "CA" ? "CA" : "US";
+    const indiaOpts = {
+      languageFirst: showLanguageFirst,
+      excludedGenreIds: streamingPageExcludedGenreIds(streamingPageIncludedHidableGenreIds),
+    };
     const defer = setTimeout(() => {
       (async () => {
         let mNow = [];
@@ -4267,10 +5069,15 @@ export default function App() {
         let tNow = [];
         let tPop = [];
         try {
-          [mNow, mPop] = await Promise.all([
-            fetchStreamingPageMoviesNowAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds),
-            fetchStreamingPageMoviesPopularAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds),
-          ]);
+          [mNow, mPop] = await Promise.all(india
+            ? [
+              fetchIndiaStreamingStrip("movie", { ...indiaOpts, sort: "date" }),
+              fetchIndiaStreamingStrip("movie", { ...indiaOpts, sort: "popularity" }),
+            ]
+            : [
+              fetchStreamingPageMoviesNowAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds, market),
+              fetchStreamingPageMoviesPopularAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds, market),
+            ]);
         } catch (e) {
           console.error(e);
         }
@@ -4288,10 +5095,15 @@ export default function App() {
         });
 
         try {
-          [tNow, tPop] = await Promise.all([
-            fetchStreamingPageTvNowAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds),
-            fetchStreamingPageTvPopularAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds),
-          ]);
+          [tNow, tPop] = await Promise.all(india
+            ? [
+              fetchIndiaStreamingStrip("tv", { ...indiaOpts, sort: "date" }),
+              fetchIndiaStreamingStrip("tv", { ...indiaOpts, sort: "popularity" }),
+            ]
+            : [
+              fetchStreamingPageTvNowAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds, market),
+              fetchStreamingPageTvPopularAllServices(showRegionKeys, streamingPageIncludedHidableGenreIds, market),
+            ]);
         } catch (e) {
           console.error(e);
         }
@@ -4313,7 +5125,13 @@ export default function App() {
       cancelled = true;
       clearTimeout(defer);
     };
-  }, [user, showRegionKeys, screen, streamingPageIncludedHidableGenreIds]);
+  }, [user, showRegionKeys, screen, streamingPageIncludedHidableGenreIds, availabilityRegion, showLanguageFirst]);
+
+  useEffect(() => {
+    if (streamingPageProviderId == null) return;
+    const valid = streamingPageServicesForRegion(availabilityRegion).some((s) => s.id === streamingPageProviderId);
+    if (!valid) setStreamingPageProviderId(null);
+  }, [availabilityRegion, streamingPageProviderId]);
 
   useEffect(() => {
     if (!user) {
@@ -4343,67 +5161,95 @@ export default function App() {
     };
   }, [user]);
 
-  /** Pulse page: week trending + global popular — one shared catalog per UTC day (`pulse_catalog_daily`, Edge `pulse-catalog`). */
+  /**
+   * Pulse page — one shared catalog per UTC day and region (`pulse_catalog_daily`, Edge `pulse-catalog`).
+   * US: week trending + global popular, 18 each. Canada: Canada-market popularity (`fetchPulseCanadaCatalog`).
+   * India: India-origin popularity pools; Languages to show first are applied when the rows are read
+   * (`pulseTrendingForRecs`), not here.
+   */
+  const pulseRegion = availabilityRegion === "IN" || availabilityRegion === "CA" ? availabilityRegion : "US";
   useEffect(() => {
     if (!user || screen !== "pulse") return;
     let cancelled = false;
 
     const utcDate = new Date().toISOString().slice(0, 10);
-    if (pulseLoadedUtcDateRef.current === utcDate) {
+    const loadKey = `${utcDate}:${pulseRegion}`;
+    if (pulseLoadedKeyRef.current === loadKey) {
       setPulseCatalogReady(true);
       return;
     }
+
+    /** India pools are large; only the rows actually shown join `catalogue` (effect after `pulseTrendingForRecs`). */
+    const applyPulseRows = (trendingIn, popularIn) => {
+      const trendingRows = filterCatalogExcludedTitles(trendingIn);
+      const popularRows = filterCatalogExcludedTitles(popularIn);
+      setPulseTrending(trendingRows);
+      setPulsePopular(popularRows);
+      setPulseCatalogRegion(pulseRegion);
+      if (pulseRegion !== "IN") {
+        setCatalogue((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const added = [...trendingRows, ...popularRows].filter((m) => m && !seen.has(m.id));
+          if (added.length === 0) return prev;
+          return [...prev, ...added];
+        });
+      }
+      setPulseCatalogReady(true);
+      pulseLoadedKeyRef.current = loadKey;
+    };
 
     setPulseCatalogReady(false);
     const defer = setTimeout(() => {
       (async () => {
         try {
-          const { data: row, error: selErr } = await supabase
+          let { data: row, error: selErr } = await supabase
             .from("pulse_catalog_daily")
             .select("trending, popular")
             .eq("utc_date", utcDate)
+            .eq("region", pulseRegion)
             .maybeSingle();
+          /** Before `20260924130000_pulse_catalog_daily_region.sql` there is no `region` column; the one row per day is US. */
+          if (selErr && pulseRegion === "US") {
+            ({ data: row, error: selErr } = await supabase
+              .from("pulse_catalog_daily")
+              .select("trending, popular")
+              .eq("utc_date", utcDate)
+              .maybeSingle());
+          }
           if (cancelled) return;
           if (!selErr && row && Array.isArray(row.trending) && Array.isArray(row.popular)) {
-            setPulseTrending(row.trending);
-            setPulsePopular(row.popular);
-            setCatalogue((prev) => {
-              const seen = new Set(prev.map((m) => m.id));
-              const added = [...row.trending, ...row.popular].filter((m) => m && !seen.has(m.id));
-              if (added.length === 0) return prev;
-              return [...prev, ...added];
-            });
-            setPulseCatalogReady(true);
-            pulseLoadedUtcDateRef.current = utcDate;
+            applyPulseRows(row.trending, row.popular);
             return;
           }
 
           const { data: inv, error: invErr } = await supabase.functions.invoke("pulse-catalog", {
-            body: { utc_date: utcDate },
+            body: { utc_date: utcDate, region: pulseRegion },
           });
           if (cancelled) return;
 
           const invRecord = inv && typeof inv === "object" ? inv : null;
           const invOk = Boolean(invRecord?.ok);
+          /** Edge before 1.1.0 ignores `region` and always serves the US catalog; 1.1.0 treats `CA` as US. */
+          const invRegion = invRecord?.region === "IN" || invRecord?.region === "CA" ? invRecord.region : "US";
           const invTrending = invOk && Array.isArray(invRecord.trending) ? invRecord.trending : null;
           const invPopular = invOk && Array.isArray(invRecord.popular) ? invRecord.popular : null;
 
-          if (!invErr && invOk && invTrending && invPopular) {
-            setPulseTrending(invTrending);
-            setPulsePopular(invPopular);
-            setCatalogue((prev) => {
-              const seen = new Set(prev.map((m) => m.id));
-              const added = [...invTrending, ...invPopular].filter((m) => m && !seen.has(m.id));
-              if (added.length === 0) return prev;
-              return [...prev, ...added];
-            });
-            setPulseCatalogReady(true);
-            pulseLoadedUtcDateRef.current = utcDate;
+          if (!invErr && invOk && invRegion === pulseRegion && invTrending && invPopular) {
+            applyPulseRows(invTrending, invPopular);
             return;
           }
 
-          if (invErr || !invOk) {
+          if (invErr || !invOk || invRegion !== pulseRegion) {
             console.warn("Pulse: pulse-catalog Edge miss", invErr || inv);
+          }
+
+          if (pulseRegion === "IN" || pulseRegion === "CA") {
+            const { trending: trendingRows, popular: popularRows } = pulseRegion === "IN"
+              ? await fetchPulseIndiaCatalog()
+              : await fetchPulseCanadaCatalog();
+            if (cancelled) return;
+            applyPulseRows(trendingRows, popularRows);
+            return;
           }
 
           const [trendingRows, popularRows] = await Promise.all([
@@ -4411,16 +5257,7 @@ export default function App() {
             fetchPulsePopularCatalog(),
           ]);
           if (cancelled) return;
-          setPulseTrending(trendingRows);
-          setPulsePopular(popularRows);
-          setCatalogue((prev) => {
-            const seen = new Set(prev.map((m) => m.id));
-            const added = [...trendingRows, ...popularRows].filter((m) => m && !seen.has(m.id));
-            if (added.length === 0) return prev;
-            return [...prev, ...added];
-          });
-          setPulseCatalogReady(true);
-          pulseLoadedUtcDateRef.current = utcDate;
+          applyPulseRows(trendingRows, popularRows);
         } catch (e) {
           if (!cancelled) {
             console.warn("Pulse: load failed", e);
@@ -4433,7 +5270,7 @@ export default function App() {
       cancelled = true;
       clearTimeout(defer);
     };
-  }, [user, screen]);
+  }, [user, screen, pulseRegion]);
 
   /**
    * V1.3.0: Hydrate `secondary_region_key` as soon as session + bootstrap allow — it was only set at
@@ -4466,7 +5303,7 @@ export default function App() {
 
   /** V1.3.0: US availability + secondary bucket languages; V1.3.2: separate pools for tabs. */
   useEffect(() => {
-    if (!user || !secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
+    if (!user || !activeSecondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(activeSecondaryRegionKey)) {
       setSecondaryTheaterRows([]);
       setSecondaryStreamingMovieRows([]);
       setSecondaryStreamingTvRows([]);
@@ -4487,9 +5324,9 @@ export default function App() {
     const defer = setTimeout(() => {
       (async () => {
         try {
-          const langCodes = getRegionLanguageCodes([secondaryRegionKey]);
+          const langCodes = getRegionLanguageCodes([activeSecondaryRegionKey]);
           /** Indian: TMDB `with_original_language` on discover is too thin; use broad US discover + client language filter. */
-          const useIndianClientTaste = secondaryRegionKey === "indian";
+          const useIndianClientTaste = activeSecondaryRegionKey === "indian";
           const langQuery =
             useIndianClientTaste || langCodes.length === 0
               ? ""
@@ -4527,12 +5364,22 @@ export default function App() {
       cancelled = true;
       clearTimeout(defer);
     };
-  }, [user, secondaryRegionKey]);
+  }, [user, activeSecondaryRegionKey]);
+
+  useEffect(() => {
+    if (availabilityRegion !== "IN" || screen !== "secondary-region") return;
+    setNavTab("home");
+    setScreen("circles");
+  }, [availabilityRegion, screen]);
 
   const inTheatersForRecs = useMemo(() => {
+    if (availabilityRegion === "IN") {
+      if (!user || showGenreIds.length === 0) return inTheaters;
+      return inTheaters.filter((m) => passesShowGenresFilter(m, showGenreIds));
+    }
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return inTheaters;
     return inTheaters.filter(m => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [inTheaters, user, showGenreIds, showRegionKeys]);
+  }, [inTheaters, user, showGenreIds, showRegionKeys, availabilityRegion]);
 
   const streamingMoviesForRecs = useMemo(() => {
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingMovies;
@@ -4545,38 +5392,38 @@ export default function App() {
   }, [streamingTV, user, showGenreIds, showRegionKeys]);
 
   const streamingMoviesNowForRecs = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingMoviesNow;
-    return streamingMoviesNow.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingMoviesNow, user, showGenreIds, showRegionKeys]);
+    if (!user) return streamingMoviesNow;
+    return filterStreamingPageRowsForProfile(streamingMoviesNow, showGenreIds, showRegionKeys, availabilityRegion);
+  }, [streamingMoviesNow, user, showGenreIds, showRegionKeys, availabilityRegion]);
   const streamingMoviesPopularForRecs = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingMoviesPopular;
-    return streamingMoviesPopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingMoviesPopular, user, showGenreIds, showRegionKeys]);
+    if (!user) return streamingMoviesPopular;
+    return filterStreamingPageRowsForProfile(streamingMoviesPopular, showGenreIds, showRegionKeys, availabilityRegion);
+  }, [streamingMoviesPopular, user, showGenreIds, showRegionKeys, availabilityRegion]);
   const streamingTVNowForRecs = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingTVNow;
-    return streamingTVNow.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingTVNow, user, showGenreIds, showRegionKeys]);
+    if (!user) return streamingTVNow;
+    return filterStreamingPageRowsForProfile(streamingTVNow, showGenreIds, showRegionKeys, availabilityRegion);
+  }, [streamingTVNow, user, showGenreIds, showRegionKeys, availabilityRegion]);
   const streamingTVPopularForRecs = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingTVPopular;
-    return streamingTVPopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingTVPopular, user, showGenreIds, showRegionKeys]);
+    if (!user) return streamingTVPopular;
+    return filterStreamingPageRowsForProfile(streamingTVPopular, showGenreIds, showRegionKeys, availabilityRegion);
+  }, [streamingTVPopular, user, showGenreIds, showRegionKeys, availabilityRegion]);
 
   const streamingPageRefillMoviesNowFiltered = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillMoviesNow;
-    return streamingPageRefillMoviesNow.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingPageRefillMoviesNow, user, showGenreIds, showRegionKeys]);
+    if (!user) return streamingPageRefillMoviesNow;
+    return filterStreamingPageRowsForProfile(streamingPageRefillMoviesNow, showGenreIds, showRegionKeys, availabilityRegion);
+  }, [streamingPageRefillMoviesNow, user, showGenreIds, showRegionKeys, availabilityRegion]);
   const streamingPageRefillMoviesPopularFiltered = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillMoviesPopular;
-    return streamingPageRefillMoviesPopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingPageRefillMoviesPopular, user, showGenreIds, showRegionKeys]);
+    if (!user) return streamingPageRefillMoviesPopular;
+    return filterStreamingPageRowsForProfile(streamingPageRefillMoviesPopular, showGenreIds, showRegionKeys, availabilityRegion);
+  }, [streamingPageRefillMoviesPopular, user, showGenreIds, showRegionKeys, availabilityRegion]);
   const streamingPageRefillTvNowFiltered = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillTvNow;
-    return streamingPageRefillTvNow.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingPageRefillTvNow, user, showGenreIds, showRegionKeys]);
+    if (!user) return streamingPageRefillTvNow;
+    return filterStreamingPageRowsForProfile(streamingPageRefillTvNow, showGenreIds, showRegionKeys, availabilityRegion);
+  }, [streamingPageRefillTvNow, user, showGenreIds, showRegionKeys, availabilityRegion]);
   const streamingPageRefillTvPopularFiltered = useMemo(() => {
-    if (!user || (!showGenreIds.length && !showRegionKeys.length)) return streamingPageRefillTvPopular;
-    return streamingPageRefillTvPopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [streamingPageRefillTvPopular, user, showGenreIds, showRegionKeys]);
+    if (!user) return streamingPageRefillTvPopular;
+    return filterStreamingPageRowsForProfile(streamingPageRefillTvPopular, showGenreIds, showRegionKeys, availabilityRegion);
+  }, [streamingPageRefillTvPopular, user, showGenreIds, showRegionKeys, availabilityRegion]);
 
   /** Secondary Region service refill: do not apply profile `showGenreIds` / `showRegionKeys` (taste = secondary bucket + TMDB). */
   const secondaryRegionRefillMoviesFiltered = useMemo(() => {
@@ -4620,6 +5467,9 @@ export default function App() {
   ]);
 
   useEffect(() => {
+    const refillGen = ++streamingPageRefillGenRef.current;
+    streamingPageProviderNowRevealRowsRef.current = null;
+    streamingPageProviderPopularRevealRowsRef.current = null;
     if (screen !== "streaming-page" || streamingPageProviderId == null) {
       setStreamingPageRefillLoading(false);
       setStreamingPageRefillMoviesNow([]);
@@ -4637,6 +5487,7 @@ export default function App() {
     const langCodes = getRegionLanguageCodes(showRegionKeys);
     const langQuery = langCodes.length > 0 ? `&with_original_language=${langCodes.join("|")}` : "";
     let cancelled = false;
+    const isStale = () => cancelled || refillGen !== streamingPageRefillGenRef.current;
     streamingPageNowRevealSigRef.current = "";
     streamingPagePopularRevealSigRef.current = "";
     setStreamingPageRefillLoading(true);
@@ -4651,6 +5502,46 @@ export default function App() {
       setStreamingPageRefillTvPopular([]);
     }
 
+    if (availabilityRegion === "IN") {
+      if (!INDIA_STREAMING_SERVICES.some((s) => s.id === streamingPageProviderId)) {
+        setStreamingPageRefillLoading(false);
+        return () => {
+          cancelled = true;
+        };
+      }
+      const indiaOpts = {
+        providerId: streamingPageProviderId,
+        languageFirst: showLanguageFirst,
+        excludedGenreIds: streamingExcludedIds,
+      };
+      (async () => {
+        const [poolNow, poolPop] = await Promise.all([
+          fetchIndiaStreamingStrip(media, { ...indiaOpts, sort: "date" }),
+          fetchIndiaStreamingStrip(media, { ...indiaOpts, sort: "popularity" }),
+        ]);
+        if (isStale()) return;
+        if (media === "movie") {
+          setStreamingPageRefillMoviesNow(poolNow);
+          setStreamingPageRefillMoviesPopular(poolPop);
+        } else {
+          setStreamingPageRefillTvNow(poolNow);
+          setStreamingPageRefillTvPopular(poolPop);
+        }
+        setStreamingPageRefillLoading(false);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const market = availabilityRegion === "CA" ? "CA" : "US";
+    if (market === "CA" && !CANADA_STREAMING_SERVICES.some((s) => s.id === streamingPageProviderId)) {
+      setStreamingPageRefillLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     (async () => {
       if (media === "movie") {
         const [poolNow, poolPop] = await Promise.all([
@@ -4658,10 +5549,10 @@ export default function App() {
             "movie",
             streamingPageProviderId,
             (partial) => {
-              if (cancelled) return;
+              if (isStale()) return;
               setStreamingPageRefillMoviesNow(partial.slice(0, STREAMING_PAGE_STRIP_CAP));
             },
-            "US",
+            market,
             langQuery,
             null,
             { discoverSort: "date", excludedGenreIds: streamingExcludedIds },
@@ -4670,16 +5561,16 @@ export default function App() {
             "movie",
             streamingPageProviderId,
             (partial) => {
-              if (cancelled) return;
+              if (isStale()) return;
               setStreamingPageRefillMoviesPopular(partial.slice(0, STREAMING_PAGE_STRIP_CAP));
             },
-            "US",
+            market,
             langQuery,
             null,
             { discoverSort: "popularity", excludedGenreIds: streamingExcludedIds },
           ),
         ]);
-        if (cancelled) return;
+        if (isStale()) return;
         setStreamingPageRefillMoviesNow(poolNow);
         setStreamingPageRefillMoviesPopular(poolPop);
       } else {
@@ -4688,10 +5579,10 @@ export default function App() {
             "tv",
             streamingPageProviderId,
             (partial) => {
-              if (cancelled) return;
+              if (isStale()) return;
               setStreamingPageRefillTvNow(partial.slice(0, STREAMING_PAGE_STRIP_CAP));
             },
-            "US",
+            market,
             langQuery,
             null,
             { discoverSort: "date", excludedGenreIds: streamingExcludedIds },
@@ -4700,16 +5591,16 @@ export default function App() {
             "tv",
             streamingPageProviderId,
             (partial) => {
-              if (cancelled) return;
+              if (isStale()) return;
               setStreamingPageRefillTvPopular(partial.slice(0, STREAMING_PAGE_STRIP_CAP));
             },
-            "US",
+            market,
             langQuery,
             null,
             { discoverSort: "popularity", excludedGenreIds: streamingExcludedIds },
           ),
         ]);
-        if (cancelled) return;
+        if (isStale()) return;
         setStreamingPageRefillTvNow(poolNow);
         setStreamingPageRefillTvPopular(poolPop);
       }
@@ -4719,13 +5610,20 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [screen, streamingPageProviderId, streamingTab, showRegionKeys, streamingPageIncludedHidableGenreIds]);
+  }, [
+    screen,
+    streamingPageProviderId,
+    streamingTab,
+    showRegionKeys,
+    streamingPageIncludedHidableGenreIds,
+    availabilityRegion,
+    showLanguageFirst,
+  ]);
 
   useEffect(() => {
     if (screen !== "streaming-page" || streamingPageProviderId == null) return;
-    const n =
-      (streamingTab === "movie" ? streamingPageRefillMoviesNowFiltered : streamingPageRefillTvNowFiltered)
-        .length;
+    const rows = streamingTab === "movie" ? streamingPageRefillMoviesNowFiltered : streamingPageRefillTvNowFiltered;
+    const n = rows.length;
     if (n === 0) {
       setStreamingPageNowDisplayLen(0);
       return;
@@ -4734,9 +5632,8 @@ export default function App() {
       setStreamingPageNowDisplayLen((p) => Math.max(p, Math.min(STREAMING_PAGE_REVEAL_FIRST, n)));
       return;
     }
-    const sig = `pnow-${streamingPageProviderId}-${streamingTab}-${n}`;
-    if (streamingPageNowRevealSigRef.current === sig) return;
-    streamingPageNowRevealSigRef.current = sig;
+    if (streamingPageProviderNowRevealRowsRef.current === rows) return;
+    streamingPageProviderNowRevealRowsRef.current = rows;
     const cap = Math.min(n, STREAMING_PAGE_STRIP_CAP);
     const first = Math.min(STREAMING_PAGE_REVEAL_FIRST, cap);
     setStreamingPageNowDisplayLen(first);
@@ -4760,10 +5657,9 @@ export default function App() {
 
   useEffect(() => {
     if (screen !== "streaming-page" || streamingPageProviderId == null) return;
-    const n =
-      (streamingTab === "movie"
-        ? streamingPageRefillMoviesPopularFiltered
-        : streamingPageRefillTvPopularFiltered).length;
+    const rows =
+      streamingTab === "movie" ? streamingPageRefillMoviesPopularFiltered : streamingPageRefillTvPopularFiltered;
+    const n = rows.length;
     if (n === 0) {
       setStreamingPagePopularDisplayLen(0);
       return;
@@ -4772,9 +5668,8 @@ export default function App() {
       setStreamingPagePopularDisplayLen((p) => Math.max(p, Math.min(STREAMING_PAGE_REVEAL_FIRST, n)));
       return;
     }
-    const sig = `ppop-${streamingPageProviderId}-${streamingTab}-${n}`;
-    if (streamingPagePopularRevealSigRef.current === sig) return;
-    streamingPagePopularRevealSigRef.current = sig;
+    if (streamingPageProviderPopularRevealRowsRef.current === rows) return;
+    streamingPageProviderPopularRevealRowsRef.current = rows;
     const cap = Math.min(n, STREAMING_PAGE_STRIP_CAP);
     const first = Math.min(STREAMING_PAGE_REVEAL_FIRST, cap);
     setStreamingPagePopularDisplayLen(first);
@@ -5040,37 +5935,60 @@ export default function App() {
     return whatsHotForRecs.map((m) => tmdbOnlyRec(m));
   }, [matchData?.whatsHotRecs, whatsHotForRecs]);
 
+  /** India Pulse ignores “Regions to show” (catalog is India; genres still apply) and orders by Languages to show first here. */
   const pulseTrendingForRecs = useMemo(() => {
+    if (pulseCatalogRegion === "IN") {
+      const rows = user && showGenreIds.length ? pulseTrending.filter((m) => passesShowGenresFilter(m, showGenreIds)) : pulseTrending;
+      return orderPulseIndiaRowsForDisplay(rows, showLanguageFirst);
+    }
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return pulseTrending;
     return pulseTrending.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [pulseTrending, user, showGenreIds, showRegionKeys]);
+  }, [pulseTrending, pulseCatalogRegion, user, showGenreIds, showRegionKeys, showLanguageFirst]);
 
   const pulsePopularForRecs = useMemo(() => {
+    if (pulseCatalogRegion === "IN") {
+      const rows = user && showGenreIds.length ? pulsePopular.filter((m) => passesShowGenresFilter(m, showGenreIds)) : pulsePopular;
+      return orderPulseIndiaRowsForDisplay(rows, showLanguageFirst);
+    }
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return pulsePopular;
     return pulsePopular.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [pulsePopular, user, showGenreIds, showRegionKeys]);
+  }, [pulsePopular, pulseCatalogRegion, user, showGenreIds, showRegionKeys, showLanguageFirst]);
 
+  useEffect(() => {
+    if (pulseCatalogRegion !== "IN") return;
+    const shown = [...pulseTrendingForRecs, ...pulsePopularForRecs];
+    if (shown.length === 0) return;
+    setCatalogue((prev) => {
+      const seen = new Set(prev.map((m) => m.id));
+      const added = dedupeMediaRowsById(shown.filter((m) => m && !seen.has(m.id)));
+      if (added.length === 0) return prev;
+      return [...prev, ...added];
+    });
+  }, [pulseCatalogRegion, pulseTrendingForRecs, pulsePopularForRecs]);
+
+  /** Follows the current strip order (India language order can change after predictions land). */
   const pulseTrendingRecsResolved = useMemo(() => {
-    const fromMatch = matchData?.pulseTrendingRecs;
-    if (fromMatch?.length) return fromMatch;
-    return pulseTrendingForRecs.map((m) => tmdbOnlyRec(m));
+    const byId = new Map((matchData?.pulseTrendingRecs || []).map((r) => [r?.movie?.id, r]));
+    return pulseTrendingForRecs.map((m) => byId.get(m.id) || tmdbOnlyRec(m));
   }, [matchData?.pulseTrendingRecs, pulseTrendingForRecs]);
 
   const pulsePopularRecsResolved = useMemo(() => {
-    const fromMatch = matchData?.pulsePopularRecs;
-    if (fromMatch?.length) return fromMatch;
-    return pulsePopularForRecs.map((m) => tmdbOnlyRec(m));
+    const byId = new Map((matchData?.pulsePopularRecs || []).map((r) => [r?.movie?.id, r]));
+    return pulsePopularForRecs.map((m) => byId.get(m.id) || tmdbOnlyRec(m));
   }, [matchData?.pulsePopularRecs, pulsePopularForRecs]);
 
   const inTheatersPagePopularForRecs = useMemo(() => {
+    if (availabilityRegion === "IN") {
+      if (!user || showGenreIds.length === 0) return inTheatersPopularRanked;
+      return inTheatersPopularRanked.filter((m) => passesShowGenresFilter(m, showGenreIds));
+    }
     if (!user || (!showGenreIds.length && !showRegionKeys.length)) return inTheatersPopularRanked;
     return inTheatersPopularRanked.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
-  }, [inTheatersPopularRanked, user, showGenreIds, showRegionKeys]);
+  }, [inTheatersPopularRanked, user, showGenreIds, showRegionKeys, availabilityRegion]);
 
   const inTheatersPagePopularRecsResolved = useMemo(() => {
-    const fromMatch = matchData?.inTheatersPagePopularRecs;
-    if (fromMatch?.length) return fromMatch;
-    return inTheatersPagePopularForRecs.map((m) => tmdbOnlyRec(m));
+    const byId = new Map((matchData?.inTheatersPagePopularRecs || []).map((r) => [r?.movie?.id, r]));
+    return inTheatersPagePopularForRecs.map((m) => byId.get(m.id) || tmdbOnlyRec(m));
   }, [matchData?.inTheatersPagePopularRecs, inTheatersPagePopularForRecs]);
 
   /** V1.3.2: Union of secondary strip rows. **Indian** per-service streaming uses US majors + {@link SECONDARY_INDIAN_STREAMING_WATCH_REGION} for Indian OTT ids; other secondaries use {@link SECONDARY_AVAILABILITY_TMDB_REGION}. */
@@ -5097,25 +6015,26 @@ export default function App() {
    * “Regions to show” would exclude them (e.g. Hollywood-only + Indian secondary). Secondary rows ignore profile genre too.
    */
   const catalogueForRecs = useMemo(() => {
-    if (!user) return catalogue;
+    const browsable = filterCatalogExcludedTitles(catalogue);
+    if (!user) return browsable;
     const baseFiltered =
       !showGenreIds.length && !showRegionKeys.length
-        ? catalogue
-        : catalogue.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
+        ? browsable
+        : browsable.filter((m) => passesProfileFilters(m, showGenreIds, showRegionKeys));
 
-    if (!secondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(secondaryRegionKey)) {
+    if (!activeSecondaryRegionKey || !V130_SECONDARY_REGION_IDS.includes(activeSecondaryRegionKey)) {
       return baseFiltered;
     }
 
     const seen = new Set(baseFiltered.map((m) => m.id));
     const extras = [];
     for (const m of secondaryStripCatalogRows) {
-      if (seen.has(m.id)) continue;
+      if (seen.has(m.id) || isCatalogExcludedTitle(m)) continue;
       seen.add(m.id);
       extras.push(m);
     }
     return extras.length === 0 ? baseFiltered : [...baseFiltered, ...extras];
-  }, [catalogue, user, showGenreIds, showRegionKeys, secondaryRegionKey, secondaryStripCatalogRows]);
+  }, [catalogue, user, showGenreIds, showRegionKeys, activeSecondaryRegionKey, secondaryStripCatalogRows]);
 
   /** For `?detail=` deep links: resolve media id once catalogue / strips are hydrated. */
   const movieLookupById = useMemo(() => {
@@ -5261,9 +6180,7 @@ export default function App() {
     const catalogueForMatch =
       Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0
         ? catalogueForRecs
-        : Array.isArray(catalogue) && catalogue.length > 0
-          ? catalogue
-          : [];
+        : filterCatalogExcludedTitles(catalogue);
     const hasCatalogue = catalogueForMatch.length > 0;
     if (!hasRatings || !hasCatalogue) {
       setMatchLoading(false);
@@ -5477,7 +6394,7 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const { ratingCount } = await loadUserData();
+        const { ratingCount, availabilityRegion: savedRegion, showLanguageFirst: savedLangFirst } = await loadUserData();
         if (cancelled) return;
         const { data: authData } = await supabase.auth.getUser();
         const { data: sess } = await supabase.auth.getSession();
@@ -5490,7 +6407,9 @@ export default function App() {
           setCinemaPreference(null);
           setOtherCinema(null);
           setObCatalogue(catalogue);
-          setScreen("pref-primary");
+          setObRegion(savedRegion);
+          setObLangFirst(savedRegion === "IN" ? savedLangFirst : []);
+          setScreen("pref-region");
           return;
         }
         setScreen("circles");
@@ -5500,7 +6419,9 @@ export default function App() {
         console.warn("Post-login routing failed:", e);
         if (!cancelled) {
           setObCatalogue(catalogue);
-          setScreen("pref-primary");
+          setObRegion("US");
+          setObLangFirst([]);
+          setScreen("pref-region");
         }
       }
     })();
@@ -5677,30 +6598,55 @@ export default function App() {
 
   async function loadUserData() {
     if (!user) return { ratingCount: 0 };
-    const [{ data: ratingsData }, { data: watchlistData }] = await Promise.all([
+    const [{ data: ratingsData }, { data: watchlistData }, { data: seasonData, error: seasonErr }] = await Promise.all([
       supabase.from("ratings").select("*").eq("user_id", user.id),
       supabase.from("watchlist").select("*").eq("user_id", user.id).order("sort_index", { ascending: true }),
+      supabase.from("season_ratings").select("tmdb_id, season_number, score").eq("user_id", user.id),
     ]);
+    if (seasonErr) console.warn(`Could not read season scores (apply 20260925120000): ${seasonErr.message}`);
     if (ratingsData) {
-      const ratingsMap = {};
+      const wholeMap = {};
+      const anchorScores = {};
       ratingsData.forEach((r) => {
         const ty = String(r.media_type ?? "").toLowerCase();
         if (ty !== "movie" && ty !== "tv") return;
         const tid = Number(r.tmdb_id);
         if (!Number.isFinite(tid)) return;
-        ratingsMap[`${ty}-${tid}`] = r.score;
+        const key = `${ty}-${tid}`;
+        if (r.score_from_seasons === true) anchorScores[key] = r.score;
+        else wholeMap[key] = r.score;
       });
+      const seasonMap = seasonErr ? {} : seasonRatingsMapFromRows(seasonData);
+      const ratingsMap = buildEffectiveRatingsMap(wholeMap, seasonMap);
+      for (const [key, score] of Object.entries(anchorScores)) {
+        if (!(key in ratingsMap)) ratingsMap[key] = score;
+      }
+      setUserShowRatings(wholeMap);
+      setUserSeasonRatings(seasonMap);
       setUserRatings(ratingsMap);
     }
     if (watchlistData?.length) {
       setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
     }
 
-    const { data: profileRow } = await supabase
+    let { data: profileRow, error: profileErr } = await supabase
       .from("profiles")
-      .select("name, streaming_provider_ids, show_genre_ids, show_region_keys, secondary_region_key")
+      .select("name, streaming_provider_ids, show_genre_ids, show_region_keys, secondary_region_key, availability_region, show_language_first")
       .eq("id", user.id)
       .maybeSingle();
+    if (profileErr) {
+      const fallback = await supabase
+        .from("profiles")
+        .select("name, streaming_provider_ids, show_genre_ids, show_region_keys, secondary_region_key")
+        .eq("id", user.id)
+        .maybeSingle();
+      profileRow = fallback.data;
+      console.warn(
+        fallback.error
+          ? `Could not read profile: ${fallback.error.message}`
+          : `Profile market columns missing; apply 20260924120000 (${profileErr.message})`,
+      );
+    }
     const allowedRegions = new Set(PROFILE_REGION_OPTIONS.map(o => o.id));
     setSelectedStreamingProviderIds(
       Array.isArray(profileRow?.streaming_provider_ids)
@@ -5721,11 +6667,24 @@ export default function App() {
     setSecondaryRegionKey(
       typeof sk === "string" && V130_SECONDARY_REGION_IDS.includes(sk) ? sk : null,
     );
+    const allowedAvailability = new Set(AVAILABILITY_REGION_OPTIONS.map(o => o.id));
+    const allowedLangFirst = new Set(SHOW_LANGUAGE_FIRST_OPTIONS.map(o => o.id));
+    const ar = profileRow?.availability_region;
+    const loadedRegion = typeof ar === "string" && allowedAvailability.has(ar) ? ar : "US";
+    const loadedLangFirst = Array.isArray(profileRow?.show_language_first)
+      ? profileRow.show_language_first.filter(k => typeof k === "string" && allowedLangFirst.has(k))
+      : [];
+    setAvailabilityRegion(loadedRegion);
+    setShowLanguageFirst(loadedLangFirst);
     const profName = profileRow?.name;
     setProfileName(
       typeof profName === "string" && profName.trim() ? profName.trim() : "",
     );
-    return { ratingCount: ratingsData?.length ?? 0 };
+    return {
+      ratingCount: ratingsData?.length ?? 0,
+      availabilityRegion: loadedRegion,
+      showLanguageFirst: loadedLangFirst,
+    };
   }
 
   /** Persisted on auth user so sign-in / new tab can skip onboarding after first completion. */
@@ -5766,7 +6725,7 @@ export default function App() {
       .update({ streaming_provider_ids: clean })
       .eq("id", user.id);
     if (error) {
-      setProfileSettingsError(`Could not save "Where you watch": ${error.message}`);
+      setProfileSettingsError(`Could not save streaming services: ${error.message}`);
       console.warn("Could not save streaming providers to profile:", error.message);
     }
   }
@@ -5817,6 +6776,46 @@ export default function App() {
       return;
     }
     setSecondaryRegionKey(clean);
+  }
+
+  async function persistAvailabilityRegion(region) {
+    if (!user) return;
+    const allowed = new Set(AVAILABILITY_REGION_OPTIONS.map(o => o.id));
+    const clean = allowed.has(region) ? region : "US";
+    if (clean !== "IN" && showLanguageFirst.length > 0) await persistShowLanguageFirst([]);
+    if (clean === availabilityRegion) return;
+    setAvailabilityRegion(clean);
+    setProfileSettingsError("");
+    const { error } = await supabase
+      .from("profiles")
+      .update({ availability_region: clean })
+      .eq("id", user.id);
+    if (error) {
+      setProfileSettingsError(`Could not save where you watch: ${error.message}`);
+      console.warn("Could not save availability_region:", error.message);
+    }
+  }
+
+  async function persistShowLanguageFirst(keys) {
+    if (!user) return;
+    const allowed = new Set(SHOW_LANGUAGE_FIRST_OPTIONS.map(o => o.id));
+    const clean = [...new Set(keys.filter(k => typeof k === "string" && allowed.has(k)))].sort();
+    setShowLanguageFirst(clean);
+    setProfileSettingsError("");
+    const { error } = await supabase
+      .from("profiles")
+      .update({ show_language_first: clean })
+      .eq("id", user.id);
+    if (error) {
+      setProfileSettingsError(`Could not save languages to show first: ${error.message}`);
+      console.warn("Could not save show_language_first:", error.message);
+    }
+  }
+
+  function toggleShowLanguageFirst(code) {
+    const has = showLanguageFirst.includes(code);
+    const next = has ? showLanguageFirst.filter(id => id !== code) : [...showLanguageFirst, code].sort();
+    persistShowLanguageFirst(next);
   }
 
   function toggleShowGenre(genreId) {
@@ -5895,12 +6894,15 @@ export default function App() {
         console.warn("profiles name after signup:", profileErr.message);
       }
     }
-    // Email confirmation: no session yet — stay on auth; native confirm link opens the app via custom scheme.
+    // Email confirmation: no session yet — enter the emailed code here, or tap the link (native link opens the app via custom scheme).
     if (!data.session) {
+      setAuthOtp("");
+      setAuthOtpEmail(authEmail.trim());
+      setAuthMode("confirm-signup");
       setAuthNotice(
         isNativeApp()
-          ? "Check your email and tap the confirmation link — it opens this app so you can continue. Onboarding starts after your first login."
-          : "Check your email to confirm your account, then sign in. Onboarding starts after your first login.",
+          ? "We emailed you a 6-digit code. Enter it below, or tap the confirmation link in the email — it opens this app."
+          : "We emailed you a 6-digit code. Enter it below, or tap the confirmation link in the email.",
       );
       return;
     }
@@ -5959,7 +6961,130 @@ export default function App() {
       setAuthError(error.message);
       return;
     }
-    setAuthNotice("Reset link sent. Open the email and continue from the link.");
+    setAuthOtp("");
+    setAuthOtpEmail(email);
+    setAuthPassword("");
+    setAuthMode("reset-code");
+    setAuthNotice("We emailed you a 6-digit code. Enter it below with your new password — no need to open the link.");
+  }
+
+  function authOtpErrorMessage(error) {
+    const code = String(error?.code || "");
+    const msg = String(error?.message || "");
+    if (code === "otp_expired" || /expired|invalid/i.test(msg)) {
+      return "That code is wrong or has expired. Check the latest email, or tap Resend code.";
+    }
+    return msg || "Could not verify the code. Try again.";
+  }
+
+  async function handleVerifyEmailOtp() {
+    const email = authOtpEmail.trim();
+    const token = authOtp.replace(/\D/g, "");
+    const type = authMode === "reset-code" ? "recovery" : "signup";
+    const nextPassword = authPassword.trim();
+    setAuthError("");
+    if (!email) {
+      setAuthError("Email is missing. Go back and start again.");
+      return;
+    }
+    if (token.length < 6) {
+      setAuthError("Enter the 6-digit code from the email.");
+      return;
+    }
+    if (type === "recovery" && nextPassword.length < 6) {
+      setAuthError("Password must be at least 6 characters.");
+      return;
+    }
+    setAuthLoading(true);
+    let data;
+    let error;
+    if (type === "recovery") otpRecoveryInFlightRef.current = true;
+    try {
+      ({ data, error } = await supabase.auth.verifyOtp({ email, token, type }));
+      if (!error && data?.session && type === "recovery") {
+        const { error: pwErr } = await supabase.auth.updateUser({ password: nextPassword });
+        if (pwErr) {
+          // Recovery session is live; fall back to the link-style reset screen so they can retry the password only.
+          setUser(data.session.user);
+          setAuthOtp("");
+          setAuthMode("reset");
+          setAuthNotice("Code verified. Set a new password to continue.");
+          setAuthError(pwErr.message);
+          return;
+        }
+      }
+    } catch (e) {
+      setAuthError(e?.message || "Could not verify the code. Check your connection and try again.");
+      return;
+    } finally {
+      otpRecoveryInFlightRef.current = false;
+      setAuthLoading(false);
+    }
+    if (error || !data?.session) {
+      setAuthError(authOtpErrorMessage(error));
+      return;
+    }
+    setAuthOtp("");
+    if (type === "recovery") {
+      setUser(data.session.user);
+      setAuthNotice("");
+      setAuthPassword("");
+      setScreen("loading-catalogue");
+      return;
+    }
+    setAuthNotice("");
+    const trimmedName = authName.trim();
+    if (data.user && trimmedName.length >= CIRCLE_NAME_MIN) {
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .update({ name: trimmedName })
+        .eq("id", data.user.id);
+      if (profileErr) {
+        console.warn("profiles name after signup confirm:", profileErr.message);
+      }
+    }
+    setUser(data.session.user);
+    if (shouldOpenCircleJoinAfterAuth()) {
+      setScreen("circle-join");
+    } else {
+      setScreen("loading-catalogue");
+    }
+  }
+
+  async function handleResendEmailOtp() {
+    const email = authOtpEmail.trim();
+    setAuthError("");
+    setAuthNotice("");
+    if (!email) {
+      setAuthError("Email is missing. Go back and start again.");
+      return;
+    }
+    setAuthLoading(true);
+    let error;
+    try {
+      if (authMode === "reset-code") {
+        ({ error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: passwordRecoveryRedirectTo(),
+        }));
+      } else {
+        ({ error } = await supabase.auth.resend({
+          type: "signup",
+          email,
+          options: { emailRedirectTo: emailConfirmRedirectTo() },
+        }));
+      }
+    } catch (e) {
+      setAuthError(e?.message || "Could not resend the email. Check your connection and try again.");
+      return;
+    } finally {
+      setAuthLoading(false);
+    }
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
+    setAuthOtp("");
+    setAuthNotice("New code sent. Use the code from the latest email.");
   }
 
   async function handleUpdatePassword() {
@@ -5999,6 +7124,8 @@ export default function App() {
     setUser(null);
     setProfileName("");
     setUserRatings({}); setWatchlist([]);
+    setUserShowRatings({});
+    setUserSeasonRatings({});
     setMatchData(null);
     setSelectedStreamingProviderIds([]);
     setShowGenreIds([]);
@@ -6026,11 +7153,13 @@ export default function App() {
     setPulseTrending([]);
     setPulsePopular([]);
     setPulseCatalogReady(false);
-    pulseLoadedUtcDateRef.current = null;
+    setPulseCatalogRegion("US");
+    pulseLoadedKeyRef.current = null;
     setInTheatersPopularRanked([]);
     setStreamingMoviesReady(true);
     setStreamingTvReady(true);
     setCinemaPreference(null); setOtherCinema(null);
+    setPublicLandingReady(true);
     setScreen("splash"); setNavTab("home");
   }
 
@@ -6064,6 +7193,7 @@ export default function App() {
         await handleSignOut();
       } catch {
         setUser(null);
+        setPublicLandingReady(true);
         setScreen("splash");
         setNavTab("home");
       }
@@ -6077,20 +7207,45 @@ export default function App() {
   async function retryInitialCatalogueFetch() {
     setCatalogueRetryBusy(true);
     try {
-      const [data, th] = await Promise.all([fetchCatalogue(), fetchInTheaters([])]);
+      const theatersRequestId = ++inTheatersFetchGenRef.current;
+      const thPromise = fetchInTheatersForAvailabilityRegion(availabilityRegion, showRegionKeys, showLanguageFirst);
+      const [data, th] = await Promise.all([fetchCatalogue(), thPromise]);
       const seen = new Set(data.map((m) => m.id));
       const pool = mergeInTheatersStripsForCatalogue(th.nowPlaying, th.popularInTheaters);
       const addedTheaters = pool.filter((m) => !seen.has(m.id));
       const merged = [...data, ...addedTheaters];
       setCatalogue(merged);
       setObCatalogue(data);
-      setInTheaters(th.nowPlaying);
-      setInTheatersPopularRanked(th.popularInTheaters);
+      if (inTheatersFetchGenRef.current === theatersRequestId) {
+        setInTheaters(th.nowPlaying);
+        setInTheatersPopularRanked(th.popularInTheaters);
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setCatalogueRetryBusy(false);
     }
+  }
+
+  function selectOnboardingRegion(region) {
+    setObRegion(region);
+    if (region !== "IN") setObLangFirst([]);
+  }
+
+  function toggleOnboardingLangFirst(code) {
+    setObLangFirst(prev => (prev.includes(code) ? prev.filter(id => id !== code) : [...prev, code].sort()));
+  }
+
+  async function confirmOnboardingRegion() {
+    if (obRegionSaving) return;
+    setObRegionSaving(true);
+    try {
+      await persistAvailabilityRegion(obRegion);
+      if (obRegion === "IN") await persistShowLanguageFirst(obLangFirst);
+    } finally {
+      setObRegionSaving(false);
+    }
+    setScreen("pref-primary");
   }
 
   // Handle cinema preference confirmation
@@ -6307,9 +7462,8 @@ export default function App() {
   );
 
   const theaterRecs = useMemo(() => {
-    const fromMatch = matchData?.theaterRecs;
-    if (fromMatch?.length) return fromMatch;
-    return inTheatersForRecs.map((m) => tmdbOnlyRec(m));
+    const byId = new Map((matchData?.theaterRecs || []).map((r) => [r?.movie?.id, r]));
+    return inTheatersForRecs.map((m) => byId.get(m.id) || tmdbOnlyRec(m));
   }, [matchData?.theaterRecs, inTheatersForRecs]);
 
   const streamingMovieRecsResolved = useMemo(() => {
@@ -6329,7 +7483,13 @@ export default function App() {
   /**
    * Streaming page: **Now** and **Popular** use **different** TMDB pools (all services: B+D for movies, etc.);
    * with a service: date-ordered vs in-service popularity. Stagger **5→25** via `streamingPage*DisplayLen`.
+   * India: after the sort, Languages to show first lead (then other Indian, then the rest).
    */
+  const streamingPageLanguageOrder = useCallback(
+    (rows) => (availabilityRegion === "IN" ? orderIndiaStreamingRowsByLanguage(rows, showLanguageFirst) : rows),
+    [availabilityRegion, showLanguageFirst],
+  );
+
   const streamingMoviesNowResolved = useMemo(() => {
     const fromMatch = matchData?.streamingMovieRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
@@ -6337,7 +7497,7 @@ export default function App() {
       streamingPageProviderId == null
         ? streamingMoviesNowForRecs
         : streamingPageRefillMoviesNowFiltered;
-    const sorted = sortStreamingByReleaseDateDesc(base);
+    const sorted = streamingPageLanguageOrder(sortStreamingByReleaseDateDesc(base));
     const cap = Math.min(streamingPageNowDisplayLen, STREAMING_PAGE_STRIP_CAP, sorted.length);
     return sorted.slice(0, cap).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
   }, [
@@ -6346,6 +7506,7 @@ export default function App() {
     streamingMoviesNowForRecs,
     streamingPageRefillMoviesNowFiltered,
     streamingPageNowDisplayLen,
+    streamingPageLanguageOrder,
   ]);
 
   const streamingMoviesPopularResolved = useMemo(() => {
@@ -6355,7 +7516,7 @@ export default function App() {
       streamingPageProviderId == null
         ? streamingMoviesPopularForRecs
         : streamingPageRefillMoviesPopularFiltered;
-    const sorted = sortStreamingByPopularityDesc(base);
+    const sorted = streamingPageLanguageOrder(sortStreamingByPopularityDesc(base));
     const cap = Math.min(streamingPagePopularDisplayLen, STREAMING_PAGE_STRIP_CAP, sorted.length);
     return sorted.slice(0, cap).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
   }, [
@@ -6364,13 +7525,14 @@ export default function App() {
     streamingMoviesPopularForRecs,
     streamingPageRefillMoviesPopularFiltered,
     streamingPagePopularDisplayLen,
+    streamingPageLanguageOrder,
   ]);
 
   const streamingTvNowResolved = useMemo(() => {
     const fromMatch = matchData?.streamingTvRecs;
     const byId = fromMatch?.length ? Object.fromEntries(fromMatch.map((r) => [r.movie.id, r])) : null;
     const base = streamingPageProviderId == null ? streamingTVNowForRecs : streamingPageRefillTvNowFiltered;
-    const sorted = sortStreamingByReleaseDateDesc(base);
+    const sorted = streamingPageLanguageOrder(sortStreamingByReleaseDateDesc(base));
     const cap = Math.min(streamingPageNowDisplayLen, STREAMING_PAGE_STRIP_CAP, sorted.length);
     return sorted.slice(0, cap).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
   }, [
@@ -6379,6 +7541,7 @@ export default function App() {
     streamingTVNowForRecs,
     streamingPageRefillTvNowFiltered,
     streamingPageNowDisplayLen,
+    streamingPageLanguageOrder,
   ]);
 
   const streamingTvPopularResolved = useMemo(() => {
@@ -6388,7 +7551,7 @@ export default function App() {
       streamingPageProviderId == null
         ? streamingTVPopularForRecs
         : streamingPageRefillTvPopularFiltered;
-    const sorted = sortStreamingByPopularityDesc(base);
+    const sorted = streamingPageLanguageOrder(sortStreamingByPopularityDesc(base));
     const cap = Math.min(streamingPagePopularDisplayLen, STREAMING_PAGE_STRIP_CAP, sorted.length);
     return sorted.slice(0, cap).map((m) => byId?.[m.id] ?? tmdbOnlyRec(m));
   }, [
@@ -6397,6 +7560,7 @@ export default function App() {
     streamingTVPopularForRecs,
     streamingPageRefillTvPopularFiltered,
     streamingPagePopularDisplayLen,
+    streamingPageLanguageOrder,
   ]);
 
   const streamingNowRecs = streamingTab === "movie" ? streamingMoviesNowResolved : streamingTvNowResolved;
@@ -6427,6 +7591,32 @@ export default function App() {
     showStreamingMovieSkeleton ||
     (streamingTab === "tv" && !streamingTvReady) ||
     showStreamingRefillEmptySkeleton;
+
+  /** Streaming → Series lists every season of each show as its own row. */
+  const streamingTvSeasonIdsSig = useMemo(() => {
+    if (streamingTab !== "tv") return "";
+    const ids = [...streamingDisplayNowRecs, ...streamingDisplayPopularRecs]
+      .map((r) => r?.movie)
+      .filter((m) => m?.type === "tv" && Number.isFinite(Number(m?.tmdbId)))
+      .map((m) => Number(m.tmdbId));
+    return [...new Set(ids)].join(",");
+  }, [streamingTab, streamingDisplayNowRecs, streamingDisplayPopularRecs]);
+
+  useEffect(() => {
+    if (screen !== "streaming-page" || !streamingTvSeasonIdsSig) return;
+    void ensureTvSeasons(streamingTvSeasonIdsSig.split(",").map(Number));
+  }, [screen, streamingTvSeasonIdsSig, ensureTvSeasons]);
+
+  /** Rated list season lines need TMDB season posters / years. */
+  const ratedSeasonTmdbIdsSig = Object.keys(userSeasonRatings)
+    .map((k) => Number(k.slice(3)))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b)
+    .join(",");
+  useEffect(() => {
+    if (screen !== "rated" || !ratedSeasonTmdbIdsSig) return;
+    void ensureTvSeasons(ratedSeasonTmdbIdsSig.split(",").map(Number));
+  }, [screen, ratedSeasonTmdbIdsSig, ensureTvSeasons]);
 
   const showSecondaryRefillEmptySkeleton = Boolean(
     screen === "secondary-region" &&
@@ -6463,9 +7653,7 @@ export default function App() {
     const catalogueRows =
       Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0
         ? catalogueForRecs
-        : Array.isArray(catalogue) && catalogue.length > 0
-          ? catalogue
-          : [];
+        : filterCatalogExcludedTitles(catalogue);
     const rated = new Set(Object.keys(userRatings));
     const inRpc = new Set();
     for (const r of recommendations) {
@@ -6524,15 +7712,13 @@ export default function App() {
     const catalogueRows =
       Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0
         ? catalogueForRecs
-        : Array.isArray(catalogue) && catalogue.length > 0
-          ? catalogue
-          : [];
+        : filterCatalogExcludedTitles(catalogue);
     const rated = new Set(Object.keys(userRatings));
     const seen = new Set();
     const cfList = [];
     for (const r of recommendations) {
       const rid = recMovieRowId(r);
-      if (!rid || seen.has(rid)) continue;
+      if (!rid || seen.has(rid) || isCatalogExcludedTitle(r?.movie)) continue;
       seen.add(rid);
       cfList.push(r);
     }
@@ -6623,16 +7809,12 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    const getFlatrateProviderIds = async (movie) => {
-      const key = `${movie.type}-${movie.tmdbId}`;
-      if (worthProviderCacheRef.current.has(key)) return worthProviderCacheRef.current.get(key);
-      const data = await fetchWatchProviders(movie.tmdbId, movie.type);
-      const ids = Array.isArray(data?.flatrate)
-        ? data.flatrate.map((p) => Number(p?.provider_id)).filter((n) => Number.isFinite(n))
-        : [];
-      worthProviderCacheRef.current.set(key, ids);
-      return ids;
-    };
+    /** Canada / India check that country's `flatrate` against the saved ids offered there; US keeps the US path. */
+    const providerRegion = availabilityRegion === "CA" || availabilityRegion === "IN" ? availabilityRegion : "US";
+    const pickProviderIds = providerRegion === "US"
+      ? selectedStreamingProviderIds
+      : selectedStreamingProviderIds.filter((id) => streamingPageServicesForRegion(providerRegion).some((s) => s.id === id));
+    const getFlatrateProviderIds = (movie) => getOrFetchFlatrateProviderIds(movie, worthProviderCacheRef.current, providerRegion);
 
     const rebuildMoreTabStrips = async () => {
       const { cfNeighborSorted, restSorted } = yourPicksMainCandidates;
@@ -6660,7 +7842,7 @@ export default function App() {
       const cfN = cfNeighborSorted.length;
       const restAligned = rotated.slice(cfN);
 
-      if (selectedStreamingProviderIds.length === 0) {
+      if (pickProviderIds.length === 0) {
         let main = rotated.slice(0, visibleCap);
         main = topUpYourPicksStrip1Only(main, rotated, visibleCap);
         if (!cancelled) {
@@ -6689,7 +7871,7 @@ export default function App() {
             if (cancelled) return;
             if (main.length >= visibleCap) break;
             const ids = await getFlatrateProviderIds(rec.movie);
-            if (ids.some((id) => selectedStreamingProviderIds.includes(id))) main.push(rec);
+            if (ids.some((id) => pickProviderIds.includes(id))) main.push(rec);
           }
         }
         if (main.length === 0 && pred.length > 0) {
@@ -6715,7 +7897,7 @@ export default function App() {
               if (cancelled) return;
               if (main.length >= visibleCap) break;
               const ids = await getFlatrateProviderIds(rec.movie);
-              if (ids.some((id) => selectedStreamingProviderIds.includes(id))) main.push(rec);
+              if (ids.some((id) => pickProviderIds.includes(id))) main.push(rec);
             }
           }
         }
@@ -6746,6 +7928,7 @@ export default function App() {
     yourPicksBatchStep,
     cfRecommendationPickIdSet,
     selectedStreamingProviderIds,
+    availabilityRegion,
     topPickOffset,
   ]);
 
@@ -6774,6 +7957,7 @@ export default function App() {
         const latestYear = String(detail?.last_air_date || detail?.first_air_date || "").slice(0, 4) || null;
         const seasonCount = Number(detail?.number_of_seasons || 0) || null;
         tvStripMetaCacheRef.current.set(id, { latestYear, seasonCount });
+        if (detail && !isTmdbApiErrorPayload(detail)) rememberTvSeasons(id, detail);
       }
       if (!cancelled) {
         const next = {};
@@ -7071,7 +8255,11 @@ export default function App() {
     const navigateDelayMs = options.navigateDelayMs ?? 800;
     const hadRating = userRatings[movieId] != null;
 
-    setUserRatings(prev => ({ ...prev, [movieId]: score }));
+    setUserShowRatings(prev => ({ ...prev, [movieId]: score }));
+    setUserRatings(prev => ({
+      ...prev,
+      [movieId]: effectiveTitleScore(score, userSeasonRatingsRef.current[movieId]),
+    }));
     setWatchlist(prev => prev.filter(m => m.id !== movieId));
     setSelectedToWatch(prev => { const n = { ...prev }; delete n[movieId]; return n; });
     let ratingsUpsertOk = false;
@@ -7145,6 +8333,14 @@ export default function App() {
     const type = parts[0];
     const tmdbId = parseInt(parts[1], 10);
     if ((type !== "movie" && type !== "tv") || !Number.isFinite(tmdbId)) return;
+    if (type === "tv" && userSeasonRatingsRef.current[movieId]) {
+      const { error: sErr } = await supabase
+        .from("season_ratings")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("tmdb_id", tmdbId);
+      if (sErr) throw new Error(sErr.message || "Could not clear season scores");
+    }
     const { error: shErr } = await supabase
       .from("rating_circle_shares")
       .delete()
@@ -7159,14 +8355,93 @@ export default function App() {
       .eq("tmdb_id", tmdbId)
       .eq("media_type", type);
     if (rErr) throw new Error(rErr.message || "Could not clear rating");
-    setUserRatings((prev) => {
+    const dropKey = (prev) => {
+      if (!(movieId in prev)) return prev;
       const n = { ...prev };
       delete n[movieId];
+      return n;
+    };
+    setUserRatings(dropKey);
+    setUserShowRatings(dropKey);
+    setUserSeasonRatings(dropKey);
+    userSeasonRatingsRef.current = dropKey(userSeasonRatingsRef.current);
+    void refreshCinemastroAvgForMediaId(movieId);
+    scheduleComputeNeighborsRebuild();
+    setCircleRatedRefreshKey((k) => k + 1);
+  }
+
+  function seasonScoreWriteError(error, fallback) {
+    const msg = String(error?.message || "");
+    if (error?.code === "42P01" || /season_ratings/i.test(msg)) {
+      return "Season scores are not available yet (database update pending).";
+    }
+    return msg || fallback;
+  }
+
+  /** Local state after a season write: season map, effective title score (season mean, else whole-show score). */
+  function applyLocalSeasonScores(movieId, nextSeasons) {
+    const hasSeasons = nextSeasons && Object.keys(nextSeasons).length > 0;
+    const nextAll = { ...userSeasonRatingsRef.current };
+    if (hasSeasons) nextAll[movieId] = nextSeasons;
+    else delete nextAll[movieId];
+    userSeasonRatingsRef.current = nextAll;
+    setUserSeasonRatings(nextAll);
+    const eff = effectiveTitleScore(userShowRatingsRef.current[movieId], hasSeasons ? nextSeasons : null);
+    setUserRatings((prev) => {
+      const n = { ...prev };
+      if (eff == null) delete n[movieId];
+      else n[movieId] = eff;
       return n;
     });
     void refreshCinemastroAvgForMediaId(movieId);
     scheduleComputeNeighborsRebuild();
     setCircleRatedRefreshKey((k) => k + 1);
+  }
+
+  async function saveSeasonRating(movie, seasonNumber, score) {
+    if (!user) throw new Error("Sign in to rate seasons.");
+    const tmdbId = Number(movie?.tmdbId);
+    const n = Number(seasonNumber);
+    if (movie?.type !== "tv" || !Number.isFinite(tmdbId) || !Number.isInteger(n) || n < 1) return;
+    const movieId = movie.id;
+    const hadRating = userRatings[movieId] != null;
+    const { error } = await supabase
+      .from("season_ratings")
+      .upsert(
+        { user_id: user.id, tmdb_id: tmdbId, season_number: n, score },
+        { onConflict: "user_id,tmdb_id,season_number" },
+      );
+    if (error) throw new Error(seasonScoreWriteError(error, "Could not save season score."));
+    applyLocalSeasonScores(movieId, { ...(userSeasonRatingsRef.current[movieId] || {}), [n]: score });
+    if (!hadRating && publishModalCircles.length > 0) {
+      const defaults = [];
+      if (rateTitleReturnCircleIdRef.current) defaults.push(rateTitleReturnCircleIdRef.current);
+      if (detailReturnScreenRef.current === "circle-detail" && selectedCircleId) defaults.push(selectedCircleId);
+      setPublishRatingModal({
+        movieId,
+        mode: "afterRate",
+        pendingNavigate: "none",
+        defaultCircleIds: [...new Set(defaults)],
+      });
+    }
+  }
+
+  async function clearSeasonRating(movie, seasonNumber) {
+    if (!user) return;
+    const tmdbId = Number(movie?.tmdbId);
+    const n = Number(seasonNumber);
+    if (movie?.type !== "tv" || !Number.isFinite(tmdbId) || !Number.isInteger(n)) return;
+    const movieId = movie.id;
+    const { error } = await supabase
+      .from("season_ratings")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("tmdb_id", tmdbId)
+      .eq("season_number", n);
+    if (error) throw new Error(seasonScoreWriteError(error, "Could not clear season score."));
+    const next = { ...(userSeasonRatingsRef.current[movieId] || {}) };
+    delete next[n];
+    applyLocalSeasonScores(movieId, next);
   }
 
   async function completePublishRatingModal(selectedIds) {
@@ -7219,24 +8494,6 @@ export default function App() {
   function openCreateCircleFromZeroCirclesHomeNudgeModal() {
     setZeroCirclesHomeNudgeModalOpen(false);
     openCreateCircleSheet();
-  }
-
-  function dismissPwaEducationGotIt() {
-    writePwaEducationNextShowAtMs(Date.now() + PWA_EDUCATION_GOT_IT_DELAY_MS);
-    setPwaEducationModalOpen(false);
-    setPwaEducationScheduleEpoch((n) => n + 1);
-  }
-
-  function dismissPwaEducationRemindLater() {
-    writePwaEducationNextShowAtMs(Date.now() + PWA_EDUCATION_REMIND_LATER_DELAY_MS);
-    setPwaEducationModalOpen(false);
-    setPwaEducationScheduleEpoch((n) => n + 1);
-  }
-
-  function dismissPwaEducationNever() {
-    writePwaEducationNeverFlag();
-    setPwaEducationModalOpen(false);
-    setPwaEducationScheduleEpoch((n) => n + 1);
   }
 
   function dismissZeroCirclesListBannerForSession() {
@@ -7471,11 +8728,12 @@ export default function App() {
     // Show skeleton until we know session + whether to call Edge — `user` from React can lag `getSession()` after refresh.
     setSelected({ movie, prediction: pred, predictionLoading: true });
     void refreshCinemastroAvgForMediaId(movie.id);
-    if (opts.startEditing && userRatings[movie.id] != null) {
+    const showLevelScore = userShowRatings[movie.id];
+    if (opts.startEditing && showLevelScore != null) {
       setDetailEditRating(true);
       setDetailClearRatingConfirm(false);
       setDetailClearRatingErr("");
-      setDetailRating(userRatings[movie.id]);
+      setDetailRating(showLevelScore);
       setDetailTouched(true);
     } else {
       setDetailEditRating(false);
@@ -7483,7 +8741,7 @@ export default function App() {
       setDetailClearRatingErr("");
       setDetailRating(7);
       /** Chips: require an explicit pick; show **—** until then (6.1.0). */
-      setDetailTouched(userRatings[movie.id] != null);
+      setDetailTouched(showLevelScore != null);
     }
     /** Title detail is a fixed overlay; keep underlying `screen` so strips stay mounted and horizontal scroll is preserved. */
     const movieId = movie.id;
@@ -7839,18 +9097,6 @@ export default function App() {
     return !circlesList.some((c) => c?.status === "active");
   }, [user, userRatings, circlesList, circlesLoaded, pendingInvitesLoaded]);
 
-  const pwaEducationEligible = useMemo(() => {
-    void pwaEducationScheduleEpoch;
-    if (!user) return false;
-    if (typeof window === "undefined") return false;
-    if (isRunningAsInstalledPwa()) return false;
-    if (!isLikelyMobileTouchInstallerBrowser()) return false;
-    if (readPwaEducationNeverFlag()) return false;
-    const next = readPwaEducationNextShowAtMs();
-    if (next != null && Date.now() < next) return false;
-    return true;
-  }, [user, pwaEducationScheduleEpoch]);
-
   /** Reset circle nudges once they belong to any active circle. */
   useEffect(() => {
     if (!circlesList.some((c) => c?.status === "active")) return;
@@ -7925,50 +9171,6 @@ export default function App() {
   useEffect(() => {
     if (screen !== "circles") setZeroCirclesHomeNudgeModalOpen(false);
   }, [screen]);
-
-  useEffect(() => {
-    if (!user) setPwaEducationModalOpen(false);
-  }, [user]);
-
-  useEffect(() => {
-    if (screen !== "circles") setPwaEducationModalOpen(false);
-  }, [screen]);
-
-  useEffect(() => {
-    if (!pwaEducationEligible) return;
-    if (screen !== "circles") return;
-    if (!circlesLoaded) return;
-    if (postOnboardingHelpOpen) return;
-    if (zeroCirclesHomeNudgeModalOpen) return;
-    if (noCirclesAfterDetailRatingModal) return;
-    if (showCreateCircleSheet) return;
-    if (publishRatingModal) return;
-    if (selectedMovie) return;
-
-    const delayMs = 800;
-    const timer = window.setTimeout(() => {
-      if (postOnboardingHelpOpenRef.current) return;
-      if (screen !== "circles") return;
-      if (zeroCirclesHomeNudgeModalOpen) return;
-      if (noCirclesAfterDetailRatingModal) return;
-      if (showCreateCircleSheet) return;
-      if (publishRatingModal) return;
-      if (selectedMovie) return;
-      setPwaEducationModalOpen(true);
-    }, delayMs);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    pwaEducationEligible,
-    screen,
-    circlesLoaded,
-    postOnboardingHelpOpen,
-    zeroCirclesHomeNudgeModalOpen,
-    noCirclesAfterDetailRatingModal,
-    showCreateCircleSheet,
-    publishRatingModal,
-    selectedMovie,
-  ]);
 
   const atCircleCap = activeCirclesCount >= CIRCLE_CAP;
   /** Pending invites merged into the main list; hidden entirely at max circles (passdown). */
@@ -8432,28 +9634,110 @@ export default function App() {
   }, []);
 
   const openWhoPublishedForCircleRow = useCallback(
-    (row, titleText) => {
+    (row, titleText, showPoster) => {
       if (!row || !selectedCircleId) return;
       const displayTitle = typeof titleText === "string" ? titleText.trim() : "";
-      setWhoPublishedModal({ status: "loading", displayTitle });
+      const mediaType = row.media_type === "tv" ? "tv" : "movie";
+      const tmdbId = Number(row.tmdb_id);
+      const seasonScoped = Boolean(row.show_row);
+      const seasonFilter = seasonScoped && row.season_number != null ? Number(row.season_number) : null;
+      const base = {
+        displayTitle: displayTitle && seasonFilter != null ? `${displayTitle} · Season ${seasonFilter}` : displayTitle,
+        mediaType,
+        tmdbId,
+        showPoster: showPoster || null,
+      };
+      setWhoPublishedModal({ ...base, status: "loading" });
+      if (mediaType === "tv") void ensureTvSeasons([tmdbId]);
       void (async () => {
         try {
-          const pubRows = await fetchCircleTitlePublishers({
+          const pubRows = await fetchCircleTitlePublisherLines({
             circleId: selectedCircleId,
             tmdbId: row.tmdb_id,
             mediaType: row.media_type,
           });
-          setWhoPublishedModal({ status: "ok", rows: pubRows || [], displayTitle });
+          const rows = (pubRows || []).filter((r) => {
+            if (!seasonScoped) return true;
+            const sn = r.season_number != null ? Number(r.season_number) : null;
+            return sn === seasonFilter;
+          });
+          setWhoPublishedModal({ ...base, status: "ok", rows });
         } catch (e) {
           setWhoPublishedModal({
+            ...base,
             status: "err",
-            displayTitle,
             message: e?.message || "Couldn’t load list.",
           });
         }
       })();
     },
-    [selectedCircleId],
+    [selectedCircleId, ensureTvSeasons],
+  );
+
+  const circleTvRowsForSeasonLines = useMemo(() => {
+    if (screen !== "circle-detail" || !selectedCircleId) return [];
+    const payload =
+      circleRatingsView === "all"
+        ? circleGridAllPayload
+        : circleRatingsView === "top"
+          ? circleGridTopPayload
+          : circleStripPayload;
+    const rows = Array.isArray(payload?.titles) ? payload.titles : [];
+    return rows.filter((r) => r?.media_type === "tv" && Number.isFinite(Number(r.tmdb_id)));
+  }, [screen, selectedCircleId, circleRatingsView, circleStripPayload, circleGridAllPayload, circleGridTopPayload]);
+
+  // Circle season lines: a show row → one row per rated season (see expandCircleRowBySeason).
+  useEffect(() => {
+    if (!user || !selectedCircleId || circleTvRowsForSeasonLines.length === 0) return;
+    const cid = selectedCircleId;
+    const need = circleTvRowsForSeasonLines.filter((r) => {
+      const k = circleSeasonLinesCacheKey(cid, r);
+      return !(k in circleSeasonLinesRef.current) && !circleSeasonLinesInflightRef.current.has(k);
+    });
+    if (need.length === 0) return;
+    for (const r of need) circleSeasonLinesInflightRef.current.add(circleSeasonLinesCacheKey(cid, r));
+    void (async () => {
+      for (let i = 0; i < need.length; i += 6) {
+        const chunk = need.slice(i, i + 6);
+        const results = await Promise.all(
+          chunk.map(async (r) => {
+            try {
+              const lines = await fetchCircleTitlePublisherLines({
+                circleId: cid,
+                tmdbId: r.tmdb_id,
+                mediaType: "tv",
+              });
+              return [r, Array.isArray(lines) ? lines : []];
+            } catch (e) {
+              console.warn("Circles: season lines failed", r.tmdb_id, e?.message);
+              return [r, []];
+            }
+          }),
+        );
+        const patch = {};
+        const seasonShowIds = [];
+        for (const [r, lines] of results) {
+          const k = circleSeasonLinesCacheKey(cid, r);
+          circleSeasonLinesInflightRef.current.delete(k);
+          patch[k] = lines;
+          if (lines.some((l) => l?.season_number != null)) seasonShowIds.push(Number(r.tmdb_id));
+        }
+        circleSeasonLinesRef.current = { ...circleSeasonLinesRef.current, ...patch };
+        setCircleSeasonLines((prev) => ({ ...prev, ...patch }));
+        if (seasonShowIds.length > 0) void ensureTvSeasons(seasonShowIds);
+      }
+    })();
+  }, [user, selectedCircleId, circleTvRowsForSeasonLines, ensureTvSeasons]);
+
+  /** Circle list rows with each TV show split into its rated seasons (whole-show row only if scored as a whole). */
+  const expandCircleRowsBySeason = useCallback(
+    (rows) =>
+      (rows || []).flatMap((r) =>
+        r?.media_type === "tv" && selectedCircleId
+          ? expandCircleRowBySeason(r, circleSeasonLines[circleSeasonLinesCacheKey(selectedCircleId, r)], user?.id)
+          : [r],
+      ),
+    [circleSeasonLines, selectedCircleId, user?.id],
   );
 
   // Circle Recent: on first load / circle change, scroll so newest title is ~centered; after “Earlier”, preserve scroll across prepended width.
@@ -9167,7 +10451,7 @@ export default function App() {
     return () => clearTimeout(t);
   }, [inviteToast]);
 
-  const shouldShowSecondaryRegionPage = Boolean(secondaryRegionKey);
+  const shouldShowSecondaryRegionPage = Boolean(activeSecondaryRegionKey);
   /** v4.0.8: `home` retired as a screen; `circles` is the landing. Kept `home` out of the set so
    *  lingering `setScreen("home")` (any we missed) would visibly fail instead of silently rendering
    *  nothing. */
@@ -9904,7 +11188,7 @@ export default function App() {
         }));
       }
       const documentarySelected = Array.isArray(genre) && genre.includes(99);
-      combined = combined.filter((m) => passesMoodRegionFilter(m, region));
+      combined = filterCatalogExcludedTitles(combined).filter((m) => passesMoodRegionFilter(m, region));
       if (!documentarySelected) {
         combined = combined.filter((m) => !isDocumentaryLike(m));
       }
@@ -9934,7 +11218,7 @@ export default function App() {
           ...((t2.results || []).slice(0, 14)).map((m) => normalize(m, "tv")),
         ];
         const seenIds = new Set(combined.map((m) => m.id));
-        const refillFiltered = refill
+        const refillFiltered = filterCatalogExcludedTitles(refill)
           .filter((m) => !seenIds.has(m.id))
           .filter((m) => passesMoodRegionFilter(m, region))
           .filter((m) => documentarySelected || !isDocumentaryLike(m));
@@ -10090,15 +11374,76 @@ export default function App() {
     setShowProfileDisplayNameEditor(true);
   }
 
-  const ratedMovies = Object.entries(userRatings).map(([id, score]) => {
-    const movie = catalogue.find(m => m.id === id);
-    return movie ? { movie, score } : null;
-  }).filter(Boolean).sort((a, b) => b.score - a.score);
+  /** Rated list: one line per whole-title score (no season label) plus one line per rated season. */
+  const catalogueById = new Map(catalogue.map((m) => [m.id, m]));
+  const ratedMovies = buildRatedLines({
+    wholeMap: userShowRatings,
+    seasonMapByKey: userSeasonRatings,
+    movieById: catalogueById,
+    seasonsByTmdbId: tvSeasonsByTmdbId,
+  });
+  /** Profile Avg: one number per title (season mean for TV shows scored by season). */
+  const ratedTitleScores = Object.entries(userRatings)
+    .filter(([id]) => catalogueById.has(id))
+    .map(([, s]) => Number(s))
+    .filter(Number.isFinite);
 
   const ratedSearchLower = ratedSearchQuery.trim().toLowerCase();
   const filteredRatedMovies = ratedSearchLower
     ? ratedMovies.filter(({ movie }) => (movie.title || "").toLowerCase().includes(ratedSearchLower))
     : ratedMovies;
+
+  /** Streaming → Series: show header (opens title) + one {@link SeasonRow} per season with the user's score. */
+  function renderStreamingTvSeasonGroups(recs) {
+    return (
+      <div className="streaming-tv-seasons">
+        {recs.map((rec) => {
+          const m = rec.movie;
+          const seasons = tvSeasonsByTmdbId[Number(m.tmdbId)];
+          return (
+            <div className="streaming-tv-show" key={m.id}>
+              <div
+                className="streaming-tv-show__head"
+                role="button"
+                tabIndex={0}
+                onClick={() => openDetail(m, rec)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openDetail(m, rec);
+                  }
+                }}
+              >
+                <div className="strip-poster streaming-tv-show__thumb">
+                  {m.poster ? <img src={posterSrcThumb(m.poster)} alt="" loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                </div>
+                <div className="streaming-tv-show__info">
+                  <div className="streaming-tv-show__title">{m.title}</div>
+                  <div className="streaming-tv-show__meta">{formatStripMediaMeta(m, tvStripMetaByTmdbId)}</div>
+                </div>
+                <div className="streaming-tv-show__badge">
+                  <StripPosterBadge movie={m} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
+                </div>
+              </div>
+              {seasons === undefined ? (
+                <div className="season-rows__loading">Loading seasons…</div>
+              ) : seasons.length === 0 ? null : (
+                <TvSeasonRowsList
+                  seasons={seasons}
+                  showPoster={m.poster}
+                  seasonScores={userSeasonRatings[m.id]}
+                  canRate={Boolean(user)}
+                  initialMax={6}
+                  onSave={(n, score) => saveSeasonRating(m, n, score)}
+                  onClear={(n) => clearSeasonRating(m, n)}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   const navProps = {
     navTab,
@@ -10197,13 +11542,32 @@ export default function App() {
           />
         )}
 
-      {/* SPLASH */}
+      {/* LOGGED-OUT HOMEPAGE — hidden until auth confirms there is no session. */}
       {screen === "splash" && (
-        <div className="splash">
-          <div className="splash-logo"><AppBrand variant="splash" /></div>
-          <button className="btn-primary" onClick={() => { authResumeScreenRef.current = "splash"; setAuthMode("signup"); setScreen("auth"); }}>Get Started</button>
-          <button className="btn-ghost" onClick={() => { authResumeScreenRef.current = "splash"; setAuthMode("signin"); setScreen("auth"); }}>Sign In</button>
-        </div>
+        publicLandingReady && !user ? (
+          <LoggedOutLanding
+            loadPosterRow={loadLoggedOutPosterRow}
+            onSignIn={() => {
+              authResumeScreenRef.current = "splash";
+              setAuthMode("signin");
+              setAuthError("");
+              setAuthNotice("");
+              setScreen("auth");
+            }}
+            onGetStarted={() => {
+              authResumeScreenRef.current = "splash";
+              setAuthMode("signup");
+              setAuthError("");
+              setAuthNotice("");
+              setScreen("auth");
+            }}
+          />
+        ) : (
+          <div className="loading">
+            <div className="loading-ring" />
+            <div className="loading-title">Loading Cinemastro…</div>
+          </div>
+        )
       )}
 
       {/* AUTH */}
@@ -10216,8 +11580,20 @@ export default function App() {
           }}
           >← Back</button>
           <div className="auth-inner">
-            <div className="auth-title">{authMode === "signup" ? "Create account" : authMode === "reset" ? "Reset password" : "Welcome back"}</div>
-            <div className="auth-sub">{authMode === "signup" ? "Join Cinemastro to get personalised picks" : authMode === "reset" ? "Set a new password for your account" : "Sign in to your Cinemastro account"}</div>
+            <div className="auth-title">
+              {authMode === "signup" ? "Create account" : authMode === "confirm-signup" ? "Confirm your email" : authMode === "reset" || authMode === "reset-code" ? "Reset password" : "Welcome back"}
+            </div>
+            <div className="auth-sub">
+              {authMode === "signup"
+                ? "Join Cinemastro to get personalised picks"
+                : authMode === "confirm-signup"
+                  ? "Enter the code we emailed to finish creating your account"
+                  : authMode === "reset-code"
+                    ? "Enter the code we emailed and choose a new password"
+                    : authMode === "reset"
+                      ? "Set a new password for your account"
+                      : "Sign in to your Cinemastro account"}
+            </div>
             {authNotice && <div className="auth-note">{authNotice}</div>}
             {authError && <div className="auth-error">{authError}</div>}
             {authMode === "signup" && (
@@ -10237,17 +11613,42 @@ export default function App() {
                 />
               </div>
             )}
+            {authMode === "confirm-signup" || authMode === "reset-code" ? (
+              <>
+                <div className="auth-field">
+                  <label className="auth-label">Email</label>
+                  <input className="auth-input auth-input--readonly" type="email" value={authOtpEmail} readOnly tabIndex={-1} aria-readonly="true" />
+                </div>
+                <div className="auth-field">
+                  <label className="auth-label">Code</label>
+                  <input
+                    className="auth-input auth-input--otp"
+                    type="text"
+                    name="one-time-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]*"
+                    maxLength={10}
+                    placeholder="6-digit code"
+                    value={authOtp}
+                    onChange={e => setAuthOtp(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="auth-field">
+                <label className="auth-label">Email</label>
+                <input className="auth-input" type="email" placeholder="you@example.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)} />
+              </div>
+            )}
+            {authMode !== "confirm-signup" && (
             <div className="auth-field">
-              <label className="auth-label">Email</label>
-              <input className="auth-input" type="email" placeholder="you@example.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)} />
-            </div>
-            <div className="auth-field">
-              <label className="auth-label">{authMode === "reset" ? "New password" : "Password"}</label>
+              <label className="auth-label">{authMode === "reset" || authMode === "reset-code" ? "New password" : "Password"}</label>
               <div className="auth-password-wrap">
                 <input
                   className="auth-input auth-input--password"
                   type={authPasswordVisible ? "text" : "password"}
-                  name={authMode === "signup" || authMode === "reset" ? "new-password" : "password"}
+                  name={authMode === "signin" ? "password" : "new-password"}
                   autoComplete={authMode === "signin" ? "current-password" : "new-password"}
                   placeholder="Min. 6 characters"
                   value={authPassword}
@@ -10275,15 +11676,51 @@ export default function App() {
                 </button>
               </div>
             </div>
+            )}
             {authMode === "signin" && (
               <div className="auth-link-row">
                 <button type="button" className="auth-link-btn" onClick={handleForgotPassword} disabled={authLoading}>Forgot password?</button>
               </div>
             )}
-            <button className="auth-btn" disabled={authLoading} onClick={authMode === "signup" ? handleSignUp : authMode === "reset" ? handleUpdatePassword : handleSignIn}>
-              {authLoading ? "Please wait…" : authMode === "signup" ? "Create Account" : authMode === "reset" ? "Update Password" : "Sign In"}
+            {(authMode === "confirm-signup" || authMode === "reset-code") && (
+              <div className="auth-link-row">
+                <button type="button" className="auth-link-btn" onClick={handleResendEmailOtp} disabled={authLoading}>Resend code</button>
+              </div>
+            )}
+            <button
+              className="auth-btn"
+              disabled={authLoading}
+              onClick={
+                authMode === "signup"
+                  ? handleSignUp
+                  : authMode === "confirm-signup" || authMode === "reset-code"
+                    ? handleVerifyEmailOtp
+                    : authMode === "reset"
+                      ? handleUpdatePassword
+                      : handleSignIn
+              }
+            >
+              {authLoading
+                ? "Please wait…"
+                : authMode === "signup"
+                  ? "Create Account"
+                  : authMode === "confirm-signup"
+                    ? "Confirm"
+                    : authMode === "reset" || authMode === "reset-code"
+                      ? "Update Password"
+                      : "Sign In"}
             </button>
-            {authMode !== "reset" && (
+            {authMode === "confirm-signup" && (
+              <div className="auth-switch">
+                Wrong email? <span onClick={() => { setAuthMode("signup"); setAuthOtp(""); setAuthError(""); setAuthNotice(""); }}>Start over</span>
+              </div>
+            )}
+            {authMode === "reset-code" && (
+              <div className="auth-switch">
+                Remembered it? <span onClick={() => { setAuthMode("signin"); setAuthOtp(""); setAuthPassword(""); setAuthError(""); setAuthNotice(""); }}>Back to sign in</span>
+              </div>
+            )}
+            {(authMode === "signup" || authMode === "signin") && (
               <div className="auth-switch">
                 {authMode === "signup"
                   ? <>Already have an account? <span onClick={() => { setAuthMode("signin"); setAuthError(""); setAuthNotice(""); }}>Sign in</span></>
@@ -10413,10 +11850,54 @@ export default function App() {
         </div>
       )}
 
+      {/* WHERE YOU WATCH — before cinema preference */}
+      {screen === "pref-region" && (
+        <div className="pref">
+          <div className="pref-step">Step 1 of 3</div>
+          <div className="pref-title">Where you watch</div>
+          <div className="pref-sub">Selecting this shows titles for your region in <span className="region-hint-section">In Theaters</span>, <span className="region-hint-section">Pulse</span>, and <span className="region-hint-section">Streaming</span> sections.</div>
+          <div className="settings-provider-grid">
+            {AVAILABILITY_REGION_OPTIONS.map(r => (
+              <button
+                key={r.id}
+                type="button"
+                className={`settings-provider-pill ${obRegion === r.id ? "selected" : ""}`}
+                aria-pressed={obRegion === r.id}
+                onClick={() => selectOnboardingRegion(r.id)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          {obRegion === "IN" ? (
+            <>
+              <div className="profile-settings-label" style={{ marginTop: 24 }}>Languages to show first</div>
+              <p className="settings-providers-hint">Selected languages lead the India list. Leave none selected to show Hindi, Tamil, Telugu, Malayalam, Kannada, Bengali, and Marathi together.</p>
+              <div className="settings-provider-grid">
+                {SHOW_LANGUAGE_FIRST_OPTIONS.map(lang => (
+                  <button
+                    key={lang.id}
+                    type="button"
+                    className={`settings-provider-pill ${obLangFirst.includes(lang.id) ? "selected" : ""}`}
+                    aria-pressed={obLangFirst.includes(lang.id)}
+                    onClick={() => toggleOnboardingLangFirst(lang.id)}
+                  >
+                    {lang.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+          <button className="pref-btn" style={{ marginTop: 32 }} disabled={obRegionSaving} onClick={() => void confirmOnboardingRegion()}>
+            {obRegionSaving ? "Saving…" : "Continue →"}
+          </button>
+        </div>
+      )}
+
       {/* CINEMA PREFERENCE — PRIMARY */}
       {screen === "pref-primary" && (
         <div className="pref">
-          <div className="pref-step">Step 1 of 2</div>
+          <div className="pref-step">Step 2 of 3</div>
           <div className="pref-title">What do you mainly watch?</div>
           <div className="pref-sub">This helps us pick the right titles for you to rate</div>
           <div className="pref-options">
@@ -10466,7 +11947,7 @@ export default function App() {
       {/* CINEMA PREFERENCE — SECONDARY */}
       {screen === "pref-secondary" && (
         <div className="pref">
-          <div className="pref-step">Step 2 of 2</div>
+          <div className="pref-step">Step 3 of 3</div>
           <div className="pref-title">Which other cinema do you love?</div>
           <div className="pref-sub">Pick one — you can always explore more later</div>
           <div className="pref-grid">
@@ -10995,12 +12476,25 @@ export default function App() {
                     </div>
                   );
                   const titles = Array.isArray(circleStripPayload?.titles) ? circleStripPayload.titles : [];
-                  const stripTitlesOrdered = titles.length > 0 ? [...titles].reverse() : [];
+                  const stripTitlesOrdered = titles.length > 0 ? expandCircleRowsBySeason([...titles].reverse()) : [];
+                  const circleRowSeason = (row) => {
+                    const sn = row.season_number != null ? Number(row.season_number) : null;
+                    if (sn == null) return { seasonNumber: null, season: null };
+                    const season =
+                      (tvSeasonsByTmdbId[Number(row.tmdb_id)] || []).find((s) => s.seasonNumber === sn) || null;
+                    return { seasonNumber: sn, season };
+                  };
+                  const circleRowKey = (row) =>
+                    `${String(row.media_type)}-${Number(row.tmdb_id)}${
+                      row.season_number != null ? `-s${Number(row.season_number)}` : ""
+                    }`;
                   const renderStripRow = (row, isNewest) => {
                     const movie = circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies);
-                    const rowKey = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
-                    const predDetail = circleStripPredictionForDetail(row);
+                    const rowKey = circleRowKey(row);
+                    const showRow = row.show_row ?? row;
+                    const predDetail = circleStripPredictionForDetail(showRow);
                     const distinctRaters = Number(row.distinct_circle_raters ?? 0);
+                    const { seasonNumber, season } = circleRowSeason(row);
                     if (!movie) {
                       return (
                         <div
@@ -11018,7 +12512,13 @@ export default function App() {
                     const inWatchlist = Boolean(watchlist.find((m) => m.id === movie.id));
                     const hasUserRating = userRatings[movie.id] != null;
                     const userPublishedHere =
-                      row.viewer_score != null && Number.isFinite(Number(row.viewer_score));
+                      showRow.viewer_score != null && Number.isFinite(Number(showRow.viewer_score));
+                    const stripPosterSrc =
+                      seasonNumber != null
+                        ? seasonRowPosterSrc(season, movie.poster)
+                        : movie.poster
+                          ? posterSrcThumb(movie.poster)
+                          : null;
                     const onStripCardPointerDown = (e) => {
                       if (e.button !== 0) return;
                       const el = e.target;
@@ -11056,7 +12556,9 @@ export default function App() {
                         ref={isNewest ? circleRecentNewestRef : null}
                         tabIndex={0}
                         role="group"
-                        aria-label={`${movie?.title || "Title"}. Open details, or use the score row for who rated in this circle.`}
+                        aria-label={`${movie?.title || "Title"}${
+                          seasonNumber != null ? `, Season ${seasonNumber}` : ""
+                        }. Open details, or use the score row for who rated in this circle.`}
                         onPointerDown={onStripCardPointerDown}
                         onPointerMove={onStripCardPointerMove}
                         onPointerUp={onStripCardPointerEnd}
@@ -11172,21 +12674,26 @@ export default function App() {
                           </div>
                         ) : null}
                         <div className="strip-poster strip-poster--circle-recent">
-                          {movie.poster ? (
-                            <img src={posterSrcThumb(movie.poster)} alt="" loading="lazy" decoding="async" />
+                          {stripPosterSrc ? (
+                            <img src={stripPosterSrc} alt="" loading="lazy" decoding="async" />
                           ) : (
                             <div className="strip-poster-fallback">🎬</div>
                           )}
                           <div className="circle-strip-poster-meta" aria-hidden="true">
-                            {formatCircleTypeYearShort(movie, tvStripMetaByTmdbId)}
+                            {seasonNumber != null && season?.airYear
+                              ? `TV · ${season.airYear}`
+                              : formatCircleTypeYearShort(movie, tvStripMetaByTmdbId)}
                           </div>
                         </div>
                         <div className="strip-title strip-title--circle-single" title={movie.title}>
                           {movie.title}
                         </div>
+                        {seasonNumber != null ? (
+                          <div className="circle-strip-season">Season {seasonNumber}</div>
+                        ) : null}
                         <CircleStripRingCineBelowTitle
                           groupRating={row.group_rating}
-                          onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title)}
+                          onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title, movie?.poster)}
                         />
                         <CircleRaterOutOfLine
                           rated={distinctRaters}
@@ -11198,8 +12705,9 @@ export default function App() {
                   };
                   const renderCircleAllTopListRow = (row) => {
                     const movie = circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies);
-                    const rowKey = `${String(row.media_type)}-${Number(row.tmdb_id)}`;
-                    const predDetail = circleStripPredictionForDetail(row);
+                    const rowKey = circleRowKey(row);
+                    const predDetail = circleStripPredictionForDetail(row.show_row ?? row);
+                    const { seasonNumber, season } = circleRowSeason(row);
                     if (!movie) {
                       return (
                         <div key={rowKey} className="circle-rated-list-row circle-rated-list-row--pending">
@@ -11223,16 +12731,29 @@ export default function App() {
                         </div>
                       );
                     }
-                    const year = formatCircleListYear(movie, tvStripMetaByTmdbId);
+                    const year =
+                      seasonNumber != null && season?.airYear
+                        ? season.airYear
+                        : formatCircleListYear(movie, tvStripMetaByTmdbId);
                     const kind = movie.type === "tv" ? "TV" : "Movie";
-                    const titleLineFull = `${movie.title} · ${kind} · ${year}`;
+                    const titleLineFull = `${movie.title}${
+                      seasonNumber != null ? ` · Season ${seasonNumber}` : ""
+                    } · ${kind} · ${year}`;
+                    const listPosterSrc =
+                      seasonNumber != null
+                        ? seasonRowPosterSrc(season, movie.poster)
+                        : movie.poster
+                          ? posterSrcThumb(movie.poster)
+                          : null;
                     return (
                       <div
                         key={rowKey}
                         role="group"
                         tabIndex={0}
                         className="circle-rated-list-row"
-                        aria-label={`${movie?.title || "Title"}. Open details, or use the circle score row to see who rated in this group.`}
+                        aria-label={`${movie?.title || "Title"}${
+                          seasonNumber != null ? `, Season ${seasonNumber}` : ""
+                        }. Open details, or use the circle score row to see who rated in this group.`}
                         onClick={(e) => {
                           if (e.target?.closest?.(".circle-who-published-hit")) return;
                           openDetail(movie, predDetail);
@@ -11246,8 +12767,8 @@ export default function App() {
                         }}
                       >
                         <div className="wl-list-thumb">
-                          {movie.poster ? (
-                            <img src={posterSrcThumb(movie.poster)} alt="" loading="lazy" decoding="async" />
+                          {listPosterSrc ? (
+                            <img src={listPosterSrc} alt="" loading="lazy" decoding="async" />
                           ) : (
                             <div
                               style={{
@@ -11266,12 +12787,15 @@ export default function App() {
                           <div className="wl-list-title circle-list-all-top__title" title={titleLineFull}>
                             {movie.title}
                           </div>
+                          {seasonNumber != null ? (
+                            <div className="circle-list-all-top__season">Season {seasonNumber}</div>
+                          ) : null}
                           <div className="circle-list-all-top__type-year" aria-label="Type and year">
                             {kind} · {year}
                           </div>
                           <CircleAllTopRatingsLine
                             row={row}
-                            onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title)}
+                            onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title, movie?.poster)}
                           />
                           <CircleRaterOutOfLine
                             rated={Number(row.distinct_circle_raters ?? 0)}
@@ -11460,7 +12984,7 @@ export default function App() {
                               emptyRated
                             ) : (
                               <>
-                                <div className="circle-rated-list">{allTitles.map(renderCircleAllTopListRow)}</div>
+                                <div className="circle-rated-list">{expandCircleRowsBySeason(allTitles).map(renderCircleAllTopListRow)}</div>
                                 {showAllMore ? (
                                   <button
                                     type="button"
@@ -11479,7 +13003,7 @@ export default function App() {
                               emptyRated
                             ) : (
                               <>
-                                <div className="circle-rated-list">{topTitles.map(renderCircleAllTopListRow)}</div>
+                                <div className="circle-rated-list">{expandCircleRowsBySeason(topTitles).map(renderCircleAllTopListRow)}</div>
                                 {showTopMore ? (
                                   <button
                                     type="button"
@@ -11685,10 +13209,36 @@ export default function App() {
                   const name = isYou
                     ? "You"
                     : (r.member_name || "").trim() || "Member";
+                  const sn = r.season_number != null ? Number(r.season_number) : null;
+                  const rowKey = `${r.user_id}-${sn ?? "show"}`;
+                  if (whoPublishedModal.mediaType !== "tv") {
+                    return (
+                      <li key={rowKey} className="who-published-modal-row">
+                        <span className="who-published-modal-name">{name}</span>
+                        <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
+                      </li>
+                    );
+                  }
+                  const season =
+                    sn != null
+                      ? (tvSeasonsByTmdbId[whoPublishedModal.tmdbId] || []).find((s) => s.seasonNumber === sn) || null
+                      : null;
                   return (
-                    <li key={r.user_id} className="who-published-modal-row">
-                      <span className="who-published-modal-name">{name}</span>
-                      <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
+                    <li key={rowKey} className="who-published-modal-row who-published-modal-row--season">
+                      <SeasonRow
+                        posterSrc={
+                          sn != null
+                            ? seasonRowPosterSrc(season, whoPublishedModal.showPoster)
+                            : whoPublishedModal.showPoster
+                              ? posterSrcThumb(whoPublishedModal.showPoster)
+                              : null
+                        }
+                        title={name}
+                        label={sn != null ? `Season ${sn}` : null}
+                        meta={sn != null ? seasonYearEpisodesLine(season) : ""}
+                        overview={sn != null ? season?.overview : ""}
+                        aside={<span className="who-published-modal-score">{formatScore(Number(r.score))}</span>}
+                      />
                     </li>
                   );
                 })}
@@ -11701,6 +13251,88 @@ export default function App() {
             >
               Close
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {titleCirclesWindowOpen && selectedMovie?.movie && titleCircleShares?.movieId === selectedMovie.movie.id ? (
+        <div
+          className="circles-modal-root"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="in-your-circles-film-title"
+        >
+          <button
+            type="button"
+            className="circles-modal-backdrop"
+            aria-label="Close"
+            onClick={() => setTitleCirclesWindowOpen(false)}
+          />
+          <div className="circles-modal-panel who-published-modal-panel in-your-circles-modal-panel">
+            <div className="who-published-modal-header">
+              <button
+                type="button"
+                className="circles-modal-close who-published-modal-close"
+                aria-label="Close"
+                onClick={() => setTitleCirclesWindowOpen(false)}
+              >
+                ×
+              </button>
+              <h2 className="who-published-modal-film-title" id="in-your-circles-film-title">
+                {selectedMovie.movie.title}
+              </h2>
+              <p className="who-published-modal-byline">
+                {titleCircleShareHeading(
+                  titleCircleShareOthersCount(titleCircleShares.lines, user?.id),
+                  titleCircleShares.circleCount,
+                )}
+              </p>
+            </div>
+            <ul className="who-published-modal-list in-your-circles-modal-list" aria-label="Published scores in your circles">
+              {(titleCircleShares.lines || []).filter((r) => !(user?.id && r.user_id === user.id)).map((r) => {
+                const name = (r.member_name || "").trim() || "Member";
+                const sn = r.season_number != null ? Number(r.season_number) : null;
+                const showCircle = titleCircleShares.circleCount > 1 && (r.circleNames || []).length > 0;
+                const circleBit = showCircle ? r.circleNames.join(" · ") : "";
+                const rowKey = `${r.user_id}-${sn ?? "show"}`;
+                const movie = selectedMovie.movie;
+                if (movie.type !== "tv") {
+                  return (
+                    <li key={rowKey} className="who-published-modal-row">
+                      <span className="in-your-circles-name">
+                        <span className="who-published-modal-name">{name}</span>
+                        {circleBit ? <span className="in-your-circles-circle">{circleBit}</span> : null}
+                      </span>
+                      <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
+                    </li>
+                  );
+                }
+                const season =
+                  sn != null
+                    ? (tvSeasonsByTmdbId[movie.tmdbId] || []).find((s) => s.seasonNumber === sn) || null
+                    : null;
+                const seasonLabel = sn != null ? `Season ${sn}` : null;
+                const label = [seasonLabel, circleBit].filter(Boolean).join(" · ") || null;
+                return (
+                  <li key={rowKey} className="who-published-modal-row who-published-modal-row--season">
+                    <SeasonRow
+                      posterSrc={
+                        sn != null
+                          ? seasonRowPosterSrc(season, movie.poster)
+                          : movie.poster
+                            ? posterSrcThumb(movie.poster)
+                            : null
+                      }
+                      title={name}
+                      label={label}
+                      meta={sn != null ? seasonYearEpisodesLine(season) : ""}
+                      overview={sn != null ? season?.overview : ""}
+                      aside={<span className="who-published-modal-score">{formatScore(Number(r.score))}</span>}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         </div>
       ) : null}
@@ -12107,62 +13739,6 @@ export default function App() {
         </div>
       ) : null}
 
-      {/* Mobile web — Add to Home Screen / install (remind 1d · Got it 2d · never). */}
-      {pwaEducationModalOpen ? (
-        <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Install Cinemastro">
-          <button
-            type="button"
-            className="circles-modal-backdrop"
-            aria-label="Close"
-            onClick={dismissPwaEducationGotIt}
-          />
-          <div className="circles-modal-panel">
-            <div className="circles-modal-header">
-              <h2 className="circles-modal-title">Add Cinemastro to your home screen</h2>
-              <button
-                type="button"
-                className="circles-modal-close"
-                aria-label="Close"
-                onClick={dismissPwaEducationGotIt}
-              >
-                ×
-              </button>
-            </div>
-            <p className="circles-modal-sub">
-              Opens faster from your home screen — same login as in the browser.
-            </p>
-            <p className="circles-modal-sub">
-              Cinemastro is a web app you can install like an app. Adding it puts an icon on your home screen so you can
-              reopen without digging through tabs.
-            </p>
-            <ul className="pwa-education-steps">
-              <li>
-                <strong>iPhone / iPad (Safari):</strong> Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>{" "}
-                → <strong>Add</strong>.
-              </li>
-              <li>
-                <strong>Android (Chrome):</strong> Tap the menu (<strong>⋮</strong>) → <strong>Install app</strong> or{" "}
-                <strong>Add to Home screen</strong> (wording may vary).
-              </li>
-            </ul>
-            <p className="circles-modal-sub circles-modal-sub--fine-print">
-              Updates roll out automatically. If something looks stuck, refresh once.
-            </p>
-            <div className="circles-sheet-actions circles-sheet-actions--pwa-education">
-              <button type="button" className="circles-btn-ghost" onClick={dismissPwaEducationRemindLater}>
-                Remind me later
-              </button>
-              <button type="button" className="circles-btn-primary" onClick={dismissPwaEducationGotIt}>
-                Got it
-              </button>
-              <button type="button" className="circles-btn-ghost" onClick={dismissPwaEducationNever}>
-                Don&apos;t show again
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {/* No active circles — nudge after first-time rating from title detail (capped). */}
       {noCirclesAfterDetailRatingModal ? (
         <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Create a circle">
@@ -12295,6 +13871,8 @@ export default function App() {
           SkeletonStrip={SkeletonStrip}
           StripPosterBadge={StripPosterBadge}
           pulseCatalogReady={pulseCatalogReady}
+          pulseIndia={pulseRegion === "IN"}
+          pulseCanada={pulseRegion === "CA"}
           pulseTrendingRecsResolved={pulseTrendingRecsResolved}
           pulsePopularRecsResolved={pulsePopularRecsResolved}
           openDetail={openDetail}
@@ -12315,6 +13893,8 @@ export default function App() {
           theaterRecs={theaterRecs}
           inTheatersPagePopularRecsResolved={inTheatersPagePopularRecsResolved}
           showRegionKeys={showRegionKeys}
+          availabilityRegion={availabilityRegion}
+          showLanguageFirst={showLanguageFirst}
           openDetail={openDetail}
           posterSrcThumb={posterSrcThumb}
           formatStripMeta={(movie) => formatStripMediaMeta(movie, tvStripMetaByTmdbId)}
@@ -12345,7 +13925,7 @@ export default function App() {
                     }}
                   >
                     <option value="">All services</option>
-                    {STREAMING_SERVICES.map((s) => (
+                    {streamingPageServicesForRegion(availabilityRegion).map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.label}
                       </option>
@@ -12392,10 +13972,12 @@ export default function App() {
                 <div className="empty-box">
                   <div className="empty-text">
                     {streamingPageProviderId != null
-                      ? `No ${streamingTab === "movie" ? "movies" : "series"} in this discover view for that service (US, subscription) — try All services or another.`
+                      ? `No ${streamingTab === "movie" ? "movies" : "series"} in this discover view for that service (${availabilityRegionLabel(availabilityRegion)}, subscription) — try All services or another.`
                       : `No streaming ${streamingTab === "movie" ? "movies" : "series"} right now`}
                   </div>
                 </div>
+              ) : streamingTab === "tv" ? (
+                renderStreamingTvSeasonGroups(streamingDisplayNowRecs)
               ) : (
                 <div className="strip">
                   {streamingDisplayNowRecs.map((rec) => (
@@ -12415,9 +13997,13 @@ export default function App() {
               <div className="section-header">
                 <div className="section-title">What&apos;s popular in streaming</div>
                 <div className="section-meta">
-                  {streamingPageProviderId == null
-                    ? "Trending this week on TMDB"
-                    : "Most popular on this service (US, subscription)"}
+                  {availabilityRegion === "IN" || availabilityRegion === "CA"
+                    ? (streamingPageProviderId == null
+                      ? `Most popular on subscription in ${availabilityRegionLabel(availabilityRegion)}`
+                      : `Most popular on this service (${availabilityRegionLabel(availabilityRegion)}, subscription)`)
+                    : (streamingPageProviderId == null
+                      ? "Trending this week on TMDB"
+                      : "Most popular on this service (US, subscription)")}
                 </div>
               </div>
               {showStreamingStripsSkeleton ? (
@@ -12426,10 +14012,12 @@ export default function App() {
                 <div className="empty-box">
                   <div className="empty-text">
                     {streamingPageProviderId != null
-                      ? `No ${streamingTab === "movie" ? "movies" : "series"} in this discover view for that service (US, subscription) — try All services or another.`
+                      ? `No ${streamingTab === "movie" ? "movies" : "series"} in this discover view for that service (${availabilityRegionLabel(availabilityRegion)}, subscription) — try All services or another.`
                       : `No streaming ${streamingTab === "movie" ? "movies" : "series"} right now`}
                   </div>
                 </div>
+              ) : streamingTab === "tv" ? (
+                renderStreamingTvSeasonGroups(streamingDisplayPopularRecs)
               ) : (
                 <div className="strip">
                   {streamingDisplayPopularRecs.map((rec) => (
@@ -12580,7 +14168,7 @@ export default function App() {
         </div>
       )}
 
-      {screen === "secondary-region" && (
+      {screen === "secondary-region" && availabilityRegion !== "IN" && (
         <SecondaryRegionPage
           PageShell={PageShell}
           BottomNav={BottomNav}
@@ -12962,29 +14550,39 @@ export default function App() {
                 <div className="disc-empty"><div className="disc-empty-text">No titles match &quot;{ratedSearchQuery.trim()}&quot;</div></div>
               ) : (
                 <div className="profile-section" style={{ paddingTop: 4 }}>
-                  {filteredRatedMovies.map(({ movie, score }) => (
-                    <div className="rated-list-item" key={movie.id} onClick={() => openDetail(movie, recMap[movie.id])}>
-                      <div className="rated-thumb">
-                        {movie.poster ? <img src={posterSrcThumb(movie.poster)} alt={movie.title} loading="lazy" decoding="async" /> : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 20 }}>🎬</div>}
+                  {filteredRatedMovies.map(({ lineKey, movie, score, seasonNumber, season }) => {
+                    const isSeason = seasonNumber != null;
+                    const thumb = isSeason ? seasonRowPosterSrc(season, movie.poster) : (movie.poster ? posterSrcThumb(movie.poster) : null);
+                    const seasonMeta = isSeason ? seasonYearEpisodesLine(season) : "";
+                    return (
+                      <div className="rated-list-item" key={lineKey} onClick={() => openDetail(movie, recMap[movie.id])}>
+                        <div className="rated-thumb">
+                          {thumb ? <img src={thumb} alt={movie.title} loading="lazy" decoding="async" /> : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 20 }}>🎬</div>}
+                        </div>
+                        <div className="rated-info">
+                          <div className="rated-info-title">{movie.title}</div>
+                          {isSeason ? <div className="rated-info-season">Season {seasonNumber}</div> : null}
+                          <div className="rated-info-meta">
+                            {isSeason
+                              ? (seasonMeta ? `TV · ${seasonMeta}` : "TV")
+                              : `${movie.type === "movie" ? "Movie" : "TV"} · ${movie.year}`}
+                          </div>
+                        </div>
+                        <div className="rated-row-actions">
+                          <div className="rated-score-pill">{score}</div>
+                          <button
+                            type="button"
+                            className="rated-rerate-btn"
+                            onClick={e => {
+                              e.stopPropagation();
+                              openDetail(movie, recMap[movie.id], isSeason ? {} : { startEditing: true });
+                            }}>
+                            Rerate
+                          </button>
+                        </div>
                       </div>
-                      <div className="rated-info">
-                        <div className="rated-info-title">{movie.title}</div>
-                        <div className="rated-info-meta">{movie.type === "movie" ? "Movie" : "TV"} · {movie.year}</div>
-                      </div>
-                      <div className="rated-row-actions">
-                        <div className="rated-score-pill">{score}</div>
-                        <button
-                          type="button"
-                          className="rated-rerate-btn"
-                          onClick={e => {
-                            e.stopPropagation();
-                            openDetail(movie, recMap[movie.id], { startEditing: true });
-                          }}>
-                          Rerate
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -13016,53 +14614,57 @@ export default function App() {
                   Rated {Object.keys(userRatings).length}
                 </button>
                 <span className="profile-stat-chip">
-                  Avg {ratedMovies.length > 0 ? (ratedMovies.reduce((s, r) => s + r.score, 0) / ratedMovies.length).toFixed(1) : "—"}
+                  Avg {ratedTitleScores.length > 0 ? (ratedTitleScores.reduce((s, x) => s + x, 0) / ratedTitleScores.length).toFixed(1) : "—"}
                 </span>
                 <span className="profile-stat-chip">Matches {recommendations.length}</span>
               </div>
-              {siteStats?.community != null &&
-              siteStats?.ratings != null &&
-              Number.isFinite(siteStats.community) &&
-              Number.isFinite(siteStats.ratings) ? (
-                <div className="profile-site-stats-line">
-                  users: {formatPublicStat(siteStats.community)}, ratings:{" "}
-                  {formatPublicStat(siteStats.ratings)}
-                </div>
-              ) : null}
             </div>
-          </div>
-          <div className="section profile-watchlist-section">
-            <div className="section-header">
-              <div className="section-title">📌 Watchlist</div>
-              <div className="section-meta">
-                {watchlist.length} / {WATCHLIST_MAX} {watchlist.length === 1 ? "title" : "titles"}
-              </div>
-            </div>
-            {watchlist.length === 0 ? (
-              <div className="empty-box"><div className="empty-text">Save titles from detail to watch later</div></div>
-            ) : (
-              <div className="strip">
-                {watchlistDisplay.map((m) => (
-                  <div className="wl-card" key={m.id} onClick={() => openDetail(m, recMap[m.id])}>
-                    <div className="wl-poster">
-                      {m.poster ? <img src={posterSrcThumb(m.poster)} alt={m.title} loading="lazy" decoding="async" /> : <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 36 }}>🎬</div>}
-                    </div>
-                    <div className="strip-title">{m.title}</div>
-                    <div className="wl-card-meta">{formatWatchlistMetaLine(m)}</div>
-                    {m.fromGroup ? <div className="wl-from-group">Group</div> : null}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
           <div className="profile-settings">
-            <div className="profile-settings-title">Settings</div>
+            <div className="profile-settings-title">Account settings</div>
             {profileSettingsError && <div className="auth-error" style={{ marginBottom: 12 }}>{profileSettingsError}</div>}
-            <div className="profile-settings-card">
-              <div className="profile-settings-label">Where you watch</div>
-              <p className="settings-providers-hint">Select the services you subscribe to. We’ll use this to tailor availability and picks.</p>
+            <div className="profile-settings-stack">
+            <section className="profile-settings-card">
+              <h3 className="profile-settings-label profile-settings-heading">Where you watch</h3>
+              <p className="settings-providers-hint">Selecting this shows titles for your region in <span className="region-hint-section">In Theaters</span>, <span className="region-hint-section">Pulse</span>, and <span className="region-hint-section">Streaming</span> sections.</p>
               <div className="settings-provider-grid">
-                {STREAMING_SERVICES.map(s => (
+                {AVAILABILITY_REGION_OPTIONS.map(r => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className={`settings-provider-pill ${availabilityRegion === r.id ? "selected" : ""}`}
+                    aria-pressed={availabilityRegion === r.id}
+                    onClick={() => persistAvailabilityRegion(r.id)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              {availabilityRegion === "IN" ? (
+                <>
+                  <h4 className="profile-settings-label profile-settings-heading profile-settings-subheading">Languages to show first</h4>
+                  <p className="settings-providers-hint">Selected languages lead the India list. Leave none selected to show Hindi, Tamil, Telugu, Malayalam, Kannada, Bengali, and Marathi together.</p>
+                  <div className="settings-provider-grid">
+                    {SHOW_LANGUAGE_FIRST_OPTIONS.map(lang => (
+                      <button
+                        key={lang.id}
+                        type="button"
+                        className={`settings-provider-pill ${showLanguageFirst.includes(lang.id) ? "selected" : ""}`}
+                        aria-pressed={showLanguageFirst.includes(lang.id)}
+                        onClick={() => toggleShowLanguageFirst(lang.id)}
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </section>
+            <section className="profile-settings-card">
+              <h3 className="profile-settings-label profile-settings-heading">Streaming services</h3>
+              <p className="settings-providers-hint">Selecting any below will show titles only for those services. Select none to show all streaming services titles.</p>
+              <div className="settings-provider-grid">
+                {profileStreamingServicesForRegion(availabilityRegion).map(s => (
                   <button
                     key={s.id}
                     type="button"
@@ -13073,7 +14675,9 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <div className="profile-settings-label" style={{ marginTop: 20 }}>Genres to show</div>
+            </section>
+            <section className="profile-settings-card">
+              <h3 className="profile-settings-label profile-settings-heading">Genres to show</h3>
               <p className="settings-providers-hint">Recommendations in Home use TMDB genres. A title appears if it has at least one of the genres you select. Leave none selected to show all genres — including animation.</p>
               <div className="settings-genre-actions">
                 <button type="button" className="settings-genre-action-btn" onClick={() => persistShowGenreIds(PROFILE_GENRE_OPTIONS.map(g => g.id))}>Select all</button>
@@ -13091,7 +14695,9 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <div className="profile-settings-label" style={{ marginTop: 20 }}>Regions to show</div>
+            </section>
+            <section className="profile-settings-card">
+              <h3 className="profile-settings-label profile-settings-heading">Regions to show</h3>
               <p className="settings-providers-hint">Recommendations in Home can be narrowed by original language buckets like Hollywood, Indian, and Asian cinema. Leave none selected to show all regions.</p>
               <div className="settings-genre-actions">
                 <button type="button" className="settings-genre-action-btn" onClick={() => persistShowRegionKeys(PROFILE_REGION_OPTIONS.map(r => r.id))}>Select all</button>
@@ -13109,8 +14715,11 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              {/* V1.3.0: Optional second home-market strip (Now Playing); primary flow stays US / Hollywood. */}
-              <div className="profile-settings-label" style={{ marginTop: 20 }}>Home — second region (optional)</div>
+            </section>
+            {/* V1.3.0: Optional second home-market strip (Now Playing); primary flow stays US / Hollywood. */}
+            {availabilityRegion !== "IN" && (
+            <section className="profile-settings-card">
+              <h3 className="profile-settings-label profile-settings-heading">Home — second region (optional)</h3>
               <p className="settings-providers-hint">
                 Adds a Region block on Now Playing with <strong>In Theaters</strong> / <strong>Streaming</strong> tabs; under Streaming, <strong>Series</strong> and <strong>Movies</strong>. Primary US strips stay above. “None” hides the block.
               </p>
@@ -13133,9 +14742,14 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <div className="profile-settings-label" style={{ marginTop: 20 }}>Email</div>
+            </section>
+            )}
+            <section className="profile-settings-card">
+              <h3 className="profile-settings-label profile-settings-heading">Email</h3>
               <div className="profile-settings-email">{user?.email || "—"}</div>
-              <div className="profile-settings-label" style={{ marginTop: 20 }}>Account</div>
+            </section>
+            <section className="profile-settings-card">
+              <h3 className="profile-settings-label profile-settings-heading">Account</h3>
               <p className="settings-providers-hint">
                 Permanently deletes your ratings, watchlist, and sign-in. Circles with other members stay; hosting moves to the next host.
               </p>
@@ -13146,16 +14760,7 @@ export default function App() {
               >
                 Delete account
               </button>
-            </div>
-            <div className="profile-app-version">
-              Cinemastro
-              {PUBLIC_BETA_LABEL ? (
-                <>
-                  {" "}
-                  <span className="product-beta-pill product-beta-pill--profile">Beta</span>
-                </>
-              ) : null}{" "}
-              v{APP_VERSION}
+            </section>
             </div>
           </div>
           {showProfileDisplayNameEditor && (
@@ -13364,6 +14969,10 @@ export default function App() {
       {screen === "about" && (
         <Suspense fallback={<LegalLazyFallback />}>
           <AboutPage
+            PageShell={PageShell}
+            BottomNav={user ? BottomNav : undefined}
+            navProps={user ? { ...navProps, navTab: "home" } : undefined}
+            showBack={!showPrimaryNav}
             appVersion={APP_VERSION}
             usersCount={siteStats?.community}
             ratingsCount={siteStats?.ratings}
@@ -13381,6 +14990,11 @@ export default function App() {
         const { movie, prediction, predictionLoading } = selectedMovie;
         const showPredSkeleton = Boolean(predictionLoading);
         const myRating = userRatings[movie.id];
+        /** Whole-title score control (TV: whole-show row only; season scores live in the Seasons block). */
+        const myShowRating = userShowRatings[movie.id];
+        const detailSeasonScores = movie.type === "tv" ? userSeasonRatings[movie.id] : undefined;
+        const detailHasSeasonScores = Boolean(detailSeasonScores && Object.keys(detailSeasonScores).length > 0);
+        const detailSeasons = movie.type === "tv" ? tvSeasonsByTmdbId[Number(movie.tmdbId)] : undefined;
         const detailMediaKey = mediaIdKey(movie);
         const detailCinemastroEntry = detailMediaKey != null ? cinemastroAvgByKey[detailMediaKey] : undefined;
         const detailCinemastroAvg = cinemastroEntryAvg(detailCinemastroEntry);
@@ -13404,7 +15018,9 @@ export default function App() {
             detailMeta.languageLabel,
         );
         const detailRatePrimaryLabel =
-          detailRateEntry === "circle" ? "Rate this title" : "Select your rating and submit";
+          movie.type === "tv" && detailHasSeasonScores
+            ? "Rate the whole show (optional)"
+            : detailRateEntry === "circle" ? "Rate this title" : "Select your rating and submit";
         const confInlineClass =
           prediction?.confidence === "high"
             ? "detail-score-conf-inline--high"
@@ -13440,12 +15056,6 @@ export default function App() {
               <button
                 type="button"
                 className={`btn-full btn-full-dark ${inWatchlist(movie.id) ? "saved-style" : ""}`}
-                disabled={!inWatchlist(movie.id) && watchlist.length >= WATCHLIST_MAX}
-                title={
-                  !inWatchlist(movie.id) && watchlist.length >= WATCHLIST_MAX
-                    ? `Watchlist full (${WATCHLIST_MAX}). Remove a title first.`
-                    : undefined
-                }
                 onClick={() => toggleWatchlist(movie)}
               >
                 {inWatchlist(movie.id) ? "✓ Saved" : "+ Watchlist"}
@@ -13610,17 +15220,25 @@ export default function App() {
                     {rateSimilarError ? <div className="d-pred-improve-err">{rateSimilarError}</div> : null}
                   </div>
                 ) : null}
-                <div className="detail-rate-section">
-                  {myRating && !detailEditRating ? (
+                <div
+                  className={`detail-rate-section${
+                    !myShowRating && detailRateEntry !== "circle" ? " detail-rate-section--card" : ""
+                  }`}
+                >
+                  {myShowRating && !detailEditRating ? (
                     <div className="rated-box rated-box--compact" style={{ marginTop: 20 }}>
-                      <div className="rated-label">Your rating saved ✓</div>
+                      <div className="rated-label">
+                        {movie.type === "tv" && detailHasSeasonScores
+                          ? `Whole-show rating ${formatScore(Number(myShowRating))} saved ✓`
+                          : "Your rating saved ✓"}
+                      </div>
                       {hasPersonalPrediction(prediction) && <div className="rated-pred">Predicted was {formatScore(prediction.predicted)} ({formatScore(prediction.low)}–{formatScore(prediction.high)})</div>}
                       <button type="button" className="btn-full btn-full-dark" style={{ marginTop: 16, width: "100%" }}
                         onClick={() => {
                           setDetailEditRating(true);
                           setDetailClearRatingConfirm(false);
                           setDetailClearRatingErr("");
-                          setDetailRating(myRating);
+                          setDetailRating(myShowRating);
                           setDetailTouched(true);
                         }}>
                         Change rating
@@ -13643,7 +15261,7 @@ export default function App() {
                         </button>
                       ) : null}
                     </div>
-                  ) : myRating && detailEditRating ? (
+                  ) : myShowRating && detailEditRating ? (
                     <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
                       <div className="d-rate-label">
                         {detailClearRatingConfirm ? "Clear your rating?" : "Update your rating"}
@@ -13651,7 +15269,9 @@ export default function App() {
                       {detailClearRatingConfirm ? (
                         <div className="detail-clear-rating-confirm">
                           <p className="detail-clear-rating-confirm-msg">
-                            This title will be removed from every circle you published it to, and your rating will be cleared.
+                            {detailHasSeasonScores
+                              ? "This title will be removed from every circle you published it to, and your show rating and season scores will be cleared."
+                              : "This title will be removed from every circle you published it to, and your rating will be cleared."}
                           </p>
                           <div className="d-actions">
                             <button
@@ -13726,7 +15346,7 @@ export default function App() {
                                 setDetailEditRating(false);
                                 setDetailClearRatingConfirm(false);
                                 setDetailClearRatingErr("");
-                                setDetailRating(myRating);
+                                setDetailRating(myShowRating);
                               }}
                             >
                               Cancel
@@ -13746,19 +15366,40 @@ export default function App() {
                         </>
                       )}
                     </div>
-                  ) : !myRating ? (
-                    <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
-                      {detailRateEntry === "circle" ? (
+                  ) : !myShowRating ? (
+                    detailRateEntry === "circle" ? (
+                      <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
                         <div className="d-rate-title-strip">{unratedDetailRateInner}</div>
-                      ) : (
-                        unratedDetailRateInner
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="detail-rate-section--slider detail-people-panel">
+                        {unratedDetailRateInner}
+                      </div>
+                    )
                   ) : null}
                 </div>
-                {detailMeta.tagline ? <p className="d-tagline">{detailMeta.tagline}</p> : null}
-                <h2 className="d-overview-heading">Overview</h2>
-                <div className="d-synopsis">{movie.synopsis}</div>
+                {(() => {
+                  if (titleCircleShares?.movieId !== movie.id) return null;
+                  const othersRated = titleCircleShareOthersCount(titleCircleShares.lines, user?.id);
+                  if (othersRated < 1) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="rated-box rated-box--compact detail-circles-block"
+                      onClick={() => setTitleCirclesWindowOpen(true)}
+                    >
+                      <div className="rated-label">
+                        {titleCircleShareHeading(othersRated, titleCircleShares.circleCount)}
+                      </div>
+                      <div className="detail-circles-hint">Click to view</div>
+                    </button>
+                  );
+                })()}
+                <div className="detail-people-panel detail-overview-panel">
+                  <h2 className="d-overview-heading d-overview-heading--panel">Overview</h2>
+                  {detailMeta.tagline ? <p className="d-tagline">{detailMeta.tagline}</p> : null}
+                  <div className="d-synopsis">{movie.synopsis}</div>
+                </div>
                 {detailMeta.castLine ? (
                   <div className="detail-people-panel">
                     <h2 className="d-overview-heading d-overview-heading--panel">Cast</h2>
@@ -13775,11 +15416,55 @@ export default function App() {
                   <WhereToWatch
                     tmdbId={movie.tmdbId}
                     type={movie.type}
+                    watchRegion={availabilityRegion}
                     movieTitle={movie.title}
                     movieYear={movie.year}
                     showTheatricalShowtimesFallback={detailInTheatersPool}
                   />
                 </div>
+                {movie.type === "tv" ? (
+                  <div className="detail-seasons">
+                    <div className="detail-seasons__head">
+                      <h2 className="d-overview-heading d-overview-heading--panel">Seasons</h2>
+                      {user && detailHasSeasonScores && publishModalCircles.length > 0 ? (
+                        <button
+                          type="button"
+                          className="season-score__btn"
+                          onClick={() => {
+                            setPublishRatingModal({
+                              movieId: movie.id,
+                              mode: "manage",
+                              pendingNavigate: "none",
+                              defaultCircleIds: [],
+                            });
+                          }}
+                        >
+                          Publish to circles…
+                        </button>
+                      ) : null}
+                    </div>
+                    {detailHasSeasonScores && myRating != null ? (
+                      <div className="detail-seasons__hint">
+                        Your show score is the average of your season scores: {formatScore(Number(myRating))}
+                      </div>
+                    ) : null}
+                    {detailSeasons === undefined ? (
+                      <div className="detail-seasons__hint">Loading seasons…</div>
+                    ) : detailSeasons.length === 0 ? (
+                      <div className="detail-seasons__hint">No season list on TMDB for this show.</div>
+                    ) : (
+                      <TvSeasonRowsList
+                        key={movie.id}
+                        seasons={detailSeasons}
+                        showPoster={movie.poster}
+                        seasonScores={detailSeasonScores}
+                        canRate={Boolean(user)}
+                        onSave={(n, score) => saveSeasonRating(movie, n, score)}
+                        onClear={(n) => clearSeasonRating(movie, n)}
+                      />
+                    )}
+                  </div>
+                ) : null}
               </div>
             </div>
             <BottomNav {...navProps} suppressBecauseDetailOverlay={false} />

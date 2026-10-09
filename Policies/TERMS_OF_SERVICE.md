@@ -1,6 +1,6 @@
 # TERMS OF USE
 
-**Last updated April 29, 2026**
+**Last updated October 8, 2026**
 
 ---
 
@@ -101,7 +101,7 @@ If the Services require you to register, you agree to keep your password confide
 
 ## 5. PRODUCTS
 
-Cinemastro offers a personalized movie and TV recommendation application. The Services are currently available to users in the United States only.
+Cinemastro offers a personalized movie and TV recommendation application. The Services are currently available to users in the United States, India, and Canada. You choose your country in the **Where you watch** setting, which decides the theaters, streaming services, and Pulse content we show you. Where you watch is a saved preference, not location tracking, and it does not change when you travel.
 
 ---
 
@@ -234,7 +234,7 @@ To expedite resolution and control the cost of any dispute, controversy, or clai
 
 ### Binding Arbitration
 
-If the parties are unable to resolve a Dispute through informal negotiations, the Dispute (except for those Disputes expressly excluded below) will be settled by binding arbitration administered by JAMS under the Comprehensive Arbitration and Mediation Services (CAMS) Rules & Procedures, or, if JAMS is unavailable, under the American Arbitration Association (AAA) Rules. The location of the arbitration will be in Maricopa County, Arizona. The arbitration will be conducted in the English language, and the arbitrator will apply the laws of the State of Arizona consistent with the Federal Arbitration Act, and may award any relief that would be available in court under law or in equity. Either party may appear and be heard by telephone. An arbitration award and any judgment confirming it will apply only to the specific case and cannot be used in any other case except to enforce the award itself.
+You agree to resolve disputes via binding arbitration in Arizona, to the extent permitted by the laws of your jurisdiction. If the parties are unable to resolve a Dispute through informal negotiations, the Dispute (except for those Disputes expressly excluded below) will be settled by binding arbitration administered by JAMS under the Comprehensive Arbitration and Mediation Services (CAMS) Rules & Procedures, or, if JAMS is unavailable, under the American Arbitration Association (AAA) Rules. The location of the arbitration will be in Maricopa County, Arizona. The arbitration will be conducted in the English language, and the arbitrator will apply the laws of the State of Arizona consistent with the Federal Arbitration Act, and may award any relief that would be available in court under law or in equity. Either party may appear and be heard by telephone. An arbitration award and any judgment confirming it will apply only to the specific case and cannot be used in any other case except to enforce the award itself.
 
 ### Restrictions
 
@@ -258,7 +258,7 @@ THE SERVICES ARE PROVIDED ON AN AS-IS AND AS-AVAILABLE BASIS. YOU AGREE THAT YOU
 
 ## 20. LIMITATIONS OF LIABILITY
 
-**IN NO EVENT WILL WE OR OUR DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE TO YOU OR ANY THIRD PARTY FOR ANY DIRECT, INDIRECT, CONSEQUENTIAL, EXEMPLARY, INCIDENTAL, SPECIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFIT, LOST REVENUE, LOSS OF DATA, OR OTHER DAMAGES ARISING FROM YOUR USE OF THE SERVICES, EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.** NOTWITHSTANDING ANYTHING TO THE CONTRARY CONTAINED HEREIN, OUR LIABILITY TO YOU FOR ANY CAUSE WHATSOEVER AND REGARDLESS OF THE FORM OF THE ACTION, WILL AT ALL TIMES BE LIMITED TO THE AMOUNT PAID, IF ANY, BY YOU TO US DURING THE SIX (6) MONTH PERIOD PRIOR TO ANY CAUSE OF ACTION ARISING. SINCE YOU HAVE NOT PAID ANYTHING TO US DURING YOUR BETA USE OF THE SERVICES, OUR LIABILITY TO YOU IS LIMITED TO ZERO DOLLARS.
+**IN NO EVENT WILL WE OR OUR DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE TO YOU OR ANY THIRD PARTY FOR ANY DIRECT, INDIRECT, CONSEQUENTIAL, EXEMPLARY, INCIDENTAL, SPECIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFIT, LOST REVENUE, LOSS OF DATA, OR OTHER DAMAGES ARISING FROM YOUR USE OF THE SERVICES, EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.** NOTWITHSTANDING ANYTHING TO THE CONTRARY CONTAINED HEREIN, OUR LIABILITY TO YOU FOR ANY CAUSE WHATSOEVER AND REGARDLESS OF THE FORM OF THE ACTION, WILL AT ALL TIMES BE LIMITED TO THE AMOUNT PAID, IF ANY, BY YOU TO US DURING THE SIX (6) MONTH PERIOD PRIOR TO ANY CAUSE OF ACTION ARISING. SINCE YOU HAVE NOT PAID ANYTHING TO US DURING YOUR BETA USE OF THE SERVICES, OUR LIABILITY IS LIMITED TO ZERO DOLLARS, TO THE EXTENT PERMITTED BY THE LAWS OF YOUR JURISDICTION.
 
 ---
 

@@ -1,6 +1,6 @@
 # PRIVACY POLICY
 
-**Last updated September 18, 2026**
+**Last updated September 24, 2026**
 
 ---
 
@@ -76,12 +76,6 @@ We collect personal information that you voluntarily provide to us when you regi
 **Sensitive Information.** We do not process sensitive information.
 
 **Social Media Login Data.** We may provide you with the option to register with us using your existing social media account details, like your Facebook, X, or other social media account. If you choose to register in this way, we will collect certain profile information about you from the social media provider.
-
-**Application Data.** If you use our application(s), we also may collect the following information if you choose to provide us with access or permission:
-
-- **Geolocation Information.** We may request access or permission to track location-based information from your mobile device, either continuously or while you are using our mobile application(s), to provide certain location-based services. If you wish to change our access or permissions, you may do so in your device's settings.
-
-This information is primarily needed to maintain the security and operation of our application(s), for troubleshooting, and for our internal analytics and reporting purposes.
 
 All personal information that you provide to us must be true, complete, and accurate, and you must notify us of any changes to such personal information.
 

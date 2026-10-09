@@ -8,7 +8,7 @@ const corsHeaders: Record<string, string> = {
 
 /** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
 const EDGE_FUNCTION_SLUG = "match";
-const EDGE_FUNCTION_VERSION = "1.0.0";
+const EDGE_FUNCTION_VERSION = "1.0.1";
 
 function jsonResponseMatch(body: Record<string, unknown>, status = 200): Response {
   return new Response(
@@ -399,6 +399,60 @@ type RatingRow = {
   score: number;
 };
 
+const SEASON_PAGE_SIZE = 1000;
+
+/**
+ * Mean of each user's `season_ratings` per show, keyed `${user_id}|${tmdb_id}`. A user with season
+ * scores is ONE value per show (the mean), which replaces their whole-show `ratings.score`.
+ * Missing table (migration not applied) → empty map, so whole-show scores are used unchanged.
+ */
+async function fetchSeasonMeans(
+  admin: SupabaseClient,
+  filter: { userIds?: string[]; tmdbIds?: number[]; excludeUserId?: string },
+): Promise<Map<string, number>> {
+  const sums = new Map<string, { sum: number; n: number }>();
+  let from = 0;
+  for (;;) {
+    let q = admin.from("season_ratings").select("user_id, tmdb_id, score");
+    if (filter.userIds) q = q.in("user_id", filter.userIds);
+    if (filter.tmdbIds) q = q.in("tmdb_id", filter.tmdbIds);
+    if (filter.excludeUserId) q = q.neq("user_id", filter.excludeUserId);
+    const { data, error } = await q
+      .order("user_id", { ascending: true })
+      .order("tmdb_id", { ascending: true })
+      .order("season_number", { ascending: true })
+      .range(from, from + SEASON_PAGE_SIZE - 1);
+    if (error) {
+      console.warn("match: season_ratings read failed", error.message);
+      return new Map();
+    }
+    const rows = (data ?? []) as { user_id: string; tmdb_id: number; score: number | string }[];
+    for (const r of rows) {
+      const sc = Number(r.score);
+      if (!Number.isFinite(sc)) continue;
+      const k = `${r.user_id}|${r.tmdb_id}`;
+      const acc = sums.get(k) ?? { sum: 0, n: 0 };
+      acc.sum += sc;
+      acc.n += 1;
+      sums.set(k, acc);
+    }
+    if (rows.length < SEASON_PAGE_SIZE) break;
+    from += SEASON_PAGE_SIZE;
+  }
+  const out = new Map<string, number>();
+  for (const [k, { sum, n }] of sums) out.set(k, sum / n);
+  return out;
+}
+
+function applySeasonMeans(rows: RatingRow[], seasonMeans: Map<string, number>): void {
+  if (seasonMeans.size === 0) return;
+  for (const r of rows) {
+    if (r.media_type !== "tv") continue;
+    const mean = seasonMeans.get(`${r.user_id}|${r.tmdb_id}`);
+    if (mean != null) r.score = mean;
+  }
+}
+
 async function fetchOverlapForMediaType(
   admin: SupabaseClient,
   excludeUserId: string,
@@ -418,6 +472,9 @@ async function fetchOverlapForMediaType(
       .limit(MAX_ROWS_OVERLAP_PER_CHUNK);
     if (error) throw error;
     if (data?.length) out.push(...(data as RatingRow[]));
+  }
+  if (mediaType === "tv" && out.length > 0) {
+    applySeasonMeans(out, await fetchSeasonMeans(admin, { tmdbIds: unique, excludeUserId }));
   }
   return out;
 }
@@ -453,6 +510,13 @@ async function fetchFullMapsForUsers(
     from += RATINGS_PAGE_SIZE;
     if (rows.length < RATINGS_PAGE_SIZE) break;
   }
+  const seasonMeans = await fetchSeasonMeans(admin, { userIds });
+  for (const [k, mean] of seasonMeans) {
+    const bar = k.indexOf("|");
+    const uid = k.slice(0, bar);
+    const tmdbId = Number(k.slice(bar + 1));
+    if (maps[uid] && Number.isFinite(tmdbId)) maps[uid]![ratingRowKey("tv", tmdbId)] = mean;
+  }
   return maps;
 }
 
@@ -471,7 +535,11 @@ async function fetchSpecificTitleRatingsForUsers(
     .in("user_id", userIds)
     .limit(Math.max(2000, userIds.length * 2));
   if (error) throw error;
-  return (data ?? []) as RatingRow[];
+  const rows = (data ?? []) as RatingRow[];
+  if (mediaType === "tv" && rows.length > 0) {
+    applySeasonMeans(rows, await fetchSeasonMeans(admin, { userIds, tmdbIds: [tmdbId] }));
+  }
+  return rows;
 }
 
 const SEED_PREFIX = "seed";

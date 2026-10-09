@@ -586,6 +586,122 @@ export async function fetchCircleTitlePublishers({ circleId, tmdbId, mediaType }
   return Array.isArray(data) ? data : [];
 }
 
+/**
+ * Circle "Rated by" lines (7.0.115): one line per whole-show score (`season_number` null) plus one per
+ * rated season. Falls back to {@link fetchCircleTitlePublishers} (one line per member) before the
+ * season migration is applied.
+ * @returns {Promise<Array<{ user_id: string, member_name: string, season_number: number | null, score: number }>>}
+ */
+export async function fetchCircleTitlePublisherLines({ circleId, tmdbId, mediaType }) {
+  const cid = (circleId || "").trim();
+  if (!cid) throw new Error("Missing circle.");
+  const tid = Number(tmdbId);
+  if (!Number.isFinite(tid)) throw new Error("Missing title.");
+  const mt = mediaType === "tv" ? "tv" : "movie";
+  const { data, error } = await supabase.rpc("get_circle_title_publisher_lines", {
+    p_circle_id: cid,
+    p_tmdb_id: Math.floor(tid),
+    p_media_type: mt,
+  });
+  if (error) {
+    if (error.message?.includes("not a member")) throw new Error(error.message);
+    const rows = await fetchCircleTitlePublishers({ circleId: cid, tmdbId: tid, mediaType: mt });
+    return rows.map((r) => ({ ...r, season_number: null }));
+  }
+  if (data == null) return [];
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * Merge published lines for one title across the viewer's circles.
+ * The same person (and season) appears once. `circleNames` lists every shared circle
+ * they published that line in. Score is the same in every circle; the first one wins.
+ * @param {Array<{ name: string, rows: Array<{ user_id?: string, member_name?: string, season_number?: number | null, score?: number }> }>} circleResults
+ */
+export function mergePublishedLinesAcrossCircles(circleResults) {
+  const map = new Map();
+  for (const { name, rows } of circleResults || []) {
+    const circleName = (name || "").trim();
+    for (const row of rows || []) {
+      const score = Number(row?.score);
+      if (!Number.isFinite(score)) continue;
+      const seasonRaw = row?.season_number;
+      const seasonNumber = seasonRaw == null ? null : Number(seasonRaw);
+      if (seasonNumber != null && (!Number.isInteger(seasonNumber) || seasonNumber < 1)) continue;
+      const userId = row?.user_id || "";
+      const key = `${userId}|${seasonNumber ?? "show"}`;
+      let group = map.get(key);
+      if (!group) {
+        group = {
+          user_id: row?.user_id || "",
+          member_name: row?.member_name || "",
+          season_number: seasonNumber,
+          score,
+          circleNames: [],
+        };
+        map.set(key, group);
+      }
+      if (circleName && !group.circleNames.includes(circleName)) group.circleNames.push(circleName);
+    }
+  }
+  return [...map.values()].sort((a, b) => {
+    const as = a.season_number == null ? -1 : a.season_number;
+    const bs = b.season_number == null ? -1 : b.season_number;
+    if (as !== bs) return as - bs;
+    return String(a.member_name || "").localeCompare(String(b.member_name || ""), undefined, { sensitivity: "base" });
+  });
+}
+
+/** People other than the viewer who published this title. One person counts once, even across seasons. */
+export function titleCircleShareOthersCount(lines, viewerId) {
+  const seen = new Set();
+  let count = 0;
+  for (const line of lines || []) {
+    const id = line?.user_id || "";
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    if (viewerId && id === viewerId) continue;
+    count += 1;
+  }
+  return count;
+}
+
+/** "2 ratings from your circles", or "1 rating from your circle" when there is one of either. */
+export function titleCircleShareHeading(count, circleCount) {
+  const n = Number(count) || 0;
+  const ratings = n === 1 ? "1 rating" : `${n} ratings`;
+  const where = Number(circleCount) > 1 ? "circles" : "circle";
+  return `${ratings} from your ${where}`;
+}
+
+/**
+ * Published ratings for this title in every active circle the viewer belongs to.
+ * Private (unpublished) ratings are not returned. Empty when they have no circles
+ * or nobody has published the title.
+ * @returns {Promise<{ circleCount: number, lines: Array }>}
+ */
+export async function fetchPublishedLinesAcrossMyCircles({ tmdbId, mediaType }) {
+  const circles = (await fetchMyCircles()).filter((c) => c?.status === "active" && c?.id);
+  if (circles.length === 0) return { circleCount: 0, lines: [] };
+  const circleResults = await Promise.all(
+    circles.map(async (circle) => {
+      try {
+        const rows = await fetchCircleTitlePublisherLines({
+          circleId: circle.id,
+          tmdbId,
+          mediaType,
+        });
+        return { name: circle.name, rows };
+      } catch (e) {
+        if (String(e?.message || "").includes("not a member")) return { name: circle.name, rows: [] };
+        console.warn("In your circles: could not read one circle", e?.message || e);
+        return { name: circle.name, rows: [] };
+      }
+    }),
+  );
+  return { circleCount: circles.length, lines: mergePublishedLinesAcrossCircles(circleResults) };
+}
+
 export async function fetchCircleRatedTitles({ circleId, limit, offset, view = "recent" }) {
   const id = (circleId || "").trim();
   if (!id) throw new Error("Missing circle.");

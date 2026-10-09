@@ -6,6 +6,8 @@ export function InTheatersPage(props) {
     theaterRecs,
     inTheatersPagePopularRecsResolved,
     showRegionKeys,
+    availabilityRegion,
+    showLanguageFirst,
     openDetail,
     posterSrcThumb,
     formatStripMeta,
@@ -19,18 +21,45 @@ export function InTheatersPage(props) {
   const BottomNav = props.BottomNav;
   const StripPosterBadge = props.StripPosterBadge;
 
-  const emptyTheatersMessage =
-    showRegionKeys.length > 0
-      ? "Limited titles for this region in US theaters right now"
-      : "No theatrical releases";
+  const india = availabilityRegion === "IN";
+  const canada = availabilityRegion === "CA";
+  const languageLead = india
+    ? (showLanguageFirst || [])
+      .map((code) => ({
+        hi: "Hindi", ta: "Tamil", te: "Telugu", ml: "Malayalam", kn: "Kannada", bn: "Bengali", mr: "Marathi",
+      }[code]))
+      .filter(Boolean)
+      .join(", ")
+    : "";
+  const emptyTheatersMessage = india
+    ? "No Indian-language releases in this window"
+    : showRegionKeys.length > 0
+      ? `Limited titles for this region in ${canada ? "Canadian" : "US"} theaters right now`
+      : canada
+        ? "No theatrical releases in Canada right now"
+        : "No theatrical releases";
+  const emptyAlsoMessage = india ? "No other films playing in India right now" : emptyTheatersMessage;
 
   return (
     <div className="home">
-      <PageShell title="In Theaters" subtitle={"Now playing and what's buzzing in US theaters — scored for your taste"}>
+      <PageShell
+        title="In Theaters"
+        subtitle={india
+          ? "Now playing in India — scored for your taste"
+          : canada
+            ? "Now playing and what's popular in theaters in Canada — scored for your taste"
+            : "Now playing and what's buzzing in US theaters — scored for your taste"}
+      >
         <div className="section" style={{ paddingTop: 0 }}>
           <div className="section-header">
             <div className="section-title">Now Playing</div>
-            <div className="section-meta">In theaters</div>
+            <div className="section-meta">
+              {india
+                ? (languageLead ? `${languageLead} first, then other Indian languages` : "Indian languages")
+                : canada
+                  ? "In theaters in Canada"
+                  : "In theaters"}
+            </div>
           </div>
           {theaterRecs.length === 0 ? (
             <div className="empty-box">
@@ -57,12 +86,18 @@ export function InTheatersPage(props) {
         </div>
         <div className="section">
           <div className="section-header">
-            <div className="section-title">Popular in theaters</div>
-            <div className="section-meta">Weekly TMDB trending — same US theatrical filters as Now Playing</div>
+            <div className="section-title">{india ? "Also in theaters" : "Popular in theaters"}</div>
+            <div className="section-meta">
+              {india
+                ? "Other films playing in India"
+                : canada
+                  ? "Most popular films playing in Canada"
+                  : "Weekly TMDB trending — same US theatrical filters as Now Playing"}
+            </div>
           </div>
           {inTheatersPagePopularRecsResolved.length === 0 ? (
             <div className="empty-box">
-              <div className="empty-text">{emptyTheatersMessage}</div>
+              <div className="empty-text">{emptyAlsoMessage}</div>
             </div>
           ) : (
             <div className="strip">

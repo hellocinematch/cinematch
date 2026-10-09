@@ -11,6 +11,31 @@ function scrollLegalHashIntoView() {
   if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+/**
+ * In-page `#id` links must not do a native fragment navigation: that fires `popstate`, which the
+ * SPA treats as Back from the legal overlay and returns to the previous screen (e.g. About).
+ */
+function onLegalInPageLinkClick(e) {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target instanceof Element ? e.target.closest("a[href^='#']") : null;
+  if (!a) return;
+  const raw = a.getAttribute("href").slice(1);
+  if (!raw) return;
+  let id = raw;
+  try {
+    id = decodeURIComponent(raw);
+  } catch {
+    /* keep raw */
+  }
+  const el = document.getElementById(id);
+  if (!el) return;
+  e.preventDefault();
+  const u = new URL(window.location.href);
+  u.hash = raw;
+  history.replaceState(history.state, "", u.toString());
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 export function LegalTopBar({ title, onBack, titleAside = null }) {
   return (
     <div className="legal-topbar">
@@ -36,7 +61,7 @@ export function LegalPagePrivacy({ onBack, signedIn = false, onDeleteAccount }) 
   }, []);
 
   return (
-    <div className="legal-shell">
+    <div className="legal-shell" onClick={onLegalInPageLinkClick}>
       <LegalTopBar title="Privacy Policy" onBack={onBack} />
       <div
         id="data-request"
@@ -64,6 +89,7 @@ export function LegalPagePrivacy({ onBack, signedIn = false, onDeleteAccount }) 
           </p>
         )}
       </div>
+      <hr className="legal-privacy-divider" />
       <div
         className="legal-body legal-body--markdown"
         dangerouslySetInnerHTML={{ __html: LEGAL_PRIVACY_HTML }}
@@ -74,7 +100,7 @@ export function LegalPagePrivacy({ onBack, signedIn = false, onDeleteAccount }) 
 
 export function LegalPageTerms({ onBack }) {
   return (
-    <div className="legal-shell">
+    <div className="legal-shell" onClick={onLegalInPageLinkClick}>
       <LegalTopBar title="Terms of Use" onBack={onBack} />
       <div
         className="legal-body legal-body--markdown"
