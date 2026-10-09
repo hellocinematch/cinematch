@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.149
+
+- **Signed-out home:** In the app, the logo and Sign in on New this week sit below the clock and stay put while the page scrolls. Sign in is easier to tap. The list clears the home indicator. Other screens and the website are unchanged.
+
 ## 7.0.148
 
 - **Home first:** New this week (or the Monday–Wednesday welcome, or Circles) finishes loading before the other title lists start. In Theaters, What’s Hot, rated-title lookups, and the rest run after that list is on screen.
