@@ -1,3 +1,5 @@
+import { supabase } from "./supabase.js";
+
 /**
  * Weekend home: Thursday 6:00pm local through Sunday.
  * The release list is Monday–Sunday of that same week, so Friday openings
@@ -6,6 +8,8 @@
 
 export const NEW_THIS_WEEK_THURSDAY_HOUR = 18;
 const TALK_NEWS_GENRE_IDS = new Set([10763, 10767]);
+/** TMDB Animation. Japanese animation is left off New this week; other animation stays. */
+const ANIMATION_GENRE_ID = 16;
 /** Same Indian languages as In Theaters. Where you watch India uses these, not the US list. */
 const INDIA_LANGS = ["hi", "ta", "te", "ml", "kn", "bn", "mr", "pa", "gu", "or", "as", "ur"];
 const INDIA_LANG_SET = new Set(INDIA_LANGS);
@@ -83,6 +87,12 @@ export function arrivalPhrase(iso, todayIso, row) {
 function isTalkOrNews(item) {
   const ids = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
   return ids.some((id) => TALK_NEWS_GENRE_IDS.has(Number(id)));
+}
+
+function isJapaneseAnimation(item) {
+  const ids = Array.isArray(item?.genre_ids) ? item.genre_ids : [];
+  const animation = ids.some((id) => Number(id) === ANIMATION_GENRE_ID);
+  return animation && String(item?.original_language || "").toLowerCase() === "ja";
 }
 
 function toTitle(item, type, row, wide) {
@@ -223,7 +233,7 @@ function collect(rawItems, type, row, wide, gte, lte) {
   const seen = new Set();
   const out = [];
   for (const item of rawItems) {
-    if (item?.id == null || !item.poster_path || isTalkOrNews(item)) continue;
+    if (item?.id == null || !item.poster_path || isTalkOrNews(item) || isJapaneseAnimation(item)) continue;
     const title = toTitle(item, type, row, wide);
     if (!title.title || !title.releaseDate) continue;
     if (title.releaseDate < gte || title.releaseDate > lte) continue;
@@ -329,6 +339,96 @@ export async function loadNewThisWeekCatalog({
     todayIso: localIso(date),
     region: market,
   };
+}
+
+/**
+ * Paint shape for a saved or freshly built catalog.
+ * India reorders by Languages to show first. The feature is the regional premiere, not a circle score.
+ */
+export function presentNewThisWeekCatalog(catalog, languageFirst = []) {
+  const market = catalog?.region === "IN" || catalog?.region === "CA" ? catalog.region : "US";
+  const byMarket = market === "IN" ? compareIndiaRelease(languageFirst) : compareReleaseDesc;
+  const streaming = (catalog?.streaming || []).map((title) => ({ ...title, lead: false }));
+  const theaters = (catalog?.theaters || []).map((title) => ({ ...title, lead: false }));
+  streaming.sort(byMarket);
+  theaters.sort(byMarket);
+  const streamingLeader = [...streaming].sort(comparePopularity)[0];
+  if (streamingLeader) streamingLeader.lead = true;
+  const wideLeader = [...theaters.filter((title) => title.wide)].sort(comparePopularity)[0]
+    || [...theaters].sort(comparePopularity)[0];
+  if (wideLeader) wideLeader.lead = true;
+  const feature = chooseFeature({
+    streaming: streaming.filter((title) => title.inWeek !== false),
+    theaters,
+    circleScores: new Map(),
+    pinnedId: null,
+  });
+  return {
+    feature,
+    streaming: displayRow(streaming, feature?.id),
+    theaters: displayRow(theaters, feature?.id),
+    todayIso: catalog?.todayIso || localIso(new Date()),
+    region: market,
+    edition: catalog?.edition || null,
+  };
+}
+
+function weekendMarket(region) {
+  return region === "IN" || region === "CA" ? region : "US";
+}
+
+/**
+ * Shared weekend list for this region. The first open builds it; later opens read the saved row.
+ * Returns null when the table or the function is not there yet, so the caller can build on the phone.
+ */
+export async function loadSharedNewThisWeekCatalog({ region, edition, date = new Date() }) {
+  if (!edition?.key) return null;
+  const market = weekendMarket(region);
+  const week = releaseWeekBounds(edition);
+  const streamWindow = market === "IN" ? indiaStreamingBounds(edition, date) : week;
+  try {
+    const { data, error } = await supabase
+      .from("new_this_week_catalog")
+      .select("streaming, theaters")
+      .eq("edition_key", edition.key)
+      .eq("region", market)
+      .maybeSingle();
+    if (!error && data && Array.isArray(data.streaming) && Array.isArray(data.theaters)) {
+      return {
+        edition,
+        streaming: data.streaming,
+        theaters: data.theaters,
+        todayIso: localIso(date),
+        region: market,
+      };
+    }
+  } catch {
+    /* table missing or offline — fall through */
+  }
+  try {
+    const { data: inv, error: invErr } = await supabase.functions.invoke("new-this-week-catalog", {
+      body: {
+        region: market,
+        edition_key: edition.key,
+        week_gte: week.gte,
+        week_lte: week.lte,
+        stream_gte: streamWindow.gte,
+        stream_lte: streamWindow.lte,
+      },
+    });
+    if (!invErr && inv?.ok && Array.isArray(inv.streaming) && Array.isArray(inv.theaters)) {
+      return {
+        edition,
+        streaming: inv.streaming,
+        theaters: inv.theaters,
+        todayIso: localIso(date),
+        region: market,
+      };
+    }
+  } catch {
+    /* function not deployed */
+  }
+  return null;
 }
 
 /**

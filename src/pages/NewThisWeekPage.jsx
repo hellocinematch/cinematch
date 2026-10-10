@@ -2,14 +2,11 @@ import { useEffect, useId, useRef, useState } from "react";
 import { CinemastroLetsYou } from "../LoggedOutLanding.jsx";
 import {
   arrivalPhrase,
-  chooseFeature,
-  displayRow,
   formatWeekendRange,
-  loadCircleScores,
   loadNewThisWeekCatalog,
-  readFeaturePin,
+  loadSharedNewThisWeekCatalog,
+  presentNewThisWeekCatalog,
   weekendEdition,
-  writeFeaturePin,
 } from "../newThisWeek.js";
 
 function regionName(region) {
@@ -56,13 +53,13 @@ function tvPosterLabel(title, seasonById) {
 export function NewThisWeekPage({
   region = "US",
   signedIn = false,
-  viewerKey = "guest",
+  viewerKey: _viewerKey = "guest",
   fetchTmdb,
   services = [],
   languageFirst = [],
   posterSrc,
   posterHeroSrc,
-  posterBadge,
+  posterBadge: _posterBadge,
   onOpenTitle,
   onGetStarted,
   onSignIn,
@@ -78,44 +75,39 @@ export function NewThisWeekPage({
   const closeRef = useRef(null);
   const titleId = useId();
   const edition = weekendEdition(new Date());
+  const editionKey = edition?.key || "";
   const languageKey = (languageFirst || []).join(",");
 
   useEffect(() => {
     let cancelled = false;
     setFailed(false);
     setPack(null);
+    const langs = languageKey ? languageKey.split(",") : [];
     (async () => {
       try {
-        const catalog = await loadNewThisWeekCatalog({
+        const editionNow = weekendEdition(new Date());
+        const shared = editionNow
+          ? await loadSharedNewThisWeekCatalog({ region, edition: editionNow, date: new Date() })
+          : null;
+        if (cancelled) return;
+        const catalog = shared || await loadNewThisWeekCatalog({
           region,
           fetchTmdb,
           services,
-          languageFirst: languageKey ? languageKey.split(",") : [],
+          languageFirst: langs,
         });
         if (cancelled) return;
-        const circleScores = signedIn ? await loadCircleScores() : new Map();
-        if (cancelled) return;
-        const pinnedId = catalog.edition
-          ? readFeaturePin(catalog.edition.key, catalog.region || region, viewerKey)
-          : null;
-        const feature = chooseFeature({
-          streaming: catalog.streaming.filter((title) => title.inWeek !== false || circleScores.has(title.id)),
-          theaters: catalog.theaters,
-          circleScores,
-          pinnedId,
-        });
-        if (feature && catalog.edition) {
-          writeFeaturePin(catalog.edition.key, catalog.region || region, viewerKey, feature.id);
-        }
-        const streaming = displayRow(catalog.streaming, feature?.id);
-        const theaters = displayRow(catalog.theaters, feature?.id);
+        const view = presentNewThisWeekCatalog(
+          { ...catalog, todayIso: catalog.todayIso },
+          langs,
+        );
         if (!cancelled) {
           setPack({
-            feature,
-            streaming,
-            theaters,
-            circleScores,
-            todayIso: catalog.todayIso,
+            feature: view.feature,
+            streaming: view.streaming,
+            theaters: view.theaters,
+            circleScores: new Map(),
+            todayIso: view.todayIso,
           });
         }
       } catch {
@@ -127,7 +119,7 @@ export function NewThisWeekPage({
     return () => {
       cancelled = true;
     };
-  }, [region, signedIn, viewerKey, fetchTmdb, services, languageKey]);
+  }, [region, editionKey, fetchTmdb, services, languageKey]);
 
   useEffect(() => {
     if (!pack || typeof fetchTmdb !== "function") return undefined;
@@ -220,7 +212,6 @@ export function NewThisWeekPage({
             src={posterHeroSrc || posterSrc}
             hero
             image={pack.feature.backdrop || null}
-            badge={posterBadge?.(pack.feature)}
             insideLabel={tvPosterLabel(pack.feature, tvSeasonById)}
           />
           <div className="ntw-hero-copy">
@@ -242,7 +233,6 @@ export function NewThisWeekPage({
         loading={pack == null && !failed}
         openTitle={openTitle}
         posterSrc={posterSrc}
-        posterBadge={posterBadge}
         tvSeasonById={tvSeasonById}
       />
       {pack?.streaming?.length > 0 && pack?.theaters?.length > 0 ? <div className="ntw-rule" /> : null}
@@ -252,7 +242,6 @@ export function NewThisWeekPage({
         loading={pack == null && !failed}
         openTitle={openTitle}
         posterSrc={posterSrc}
-        posterBadge={posterBadge}
         tvSeasonById={tvSeasonById}
       />
 
@@ -301,7 +290,7 @@ export function NewThisWeekPage({
   );
 }
 
-function Group({ heading, note, items, loading, openTitle, posterSrc, posterBadge, tvSeasonById }) {
+function Group({ heading, note, items, loading, openTitle, posterSrc, tvSeasonById }) {
   if (!loading && (!items || items.length === 0)) return null;
   return (
     <section className="ntw-group" aria-label={heading}>
@@ -330,7 +319,6 @@ function Group({ heading, note, items, loading, openTitle, posterSrc, posterBadg
                 <Poster
                   title={title}
                   src={posterSrc}
-                  badge={posterBadge?.(title)}
                   logo={logo}
                   insideLabel={tvPosterLabel(title, tvSeasonById)}
                 />

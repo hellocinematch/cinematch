@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.preview-circle-invite-link]
 verify_jwt = false
+
+[functions.new-this-week-catalog]
+verify_jwt = false

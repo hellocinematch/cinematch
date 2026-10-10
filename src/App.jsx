@@ -12730,7 +12730,12 @@ export default function App() {
                           </button>
                         </div>
                         <div className="circle-hero__top-bar-center">
-                          <div className="circle-hero__identity">
+                          <button
+                            type="button"
+                            className="circle-hero__identity circle-hero__identity--open-info"
+                            onClick={() => setShowCircleInfoSheet(true)}
+                            aria-label={`Circle info for ${circleDetailData.name}`}
+                          >
                             <div className="circle-hero__avatar" aria-hidden="true">
                               <span className="circle-hero__avatar-initials">{initials}</span>
                             </div>
@@ -12762,7 +12767,7 @@ export default function App() {
                                 </span>
                               </div>
                             </div>
-                          </div>
+                          </button>
                         </div>
                         <div className="circle-hero__top-bar-side circle-hero__top-bar-side--right">
                           <button
@@ -13614,45 +13619,19 @@ export default function App() {
             </div>
             <ul className="who-published-modal-list in-your-circles-modal-list" aria-label="Published scores in your circles">
               {(titleCircleShares.lines || []).filter((r) => !(user?.id && r.user_id === user.id)).map((r) => {
-                const name = (r.member_name || "").trim() || "Member";
                 const sn = r.season_number != null ? Number(r.season_number) : null;
+                const person = (r.member_name || "").trim() || "Member";
+                const name = sn != null ? `${person} · S${sn}` : person;
                 const showCircle = titleCircleShares.circleCount > 1 && (r.circleNames || []).length > 0;
                 const circleBit = showCircle ? r.circleNames.join(" · ") : "";
                 const rowKey = `${r.user_id}-${sn ?? "show"}`;
-                const movie = selectedMovie.movie;
-                if (movie.type !== "tv") {
-                  return (
-                    <li key={rowKey} className="who-published-modal-row">
-                      <span className="in-your-circles-name">
-                        <span className="who-published-modal-name">{name}</span>
-                        {circleBit ? <span className="in-your-circles-circle">{circleBit}</span> : null}
-                      </span>
-                      <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
-                    </li>
-                  );
-                }
-                const season =
-                  sn != null
-                    ? (tvSeasonsByTmdbId[movie.tmdbId] || []).find((s) => s.seasonNumber === sn) || null
-                    : null;
-                const seasonLabel = sn != null ? `Season ${sn}` : null;
-                const label = [seasonLabel, circleBit].filter(Boolean).join(" · ") || null;
                 return (
-                  <li key={rowKey} className="who-published-modal-row who-published-modal-row--season">
-                    <SeasonRow
-                      posterSrc={
-                        sn != null
-                          ? seasonRowPosterSrc(season, movie.poster)
-                          : movie.poster
-                            ? posterSrcThumb(movie.poster)
-                            : null
-                      }
-                      title={name}
-                      label={label}
-                      meta={sn != null ? seasonYearEpisodesLine(season) : ""}
-                      overview={sn != null ? season?.overview : ""}
-                      aside={<span className="who-published-modal-score">{formatScore(Number(r.score))}</span>}
-                    />
+                  <li key={rowKey} className="who-published-modal-row">
+                    <span className="in-your-circles-name">
+                      <span className="who-published-modal-name">{name}</span>
+                      {circleBit ? <span className="in-your-circles-circle">{circleBit}</span> : null}
+                    </span>
+                    <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
                   </li>
                 );
               })}

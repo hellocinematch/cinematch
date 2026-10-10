@@ -1,5 +1,25 @@
 # Changelog
 
+## 7.0.154
+
+- **Bottom menu:** The signed-in bar is a floating pill, inset from the edges, with a gap above the home indicator. The icons are brighter.
+
+## 7.0.153
+
+- **Circle banner:** A tap on the circle name, picture, or member line opens Circle info, the same as the **i** on the right. The back button still returns to the circle list.
+
+## 7.0.152
+
+- **New this week — no score on the posters:** The weekend posters are the picture only. A tap opens the title, and the rating is on that screen.
+
+## 7.0.151
+
+- **New this week — saved list:** The first open in a region builds the weekend list and saves it. Later opens show that list right away. Ratings are not part of the saved list. Japanese animation is left off. Other animation stays.
+
+## 7.0.150
+
+- **From your circles:** A TV row is the name and the score, the same as a movie. The season is **S1** on the name. The poster, season overview, and episode line are gone. The circle name still shows when you belong to more than one circle.
+
 ## 7.0.149
 
 - **Signed-out home:** In the app, the logo and Sign in on New this week sit below the clock and stay put while the page scrolls. Sign in is easier to tap. The list clears the home indicator. Other screens and the website are unchanged.

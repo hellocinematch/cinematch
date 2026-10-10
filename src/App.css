@@ -308,7 +308,7 @@
     .onboarding .card-poster { height: min(28vh, 220px); }
   }
 
-  .home { flex:1 1 0; min-height:0; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
+  .home { flex:1 1 0; min-height:0; background:#0a0a0a; padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px)); animation:fadeIn 0.5s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
   .home-topbar { display:none; }
   /* Shared top chrome on Discover / Rated / Detail when the primary nav is not showing. */
   .page-topbar {
@@ -694,15 +694,36 @@
   .empty-box { margin:0 24px; padding:24px; border:1px dashed #222; border-radius:10px; text-align:center; }
   .empty-text { font-size:13px; color:#444; }
 
-  /* z-index 100: above scroll content + overlays tied to nav chrome */
-  .bottom-nav { position:fixed; bottom:0; left:0; right:0; margin-left:auto; margin-right:auto; width:100%; max-width:var(--shell); box-sizing:border-box; background:rgba(10,10,10,0.95); border-top:1px solid #1a1a1a; display:flex; align-items:center; justify-content:space-between; gap:6px; padding:10px 8px calc(14px + env(safe-area-inset-bottom,0px)); padding-left:max(8px, env(safe-area-inset-left,0px)); padding-right:max(8px, env(safe-area-inset-right,0px)); backdrop-filter:blur(20px); z-index:100; }
+  /* Floating pill, inset from the edges, above the home indicator. z-index 100: above scroll content. */
+  .bottom-nav {
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 10px);
+    margin-left:auto;
+    margin-right:auto;
+    width:min(calc(100% - 28px), calc(var(--shell) - 28px), 480px);
+    box-sizing:border-box;
+    background:rgba(28, 28, 28, 0.82);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:999px;
+    display:flex;
+    align-items:center;
+    justify-content:space-around;
+    gap:4px;
+    padding:6px 14px;
+    backdrop-filter:blur(22px);
+    -webkit-backdrop-filter:blur(22px);
+    box-shadow:0 10px 28px rgba(0,0,0,0.45);
+    z-index:100;
+  }
   .nav-item__icon-wrap { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:background 0.2s; }
-  .nav-item__icon-wrap--active { background:rgba(232, 201, 106, 0.14); }
-  .nav-icon--svg { display:flex; align-items:center; justify-content:center; color:#c9c9c9; }
-  .nav-item.active .nav-item__icon-wrap .nav-icon--svg { color:#e8c96a; }
+  .nav-item__icon-wrap--active { background:rgba(232, 201, 106, 0.18); }
+  .nav-icon--svg { display:flex; align-items:center; justify-content:center; color:#f4f4f4; }
+  .nav-item.active .nav-item__icon-wrap .nav-icon--svg { color:#f0dc9a; }
   .bottom-nav-list-svg { display:block; }
   .bottom-nav-circles-svg { display:block; }
-  .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; cursor:pointer; opacity:0.4; transition:opacity 0.2s; min-width:0; min-height:48px; }
+  .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; cursor:pointer; opacity:0.78; transition:opacity 0.2s; min-width:0; min-height:48px; }
   .nav-item--profile { position:relative; }
   .nav-item.active { opacity:1; }
   .nav-icon { font-size:20px; }
@@ -899,7 +920,7 @@
   .legal-body--markdown strong { color:#ccc; font-weight:600; }
   .legal-body--markdown blockquote { margin:12px 0; padding-left:14px; border-left:3px solid #3a3020; color:#777; font-size:14px; line-height:1.6; }
 
-  .discover { height:100%; min-height:0; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
+  .discover { height:100%; min-height:0; background:#0a0a0a; padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px)); animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
   .discover-title { font-family:'DM Serif Display',serif; font-size:calc(30px * var(--cm-read)); color:#ddd7cd; }
   .search-box { position:relative; margin-top:12px; min-width:0; }
   .search-submit-btn { position:absolute; left:8px; top:50%; transform:translateY(-50%); width:28px; height:28px; border:none; background:transparent; color:#888; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; }
@@ -965,7 +986,7 @@
   .disc-empty { padding:48px 24px; text-align:center; }
   .disc-empty-text { font-size:14px; color:#444; }
 
-  .mood { height:100%; min-height:0; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
+  .mood { height:100%; min-height:0; background:#0a0a0a; padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px)); animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
   .mood-back { background:none; border:none; color:#666; font-size:14px; cursor:pointer; font-family:'DM Sans',sans-serif; margin-bottom:16px; display:block; padding:0; }
   .mood-back:hover { color:#ccc; }
   .mood-step { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#e8c96a; margin-bottom:8px; }
@@ -1000,7 +1021,7 @@
   .mood-skip { background:transparent; color:#666; border:1px solid #2a2a2a; padding:13px; font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; border-radius:2px; transition:all 0.2s; }
   .mood-skip:hover { border-color:#555; color:#aaa; }
 
-  .mood-results { height:100%; min-height:0; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
+  .mood-results { height:100%; min-height:0; background:#0a0a0a; padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px)); animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
   .mood-results-back { background:none; border:none; color:#666; font-size:20px; cursor:pointer; padding:0; }
   .mood-results-title { font-family:'DM Serif Display',serif; font-size:calc(26px * var(--cm-read)); color:#f0ebe0; }
   /* Shared Mood results container; desktop layout is upgraded in the >=900px media query. */
@@ -1089,7 +1110,7 @@
     box-sizing:border-box;
   }
 
-  .detail { height:100%; min-height:0; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:80px; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; position:relative; width:100%; max-width:100%; }
+  .detail { height:100%; min-height:0; background:#0a0a0a; animation:fadeIn 0.3s ease; padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px)); overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; position:relative; width:100%; max-width:100%; }
   /* Hero: backdrop + TMDB-style poster float on the right, overlapping the band. */
   .detail-hero { position:relative; width:100%; max-width:100%; box-sizing:border-box; }
   .detail-hero-backdrop { position:relative; height:min(38vw, 240px); min-height:180px; max-height:300px; overflow:visible; background:#141414; }
@@ -1451,7 +1472,7 @@
   .no-recs { margin:0 24px; padding:28px; border:1px dashed #222; border-radius:12px; text-align:center; }
   .no-recs-text { font-size:13px; color:#444; line-height:1.6; }
 
-  .profile { height:100%; min-height:0; background:#0a0a0a; padding-bottom:80px; animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
+  .profile { height:100%; min-height:0; background:#0a0a0a; padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px)); animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
   .profile-top { display:flex; gap:16px; align-items:flex-start; padding:52px 24px 20px; }
   .profile .profile-top { padding:14px 24px 20px; }
   .profile-top-text { min-width:0; }
@@ -1674,7 +1695,7 @@
     /* Mobile stability: stats beside logo can reintroduce tiny horizontal pan on some Safari widths. */
     .page-topbar .public-site-stats { display:none; }
     /* Title detail: same horizontal rhythm as home strips / section headers + safe-area (TMDB-like gutter). */
-    .detail { padding-bottom:max(80px, calc(80px + env(safe-area-inset-bottom, 0px))); }
+    .detail { padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px)); }
     .detail-hero-band {
       padding-left:max(20px, env(safe-area-inset-left, 0px));
       padding-right:max(20px, env(safe-area-inset-right, 0px));
@@ -1985,6 +2006,27 @@
     min-width:0;
     width:100%;
     max-width:100%;
+  }
+  /* Banner tap opens Circle info. The back control stays a separate button. */
+  .circle-hero--detail .circle-hero__identity--open-info {
+    appearance:none;
+    -webkit-appearance:none;
+    border:none;
+    background:transparent;
+    margin:0;
+    padding:4px 6px;
+    color:inherit;
+    font:inherit;
+    text-align:left;
+    cursor:pointer;
+    border-radius:12px;
+  }
+  .circle-hero--detail .circle-hero__identity--open-info:hover {
+    background:rgba(255,255,255,0.06);
+  }
+  .circle-hero--detail .circle-hero__identity--open-info:focus-visible {
+    outline:2px solid #e8c96a;
+    outline-offset:2px;
   }
   .circle-hero__avatar {
     width:44px;
