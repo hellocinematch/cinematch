@@ -8943,6 +8943,62 @@ export default function App() {
   }
 
   /** v3.2.1: Navigate immediately; fetch `predict` in background and show skeleton until settled. */
+  /**
+   * One title, read from `ratings` (and `season_ratings` for a show) when the screen opens.
+   * Fills the login copy for this title only. An empty or failed read leaves that copy alone.
+   */
+  async function refreshOpenDetailRating(movieId) {
+    const [type, idRaw] = String(movieId || "").split("-");
+    const tmdbId = parseInt(idRaw, 10);
+    if ((type !== "movie" && type !== "tv") || !Number.isFinite(tmdbId)) return;
+    const { data: sessWrap } = await supabase.auth.getSession();
+    const uid = sessWrap?.session?.user?.id;
+    if (!uid) return;
+    const { data: ratingRow, error: ratingErr } = await supabase
+      .from("ratings")
+      .select("score, score_from_seasons")
+      .eq("user_id", uid)
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", type)
+      .maybeSingle();
+    if (ratingErr) return;
+    let seasonRows = [];
+    if (type === "tv") {
+      const { data, error } = await supabase
+        .from("season_ratings")
+        .select("tmdb_id, season_number, score")
+        .eq("user_id", uid)
+        .eq("tmdb_id", tmdbId);
+      if (error) return;
+      seasonRows = data || [];
+    }
+    const key = `${type}-${tmdbId}`;
+    const wholeMap = {};
+    const anchorScores = {};
+    if (ratingRow && Number.isFinite(Number(ratingRow.score))) {
+      if (ratingRow.score_from_seasons === true) anchorScores[key] = Number(ratingRow.score);
+      else wholeMap[key] = Number(ratingRow.score);
+    }
+    const seasonForKey = seasonRatingsMapFromRows(seasonRows);
+    const ratingsMap = buildEffectiveRatingsMap(wholeMap, seasonForKey);
+    for (const [k, score] of Object.entries(anchorScores)) {
+      if (!(k in ratingsMap)) ratingsMap[k] = score;
+    }
+    if (key in wholeMap) {
+      const score = wholeMap[key];
+      setUserShowRatings((prev) => (prev[key] === score ? prev : { ...prev, [key]: score }));
+    }
+    if (seasonForKey[key] && Object.keys(seasonForKey[key]).length > 0) {
+      const seasons = seasonForKey[key];
+      userSeasonRatingsRef.current = { ...userSeasonRatingsRef.current, [key]: seasons };
+      setUserSeasonRatings((prev) => ({ ...prev, [key]: seasons }));
+    }
+    if (key in ratingsMap) {
+      const score = ratingsMap[key];
+      setUserRatings((prev) => (prev[key] === score ? prev : { ...prev, [key]: score }));
+    }
+  }
+
   function openDetail(movie, prediction, opts = {}) {
     const pred = prediction ?? null;
     const s = screenRef.current;
@@ -8971,6 +9027,7 @@ export default function App() {
     // Show skeleton until we know session + whether to call Edge — `user` from React can lag `getSession()` after refresh.
     setSelected({ movie, prediction: pred, predictionLoading: true });
     void refreshCinemastroAvgForMediaId(movie.id);
+    void refreshOpenDetailRating(movie.id);
     const showLevelScore = userShowRatings[movie.id];
     if (opts.startEditing && showLevelScore != null) {
       setDetailEditRating(true);

@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.156
+
+- **Title screen:** Opening a title reads that user’s score from `ratings`. If it is there, the screen shows it and the poster copy for that title is updated. A miss or a failed read leaves the login copy alone.
+
+## 7.0.155
+
+- **Indian secondary streaming:** Opening Streaming asks for a service first. There is no All services list. Theaters are unchanged.
+
 ## 7.0.154
 
 - **Bottom menu:** The signed-in bar is a floating pill, inset from the edges, with a gap above the home indicator. The icons are brighter.

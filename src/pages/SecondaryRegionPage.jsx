@@ -36,6 +36,10 @@ export function SecondaryRegionPage(props) {
   const BottomNav = props.BottomNav;
   const StripPosterBadge = props.StripPosterBadge;
   const SkeletonStrip = props.SkeletonStrip;
+  const indianStreamingNeedsService =
+    secondaryRegionKey === "indian" &&
+    secondaryBlockSegment === segmentStreamingKey &&
+    secondaryRegionStreamingProviderId == null;
 
   return (
     <div className="home">
@@ -77,7 +81,11 @@ export function SecondaryRegionPage(props) {
                       onStreamingProviderIdChange(v === "" ? null : Number(v));
                     }}
                   >
-                    <option value="">All services</option>
+                    {secondaryRegionKey === "indian" ? (
+                      <option value="">Choose a service</option>
+                    ) : (
+                      <option value="">All services</option>
+                    )}
                     {streamingServiceOptions.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.label}
@@ -117,7 +125,11 @@ export function SecondaryRegionPage(props) {
                       : "US streaming for this taste"}
                 </div>
               </div>
-              {!secondaryStripReady || showSecondaryRefillEmptySkeleton ? (
+              {indianStreamingNeedsService ? (
+                <div className="empty-box">
+                  <div className="empty-text">Choose a service to see what’s streaming.</div>
+                </div>
+              ) : !secondaryStripReady || showSecondaryRefillEmptySkeleton ? (
                 <SkeletonStrip />
               ) : secondaryActiveRawRows.length === 0 ? (
                 <div className="empty-box">
@@ -126,15 +138,11 @@ export function SecondaryRegionPage(props) {
                       ? "No matching theatrical releases in the US right now"
                       : secondaryRegionStreamingProviderId != null
                         ? secondaryRegionKey === "indian"
-                          ? `No ${secondaryBlockStreamingTab === "movie" ? "movies" : "series"} for that service in India (TMDB) — try All services or another.`
+                          ? `No ${secondaryBlockStreamingTab === "movie" ? "movies" : "series"} for that service in India (TMDB) — try another.`
                           : `No ${secondaryBlockStreamingTab === "movie" ? "movies" : "series"} in this US discover view for that service — try All services or another.`
                         : secondaryBlockStreamingTab === "movie"
-                          ? secondaryRegionKey === "indian"
-                            ? "No matching streaming movies for this taste right now"
-                            : "No matching streaming movies in the US right now"
-                          : secondaryRegionKey === "indian"
-                            ? "No matching streaming series for this taste right now"
-                            : "No matching streaming series in the US right now"}
+                          ? "No matching streaming movies in the US right now"
+                          : "No matching streaming series in the US right now"}
                   </div>
                 </div>
               ) : (
