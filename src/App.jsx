@@ -53,6 +53,7 @@ import {
   titleCircleShareHeading,
   fetchCirclePendingInviteLabels,
   fetchCircleRatedTitles,
+  fetchMyUnratedCirclePicks,
   readJoinInviteTokenFromPath,
   PENDING_CIRCLE_INVITE_TOKEN_KEY,
   buildCircleInviteShareUrl,
@@ -110,6 +111,7 @@ import {
 import "./App.css";
 import { TEXT_SIZE_OPTIONS, readTextSize, writeTextSize } from "./textSize.js";
 import { PulsePage } from "./pages/PulsePage.jsx";
+import { StripPosterImage } from "./StripPosterImage.jsx";
 import { InTheatersPage } from "./pages/InTheatersPage.jsx";
 import { SecondaryRegionPage } from "./pages/SecondaryRegionPage.jsx";
 import { PostOnboardingHelpTour, HelpFullPage } from "./helpPage.jsx";
@@ -3880,29 +3882,15 @@ function stripBadgeDisplay(
   return { text: "—", title: "", color: "#e8c96a", pillClass: "", cinemastroCount: null };
 }
 
-/**
- * Label drawn on a TV poster: "TV · 2024 · S2".
- * `seasonHint` is one season (a circle season card, or the season on a Streaming series poster).
- * Otherwise the number is how many seasons TMDB lists, when that detail has loaded.
- * Movies return null. Their old line under the poster is not moved onto the art.
- */
-function posterInsideTypeYear(movie, tvMetaByTmdbId, seasonHint) {
-  if (movie?.type !== "tv") return null;
-  const meta = movie?.tmdbId != null ? tvMetaByTmdbId?.[movie.tmdbId] : null;
-  const hinted = Number(seasonHint?.seasonNumber);
-  const hasHint = Number.isInteger(hinted) && hinted > 0;
-  const counted = Number(meta?.seasonCount);
-  const seasonNumber = hasHint
-    ? hinted
-    : (Number.isFinite(counted) && counted > 0 ? counted : null);
-  const year = (hasHint ? seasonHint?.airYear : null) || meta?.latestYear || movie?.year || null;
-  const yearBit = year != null && String(year).trim() !== "" ? String(year) : "—";
-  if (seasonNumber != null) return `TV · ${yearBit} · S${seasonNumber}`;
-  return `TV · ${yearBit}`;
+/** Circle season card only: "S1". Other posters do not say Movie or TV. */
+function posterSeasonMark(seasonNumber) {
+  const n = Number(seasonNumber);
+  if (!Number.isInteger(n) || n < 1) return null;
+  return `S${n}`;
 }
 
-function PosterInsideMeta({ movie, tvMetaByTmdbId, seasonHint }) {
-  const label = posterInsideTypeYear(movie, tvMetaByTmdbId, seasonHint);
+function PosterInsideMeta({ seasonHint }) {
+  const label = posterSeasonMark(seasonHint?.seasonNumber);
   if (!label) return null;
   return <div className="poster-inside-meta">{label}</div>;
 }
@@ -3940,13 +3928,6 @@ function formatCircleListYear(movie, tvMetaByTmdbId) {
   const rd = movie.releaseDate;
   if (rd && /^\d{4}/.test(String(rd))) return String(rd).slice(0, 4);
   return "—";
-}
-
-/** Inline `Movie · YYYY` / `TV · YYYY` for circle title rows (same year rules as list year). */
-function formatCircleTypeYearShort(movie, tvMetaByTmdbId) {
-  if (!movie) return "· —";
-  const kind = movie.type === "tv" ? "TV" : "Movie";
-  return `${kind} · ${formatCircleListYear(movie, tvMetaByTmdbId)}`;
 }
 
 /** Same 24×24 path for circle (orange) and Cinemastro (gold) in strip + list — `currentColor` from parent. */
@@ -8018,8 +7999,12 @@ export default function App() {
     );
   }, [yourPicksTotalCandidates]);
 
-  /** Your Picks **For you** row — built in `rebuildMoreTabStrips`. */
+  /** Your Picks **Cinemastro recommends** row — built in `rebuildMoreTabStrips`. */
   const [moreForYouStrip, setMoreForYouStrip] = useState([]);
+  /** Your Picks **From your circles**: circle averages for titles this user has not rated. */
+  const [circlePickScores, setCirclePickScores] = useState([]);
+  const [circlePicksReady, setCirclePicksReady] = useState(false);
+  const [circlePicksMovies, setCirclePicksMovies] = useState(() => new Map());
   /** True while resolving TMDB watch providers for Your Picks (streaming filter on). */
   const [moreStripsLoading, setMoreStripsLoading] = useState(false);
 
@@ -8147,6 +8132,83 @@ export default function App() {
     availabilityRegion,
     topPickOffset,
   ]);
+
+  useEffect(() => {
+    if (screen !== "your-picks") return;
+    if (!user) {
+      setCirclePickScores([]);
+      setCirclePicksReady(true);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const picks = await fetchMyUnratedCirclePicks();
+        if (!cancelled) setCirclePickScores(picks);
+      } catch (e) {
+        console.warn("Your Picks circles:", e?.message || e);
+        if (!cancelled) setCirclePickScores([]);
+      } finally {
+        if (!cancelled) setCirclePicksReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, screen, circleRatedRefreshKey]);
+
+  const circlePicksVisible = useMemo(() => {
+    const out = [];
+    for (const row of circlePickScores) {
+      const id = `${row.mediaType}-${row.tmdbId}`;
+      if (userRatings[id] != null || userShowRatings[id] != null) continue;
+      const seasons = userSeasonRatings[id];
+      if (seasons && Object.keys(seasons).length > 0) continue;
+      const movie =
+        movieLookupById.get(id) ??
+        circlePicksMovies.get(id) ??
+        peekCircleTmdbHydrateCache(id) ??
+        null;
+      if (movie && isCatalogExcludedTitle(movie)) continue;
+      out.push({ id, score: row.score, mediaType: row.mediaType, tmdbId: row.tmdbId, movie });
+      if (out.length >= YOUR_PICKS_VISIBLE_MAX) break;
+    }
+    return out;
+  }, [circlePickScores, userRatings, userShowRatings, userSeasonRatings, movieLookupById, circlePicksMovies, circleTmdbHydrateTick]);
+
+  useEffect(() => {
+    if (screen !== "your-picks" || circlePickScores.length === 0) return;
+    const need = [];
+    for (const row of circlePickScores) {
+      const id = `${row.mediaType}-${row.tmdbId}`;
+      if (userRatings[id] != null || userShowRatings[id] != null) continue;
+      if (movieLookupById.has(id) || circlePicksMovies.has(id) || peekCircleTmdbHydrateCache(id)) continue;
+      need.push(row);
+      if (need.length >= YOUR_PICKS_VISIBLE_MAX + 4) break;
+    }
+    if (need.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const fetched = new Map();
+      for (let i = 0; i < need.length; i += 8) {
+        const chunk = need.slice(i, i + 8);
+        await Promise.all(
+          chunk.map(async (row) => {
+            const raw = await fetchTMDB(`/${row.mediaType}/${row.tmdbId}?language=en-US`);
+            if (cancelled || isTmdbApiErrorPayload(raw) || raw?.id == null) return;
+            fetched.set(`${row.mediaType}-${row.tmdbId}`, normalizeTMDBItem(raw, row.mediaType));
+          }),
+        );
+      }
+      if (!cancelled && fetched.size) {
+        mergeCircleTmdbHydrateCache(fetched);
+        setCirclePicksMovies((prev) => new Map([...prev, ...fetched]));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, circlePickScores, userRatings, userShowRatings, movieLookupById, circlePicksMovies]);
 
   useEffect(() => {
     let cancelled = false;
@@ -10775,10 +10837,10 @@ export default function App() {
   ]);
   const menuItems = [
     { id: "circles", label: "Circles" },
+    { id: "your-picks", label: "Your Picks" },
     { id: "pulse", label: "Pulse" },
     { id: "in-theaters", label: "In Theaters" },
     { id: "streaming-page", label: "Streaming" },
-    { id: "your-picks", label: "Your Picks" },
     { id: "watchlist", label: "Watchlist" },
     { id: "about", label: "About" },
     ...(shouldShowSecondaryRegionPage
@@ -11705,22 +11767,14 @@ export default function App() {
   }
 
   function renderStreamingSeriesStrip(recs) {
-    const today = new Date();
-    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     return (
       <div className="strip">
         {recs.map((rec) => {
           const poster = streamingSeriesPosterSrc(rec.movie);
-          const current = currentAiredSeason(tvSeasonsByTmdbId[Number(rec.movie?.tmdbId)], todayIso);
           return (
             <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
               <div className="strip-poster">
-                {poster ? <img src={poster} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
-                <PosterInsideMeta
-                  movie={rec.movie}
-                  tvMetaByTmdbId={tvStripMetaByTmdbId}
-                  seasonHint={current ? { seasonNumber: current.seasonNumber, airYear: current.airYear } : null}
-                />
+                <StripPosterImage src={poster} title={rec.movie.title} alt={rec.movie.title} />
                 <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
               </div>
             </div>
@@ -13093,19 +13147,10 @@ export default function App() {
                           </div>
                         ) : null}
                         <div className="strip-poster strip-poster--circle-recent">
-                          {stripPosterSrc ? (
-                            <img src={stripPosterSrc} alt="" loading="lazy" decoding="async" />
-                          ) : (
-                            <div className="strip-poster-fallback">🎬</div>
-                          )}
-                          <div className="poster-inside-meta">
-                            {seasonNumber != null
-                              ? posterInsideTypeYear(movie, tvStripMetaByTmdbId, {
-                                seasonNumber,
-                                airYear: season?.airYear,
-                              })
-                              : formatCircleTypeYearShort(movie, tvStripMetaByTmdbId)}
-                          </div>
+                          <StripPosterImage src={stripPosterSrc} title={movie?.title} alt="" />
+                          {posterSeasonMark(seasonNumber) ? (
+                            <div className="poster-inside-meta">{posterSeasonMark(seasonNumber)}</div>
+                          ) : null}
                         </div>
                         <CircleStripRingCineBelowTitle
                           groupRating={row.group_rating}
@@ -13151,10 +13196,9 @@ export default function App() {
                       seasonNumber != null && season?.airYear
                         ? season.airYear
                         : formatCircleListYear(movie, tvStripMetaByTmdbId);
-                    const kind = movie.type === "tv" ? "TV" : "Movie";
-                    const titleLineFull = `${movie.title} · ${
-                      seasonNumber != null ? `TV · ${year} · S${seasonNumber}` : `${kind} · ${year}`
-                    }`;
+                    const titleLineFull = seasonNumber != null
+                      ? `${movie.title} · ${year} · S${seasonNumber}`
+                      : `${movie.title} · ${year}`;
                     const listPosterSrc =
                       seasonNumber != null
                         ? seasonRowPosterSrc(season, movie.poster)
@@ -13203,8 +13247,8 @@ export default function App() {
                           <div className="wl-list-title circle-list-all-top__title" title={titleLineFull}>
                             {movie.title}
                           </div>
-                          <div className="circle-list-all-top__type-year" aria-label="Type and year">
-                            {seasonNumber != null ? `TV · ${year} · S${seasonNumber}` : `${kind} · ${year}`}
+                          <div className="circle-list-all-top__type-year" aria-label="Year">
+                            {seasonNumber != null ? `${year} · S${seasonNumber}` : year}
                           </div>
                           <CircleAllTopRatingsLine
                             row={row}
@@ -14345,7 +14389,7 @@ export default function App() {
                   {streamingDisplayNowRecs.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
-                        {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                        <StripPosterImage src={rec.movie.poster ? posterSrcThumb(rec.movie.poster) : ""} title={rec.movie.title} alt={rec.movie.title} />
                         <PosterInsideMeta movie={rec.movie} tvMetaByTmdbId={tvStripMetaByTmdbId} />
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
@@ -14384,7 +14428,7 @@ export default function App() {
                   {streamingDisplayPopularRecs.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
-                        {rec.movie.poster ? <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                        <StripPosterImage src={rec.movie.poster ? posterSrcThumb(rec.movie.poster) : ""} title={rec.movie.title} alt={rec.movie.title} />
                         <PosterInsideMeta movie={rec.movie} tvMetaByTmdbId={tvStripMetaByTmdbId} />
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
@@ -14411,12 +14455,53 @@ export default function App() {
 
       {screen === "your-picks" && (
         <div className="home">
-          <PageShell title="Your Picks" subtitle="CF predictions first, then high predicted, then popular — five at a time (up to 20)">
-            {/* Strips: score badge bottom-right; ✨/📈 icon-only pill bottom-left. */}
-            {(hasYourPicksStripSource || yourPicksLoading) && (
+          <PageShell title="Your Picks" subtitle="Curated for your taste">
+            {circlePicksVisible.length > 0 && (
               <div className="section" style={{ paddingTop: 0 }}>
                 <div className="section-header">
-                  <div className="section-title">🔥 For you</div>
+                  <div className="section-title">From your circles</div>
+                </div>
+                <div className="strip">
+                  {circlePicksVisible.map((row) => {
+                    const movie = row.movie;
+                    const title = movie?.title || "Title";
+                    return (
+                      <div
+                        className="strip-card"
+                        key={row.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${title}, from your circles, ${formatScore(row.score)}`}
+                        onClick={() => { if (movie) openDetail(movie, null); }}
+                        onKeyDown={(e) => {
+                          if ((e.key === "Enter" || e.key === " ") && movie) {
+                            e.preventDefault();
+                            openDetail(movie, null);
+                          }
+                        }}
+                      >
+                        <div className="strip-poster">
+                          <StripPosterImage src={movie?.poster ? posterSrcThumb(movie.poster) : ""} title={movie?.title} alt="" />
+                          {movie ? <PosterInsideMeta movie={movie} tvMetaByTmdbId={tvStripMetaByTmdbId} /> : null}
+                          <div
+                            className="strip-badge"
+                            style={{ color: "#f97316" }}
+                            title="Average of your circle scores"
+                          >
+                            <span className="strip-badge-score">{formatScore(row.score)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {/* Strips: score badge bottom-right; ✨/📈 icon-only pill bottom-left. */}
+            {(hasYourPicksStripSource || yourPicksLoading) && (
+              <div className="section" style={{ paddingTop: circlePicksVisible.length > 0 ? undefined : 0 }}>
+                <div className="section-header">
+                  <div className="section-title">Cinemastro recommends</div>
                   {hasYourPicksStripSource && (
                     <button
                       type="button"
@@ -14441,7 +14526,7 @@ export default function App() {
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(row.rec.movie, row.rec); } }}
                       >
                         <div className="strip-poster">
-                          {row.rec.movie.poster ? <img src={posterSrcThumb(row.rec.movie.poster)} alt="" loading="lazy" decoding="async" /> : <div className="strip-poster-fallback">🎬</div>}
+                          <StripPosterImage src={row.rec.movie.poster ? posterSrcThumb(row.rec.movie.poster) : ""} title={row.rec.movie.title} alt="" />
                           <span
                             className={`strip-kind-icon ${row.kind === "pick" ? "strip-kind-icon--pick" : "strip-kind-icon--pop"}`}
                             aria-hidden
@@ -14512,7 +14597,7 @@ export default function App() {
                 )}
               </div>
             )}
-            {!hasYourPicksStripSource && !yourPicksLoading && (
+            {!hasYourPicksStripSource && !yourPicksLoading && circlePicksReady && circlePicksVisible.length === 0 && (
               <div className="section">
                 <div className="no-recs">
                   <div className="no-recs-text">Predictions will show here after your first catalogue load and ratings.<br />Browse <strong>In Theaters</strong> or <strong>Streaming</strong> to get started.</div>
@@ -14681,12 +14766,7 @@ export default function App() {
                 return (
                   <div className="disc-card" key={m.id} onClick={() => openDetail(m, rec)}>
                     <div className="disc-poster">
-                      {m.poster ? <img src={posterSrcThumb(m.poster)} alt={m.title} loading="lazy" decoding="async" /> : <div className="disc-poster-fallback">🎬</div>}
-                      {m.type === "movie" ? (
-                        <div className="disc-type">Movie</div>
-                      ) : (
-                        <PosterInsideMeta movie={m} tvMetaByTmdbId={tvStripMetaByTmdbId} />
-                      )}
+                      <StripPosterImage src={m.poster ? posterSrcThumb(m.poster) : ""} title={m.title} alt={m.title} />
                       <div className="disc-badge">
                         {myRating ? <span className="disc-rated-badge">★ {myRating}</span>
                           : discBd.text === "—"

@@ -728,6 +728,65 @@ export async function fetchCircleRatedTitles({ circleId, limit, offset, view = "
   }
 }
 
+const CIRCLE_PICKS_PAGE = 50;
+const CIRCLE_PICKS_PAGE_CAP = 4;
+
+/**
+ * Titles other members have published in the user's circles, highest first.
+ * Each circle contributes its average. A title in more than one circle uses the average of those scores.
+ * A circle where this user already has a score is left out. At most four pages per circle.
+ */
+export async function fetchMyUnratedCirclePicks() {
+  const circles = (await fetchMyCircles()).filter((c) => c?.status === "active" && c?.id);
+  const byKey = new Map();
+  await Promise.all(
+    circles.map(async (circle) => {
+      let offset = 0;
+      for (let page = 0; page < CIRCLE_PICKS_PAGE_CAP; page += 1) {
+        const { data, error } = await supabase.rpc("get_circle_rated_all_grid", {
+          p_circle_id: circle.id,
+          p_limit: CIRCLE_PICKS_PAGE,
+          p_offset: offset,
+        });
+        if (error) {
+          console.warn("Your Picks circles:", error.message);
+          return;
+        }
+        const payload = normalizeCircleRatedRpcPayload(data);
+        if (payload.gated) return;
+        for (const t of payload.titles) {
+          if (t.viewer_score != null && Number.isFinite(Number(t.viewer_score))) continue;
+          const score = Number(t.group_rating);
+          const tmdbId = Number(t.tmdb_id);
+          const mediaType = String(t.media_type || "").toLowerCase();
+          if (!Number.isFinite(score) || !Number.isFinite(tmdbId)) continue;
+          if (mediaType !== "movie" && mediaType !== "tv") continue;
+          const key = `${mediaType}-${tmdbId}`;
+          let bucket = byKey.get(key);
+          if (!bucket) {
+            bucket = { mediaType, tmdbId, scores: [] };
+            byKey.set(key, bucket);
+          }
+          bucket.scores.push(score);
+        }
+        if (!payload.has_more || payload.titles.length === 0) return;
+        offset += payload.titles.length;
+      }
+    }),
+  );
+  const picks = [];
+  for (const bucket of byKey.values()) {
+    const avg = bucket.scores.reduce((sum, n) => sum + n, 0) / bucket.scores.length;
+    picks.push({
+      mediaType: bucket.mediaType,
+      tmdbId: bucket.tmdbId,
+      score: Math.round(avg * 10) / 10,
+    });
+  }
+  picks.sort((a, b) => b.score - a.score || a.tmdbId - b.tmdbId);
+  return picks;
+}
+
 /** Decline runs directly under the "recipient can respond to invite" UPDATE policy. No Edge. */
 export async function declineCircleInvite({ inviteId }) {
   if (!inviteId) throw new Error("Missing invite.");

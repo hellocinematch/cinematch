@@ -1,5 +1,21 @@
 # Changelog
 
+## 7.0.160
+
+- **Top menu:** **Your Picks** sits next to **Circles**.
+
+## 7.0.159
+
+- **Empty posters:** When a poster image is missing or fails to load, the title is shown inside that box. Posters that load stay picture-only.
+
+## 7.0.158
+
+- **Posters:** The **Movie** and **TV · year** label is gone from the art. A circle season card still says **S1**.
+
+## 7.0.157
+
+- **Your Picks:** The line under the title is **Curated for your taste**. **From your circles** is the top row: titles other people in the user’s circles have rated, which this user has not. Highest score first. A title in more than one circle shows the average of those circle scores. The row is hidden when there is nothing to show. The other row is **Cinemastro recommends**.
+
 ## 7.0.156
 
 - **Title screen:** Opening a title reads that user’s score from `ratings`. If it is there, the screen shows it and the poster copy for that title is updated. A miss or a failed read leaves the login copy alone.

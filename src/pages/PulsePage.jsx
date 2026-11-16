@@ -1,3 +1,5 @@
+import { StripPosterImage } from "../StripPosterImage.jsx";
+
 /**
  * Pulse — trending & popular strips (worldwide, or India / Canada per Where you watch).
  * Presentational only; state and effects stay in `App.jsx`.
@@ -69,11 +71,7 @@ export function PulsePage(props) {
                   {pulseTrendingRecsResolved.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
-                        {rec.movie.poster ? (
-                          <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" />
-                        ) : (
-                          <div className="strip-poster-fallback">🎬</div>
-                        )}
+                        <StripPosterImage src={rec.movie.poster ? posterSrcThumb(rec.movie.poster) : ""} title={rec.movie.title} alt={rec.movie.title} />
                         <PosterInsideMeta movie={rec.movie} tvMetaByTmdbId={tvStripMetaByTmdbId} />
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>
@@ -96,11 +94,7 @@ export function PulsePage(props) {
                   {pulsePopularRecsResolved.map((rec) => (
                     <div className="strip-card" key={rec.movie.id} onClick={() => openDetail(rec.movie, rec)}>
                       <div className="strip-poster">
-                        {rec.movie.poster ? (
-                          <img src={posterSrcThumb(rec.movie.poster)} alt={rec.movie.title} loading="lazy" decoding="async" />
-                        ) : (
-                          <div className="strip-poster-fallback">🎬</div>
-                        )}
+                        <StripPosterImage src={rec.movie.poster ? posterSrcThumb(rec.movie.poster) : ""} title={rec.movie.title} alt={rec.movie.title} />
                         <PosterInsideMeta movie={rec.movie} tvMetaByTmdbId={tvStripMetaByTmdbId} />
                         <StripPosterBadge movie={rec.movie} predicted={rec.predicted} predictedNeighborCount={recNeighborCount(rec)} />
                       </div>

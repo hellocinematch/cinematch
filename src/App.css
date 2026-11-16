@@ -640,7 +640,8 @@
   .circle-recent-strip-menu__item--danger:hover:not(:disabled) { background:rgba(224,80,80,0.08); }
   .strip-poster { width:152px; height:212px; border-radius:12px; overflow:hidden; position:relative; border:1px solid #1e1e1e; background:#1a1a1a; }
   .strip-poster img { width:100%; height:100%; object-fit:cover; }
-  .strip-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:40px; }
+  .strip-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:40px; padding:14px 10px; box-sizing:border-box; }
+  .strip-poster-fallback__title { font-family:'DM Serif Display',serif; font-size:calc(16px * var(--cm-read)); line-height:1.25; color:#f0ebe0; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; }
   .strip-badge { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.82); padding:4px 8px; border-radius:10px; font-size:calc(12px * var(--cm-read)); color:#e8c96a; font-family:'DM Serif Display',serif; z-index:2; }
   /* v3.0.0: Cinemastro community avg — Option B gold edge; TMDB uses base .strip-badge only. */
   .strip-badge.strip-badge--cinemastro { border:1px solid rgba(201,162,39,0.65); box-shadow:0 0 0 1px rgba(232,201,106,0.1); }
@@ -967,7 +968,7 @@
   .disc-card:hover { transform:translateY(-3px); }
   .disc-poster { width:100%; aspect-ratio:2/3; border-radius:12px; overflow:hidden; position:relative; border:1px solid #1e1e1e; background:#1a1a1a; }
   .disc-poster img { width:100%; height:100%; object-fit:cover; }
-  .disc-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:48px; }
+  .disc-poster-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:48px; padding:14px 10px; box-sizing:border-box; }
   .disc-badge { position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.82); padding:4px 8px; border-radius:10px; font-size:11px; font-family:'DM Serif Display',serif; z-index:2; }
   .disc-type { position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.75); border:1px solid #333; padding:2px 7px; border-radius:8px; font-size:9px; letter-spacing:1px; text-transform:uppercase; color:#aaa; }
   .disc-rated-badge { color:#88cc88; }
