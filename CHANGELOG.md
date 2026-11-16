@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.161
+
+- **Opening page first:** On a weekend, New this week and Circles finish before the other title lists and Your Picks. On other days, Circles finishes first. The rest of a member's ratings load after that, and Your Picks is built from the full set.
+
 ## 7.0.160
 
 - **Top menu:** **Your Picks** sits next to **Circles**.

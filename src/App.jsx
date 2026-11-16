@@ -93,7 +93,7 @@ import {
 import { fingerprintMyCirclesList } from "./myCirclesListFingerprint.js";
 import { PUBLIC_BETA_LABEL } from "./productLabels.js";
 import LoggedOutLanding from "./LoggedOutLanding.jsx";
-import { weekendHomeScreen } from "./newThisWeek.js";
+import { isNewThisWeekWindow, weekendHomeScreen } from "./newThisWeek.js";
 import { NewThisWeekPage } from "./pages/NewThisWeekPage.jsx";
 import { formatPublicStat } from "./formatPublicStat.js";
 import { deleteMyAccount, isDeleteAccountConfirm, DELETE_CONFIRM_WORD } from "./accountDelete.js";
@@ -768,6 +768,40 @@ function spaUrlWithoutOverlays() {
 const CATALOGUE_BOOTSTRAP_SAFETY_MS = 22_000;
 /** If the home list never reports back, start the other title lists anyway. */
 const HOME_FEED_RELEASE_MS = 20_000;
+/** PostgREST stops a single read at this many rows. Later pages load after the opening page. */
+const RATINGS_PAGE_SIZE = 1000;
+
+function mapsFromRatingRows(ratingsData, seasonData) {
+  const wholeMap = {};
+  const anchorScores = {};
+  for (const r of ratingsData || []) {
+    const ty = String(r.media_type ?? "").toLowerCase();
+    if (ty !== "movie" && ty !== "tv") continue;
+    const tid = Number(r.tmdb_id);
+    if (!Number.isFinite(tid)) continue;
+    const key = `${ty}-${tid}`;
+    if (r.score_from_seasons === true) anchorScores[key] = r.score;
+    else wholeMap[key] = r.score;
+  }
+  const seasonMap = seasonRatingsMapFromRows(seasonData);
+  const ratingsMap = buildEffectiveRatingsMap(wholeMap, seasonMap);
+  for (const [key, score] of Object.entries(anchorScores)) {
+    if (!(key in ratingsMap)) ratingsMap[key] = score;
+  }
+  return { wholeMap, seasonMap, ratingsMap };
+}
+
+/** Keep a score saved while later pages were still loading. */
+function mergeMapPreservingEdits(rebuilt, prev, snapshot) {
+  const next = { ...rebuilt };
+  for (const key of Object.keys(snapshot || {})) {
+    if (!Object.prototype.hasOwnProperty.call(prev, key)) delete next[key];
+  }
+  for (const [key, value] of Object.entries(prev || {})) {
+    if (snapshot?.[key] !== value) next[key] = value;
+  }
+  return next;
+}
 /** Startup logo + circle must stop if the session check or the following load never finishes. */
 const STARTUP_COVER_MAX_MS = 15_000;
 /** Defer non-critical home fetches so first paint / post-login routing wins on slow mobile networks. */
@@ -4186,10 +4220,18 @@ export default function App() {
   const [catalogue, setCatalogue] = useState([]);
   /** After first bootstrap attempt finishes or safety timeout — avoids infinite "Loading Cinemastro…" when TMDB hangs. */
   const [catalogueBootstrapDone, setCatalogueBootstrapDone] = useState(false);
-  /** Other title lists wait until the home screen has finished its own fetch. */
+  /** Other title lists wait until the opening page has finished its own fetch. */
   const [homeFeedReady, setHomeFeedReady] = useState(false);
+  /** New this week has drawn. On a weekend this is required before the other lists start. */
+  const [ntwSettled, setNtwSettled] = useState(false);
+  /** Every saved score is in memory. Your Picks waits for this so a rated title is not recommended. */
+  const [ratingsHistoryReady, setRatingsHistoryReady] = useState(false);
   const onboardingRouteRef = useRef(null);
-  const releaseHomeFeed = useCallback(() => setHomeFeedReady(true), []);
+  const ratingRowsRef = useRef([]);
+  const seasonRowsRef = useRef([]);
+  const ratingsSnapshotRef = useRef({ ratings: {}, show: {}, seasons: {} });
+  const ratingsBackfillFromRef = useRef({ ratingsFrom: null, seasonsFrom: null });
+  const releaseHomeFeed = useCallback(() => setNtwSettled(true), []);
   const [catalogueRetryBusy, setCatalogueRetryBusy] = useState(false);
   /** True after the first `getSession()` returns, so an empty auth event cannot flash the signed-out page. */
   const startupSessionSettledRef = useRef(false);
@@ -5107,10 +5149,18 @@ export default function App() {
   }, [homeFeedReady, screen, publicLandingReady]);
 
   useEffect(() => {
-    if (homeFeedReady) return undefined;
-    if (screen === "circles" && circlesLoaded) setHomeFeedReady(true);
-    return undefined;
-  }, [homeFeedReady, screen, circlesLoaded]);
+    if (homeFeedReady) return;
+    if (!user) {
+      if (ntwSettled) setHomeFeedReady(true);
+      return;
+    }
+    if (isNewThisWeekWindow()) {
+      const openingWeekend = screen === "new-this-week" || screen === "loading-catalogue" || screen === "splash";
+      if (circlesLoaded && (ntwSettled || !openingWeekend)) setHomeFeedReady(true);
+      return;
+    }
+    if (circlesLoaded) setHomeFeedReady(true);
+  }, [homeFeedReady, user, ntwSettled, circlesLoaded, screen]);
 
   useEffect(() => {
     if (!homeFeedReady) return undefined;
@@ -6316,6 +6366,7 @@ export default function App() {
       setMatchLoading(false);
       return;
     }
+    if (!ratingsHistoryReady) return;
     const hasRatings = Object.keys(userRatings).length > 0;
     const catalogueForMatch =
       Array.isArray(catalogueForRecs) && catalogueForRecs.length > 0
@@ -6462,6 +6513,7 @@ export default function App() {
     inTheatersForRecs,
     streamingMoviesForRecs,
     streamingTVForRecs,
+    ratingsHistoryReady,
   ]);
 
   /** Page-local `predict_cached` for strips on the active screen only (no `your_picks_page` here). */
@@ -6749,33 +6801,42 @@ export default function App() {
 
   async function loadUserData() {
     if (!user) return { ratingCount: 0 };
+    const ratingsQuery = supabase
+      .from("ratings")
+      .select("tmdb_id, media_type, score, score_from_seasons")
+      .eq("user_id", user.id)
+      .order("media_type", { ascending: true })
+      .order("tmdb_id", { ascending: true })
+      .range(0, RATINGS_PAGE_SIZE - 1);
+    const seasonQuery = supabase
+      .from("season_ratings")
+      .select("tmdb_id, season_number, score")
+      .eq("user_id", user.id)
+      .order("tmdb_id", { ascending: true })
+      .order("season_number", { ascending: true })
+      .range(0, RATINGS_PAGE_SIZE - 1);
     const [{ data: ratingsData }, { data: watchlistData }, { data: seasonData, error: seasonErr }] = await Promise.all([
-      supabase.from("ratings").select("*").eq("user_id", user.id),
+      ratingsQuery,
       supabase.from("watchlist").select("*").eq("user_id", user.id).order("sort_index", { ascending: true }),
-      supabase.from("season_ratings").select("tmdb_id, season_number, score").eq("user_id", user.id),
+      seasonQuery,
     ]);
     if (seasonErr) console.warn(`Could not read season scores (apply 20260925120000): ${seasonErr.message}`);
+    ratingRowsRef.current = ratingsData || [];
+    seasonRowsRef.current = seasonErr ? [] : (seasonData || []);
     if (ratingsData) {
-      const wholeMap = {};
-      const anchorScores = {};
-      ratingsData.forEach((r) => {
-        const ty = String(r.media_type ?? "").toLowerCase();
-        if (ty !== "movie" && ty !== "tv") return;
-        const tid = Number(r.tmdb_id);
-        if (!Number.isFinite(tid)) return;
-        const key = `${ty}-${tid}`;
-        if (r.score_from_seasons === true) anchorScores[key] = r.score;
-        else wholeMap[key] = r.score;
-      });
-      const seasonMap = seasonErr ? {} : seasonRatingsMapFromRows(seasonData);
-      const ratingsMap = buildEffectiveRatingsMap(wholeMap, seasonMap);
-      for (const [key, score] of Object.entries(anchorScores)) {
-        if (!(key in ratingsMap)) ratingsMap[key] = score;
-      }
+      const { wholeMap, seasonMap, ratingsMap } = mapsFromRatingRows(ratingRowsRef.current, seasonRowsRef.current);
+      ratingsSnapshotRef.current = { ratings: ratingsMap, show: wholeMap, seasons: seasonMap };
       setUserShowRatings(wholeMap);
       setUserSeasonRatings(seasonMap);
       setUserRatings(ratingsMap);
     }
+    const ratingsFull = (ratingsData?.length ?? 0) >= RATINGS_PAGE_SIZE;
+    const seasonsFull = !seasonErr && (seasonData?.length ?? 0) >= RATINGS_PAGE_SIZE;
+    ratingsBackfillFromRef.current = {
+      ratingsFrom: ratingsFull ? RATINGS_PAGE_SIZE : null,
+      seasonsFrom: seasonsFull ? RATINGS_PAGE_SIZE : null,
+    };
+    setRatingsHistoryReady(!ratingsFull && !seasonsFull);
     if (watchlistData?.length) {
       setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
     }
@@ -6837,6 +6898,53 @@ export default function App() {
       showLanguageFirst: loadedLangFirst,
     };
   }
+
+  useEffect(() => {
+    if (!user || !homeFeedReady || ratingsHistoryReady) return undefined;
+    const uid = user.id;
+    const { ratingsFrom, seasonsFrom } = ratingsBackfillFromRef.current;
+    let cancelled = false;
+    (async () => {
+      try {
+        async function restOf(table, select, orders, from) {
+          if (from == null) return [];
+          const rows = [];
+          let offset = from;
+          while (!cancelled) {
+            let query = supabase.from(table).select(select).eq("user_id", uid);
+            for (const column of orders) query = query.order(column, { ascending: true });
+            const { data, error } = await query.range(offset, offset + RATINGS_PAGE_SIZE - 1);
+            if (error) throw error;
+            const page = data || [];
+            rows.push(...page);
+            if (page.length < RATINGS_PAGE_SIZE) break;
+            offset += RATINGS_PAGE_SIZE;
+          }
+          return rows;
+        }
+        const [moreRatings, moreSeasons] = await Promise.all([
+          restOf("ratings", "tmdb_id, media_type, score, score_from_seasons", ["media_type", "tmdb_id"], ratingsFrom),
+          restOf("season_ratings", "tmdb_id, season_number, score", ["tmdb_id", "season_number"], seasonsFrom),
+        ]);
+        if (cancelled) return;
+        ratingRowsRef.current = [...ratingRowsRef.current, ...moreRatings];
+        seasonRowsRef.current = [...seasonRowsRef.current, ...moreSeasons];
+        const { wholeMap, seasonMap, ratingsMap } = mapsFromRatingRows(ratingRowsRef.current, seasonRowsRef.current);
+        const snap = ratingsSnapshotRef.current;
+        setUserShowRatings((prev) => mergeMapPreservingEdits(wholeMap, prev, snap.show));
+        setUserSeasonRatings((prev) => mergeMapPreservingEdits(seasonMap, prev, snap.seasons));
+        setUserRatings((prev) => mergeMapPreservingEdits(ratingsMap, prev, snap.ratings));
+        ratingsSnapshotRef.current = { ratings: ratingsMap, show: wholeMap, seasons: seasonMap };
+      } catch (e) {
+        console.warn("Could not finish reading ratings:", e?.message || e);
+      } finally {
+        if (!cancelled) setRatingsHistoryReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, homeFeedReady, ratingsHistoryReady]);
 
   /** Persisted on auth user so sign-in / new tab can skip onboarding after first completion. */
   async function markOnboardingComplete() {
@@ -7285,6 +7393,10 @@ export default function App() {
     setUserRatings({}); setWatchlist([]);
     setUserShowRatings({});
     setUserSeasonRatings({});
+    setRatingsHistoryReady(false);
+    ratingRowsRef.current = [];
+    seasonRowsRef.current = [];
+    ratingsBackfillFromRef.current = { ratingsFrom: null, seasonsFrom: null };
     setMatchData(null);
     setSelectedStreamingProviderIds([]);
     setShowGenreIds([]);
@@ -8009,6 +8121,11 @@ export default function App() {
   const [moreStripsLoading, setMoreStripsLoading] = useState(false);
 
   useEffect(() => {
+    if (!ratingsHistoryReady) {
+      setMoreStripsLoading(true);
+      setMoreForYouStrip([]);
+      return undefined;
+    }
     let cancelled = false;
     /** Canada / India check that country's `flatrate` against the saved ids offered there; US keeps the US path. */
     const providerRegion = availabilityRegion === "CA" || availabilityRegion === "IN" ? availabilityRegion : "US";
@@ -8131,6 +8248,7 @@ export default function App() {
     selectedStreamingProviderIds,
     availabilityRegion,
     topPickOffset,
+    ratingsHistoryReady,
   ]);
 
   useEffect(() => {
@@ -8140,6 +8258,7 @@ export default function App() {
       setCirclePicksReady(true);
       return;
     }
+    if (!ratingsHistoryReady) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -8155,7 +8274,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [user, screen, circleRatedRefreshKey]);
+  }, [user, screen, circleRatedRefreshKey, ratingsHistoryReady]);
 
   const circlePicksVisible = useMemo(() => {
     const out = [];
