@@ -1,5 +1,54 @@
 # Changelog
 
+## 7.0.177
+
+- **Streaming:** The Genres list is a readable box under the Genres button. The words wrap instead of running off the left edge.
+
+## 7.0.176
+
+- **Streaming:** The Genres list closes when you click anywhere else. It no longer stays open on the page.
+
+## 7.0.175
+
+- **Streaming and Indian:** All services, Series, Movies, and Genres are one row of boxes. Series or Movies, whichever is on, has a gold edge. Menus keep a chevron.
+
+## 7.0.174
+
+- **Streaming:** All services, Series, and Movies sit on the Now Streaming line. The page-name box is the title and the sentence again.
+
+## 7.0.173
+
+- **Indian:** In theaters and Streaming are both on the page. The service, Series, and Movies sit on the Streaming heading.
+- **Streaming:** All services, Series, Movies, and Genres sit in the page-name box. The selected word is gold.
+
+## 7.0.172
+
+- **Page names:** The gradient box has square bottom corners.
+
+## 7.0.171
+
+- **Page names:** The gradient box is back to the softer gold, now washing up from the bottom instead of the top corner.
+
+## 7.0.170
+
+- **Page names:** The gradient box is a little brighter, and the warm fill stays visible through the bottom edge.
+
+## 7.0.169
+
+- **Page names:** The gradient box runs the full width and sits against the top bar. Section headings are unchanged.
+
+## 7.0.168
+
+- **Page names:** Your Picks, Pulse, and the other page names sit in a rounded gradient box, with no line around it. Section headings keep their line.
+
+## 7.0.167
+
+- **Page names:** The block capitals are one step larger, 16px. Section names stay the lighter 12px label.
+
+## 7.0.166
+
+- **Headings:** Page names are bold block capitals. Section names stay the lighter label, with a line under each one. The page-name bar has space before the first row.
+
 ## 7.0.165
 
 - **Headings:** Page names and row titles use a small uppercase sans, so the wordmark stays the brand. A hairline runs under the dark page-name bar. The sentence under a page name stays sentence case and quieter. Film titles, the wordmark, startup, and sign-in are unchanged.

@@ -3172,12 +3172,35 @@ function AppPrimaryNav({
   );
 }
 
-function PageShell({ title, subtitle, children }) {
+function StreamingGenreMenu({ active, children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const onPointerDown = (event) => {
+      const menu = ref.current;
+      if (!menu?.open) return;
+      if (event.target instanceof Node && menu.contains(event.target)) return;
+      menu.open = false;
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+  return (
+    <details
+      ref={ref}
+      className={`streaming-page-genre-details choice-box choice-box--menu${active ? " choice-box--on" : ""}`}
+    >
+      {children}
+    </details>
+  );
+}
+
+function PageShell({ title, subtitle, headerExtra, children }) {
   return (
     <div className="discover">
-      <div className="discover-header">
+      <div className={`discover-header${headerExtra ? " discover-header--controls" : ""}`}>
         <div className="discover-title">{title}</div>
         {subtitle ? <div className="search-status" style={{ paddingLeft: 0 }}>{subtitle}</div> : null}
+        {headerExtra || null}
       </div>
       {children}
     </div>
@@ -4768,7 +4791,7 @@ export default function App() {
   // 1) prevent page-level horizontal gestures (except intended x-scrollers)
   // 2) aggressively clamp viewport/document x back to 0 after touch/scroll/layout events
   useEffect(() => {
-    const ALLOW_PAN_X_SELECTOR = ".strip, .filter-row, .app-primary-nav__links, .streaming-page-filter-scroll";
+    const ALLOW_PAN_X_SELECTOR = ".strip, .filter-row, .app-primary-nav__links, .streaming-page-filter-scroll, .choice-line__scroll";
     let startX = 0;
     let startY = 0;
     let allowPanX = false;
@@ -6351,6 +6374,40 @@ export default function App() {
       .slice(0, SECONDARY_STRIP_TAB_CAP)
       .map((m) => byId[m.id] ?? tmdbOnlyRec(m));
   }, [secondaryActiveRawRows, secondaryStripRecsResolved]);
+  /** Indian page shows theaters and streaming together, so each list is resolved on its own. */
+  const secondaryTheaterRecsVisible = useMemo(() => {
+    const byId = Object.fromEntries(secondaryStripRecsResolved.map((r) => [r.movie.id, r]));
+    return secondaryTheaterRows
+      .slice(0, SECONDARY_STRIP_TAB_CAP)
+      .map((m) => byId[m.id] ?? tmdbOnlyRec(m));
+  }, [secondaryTheaterRows, secondaryStripRecsResolved]);
+  const secondaryStreamingRecsVisible = useMemo(() => {
+    let rows;
+    if (secondaryRegionStreamingProviderId == null) {
+      const pool =
+        secondaryBlockStreamingTab === "movie" ? secondaryStreamingMovieRows : secondaryStreamingTvRows;
+      const k = Math.min(pool.length, secondaryRegionAllServicesStreamDisplayLen, SECONDARY_REGION_STREAM_REVEAL_MAX);
+      rows = pool.slice(0, k);
+    } else {
+      const cap = Math.min(secondaryRegionRefillDisplayLen, STREAMING_PAGE_PROVIDER_REFILL_CAP);
+      rows =
+        secondaryBlockStreamingTab === "movie"
+          ? secondaryRegionRefillMoviesFiltered.slice(0, cap)
+          : secondaryRegionRefillTvFiltered.slice(0, cap);
+    }
+    const byId = Object.fromEntries(secondaryStripRecsResolved.map((r) => [r.movie.id, r]));
+    return rows.slice(0, SECONDARY_STRIP_TAB_CAP).map((m) => byId[m.id] ?? tmdbOnlyRec(m));
+  }, [
+    secondaryBlockStreamingTab,
+    secondaryStreamingMovieRows,
+    secondaryStreamingTvRows,
+    secondaryRegionStreamingProviderId,
+    secondaryRegionRefillMoviesFiltered,
+    secondaryRegionRefillTvFiltered,
+    secondaryRegionRefillDisplayLen,
+    secondaryRegionAllServicesStreamDisplayLen,
+    secondaryStripRecsResolved,
+  ]);
 
   /**
    * Global CF hydration: `your_picks_page` + optional `predict_cached` overlay for rec ids.
@@ -7929,7 +7986,7 @@ export default function App() {
 
   const showSecondaryRefillEmptySkeleton = Boolean(
     screen === "secondary-region" &&
-      secondaryBlockSegment === SECONDARY_BLOCK_STREAMING &&
+      (secondaryRegionKey === "indian" || secondaryBlockSegment === SECONDARY_BLOCK_STREAMING) &&
       secondaryRegionStreamingProviderId != null &&
       secondaryRegionRefillLoading &&
       (secondaryBlockStreamingTab === "movie"
@@ -14437,58 +14494,56 @@ export default function App() {
             subtitle="New & popular — optional service filter (profile picks apply only in Your Picks). Scored for your taste."
           >
             <div className="section" style={{ paddingTop: 0 }}>
-              <div className="filter-row streaming-page-filter-row" style={{ paddingTop: 0, paddingBottom: 4 }}>
-                <div className="streaming-page-filter-scroll">
-                  <select
-                    id="streaming-page-service"
-                    className={`streaming-page-service-select${streamingPageProviderId != null ? " streaming-page-service-select--active" : ""}`}
-                    aria-label="Filter by streaming service"
-                    value={streamingPageProviderId == null ? "" : String(streamingPageProviderId)}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setStreamingPageProviderId(v === "" ? null : Number(v));
-                    }}
-                  >
-                    <option value="">All services</option>
-                    {streamingPageServicesForRegion(availabilityRegion).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="streaming-page-service-pill-divider" aria-hidden />
-                  <button type="button" className={`filter-pill ${streamingTab === "tv" ? "active" : ""}`} onClick={() => setStreamingTab("tv")}>
-                    Series
-                  </button>
-                  <button type="button" className={`filter-pill ${streamingTab === "movie" ? "active" : ""}`} onClick={() => setStreamingTab("movie")}>
-                    Movies
-                  </button>
-                </div>
-                <span className="streaming-page-service-pill-divider" aria-hidden />
-                <details className="streaming-page-genre-details">
-                  <summary className={`streaming-page-genre-summary${streamingPageIncludedHidableGenreIds.length > 0 ? " streaming-page-genre-summary--active" : ""}`}>
-                    Genres
-                    {streamingPageIncludedHidableGenreIds.length > 0 ? ` · ${streamingPageIncludedHidableGenreIds.length}` : ""}
-                  </summary>
-                  <div className="streaming-page-genre-panel">
-                    <div className="streaming-page-genre-hint">
-                      Animation, documentary, reality &amp; kids are hidden by default (family stays). Check to include.
-                    </div>
-                    {STREAMING_PAGE_GENRE_TOGGLE_OPTIONS.map((opt) => (
-                      <label key={opt.id} className="streaming-page-genre-option">
-                        <input
-                          type="checkbox"
-                          checked={streamingPageIncludedHidableGenreIds.includes(opt.id)}
-                          onChange={() => toggleStreamingPageIncludedGenre(opt.id)}
-                        />
-                        <span>{opt.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </details>
-              </div>
-              <div className="section-header">
+              <div className="section-header section-header--choices">
                 <div className="section-title">Now Streaming</div>
+                <div className="choice-line choice-line--beside">
+                  <div className="choice-boxes">
+                    <select
+                      id="streaming-page-service"
+                      className={`choice-box choice-box--menu${streamingPageProviderId != null ? " choice-box--on" : ""}`}
+                      aria-label="Filter by streaming service"
+                      value={streamingPageProviderId == null ? "" : String(streamingPageProviderId)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setStreamingPageProviderId(v === "" ? null : Number(v));
+                      }}
+                    >
+                      <option value="">All services</option>
+                      {streamingPageServicesForRegion(availabilityRegion).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" className={`choice-box${streamingTab === "tv" ? " choice-box--on" : ""}`} onClick={() => setStreamingTab("tv")}>
+                      Series
+                    </button>
+                    <button type="button" className={`choice-box${streamingTab === "movie" ? " choice-box--on" : ""}`} onClick={() => setStreamingTab("movie")}>
+                      Movies
+                    </button>
+                    <StreamingGenreMenu active={streamingPageIncludedHidableGenreIds.length > 0}>
+                    <summary className={`streaming-page-genre-summary${streamingPageIncludedHidableGenreIds.length > 0 ? " streaming-page-genre-summary--active" : ""}`}>
+                      Genres
+                      {streamingPageIncludedHidableGenreIds.length > 0 ? ` · ${streamingPageIncludedHidableGenreIds.length}` : ""}
+                    </summary>
+                    <div className="streaming-page-genre-panel">
+                      <div className="streaming-page-genre-hint">
+                        Animation, documentary, reality &amp; kids are hidden by default (family stays). Check to include.
+                      </div>
+                      {STREAMING_PAGE_GENRE_TOGGLE_OPTIONS.map((opt) => (
+                        <label key={opt.id} className="streaming-page-genre-option">
+                          <input
+                            type="checkbox"
+                            checked={streamingPageIncludedHidableGenreIds.includes(opt.id)}
+                            onChange={() => toggleStreamingPageIncludedGenre(opt.id)}
+                          />
+                          <span>{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    </StreamingGenreMenu>
+                  </div>
+                </div>
                 <div className="section-meta">Newest {streamingTab === "movie" ? "releases" : "series"}</div>
               </div>
               {showStreamingStripsSkeleton ? (
@@ -14757,6 +14812,8 @@ export default function App() {
           showSecondaryRefillEmptySkeleton={showSecondaryRefillEmptySkeleton}
           secondaryActiveRawRows={secondaryActiveRawRows}
           secondaryStripRecsVisible={secondaryStripRecsVisible}
+          secondaryTheaterRecsVisible={secondaryTheaterRecsVisible}
+          secondaryStreamingRecsVisible={secondaryStreamingRecsVisible}
           openDetail={openDetail}
           posterSrcThumb={posterSrcThumb}
           PosterInsideMeta={PosterInsideMeta}
