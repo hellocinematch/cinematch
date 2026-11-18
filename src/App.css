@@ -75,11 +75,12 @@
   .app-brand.brand-logo--splash { width:min(86%, 380px); max-width:100%; height:auto; object-position:center center; }
   .home-header .app-brand { margin-bottom:10px; }
   .discover-header {
-    padding:16px 24px 14px;
+    padding:14px 24px 12px;
     background:#141414;
     box-shadow:0 10px 22px rgba(0,0,0,0.45);
+    border-bottom:1px solid #2a2a2a;
   }
-  .discover-header .search-status { padding-left:0; padding-right:0; }
+  .discover-header .search-status { padding:6px 0 0; font-size:12px; line-height:1.4; color:#5c5c5c; }
   .discover-header .search-input { background:#0a0a0a; }
   .mood-header { padding:16px 24px 16px; }
   .mood-results-header { padding:16px 24px 20px; display:flex; align-items:center; gap:12px; }
@@ -552,7 +553,7 @@
   .avatar-menu-btn.danger:hover { background:#2a1818; }
   .section { padding:0 0 30px; min-width:0; }
   .section-header { padding:0 24px; display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px; min-width:0; }
-  .section-title { font-family:'DM Serif Display',serif; font-size:calc(22px * var(--cm-read)); color:#ddd7cd; min-width:0; flex:1 1 auto; }
+  .section-title { font-family:'DM Sans',sans-serif; font-size:calc(12px * var(--cm-read)); font-weight:500; letter-spacing:0.14em; text-transform:uppercase; line-height:1.35; color:#b7b2a8; min-width:0; flex:1 1 auto; }
   .section-meta { font-size:12px; color:#555; letter-spacing:1px; text-transform:uppercase; min-width:0; flex:0 1 auto; overflow-wrap:anywhere; text-align:right; }
   /** Your Picks — header refresh: gold accent (was same gray as passive `.section-meta`). */
   /** Only color + button reset; explicit 12px so UA `button` font cannot override `.section-meta`. */
@@ -573,7 +574,7 @@
   .top-picks-block { margin-top:24px; min-width:0; max-width:100%; }
   .top-picks-block:first-of-type { margin-top:0; }
   .top-picks-block .section-header { margin-bottom:10px; }
-  .top-picks-block .section-title { font-size:calc(22px * var(--cm-read)); }
+  .top-picks-block .section-title { font-size:calc(12px * var(--cm-read)); }
 
   /* Explicit width + min-width:0 so the row of cards cannot widen the page (iOS / flex min-content bug). */
   .strip {
@@ -933,7 +934,7 @@
   .legal-body--markdown blockquote { margin:12px 0; padding-left:14px; border-left:3px solid #3a3020; color:#777; font-size:14px; line-height:1.6; }
 
   .discover { height:100%; min-height:0; background:#0a0a0a; padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px)); animation:fadeIn 0.4s ease; overflow-x:hidden; overflow-x:clip; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; min-width:0; width:100%; max-width:100%; }
-  .discover-title { font-family:'DM Serif Display',serif; font-size:calc(30px * var(--cm-read)); color:#ddd7cd; }
+  .discover-title { font-family:'DM Sans',sans-serif; font-size:calc(13px * var(--cm-read)); font-weight:500; letter-spacing:0.16em; text-transform:uppercase; line-height:1.3; color:#c8c4bc; }
   .search-box { position:relative; margin-top:12px; min-width:0; }
   .search-submit-btn { position:absolute; left:8px; top:50%; transform:translateY(-50%); width:28px; height:28px; border:none; background:transparent; color:#888; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; }
   .search-submit-btn:active { opacity:0.8; }
@@ -1585,9 +1586,10 @@
   .settings-genre-action-btn:hover { border-color:#555; color:#ccc; }
   .profile-watchlist-section { padding:0 0 8px; }
   .watchlist-page-intro {
-    padding:16px 24px 14px;
+    padding:14px 24px 12px;
     background:#141414;
     box-shadow:0 10px 22px rgba(0,0,0,0.45);
+    border-bottom:1px solid #2a2a2a;
   }
   .watchlist-page-intro .discover-title { margin:0; }
   .watchlist-page-intro .section-meta { margin-top:6px; color:#666; font-size:12px; }
@@ -1838,10 +1840,10 @@
   /* =============================================================================================
      Circles (v5.0.0 Phase A)
      ============================================================================================= */
-  .circles-header { padding:16px 24px 14px; }
+  .circles-header { padding:14px 24px 12px; }
   .circles-header-row { display:flex; align-items:flex-start; gap:12px; justify-content:space-between; }
   .circles-header-copy { min-width:0; flex:1 1 auto; }
-  .circles-count-sub { font-family:'DM Sans',sans-serif; font-size:13px; color:#888; margin-top:4px; }
+  .circles-count-sub { font-family:'DM Sans',sans-serif; font-size:12px; color:#666; margin-top:6px; line-height:1.4; }
   .circles-header-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
   .circles-bell { position:relative; background:#141414; border:1px solid #2a2a2a; color:#e8c96a; padding:8px 10px; border-radius:999px; cursor:pointer; font-size:14px; line-height:1; display:flex; align-items:center; gap:4px; }
   .circles-bell[disabled] { opacity:0.55; cursor:default; }
@@ -3126,12 +3128,13 @@
     padding:18px 24px 0;
   }
   .ntw-intro {
-    padding:20px 24px 16px;
+    padding:14px 24px 12px;
     display:flex;
     flex-direction:column;
-    gap:10px;
+    gap:8px;
     background:#141414;
     box-shadow:0 10px 22px rgba(0,0,0,0.45);
+    border-bottom:1px solid #2a2a2a;
   }
   .ntw-intro-row { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
   .ntw-kicker {
@@ -3143,11 +3146,13 @@
   .ntw-region { font-size:12px; color:#8a857c; flex:none; }
   .ntw-title {
     margin:0;
-    font-family:'DM Serif Display', Georgia, serif;
-    font-size:calc(34px * var(--cm-read));
-    font-weight:400;
-    line-height:1.05;
-    color:#f0ebe0;
+    font-family:'DM Sans',sans-serif;
+    font-size:calc(13px * var(--cm-read));
+    font-weight:500;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    line-height:1.3;
+    color:#c8c4bc;
   }
   .logged-out-cta--after { margin-top:22px; }
   .ntw-hero {
@@ -3214,11 +3219,13 @@
   .ntw-group-head { padding:0 24px; display:flex; flex-direction:column; gap:4px; }
   .ntw-group-title {
     margin:0;
-    font-family:'DM Serif Display', Georgia, serif;
-    font-size:calc(21px * var(--cm-read));
-    font-weight:400;
-    line-height:1.15;
-    color:#f0ebe0;
+    font-family:'DM Sans',sans-serif;
+    font-size:calc(12px * var(--cm-read));
+    font-weight:500;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    line-height:1.35;
+    color:#b7b2a8;
   }
   .ntw-group-note { font-size:calc(12.5px * var(--cm-read)); color:#8a857c; }
   .ntw-strip { padding-bottom:4px; }

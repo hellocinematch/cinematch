@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.165
+
+- **Headings:** Page names and row titles use a small uppercase sans, so the wordmark stays the brand. A hairline runs under the dark page-name bar. The sentence under a page name stays sentence case and quieter. Film titles, the wordmark, startup, and sign-in are unchanged.
+
 ## 7.0.164
 
 - **Page headings:** The dark heading bar sits directly under the top bar. The black gap above Pulse, Your Picks, In Theaters, and the other page names is gone.
