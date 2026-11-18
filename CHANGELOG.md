@@ -1,5 +1,10 @@
 # Changelog
 
+## 7.0.179
+
+- **Streaming:** Now Streaming has no tagline. The second row is **Popular this week**, with the TMDB sentence removed.
+- **In Theaters:** Now Playing has no tagline. The second row is **Popular this week**, with its tagline removed.
+
 ## 7.0.178
 
 - **Phone:** A section heading and its short tagline share one line. A tagline that does not fit is left off.

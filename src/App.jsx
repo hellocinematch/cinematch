@@ -14544,7 +14544,6 @@ export default function App() {
                     </StreamingGenreMenu>
                   </div>
                 </div>
-                <div className="section-meta">Newest {streamingTab === "movie" ? "releases" : "series"}</div>
               </div>
               {showStreamingStripsSkeleton ? (
                 <SkeletonStrip />
@@ -14574,16 +14573,7 @@ export default function App() {
             </div>
             <div className="section">
               <div className="section-header">
-                <div className="section-title">What&apos;s popular in streaming</div>
-                <div className="section-meta">
-                  {availabilityRegion === "IN" || availabilityRegion === "CA"
-                    ? (streamingPageProviderId == null
-                      ? `Most popular on subscription in ${availabilityRegionLabel(availabilityRegion)}`
-                      : `Most popular on this service (${availabilityRegionLabel(availabilityRegion)}, subscription)`)
-                    : (streamingPageProviderId == null
-                      ? "Trending this week on TMDB"
-                      : "Most popular on this service (US, subscription)")}
-                </div>
+                <div className="section-title">Popular this week</div>
               </div>
               {showStreamingStripsSkeleton ? (
                 <SkeletonStrip />

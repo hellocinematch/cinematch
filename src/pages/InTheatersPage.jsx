@@ -9,7 +9,6 @@ export function InTheatersPage(props) {
     inTheatersPagePopularRecsResolved,
     showRegionKeys,
     availabilityRegion,
-    showLanguageFirst,
     openDetail,
     posterSrcThumb,
     PosterInsideMeta,
@@ -26,14 +25,6 @@ export function InTheatersPage(props) {
 
   const india = availabilityRegion === "IN";
   const canada = availabilityRegion === "CA";
-  const languageLead = india
-    ? (showLanguageFirst || [])
-      .map((code) => ({
-        hi: "Hindi", ta: "Tamil", te: "Telugu", ml: "Malayalam", kn: "Kannada", bn: "Bengali", mr: "Marathi",
-      }[code]))
-      .filter(Boolean)
-      .join(", ")
-    : "";
   const emptyTheatersMessage = india
     ? "No Indian-language releases in this window"
     : showRegionKeys.length > 0
@@ -56,13 +47,6 @@ export function InTheatersPage(props) {
         <div className="section" style={{ paddingTop: 0 }}>
           <div className="section-header">
             <div className="section-title">Now Playing</div>
-            <div className="section-meta">
-              {india
-                ? (languageLead ? `${languageLead} first, then other Indian languages` : "Indian languages")
-                : canada
-                  ? "In theaters in Canada"
-                  : "In theaters"}
-            </div>
           </div>
           {theaterRecs.length === 0 ? (
             <div className="empty-box">
@@ -84,14 +68,7 @@ export function InTheatersPage(props) {
         </div>
         <div className="section">
           <div className="section-header">
-            <div className="section-title">{india ? "Also in theaters" : "Popular in theaters"}</div>
-            <div className="section-meta">
-              {india
-                ? "Other films playing in India"
-                : canada
-                  ? "Most popular films playing in Canada"
-                  : "Weekly TMDB trending — same US theatrical filters as Now Playing"}
-            </div>
+            <div className="section-title">Popular this week</div>
           </div>
           {inTheatersPagePopularRecsResolved.length === 0 ? (
             <div className="empty-box">
