@@ -1721,18 +1721,30 @@
     .section-header {
       padding-left:max(20px, env(safe-area-inset-left, 0px));
       padding-right:max(20px, env(safe-area-inset-right, 0px));
-      flex-direction:column;
-      align-items:stretch;
-      gap:6px;
+      flex-direction:row;
+      flex-wrap:wrap;
+      align-items:baseline;
+      gap:12px;
+      row-gap:0;
       width:100%;
       max-width:100%;
       box-sizing:border-box;
+      /* One line. A tagline that does not fit wraps under the heading and is clipped away. */
+      max-height:calc((12px * var(--cm-read) * 1.35) + 11px);
+      overflow:hidden;
     }
-    /* Stretch + right-align so labels stay inside the shell (flex-end + wide ancestor was clipping on the right). */
+    .section-header .section-title {
+      flex:0 0 auto;
+      white-space:nowrap;
+    }
     .section-header .section-meta {
-      align-self:stretch;
-      width:100%;
-      max-width:100%;
+      flex:0 0 auto;
+      width:auto;
+      max-width:none;
+      align-self:baseline;
+      margin-left:auto;
+      white-space:nowrap;
+      overflow-wrap:normal;
       text-align:right;
       line-height:1.35;
       letter-spacing:0.5px;
@@ -1743,6 +1755,8 @@
       flex-wrap:wrap;
       align-items:center;
       row-gap:10px;
+      max-height:none;
+      overflow:visible;
     }
     .section-header.section-header--choices .choice-line--beside {
       flex:1 0 100%;

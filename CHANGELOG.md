@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.178
+
+- **Phone:** A section heading and its short tagline share one line. A tagline that does not fit is left off.
+
 ## 7.0.177
 
 - **Streaming:** The Genres list is a readable box under the Genres button. The words wrap instead of running off the left edge.
