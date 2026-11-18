@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 12 336 70" role="img" aria-label="Cinemastro">
+  <!-- Header word only. The full mark with the tagline stays in cinemastro-logo.svg. -->
+  <text x="200" y="80" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="72" letter-spacing="-3">
+    <tspan fill="#f0ebe0">cinem</tspan><tspan fill="#8B1A1A">a</tspan><tspan fill="#e8c96a">stro</tspan>
+  </text>
+</svg>

@@ -1,7 +1,7 @@
 {
   "name": "cinematch",
   "private": true,
-  "version": "7.0.161",
+  "version": "7.0.164",
   "type": "module",
   "scripts": {
     "dev": "vite",

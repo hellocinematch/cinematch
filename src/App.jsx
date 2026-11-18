@@ -3462,13 +3462,13 @@ function WhereToWatch({ tmdbId, type, movieTitle, movieYear, showTheatricalShowt
 // ---------------------------------------------------------------------------
 // Nav
 // ---------------------------------------------------------------------------
-/** Wordmark: `public/cinemastro-logo.svg` — replace file with your export (same path). */
+/** Header word: `public/cinemastro-wordmark.svg`. Splash keeps the full mark with the tagline. */
 function AppBrand({ variant = "header", onPress }) {
   const splash = variant === "splash";
   const img = (
     <img
       className={`app-brand brand-logo ${splash ? "brand-logo--splash" : "brand-logo--header"}`}
-      src="/cinemastro-logo.svg"
+      src={splash ? "/cinemastro-logo.svg" : "/cinemastro-wordmark.svg"}
       alt="Cinemastro"
       decoding="async"
     />

@@ -10,8 +10,8 @@
   /* Fixed clipping shell: visual viewport shifts stay inside app bounds and cannot expand page width. */
   .viewport-shell { position:fixed; inset:0; width:100%; max-width:100%; overflow:hidden; display:flex; justify-content:center; align-items:stretch; background:#0a0a0a; }
   /* Shell: use % not 100vw — iOS Safari can treat 100vw wider than the paint area and allow sideways pan */
-  /* Bump default when logo + Beta sit in fixed nav (~40px logo + paddings); avoids hero rows kissing divider. */
-  .app { --shell:480px; --primary-nav-overlay-clearance:72px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; height:100%; min-height:0; max-height:100%; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; overflow-x:clip; overflow-y:hidden; min-width:0; position:relative; touch-action:pan-y; display:flex; flex-direction:column; }
+  /* Matches the fixed top bar: 56px row + 1px border. A taller value leaves a black gap above the page heading. */
+  .app { --shell:480px; --primary-nav-overlay-clearance:57px; font-family:'DM Sans',sans-serif; background:#0a0a0a; color:#f0ebe0; height:100%; min-height:0; max-height:100%; width:100%; max-width:min(100%,var(--shell)); margin:0 auto; overflow-x:hidden; overflow-x:clip; overflow-y:hidden; min-width:0; position:relative; touch-action:pan-y; display:flex; flex-direction:column; }
   /* Capacitor: edge-to-edge WebView — dark html/body so native letterbox gaps are not white. */
   html.cap-native,
   html.cap-native body { background:#0a0a0a; min-height:100%; }
@@ -65,11 +65,22 @@
   .app-brand-button { display:block; line-height:0; padding:0; margin:0; border:none; background:none; cursor:pointer; font:inherit; color:inherit; text-align:left; max-width:100%; min-width:0; }
   .app-brand-button:focus-visible { outline:2px solid #e8c96a; outline-offset:3px; border-radius:4px; }
   /* Use % of grid cell — 100vw on iOS can be wider than the layout and reintroduces horizontal pan. */
-  .app-brand.brand-logo--header { width:min(220px, 100%); max-width:100%; height:auto; }
+  .app-brand.brand-logo--header {
+    height:30px;
+    width:auto;
+    max-height:30px;
+    max-width:min(220px, 100%);
+  }
   /* Taller on splash so wordmark + tagline stay readable (full logo viewBox 400×120). */
   .app-brand.brand-logo--splash { width:min(86%, 380px); max-width:100%; height:auto; object-position:center center; }
   .home-header .app-brand { margin-bottom:10px; }
-  .discover-header { padding:16px 24px 12px; }
+  .discover-header {
+    padding:16px 24px 14px;
+    background:#141414;
+    box-shadow:0 10px 22px rgba(0,0,0,0.45);
+  }
+  .discover-header .search-status { padding-left:0; padding-right:0; }
+  .discover-header .search-input { background:#0a0a0a; }
   .mood-header { padding:16px 24px 16px; }
   .mood-results-header { padding:16px 24px 20px; display:flex; align-items:center; gap:12px; }
   .btn-primary { background:#e8c96a; color:#0a0a0a; border:none; padding:16px 48px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:500; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; width:220px; }
@@ -409,13 +420,13 @@
     max-height:44px;
   }
   .app-primary-nav__brand .brand-logo--header {
-    height:40px;
+    height:30px;
     width:auto;
-    max-width:min(240px, 48vw);
-    max-height:40px;
+    max-width:min(220px, 48vw);
+    max-height:30px;
     display:block;
     object-fit:contain;
-    object-position:left center;
+    object-position:center center;
   }
   .app-primary-nav__links {
     display:flex;
@@ -482,7 +493,7 @@
     left:0;
     right:0;
     bottom:0;
-    top:calc(60px + env(safe-area-inset-top, 0px));
+    top:calc(var(--primary-nav-overlay-clearance, 57px) + env(safe-area-inset-top, 0px));
     background:rgba(0,0,0,0.55);
     border:none;
     padding:0;
@@ -492,7 +503,7 @@
   }
   .app-primary-nav__drawer {
     position:fixed;
-    top:calc(60px + env(safe-area-inset-top, 0px));
+    top:calc(var(--primary-nav-overlay-clearance, 57px) + env(safe-area-inset-top, 0px));
     left:0;
     right:0;
     z-index:2101;
@@ -502,7 +513,7 @@
     display:none;
     flex-direction:column;
     padding:6px 0 10px;
-    max-height:calc(100vh - 60px - env(safe-area-inset-top, 0px));
+    max-height:calc(100vh - var(--primary-nav-overlay-clearance, 57px) - env(safe-area-inset-top, 0px));
     overflow-y:auto;
   }
   .app-primary-nav__drawer-link {
@@ -519,7 +530,7 @@
   }
   .app-primary-nav__drawer-link:hover { color:#e8c96a; background:rgba(232, 201, 106, 0.08); }
   .app-primary-nav__drawer-link--active { color:#e8c96a; background:#2a2610; }
-  .app--primary-nav { padding-top:calc(var(--primary-nav-overlay-clearance, 72px) + env(safe-area-inset-top, 0px)); }
+  .app--primary-nav { padding-top:calc(var(--primary-nav-overlay-clearance, 57px) + env(safe-area-inset-top, 0px)); }
   .app--primary-nav .home-header { padding-top:20px; }
   .topbar-brand-cluster { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:nowrap; }
   .topbar-brand-cluster .app-brand-button { flex-shrink:1; }
@@ -1084,7 +1095,7 @@
   /** Title detail: fixed shell under primary nav (nav z-index 2100); underlying route stays mounted for strip scroll. */
   .detail-overlay-root {
     position:fixed;
-    top:calc(var(--primary-nav-overlay-clearance, 72px) + env(safe-area-inset-top, 0px));
+    top:calc(var(--primary-nav-overlay-clearance, 57px) + env(safe-area-inset-top, 0px));
     left:0;
     right:0;
     bottom:0;
@@ -1573,7 +1584,11 @@
   .settings-genre-action-btn { background:#1a1a1a; color:#888; border:1px solid #2a2a2a; padding:8px 14px; font-size:12px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.2s; }
   .settings-genre-action-btn:hover { border-color:#555; color:#ccc; }
   .profile-watchlist-section { padding:0 0 8px; }
-  .watchlist-page-intro { padding:8px 24px 4px; }
+  .watchlist-page-intro {
+    padding:16px 24px 14px;
+    background:#141414;
+    box-shadow:0 10px 22px rgba(0,0,0,0.45);
+  }
   .watchlist-page-intro .discover-title { margin:0; }
   .watchlist-page-intro .section-meta { margin-top:6px; color:#666; font-size:12px; }
   .wl-from-group { font-size:9px; letter-spacing:0.06em; text-transform:uppercase; color:#6a6a6a; margin-top:4px; font-weight:600; }
@@ -1692,7 +1707,7 @@
     }
     .page-topbar > div:nth-child(2) { display:none; }
     .page-topbar .topbar-brand-cluster { gap:6px; min-width:0; }
-    .page-topbar .app-brand.brand-logo--header { width:min(176px, 100%); }
+    .page-topbar .app-brand.brand-logo--header { height:30px; width:auto; max-width:100%; }
     /* Mobile stability: stats beside logo can reintroduce tiny horizontal pan on some Safari widths. */
     .page-topbar .public-site-stats { display:none; }
     /* Title detail: same horizontal rhythm as home strips / section headers + safe-area (TMDB-like gutter). */
@@ -1724,11 +1739,12 @@
 
   /* Desktop/tablet: let app breathe beyond the mobile shell while keeping phone UX unchanged. */
   @media (min-width: 900px) {
-    .app { --shell:1120px; --primary-nav-overlay-clearance:82px; }
-    .app-brand.brand-logo--header { width:min(360px, 100%); }
+    .app { --shell:1120px; --primary-nav-overlay-clearance:57px; }
+    .app-brand.brand-logo--header { height:30px; width:auto; max-width:min(280px, 100%); }
     .app-primary-nav__brand .brand-logo--header {
-      height:48px;
-      max-width:min(300px, 34vw);
+      height:30px;
+      max-height:30px;
+      max-width:min(280px, 34vw);
     }
     .topbar-brand-cluster { gap:14px; }
     .public-site-stats-val { font-size:12px; }
@@ -1802,7 +1818,7 @@
   }
 
   @media (min-width: 1200px) {
-    .app { --shell:1240px; --primary-nav-overlay-clearance:84px; }
+    .app { --shell:1240px; --primary-nav-overlay-clearance:57px; }
     .strip-card { width:198px; }
     .strip-poster { width:198px; height:276px; }
     .disc-grid { grid-template-columns:repeat(5, minmax(0, 1fr)); gap:18px; }
@@ -1822,7 +1838,7 @@
   /* =============================================================================================
      Circles (v5.0.0 Phase A)
      ============================================================================================= */
-  .circles-header { padding:16px 24px 4px; }
+  .circles-header { padding:16px 24px 14px; }
   .circles-header-row { display:flex; align-items:flex-start; gap:12px; justify-content:space-between; }
   .circles-header-copy { min-width:0; flex:1 1 auto; }
   .circles-count-sub { font-family:'DM Sans',sans-serif; font-size:13px; color:#888; margin-top:4px; }
@@ -3090,7 +3106,7 @@
   }
 
   /* Weekend home — New this week. Reading text scales; posters and the bottom menu do not. */
-  .ntw { padding:8px 0 28px; }
+  .ntw { padding:0 0 28px; }
   .ntw--guest {
     flex:1;
     min-height:0;
@@ -3109,7 +3125,14 @@
     gap:16px;
     padding:18px 24px 0;
   }
-  .ntw-intro { padding:28px 24px 0; display:flex; flex-direction:column; gap:10px; }
+  .ntw-intro {
+    padding:20px 24px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    background:#141414;
+    box-shadow:0 10px 22px rgba(0,0,0,0.45);
+  }
   .ntw-intro-row { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
   .ntw-kicker {
     font-size:11px;

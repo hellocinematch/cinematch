@@ -1,5 +1,17 @@
 # Changelog
 
+## 7.0.164
+
+- **Page headings:** The dark heading bar sits directly under the top bar. The black gap above Pulse, Your Picks, In Theaters, and the other page names is gone.
+
+## 7.0.163
+
+- **Page headings:** Your Picks, In Theaters, and the other page names sit with their line on a dark bar, with a shadow under it. Row titles such as Now Playing stay on the black page.
+
+## 7.0.162
+
+- **Top bar:** The phone and website bars show the Cinemastro word at 30px, without the tagline. The startup screen, About, and the signed-out page still use the full logo.
+
 ## 7.0.161
 
 - **Opening page first:** On a weekend, New this week and Circles finish before the other title lists and Your Picks. On other days, Circles finishes first. The rest of a member's ratings load after that, and Your Picks is built from the full set.
