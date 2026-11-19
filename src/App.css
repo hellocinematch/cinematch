@@ -2390,8 +2390,21 @@
   .circle-detail-strip-wrap { display:flex; flex-direction:column; gap:18px; }
   .circle-detail-strip-section { margin:0; }
   .circle-detail-strip-header { padding-left:0 !important; padding-right:0 !important; }
-  .circle-detail-strip-header--tabs { flex-direction:column; align-items:stretch !important; gap:12px; padding-bottom:4px !important; }
-  .circle-detail-ratings-tabs { display:flex; gap:8px; flex-wrap:wrap; width:100%; }
+  .section-header.circle-detail-strip-header--tabs {
+    flex-direction:column;
+    flex-wrap:nowrap;
+    align-items:stretch;
+    gap:12px;
+    max-height:none;
+    overflow:visible;
+    border-bottom:none;
+    padding-bottom:0;
+  }
+  .circle-detail-ratings-spacer {
+    height:calc(12px * var(--cm-read) * 1.35);
+    flex:none;
+  }
+  .circle-detail-ratings-tabs { display:flex; align-items:stretch; gap:8px; flex-wrap:nowrap; width:100%; }
   .circle-detail-ratings-tab {
     flex:1;
     min-width:72px;
@@ -2675,6 +2688,11 @@
   .circle-detail-strip-empty .empty-sub { margin-top:8px; font-size:12px; color:#777; line-height:1.45; }
   .circle-strip-cap-hint { font-size:12px; color:#777; line-height:1.5; margin-top:8px; text-align:center; max-width:36em; margin-left:auto; margin-right:auto; }
   .circle-strip-cap-hint button { margin-top:8px; background:transparent; border:none; color:#e8c96a; text-decoration:underline; cursor:pointer; font-size:inherit; padding:0; font-family:inherit; }
+  .circle-detail-body .strip.strip--circle-recent {
+    padding-left:0;
+    padding-right:0;
+    scroll-padding-left:0;
+  }
   .strip--circle-recent--solo-cta { justify-content:center; }
   .circle-detail-recent-strip-outer { position:relative; width:100%; min-width:0; max-width:100%; }
   .circle-recent-scroll-hint {

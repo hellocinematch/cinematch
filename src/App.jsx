@@ -13175,7 +13175,7 @@ export default function App() {
                   }
                   const ratingsTabs = (
                     <div className="section-header circle-detail-strip-header circle-detail-strip-header--tabs">
-                      <div className="section-title">Ratings</div>
+                      <div className="circle-detail-ratings-spacer" aria-hidden="true" />
                       <div className="circle-detail-ratings-tabs" role="tablist" aria-label="Circle ratings views">
                         <button
                           type="button"

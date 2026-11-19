@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.182
+
+- **Circles:** The word Ratings is gone. That row stays blank. Recent, All, and Top sit together on the next row. The line under those pills is gone.
+
 ## 7.0.181
 
 - **Discover:** While a title is being typed, a short list of matching movies and shows appears under the field. Tapping a name opens that title. **Search** still fills the poster grid.
