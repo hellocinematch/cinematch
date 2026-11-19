@@ -601,6 +601,55 @@ const EMPTY_MATCH_RECS = [];
 
 /** Discover: how many TMDB search pages to merge (broader tail than website #2 ≠ API #2). */
 const DISCOVER_SEARCH_PAGES = 2;
+/** Live title list under the Discover field. One TMDB page, after the person pauses. */
+const DISCOVER_SUGGEST_LIMIT = 8;
+const DISCOVER_SUGGEST_DEBOUNCE_MS = 300;
+
+function discoverSuggestionFromTmdb(item, type) {
+  const originCountries = Array.isArray(item.origin_country)
+    ? item.origin_country.filter((c) => typeof c === "string").map((c) => c.toUpperCase())
+    : Array.isArray(item.production_countries)
+      ? item.production_countries.map((c) => c?.iso_3166_1).filter((c) => typeof c === "string").map((c) => c.toUpperCase())
+      : [];
+  return {
+    id: `${type}-${item.id}`,
+    tmdbId: item.id,
+    type,
+    title: item.title || item.name || "",
+    year: (item.release_date || item.first_air_date || "").slice(0, 4),
+    releaseDate: tmdbReleaseDateString(item),
+    synopsis: item.overview || "",
+    poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : null,
+    backdrop: item.backdrop_path ? `${TMDB_IMG_BACKDROP}${item.backdrop_path}` : null,
+    tmdbRating: Math.round((Number(item.vote_average) || 0) * 10) / 10,
+    genreIds: item.genre_ids || [],
+    language: item.original_language || "en",
+    originCountries,
+  };
+}
+
+/** One page of movie and TV names for the Discover field. People are left out. */
+async function fetchDiscoverSuggestions(query, activeFilter) {
+  const filterType = activeFilter === "Movies" ? "movie" : activeFilter === "TV Shows" ? "tv" : null;
+  const path = filterType
+    ? `/search/${filterType}?query=${encodeURIComponent(query)}&page=1`
+    : `/search/multi?query=${encodeURIComponent(query)}&page=1`;
+  const page = await fetchTMDB(path);
+  if (isTmdbApiErrorPayload(page)) return [];
+  const wantsAnimationOnly = isAnimationIntentQuery(query);
+  const raw = (page?.results || []).filter((item) => {
+    const type = filterType || item.media_type;
+    const title = item?.title || item?.name;
+    return (type === "movie" || type === "tv") && String(title || "").trim();
+  });
+  const filtered = wantsAnimationOnly
+    ? raw.filter((item) => hasExcludedGenre(item))
+    : filterDefaultExcludedGenres(raw);
+  return filtered.slice(0, DISCOVER_SUGGEST_LIMIT).map((item) => {
+    const type = filterType || item.media_type;
+    return discoverSuggestionFromTmdb(item, type);
+  });
+}
 const DISCOVER_ALL_CAP_MOVIES = 40;
 const DISCOVER_ALL_CAP_TV = 40;
 const DISCOVER_SINGLE_TYPE_CAP = 40;
@@ -4343,6 +4392,8 @@ export default function App() {
   const discoverSearchInputRef = useRef(null);
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchResults, setSearchResults] = useState([]);
+  const [searchSuggest, setSearchSuggest] = useState([]);
+  const suggestSeqRef = useRef(0);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [moodStep, setMoodStep] = useState(0);
@@ -7755,14 +7806,45 @@ export default function App() {
     })();
   }, [appliedSearchQuery, activeFilter]);
 
+  useEffect(() => {
+    const q = searchQuery.trim();
+    const seq = ++suggestSeqRef.current;
+    if (screen !== "discover" || q.length < 2) {
+      setSearchSuggest([]);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const rows = await fetchDiscoverSuggestions(q, activeFilter);
+          if (suggestSeqRef.current !== seq) return;
+          setSearchSuggest(rows);
+        } catch (e) {
+          console.error(e);
+          if (suggestSeqRef.current !== seq) return;
+          setSearchSuggest([]);
+        }
+      })();
+    }, DISCOVER_SUGGEST_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, activeFilter, screen]);
+
   /** v3.1.2: One-tap clear for Discover search (input + applied query + results). */
   function clearDiscoverSearch() {
+    suggestSeqRef.current += 1;
     setSearchQuery("");
     setAppliedSearchQuery("");
     setSearchResults([]);
+    setSearchSuggest([]);
     setSearchError("");
     setSearching(false);
     discoverSearchInputRef.current?.focus();
+  }
+
+  function openDiscoverSuggestion(item) {
+    suggestSeqRef.current += 1;
+    setSearchSuggest([]);
+    openDetail(item);
   }
 
   const ONBOARDING_COUNT = 12;
@@ -14871,6 +14953,8 @@ export default function App() {
               className="search-box"
               onSubmit={e => {
                 e.preventDefault();
+                suggestSeqRef.current += 1;
+                setSearchSuggest([]);
                 const q = searchQuery.trim();
                 setAppliedSearchQuery(q);
                 if (q.length < 2) { setSearchResults([]); setSearchError(""); }
@@ -14882,7 +14966,8 @@ export default function App() {
               <input
                 ref={discoverSearchInputRef}
                 className={`search-input${searchQuery.length > 0 ? " search-input--with-clear" : ""}`}
-                type="text"
+                type="search"
+                enterKeyHint="search"
                 placeholder="Search any movie or show…"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
@@ -14899,6 +14984,22 @@ export default function App() {
                 </button>
               ) : null}
             </form>
+            {searchSuggest.length > 0 ? (
+              <ul className="search-suggest" aria-label="Matching titles">
+                {searchSuggest.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className="search-suggest-row"
+                      onClick={() => openDiscoverSuggestion(item)}
+                    >
+                      <span className="search-suggest-title">{item.title}</span>
+                      <span className="search-suggest-kind">{item.type === "tv" ? "TV" : "Movie"}{item.year ? ` · ${item.year}` : ""}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           <div className="filter-row">
             {FILTERS.map(f => (

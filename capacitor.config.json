@@ -18,6 +18,9 @@
     },
     "PushNotifications": {
       "presentationOptions": ["badge", "banner", "list", "sound", "alert"]
+    },
+    "Keyboard": {
+      "resize": "none"
     }
   }
 }

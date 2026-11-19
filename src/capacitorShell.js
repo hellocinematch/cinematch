@@ -34,6 +34,15 @@ export async function initCapacitorShell() {
     /* StatusBar plugin not available on all platforms */
   }
 
+  if (Capacitor.getPlatform() === "ios") {
+    try {
+      const { Keyboard } = await import("@capacitor/keyboard");
+      await Keyboard.setAccessoryBarVisible({ isVisible: false });
+    } catch {
+      /* Keyboard plugin not available */
+    }
+  }
+
   App.addListener("appUrlOpen", ({ url }) => {
     if (url) scheduleDeepLink(url);
   });

@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.181
+
+- **Discover:** While a title is being typed, a short list of matching movies and shows appears under the field. Tapping a name opens that title. **Search** still fills the poster grid.
+
+## 7.0.180
+
+- **Discover on iPhone:** The bar above the keyboard is gone, including the checkmark. The return key says **Search** and runs the search.
+
 ## 7.0.179
 
 - **Streaming:** Now Streaming has no tagline. The second row is **Popular this week**, with the TMDB sentence removed.
