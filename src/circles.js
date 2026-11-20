@@ -430,6 +430,13 @@ export function readJoinInviteTokenFromPath(pathname) {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+/** Words sent with a circle link. The host’s name stays in the sentence. */
+export function buildCircleInviteShareMessage(inviterName, url) {
+  const name = String(inviterName || "").replace(/[\r\n]+/g, " ").trim() || "Someone";
+  const link = String(url || "").trim();
+  return `Join ${name}'s circle on Cinemastro.\nThis link expires in 7 days.\n${link}`;
+}
+
 /**
  * Canonical share URL for a circle invite token.
  * Uses **`VITE_PUBLIC_SITE_URL`** when set, else **`window.location.origin`**, else **`https://www.cinemastro.com`**.
@@ -456,7 +463,7 @@ export async function previewCircleInviteLink({ token }) {
   return invokeCirclesEdge("preview-circle-invite-link", { token });
 }
 
-/** Bind `auth.uid()` to a link invite row (first caller wins). Requires session. */
+/** Attach the signed-in person to a link. A share link stays open for the next person. Requires session. */
 export async function claimCircleInviteToken({ token }) {
   const t = (token || "").trim();
   if (!t) throw new Error("Missing invite.");

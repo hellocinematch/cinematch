@@ -7,7 +7,9 @@ const corsHeaders: Record<string, string> = {
 };
 
 const EDGE_FUNCTION_SLUG = "claim-circle-invite-token";
-const EDGE_FUNCTION_VERSION = "1.0.0";
+const EDGE_FUNCTION_VERSION = "1.0.1";
+
+const CIRCLE_MEMBER_CAP = 25;
 
 function jsonResponse(body: unknown, status = 200): Response {
   const payload =
@@ -70,7 +72,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: inv, error: invErr } = await admin
       .from("circle_invites")
-      .select("id, circle_id, status, expires_at, invite_token, invited_user_id, invited_by")
+      .select("id, circle_id, status, expires_at, invite_token, invited_user_id, invited_by, invite_email")
       .eq("invite_token", token)
       .maybeSingle();
 
@@ -82,7 +84,6 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "This invite is no longer valid." }, 404);
     }
 
-    const nowIso = new Date().toISOString();
     const now = Date.now();
     const exp = inv.expires_at ? new Date(String(inv.expires_at)).getTime() : NaN;
     if (Number.isFinite(exp) && exp < now) {
@@ -112,11 +113,17 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "This invite is no longer valid." }, 410);
     }
 
-    const invitedUserId = typeof inv.invited_user_id === "string" ? inv.invited_user_id : null;
-    if (invitedUserId && invitedUserId !== callerId) {
-      return jsonResponse({
-        error: "This invite link was already used by someone else.",
-      }, 409);
+    const circleName = typeof circle.name === "string" ? circle.name : "This circle";
+    const { count: memberTotal, error: memberTotalErr } = await admin
+      .from("circle_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("circle_id", circleId);
+    if (memberTotalErr) {
+      console.error("claim-circle-invite-token: member count failed", memberTotalErr.message);
+      return jsonResponse({ error: "Could not verify membership." }, 500);
+    }
+    if ((memberTotal ?? 0) >= CIRCLE_MEMBER_CAP) {
+      return jsonResponse({ error: "This circle is full." }, 409);
     }
 
     const { count: memberCount, error: memberErr } = await admin
@@ -128,113 +135,6 @@ Deno.serve(async (req: Request) => {
       console.error("claim-circle-invite-token: member check failed", memberErr.message);
       return jsonResponse({ error: "Could not verify membership." }, 500);
     }
-    if ((memberCount ?? 0) > 0) {
-      const { data: inviterProf } = await admin
-        .from("profiles")
-        .select("name")
-        .eq("id", inv.invited_by)
-        .maybeSingle();
-      const inviterName = typeof inviterProf?.name === "string" && inviterProf.name.trim()
-        ? inviterProf.name.trim()
-        : "Someone";
-      return jsonResponse({
-        ok: true,
-        already_member: true,
-        circle_id: circleId,
-        circle_name: typeof circle.name === "string" ? circle.name : "This circle",
-        inviter_name: inviterName,
-      });
-    }
-
-    if (invitedUserId === callerId) {
-      const { data: inviterProf } = await admin
-        .from("profiles")
-        .select("name")
-        .eq("id", inv.invited_by)
-        .maybeSingle();
-      const inviterName = typeof inviterProf?.name === "string" && inviterProf.name.trim()
-        ? inviterProf.name.trim()
-        : "Someone";
-      return jsonResponse({
-        ok: true,
-        invite_id: inviteId,
-        circle_id: circleId,
-        circle_name: typeof circle.name === "string" ? circle.name : "This circle",
-        inviter_name: inviterName,
-        claimed: true,
-      });
-    }
-
-    const { data: existingPending, error: existingErr } = await admin
-      .from("circle_invites")
-      .select("id")
-      .eq("circle_id", circleId)
-      .eq("invited_user_id", callerId)
-      .eq("status", "pending")
-      .maybeSingle();
-    if (existingErr) {
-      console.error("claim-circle-invite-token: existing pending failed", existingErr.message);
-      return jsonResponse({ error: "Could not verify invites." }, 500);
-    }
-    if (existingPending && typeof existingPending.id === "string" && existingPending.id !== inviteId) {
-      await admin
-        .from("circle_invites")
-        .update({ status: "revoked", responded_at: nowIso })
-        .eq("id", inviteId);
-      const { data: inviterProf } = await admin
-        .from("profiles")
-        .select("name")
-        .eq("id", inv.invited_by)
-        .maybeSingle();
-      const inviterName = typeof inviterProf?.name === "string" && inviterProf.name.trim()
-        ? inviterProf.name.trim()
-        : "Someone";
-      const { data: c2 } = await admin.from("circles").select("name").eq("id", circleId).maybeSingle();
-      return jsonResponse({
-        ok: true,
-        invite_id: existingPending.id,
-        superseded: true,
-        circle_id: circleId,
-        circle_name: typeof c2?.name === "string" ? c2.name : "This circle",
-        inviter_name: inviterName,
-      });
-    }
-
-    const { data: authUser, error: authLookupErr } = await admin.auth.admin.getUserById(callerId);
-    if (authLookupErr) {
-      console.warn("claim-circle-invite-token: getUserById", authLookupErr.message);
-    }
-    const email =
-      typeof authUser?.user?.email === "string" && authUser.user.email.trim()
-        ? authUser.user.email.trim().toLowerCase()
-        : null;
-
-    const { data: updated, error: updErr } = await admin
-      .from("circle_invites")
-      .update({
-        invited_user_id: callerId,
-        invite_email: email,
-      })
-      .eq("id", inviteId)
-      .is("invited_user_id", null)
-      .select("id")
-      .maybeSingle();
-
-    if (updErr || !updated) {
-      const { data: again } = await admin
-        .from("circle_invites")
-        .select("invited_user_id")
-        .eq("id", inviteId)
-        .maybeSingle();
-      const uid = typeof again?.invited_user_id === "string" ? again.invited_user_id : null;
-      if (uid && uid !== callerId) {
-        return jsonResponse({
-          error: "This invite link was already used by someone else.",
-        }, 409);
-      }
-      console.error("claim-circle-invite-token: claim update failed", updErr?.message ?? "no row");
-      return jsonResponse({ error: "Could not claim this invite. Try again." }, 409);
-    }
 
     const { data: inviterProf } = await admin
       .from("profiles")
@@ -245,14 +145,143 @@ Deno.serve(async (req: Request) => {
       ? inviterProf.name.trim()
       : "Someone";
 
-    return jsonResponse({
-      ok: true,
-      invite_id: inviteId,
-      circle_id: circleId,
-      circle_name: typeof circle.name === "string" ? circle.name : "This circle",
-      inviter_name: inviterName,
-      claimed: true,
-    });
+    if ((memberCount ?? 0) > 0) {
+      return jsonResponse({
+        ok: true,
+        already_member: true,
+        circle_id: circleId,
+        circle_name: circleName,
+        inviter_name: inviterName,
+      });
+    }
+
+    const lockedEmail = typeof inv.invite_email === "string"
+      ? inv.invite_email.trim().toLowerCase()
+      : "";
+
+    async function callerEmail(): Promise<string | null> {
+      const { data: authUser, error: authLookupErr } = await admin.auth.admin.getUserById(callerId);
+      if (authLookupErr) {
+        console.warn("claim-circle-invite-token: getUserById", authLookupErr.message);
+      }
+      const email = authUser?.user?.email;
+      return typeof email === "string" && email.trim() ? email.trim().toLowerCase() : null;
+    }
+
+    async function openPersonalInvite(): Promise<string | null> {
+      const loadRow = async () => {
+        const { data, error } = await admin
+          .from("circle_invites")
+          .select("id, status")
+          .eq("circle_id", circleId)
+          .eq("invited_user_id", callerId)
+          .maybeSingle();
+        if (error) {
+          console.error("claim-circle-invite-token: personal lookup failed", error.message);
+          return null;
+        }
+        return data;
+      };
+
+      const touch = async (rowId: string, status: string) => {
+        if (status === "pending") {
+          await admin.from("circle_invites").update({ invited_by: inv.invited_by }).eq("id", rowId);
+          return true;
+        }
+        const { error } = await admin
+          .from("circle_invites")
+          .update({
+            status: "pending",
+            responded_at: null,
+            invited_by: inv.invited_by,
+          })
+          .eq("id", rowId);
+        if (error) {
+          console.error("claim-circle-invite-token: revive failed", error.message);
+          return false;
+        }
+        return true;
+      };
+
+      const existing = await loadRow();
+      if (existing && typeof existing.id === "string") {
+        const ok = await touch(existing.id, typeof existing.status === "string" ? existing.status : "");
+        return ok ? existing.id : null;
+      }
+
+      const email = await callerEmail();
+      const { data: inserted, error: insertErr } = await admin
+        .from("circle_invites")
+        .insert({
+          circle_id: circleId,
+          invited_by: inv.invited_by,
+          invited_user_id: callerId,
+          invite_email: email,
+          status: "pending",
+        })
+        .select("id")
+        .maybeSingle();
+      if (inserted && typeof inserted.id === "string") return inserted.id;
+      if (String(insertErr?.code ?? "") !== "23505") {
+        console.error(
+          "claim-circle-invite-token: personal insert failed",
+          insertErr?.message ?? "no row",
+        );
+        return null;
+      }
+      const again = await loadRow();
+      if (again && typeof again.id === "string") {
+        const ok = await touch(again.id, typeof again.status === "string" ? again.status : "");
+        return ok ? again.id : null;
+      }
+      return null;
+    }
+
+    function claimedResponse(personalInviteId: string) {
+      return jsonResponse({
+        ok: true,
+        invite_id: personalInviteId,
+        circle_id: circleId,
+        circle_name: circleName,
+        inviter_name: inviterName,
+        claimed: true,
+      });
+    }
+
+    if (lockedEmail) {
+      const email = await callerEmail();
+      if (!email || email !== lockedEmail) {
+        return jsonResponse({
+          error: "This invite was sent to a different email address.",
+        }, 403);
+      }
+      const boundId = typeof inv.invited_user_id === "string" ? inv.invited_user_id : null;
+      if (boundId && boundId !== callerId) {
+        return jsonResponse({
+          error: "This invite link was already used by someone else.",
+        }, 409);
+      }
+      if (boundId === callerId) return claimedResponse(inviteId);
+
+      const { data: updated, error: updErr } = await admin
+        .from("circle_invites")
+        .update({ invited_user_id: callerId, invite_email: lockedEmail })
+        .eq("id", inviteId)
+        .is("invited_user_id", null)
+        .select("id")
+        .maybeSingle();
+      if (updated && typeof updated.id === "string") return claimedResponse(updated.id);
+      if (updErr && String(updErr.code ?? "") !== "23505") {
+        console.error("claim-circle-invite-token: email bind failed", updErr.message);
+      }
+      const personalId = await openPersonalInvite();
+      if (!personalId) return jsonResponse({ error: "Could not claim this invite. Try again." }, 409);
+      return claimedResponse(personalId);
+    }
+
+    const personalId = await openPersonalInvite();
+    if (!personalId) return jsonResponse({ error: "Could not claim this invite. Try again." }, 409);
+    return claimedResponse(personalId);
   } catch (e) {
     console.error("claim-circle-invite-token: unhandled", e);
     return jsonResponse({ error: "Unexpected error." }, 500);

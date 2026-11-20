@@ -7,7 +7,9 @@ const corsHeaders: Record<string, string> = {
 };
 
 const EDGE_FUNCTION_SLUG = "preview-circle-invite-link";
-const EDGE_FUNCTION_VERSION = "1.0.0";
+const EDGE_FUNCTION_VERSION = "1.0.1";
+
+const CIRCLE_MEMBER_CAP = 25;
 
 function jsonResponse(body: unknown, status = 200): Response {
   const payload =
@@ -96,6 +98,22 @@ Deno.serve(async (req: Request) => {
     }
     if (circle.status !== "active") {
       return jsonResponse({ error: "This invite is no longer valid.", code: "inactive_circle" }, 410);
+    }
+
+    const { count: memberCount, error: memberCountErr } = await admin
+      .from("circle_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("circle_id", circleId);
+    if (memberCountErr) {
+      console.error("preview-circle-invite-link: member count failed", memberCountErr.message);
+      return jsonResponse({ error: "Could not load invite." }, 500);
+    }
+    if ((memberCount ?? 0) >= CIRCLE_MEMBER_CAP) {
+      return jsonResponse({
+        ok: false,
+        full: true,
+        error: "This circle is full.",
+      });
     }
 
     const invitedBy = typeof inv.invited_by === "string" ? inv.invited_by : "";

@@ -57,6 +57,7 @@ import {
   readJoinInviteTokenFromPath,
   PENDING_CIRCLE_INVITE_TOKEN_KEY,
   buildCircleInviteShareUrl,
+  buildCircleInviteShareMessage,
   previewCircleInviteLink,
   claimCircleInviteToken,
   createCircleInviteLink,
@@ -182,6 +183,20 @@ function inviterDisplayNameForShare(profileName, user) {
   const local = user?.email?.split("@")[0];
   if (local && String(local).trim()) return String(local).trim();
   return "Someone";
+}
+
+/** Opens the host’s own email app. Cinemastro does not send the message. */
+function openHostEmailApp({ to, subject, body }) {
+  const href =
+    `mailto:${encodeURIComponent(to)}` +
+    `?subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+  const link = document.createElement("a");
+  link.href = href;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 /** Circle detail — visible-tab watermark poll for “New activity” (`get_circle_others_activity_watermark`). Tier advances when the server timestamp is unchanged since the last poll. */
@@ -10990,30 +11005,30 @@ export default function App() {
       if (!tok) throw new Error("Could not create invite link.");
       const url = buildCircleInviteShareUrl(tok);
       const name = inviterDisplayNameForShare(profileName, user);
-      const body =
-        `${name} invited you to their Cinemastro Circle — Skip the ` +
-        `'what should we watch' debate, Get personalized picks you'll actually enjoy`;
-      const msg = `${body}\n\n${url}`;
+      const msg = buildCircleInviteShareMessage(name, url);
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-        /* Avoid `{ url }` + `{ text }` together — many targets (esp. iOS) forward only the URL and drop text. */
+        /* Text includes the URL. A separate `url` field drops the words on iOS. */
         await navigator.share({
-          title: `${name} invited you to their Cinemastro Circle`,
+          title: `Join ${name}'s circle on Cinemastro`,
           text: msg,
         });
       } else if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(msg);
-        setInviteToast({ tone: "ok", text: "Invite message copied — paste it into any app." });
+        setInviteToast({ tone: "ok", text: "Invite message copied. Paste it into any app." });
       } else {
         setInviteToast({ tone: "warn", text: msg });
       }
-      closeInviteSheet();
+      setShowInviteSheet(false);
+      setInviteSheetError("");
     } catch (e) {
+      const name = e?.name || "";
       const msg = e?.message || "Could not create invite link.";
-      if (String(msg).includes("AbortError") || String(msg).includes("share canceled")) {
-        /* user dismissed native sheet */
-      } else {
-        setInviteSheetError(msg);
-      }
+      const canceled =
+        name === "AbortError" ||
+        String(msg).includes("AbortError") ||
+        String(msg).toLowerCase().includes("share canceled") ||
+        String(msg).toLowerCase().includes("share cancelled");
+      if (!canceled) setInviteSheetError(msg);
     } finally {
       setInviteLinkBusy(false);
     }
@@ -11034,6 +11049,23 @@ export default function App() {
         circleId: circleDetailData.id,
         invitedEmail: email,
       });
+      if (res?.no_account && typeof res?.invite_token === "string" && res.invite_token) {
+        const name = inviterDisplayNameForShare(profileName, user);
+        const url = buildCircleInviteShareUrl(res.invite_token);
+        const message = buildCircleInviteShareMessage(name, url);
+        openHostEmailApp({
+          to: email,
+          subject: `Join ${name}'s circle on Cinemastro`,
+          body: message,
+        });
+        setInviteToast({
+          tone: "ok",
+          text: "Your email app is open. Send the message to invite them.",
+        });
+        setShowInviteSheet(false);
+        setInviteEmailDraft("");
+        return;
+      }
       const recipientName = res?.recipient?.name || email;
       if (res?.auto_declined) {
         setInviteToast({
@@ -12395,6 +12427,7 @@ export default function App() {
       {screen === "circle-join" && (
         <div className="auth circle-join-flow">
           <div className="auth-inner">
+            <img className="circle-join-card" src="/cinemastro-invite-card.png" alt="cinemastro.com" />
             <div className="auth-title">Circle invite</div>
             {circleJoinOpenAppHref ? (
               <>
@@ -12494,7 +12527,7 @@ export default function App() {
                   disabled={Boolean(circleJoinModel.busy)}
                   onClick={() => void handleCircleJoinAccept()}
                 >
-                  {circleJoinModel.busy === "accept" ? "Joining…" : "Join circle"}
+                  {circleJoinModel.busy === "accept" ? "Joining…" : "Join"}
                 </button>
                 <button
                   type="button"
@@ -14174,7 +14207,7 @@ export default function App() {
 
       {/* Phase B: invite-by-email composer sheet (host = admin, circle-detail). */}
       {showInviteSheet && circleDetailData && (
-        <div className="circles-sheet-root" role="dialog" aria-modal="true" aria-label="Invite a member">
+        <div className="circles-sheet-root" role="dialog" aria-modal="true" aria-label="Invite others">
           <button
             type="button"
             className="circles-sheet-backdrop"
@@ -14183,58 +14216,46 @@ export default function App() {
           />
           <div className="circles-sheet">
             <div className="circles-sheet-handle" aria-hidden="true" />
-            <div className="circles-sheet-title">Invite a member</div>
+            <div className="circles-sheet-title">Invite others</div>
             <div className="circles-sheet-sub">
-              Invite someone who already uses Cinemastro by email, or share a link they can open after signing up.
+              They open the link, sign in, and tap Join. Sending it does not add them.
             </div>
 
             <div className="circles-field">
-              <label className="circles-field-label">Search by email</label>
+              <label className="circles-field-label" htmlFor="invite-others-email">Email</label>
               <input
+                id="invite-others-email"
                 className="circles-input"
                 type="email"
+                inputMode="email"
                 autoComplete="email"
                 placeholder="friend@example.com"
                 value={inviteEmailDraft}
                 onChange={(e) => setInviteEmailDraft(e.target.value)}
                 disabled={inviteSheetSubmitting || inviteLinkBusy}
-                autoFocus
               />
             </div>
 
             {inviteSheetError && <div className="circles-error-banner">{inviteSheetError}</div>}
 
-            <div className="circles-sheet-actions">
+            <div className="circles-sheet-actions circles-invite-pair">
               <button
                 type="button"
-                className="circles-btn-ghost"
-                onClick={closeInviteSheet}
+                className="circles-btn-primary"
+                onClick={() => void submitShareInviteLink()}
                 disabled={inviteSheetSubmitting || inviteLinkBusy}
               >
-                Cancel
+                {inviteLinkBusy ? "Preparing…" : "Share link"}
               </button>
               <button
                 type="button"
                 className="circles-btn-primary"
                 onClick={() => void submitInviteByEmail()}
-                disabled={inviteSheetSubmitting || inviteLinkBusy || !inviteEmailDraft.trim()}
+                disabled={inviteSheetSubmitting || inviteLinkBusy}
               >
-                {inviteSheetSubmitting ? "Sending…" : "Send invite"}
+                {inviteSheetSubmitting ? "Sending…" : "Email"}
               </button>
             </div>
-
-            <div className="circles-invite-divider" role="separator">
-              Or share a link
-            </div>
-
-            <button
-              type="button"
-              className="circles-btn-primary circles-invite-share-link-btn"
-              onClick={() => void submitShareInviteLink()}
-              disabled={inviteSheetSubmitting || inviteLinkBusy}
-            >
-              {inviteLinkBusy ? "Preparing…" : "Share invite link"}
-            </button>
           </div>
         </div>
       )}

@@ -12,7 +12,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 //   1. Resolve caller (user) via JWT.
 //   2. Verify (host/admin + active) using service role.
 //   3. Resolve invited_email -> profiles.id via service role (auth.users).
-//      - No match -> 404 "no account found for that email".
+//      - No match -> email-locked /join link (no_account). The host's mail app sends it.
 //      - Match == caller -> 400 self-invite.
 //   4. Reject if recipient is already a member of the circle.
 //   5. Reject if member cap would be breached (25/25).
@@ -34,7 +34,9 @@ const corsHeaders: Record<string, string> = {
 
 /** Bump when this function’s behavior or deps change, then redeploy — verify via JSON `edge.version`. */
 const EDGE_FUNCTION_SLUG = "send-circle-invite";
-const EDGE_FUNCTION_VERSION = "1.0.3";
+const EDGE_FUNCTION_VERSION = "1.0.4";
+
+const INVITE_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const CIRCLE_MEMBER_CAP = 25;
 const CIRCLE_USER_ACTIVE_CAP = 10;
@@ -68,6 +70,12 @@ async function resolveEmailToUserId(admin: SupabaseClient, email: string): Promi
   }
   if (typeof data === "string" && data.length > 0) return { ok: true, userId: data };
   return { ok: false, reason: "not_found" };
+}
+
+function randomTokenHex(bytes = 24): string {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 Deno.serve(async (req: Request) => {
@@ -162,13 +170,75 @@ Deno.serve(async (req: Request) => {
       );
     }
     if (!resolved.ok) {
-      return jsonResponse(
-        {
-          error:
-            "No Cinemastro account found for that email. Use “Share invite link” on the same screen so they can join after signing up.",
-        },
-        404,
-      );
+      const { count: memberCount, error: memberCountErr } = await admin
+        .from("circle_members")
+        .select("user_id", { count: "exact", head: true })
+        .eq("circle_id", circleId);
+      if (memberCountErr) {
+        console.error("send-circle-invite: member count failed", memberCountErr.message);
+        return jsonResponse({ error: "Could not verify member count." }, 500);
+      }
+      if ((memberCount ?? 0) >= CIRCLE_MEMBER_CAP) {
+        return jsonResponse(
+          { error: `This circle is full (${CIRCLE_MEMBER_CAP}/${CIRCLE_MEMBER_CAP} members).` },
+          409,
+        );
+      }
+
+      const email = invitedEmail.toLowerCase();
+      const expiresAt = new Date(Date.now() + INVITE_LINK_TTL_MS).toISOString();
+      const { data: priorLink, error: priorLinkErr } = await admin
+        .from("circle_invites")
+        .select("id, invite_token")
+        .eq("circle_id", circleId)
+        .eq("status", "pending")
+        .is("invited_user_id", null)
+        .eq("invite_email", email)
+        .not("invite_token", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (priorLinkErr) {
+        console.error("send-circle-invite: email link lookup failed", priorLinkErr.message);
+        return jsonResponse({ error: "Could not create invite link." }, 500);
+      }
+      if (priorLink && typeof priorLink.invite_token === "string" && priorLink.invite_token) {
+        const { error: refreshErr } = await admin
+          .from("circle_invites")
+          .update({ expires_at: expiresAt, invited_by: callerId })
+          .eq("id", priorLink.id);
+        if (refreshErr) {
+          console.error("send-circle-invite: email link refresh failed", refreshErr.message);
+          return jsonResponse({ error: "Could not create invite link." }, 500);
+        }
+        return jsonResponse({
+          ok: true,
+          no_account: true,
+          invite_token: priorLink.invite_token,
+          expires_at: expiresAt,
+        });
+      }
+
+      const token = randomTokenHex(24);
+      const { error: linkErr } = await admin.from("circle_invites").insert({
+        circle_id: circleId,
+        invited_by: callerId,
+        invited_user_id: null,
+        invite_token: token,
+        invite_email: email,
+        expires_at: expiresAt,
+        status: "pending",
+      });
+      if (linkErr) {
+        console.error("send-circle-invite: email link insert failed", linkErr.message);
+        return jsonResponse({ error: "Could not create invite link." }, 500);
+      }
+      return jsonResponse({
+        ok: true,
+        no_account: true,
+        invite_token: token,
+        expires_at: expiresAt,
+      });
     }
     const invitedUserId = resolved.userId;
     if (invitedUserId === callerId) {

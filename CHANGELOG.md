@@ -1,5 +1,10 @@
 # Changelog
 
+## 7.0.183
+
+- **Circles — Invite others:** The sheet is titled **Invite others**. **Share link** and **Email** sit side by side. **Share link** opens the phone’s own share sheet. Cinemastro does not read contacts, and sending the link does not add anyone. The message is **Join {Name}'s circle on Cinemastro.** then **This link expires in 7 days.** then the link. One link works for more than one person for 7 days, until the circle is full or no longer active. **Email** to an existing account sends that person’s in-app invite. Any other address opens the host’s email app with the same message. That link works only for the address they typed. The public page shows the Cinemastro card.
+- **Edge:** Redeploy **`create-circle-invite-link` `1.0.1`**, **`preview-circle-invite-link` `1.0.1`**, **`claim-circle-invite-token` `1.0.1`**, and **`send-circle-invite` `1.0.4`**. No new SQL.
+
 ## 7.0.182
 
 - **Circles:** The word Ratings is gone. That row stays blank. Recent, All, and Top sit together on the next row. The line under those pills is gone.

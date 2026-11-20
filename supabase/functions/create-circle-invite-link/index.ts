@@ -7,7 +7,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 const EDGE_FUNCTION_SLUG = "create-circle-invite-link";
-const EDGE_FUNCTION_VERSION = "1.0.0";
+const EDGE_FUNCTION_VERSION = "1.0.1";
 
 const CIRCLE_MEMBER_CAP = 25;
 const INVITE_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -117,6 +117,31 @@ Deno.serve(async (req: Request) => {
         { error: `This circle is full (${CIRCLE_MEMBER_CAP}/${CIRCLE_MEMBER_CAP} members).` },
         409,
       );
+    }
+
+    const nowIso = new Date().toISOString();
+    const { data: existingLink, error: existingErr } = await admin
+      .from("circle_invites")
+      .select("id, circle_id, invite_token, expires_at, created_at")
+      .eq("circle_id", circleId)
+      .eq("invited_by", callerId)
+      .eq("status", "pending")
+      .is("invited_user_id", null)
+      .is("invite_email", null)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingErr) {
+      console.error("create-circle-invite-link: reuse lookup failed", existingErr.message);
+      return jsonResponse({ error: "Could not create invite link." }, 500);
+    }
+    if (existingLink && typeof existingLink.invite_token === "string" && existingLink.invite_token) {
+      return jsonResponse({
+        ok: true,
+        invite: existingLink,
+        invite_token: existingLink.invite_token,
+      });
     }
 
     const token = randomTokenHex(24);
