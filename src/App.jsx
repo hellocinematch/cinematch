@@ -41,7 +41,6 @@ import {
   leaveCircle,
   isCircleModerator,
   fetchPendingInvites,
-  sendCircleInvite,
   acceptCircleInvite,
   declineCircleInvite,
   fetchRatingCircleShareIds,
@@ -183,20 +182,6 @@ function inviterDisplayNameForShare(profileName, user) {
   const local = user?.email?.split("@")[0];
   if (local && String(local).trim()) return String(local).trim();
   return "Someone";
-}
-
-/** Opens the host’s own email app. Cinemastro does not send the message. */
-function openHostEmailApp({ to, subject, body }) {
-  const href =
-    `mailto:${encodeURIComponent(to)}` +
-    `?subject=${encodeURIComponent(subject)}` +
-    `&body=${encodeURIComponent(body)}`;
-  const link = document.createElement("a");
-  link.href = href;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
 }
 
 /** Circle detail — visible-tab watermark poll for “New activity” (`get_circle_others_activity_watermark`). Tier advances when the server timestamp is unchanged since the last poll. */
@@ -4562,10 +4547,10 @@ export default function App() {
   const [inviteActionBusy, setInviteActionBusy] = useState({});
   const [inviteActionError, setInviteActionError] = useState("");
   const [showInviteSheet, setShowInviteSheet] = useState(false);
-  const [inviteEmailDraft, setInviteEmailDraft] = useState("");
-  const [inviteSheetSubmitting, setInviteSheetSubmitting] = useState(false);
+  const [inviteShareUrl, setInviteShareUrl] = useState("");
   const [inviteLinkBusy, setInviteLinkBusy] = useState(false);
   const [inviteSheetError, setInviteSheetError] = useState("");
+  const inviteLinkReqRef = useRef(0);
   /** `profiles.name` from `loadUserData` (see `inviterDisplayNameForShare` for link invites). */
   const [profileName, setProfileName] = useState("");
   const [inviteToast, setInviteToast] = useState(null);
@@ -10978,34 +10963,45 @@ export default function App() {
     }
   }
 
-  function openInviteSheet() {
+  async function openInviteSheet() {
+    if (!user || !circleDetailData?.id) return;
+    const req = inviteLinkReqRef.current + 1;
+    inviteLinkReqRef.current = req;
     setShowCircleInfoSheet(false);
-    setInviteEmailDraft("");
+    setInviteShareUrl("");
     setInviteSheetError("");
-    setInviteLinkBusy(false);
-    setShowInviteSheet(true);
-  }
-
-  function closeInviteSheet() {
-    if (inviteSheetSubmitting || inviteLinkBusy) return;
-    setShowInviteSheet(false);
-    setInviteSheetError("");
-    setInviteLinkBusy(false);
-  }
-
-  async function submitShareInviteLink() {
-    if (!user || inviteLinkBusy || inviteSheetSubmitting || !circleDetailData?.id) return;
     setInviteLinkBusy(true);
-    setInviteSheetError("");
+    setShowInviteSheet(true);
     try {
       const res = await createCircleInviteLink({ circleId: circleDetailData.id });
+      if (inviteLinkReqRef.current !== req) return;
       const tok =
         (typeof res?.invite_token === "string" && res.invite_token) ||
         (res?.invite && typeof res.invite.invite_token === "string" ? res.invite.invite_token : "");
       if (!tok) throw new Error("Could not create invite link.");
-      const url = buildCircleInviteShareUrl(tok);
-      const name = inviterDisplayNameForShare(profileName, user);
-      const msg = buildCircleInviteShareMessage(name, url);
+      setInviteShareUrl(buildCircleInviteShareUrl(tok));
+    } catch (e) {
+      if (inviteLinkReqRef.current !== req) return;
+      setInviteSheetError(e?.message || "Could not create invite link.");
+    } finally {
+      if (inviteLinkReqRef.current === req) setInviteLinkBusy(false);
+    }
+  }
+
+  function closeInviteSheet() {
+    inviteLinkReqRef.current += 1;
+    setInviteLinkBusy(false);
+    setShowInviteSheet(false);
+    setInviteShareUrl("");
+    setInviteSheetError("");
+  }
+
+  async function submitShareInviteLink() {
+    if (!user || inviteLinkBusy || !inviteShareUrl) return;
+    const name = inviterDisplayNameForShare(profileName, user);
+    const msg = buildCircleInviteShareMessage(name, inviteShareUrl);
+    setInviteSheetError("");
+    try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         /* Text includes the URL. A separate `url` field drops the words on iOS. */
         await navigator.share({
@@ -11019,80 +11015,17 @@ export default function App() {
         setInviteToast({ tone: "warn", text: msg });
       }
       setShowInviteSheet(false);
+      setInviteShareUrl("");
       setInviteSheetError("");
     } catch (e) {
-      const name = e?.name || "";
-      const msg = e?.message || "Could not create invite link.";
+      const errName = e?.name || "";
+      const errMsg = e?.message || "Could not share the link.";
       const canceled =
-        name === "AbortError" ||
-        String(msg).includes("AbortError") ||
-        String(msg).toLowerCase().includes("share canceled") ||
-        String(msg).toLowerCase().includes("share cancelled");
-      if (!canceled) setInviteSheetError(msg);
-    } finally {
-      setInviteLinkBusy(false);
-    }
-  }
-
-  async function submitInviteByEmail() {
-    if (!user || inviteSheetSubmitting) return;
-    if (!circleDetailData) return;
-    const email = inviteEmailDraft.trim();
-    if (!email) {
-      setInviteSheetError("Enter an email address.");
-      return;
-    }
-    setInviteSheetSubmitting(true);
-    setInviteSheetError("");
-    try {
-      const res = await sendCircleInvite({
-        circleId: circleDetailData.id,
-        invitedEmail: email,
-      });
-      if (res?.no_account && typeof res?.invite_token === "string" && res.invite_token) {
-        const name = inviterDisplayNameForShare(profileName, user);
-        const url = buildCircleInviteShareUrl(res.invite_token);
-        const message = buildCircleInviteShareMessage(name, url);
-        openHostEmailApp({
-          to: email,
-          subject: `Join ${name}'s circle on Cinemastro`,
-          body: message,
-        });
-        setInviteToast({
-          tone: "ok",
-          text: "Your email app is open. Send the message to invite them.",
-        });
-        setShowInviteSheet(false);
-        setInviteEmailDraft("");
-        return;
-      }
-      const recipientName = res?.recipient?.name || email;
-      if (res?.auto_declined) {
-        setInviteToast({
-          tone: "warn",
-          text: `${recipientName}'s circles are full — invite was auto-declined.`,
-        });
-      } else {
-        setInviteToast({
-          tone: "ok",
-          text: `Invite sent to ${recipientName}.`,
-        });
-        if (showCircleInfoSheet && circleDetailData?.id) {
-          try {
-            const rows = await fetchCirclePendingInviteLabels(circleDetailData.id);
-            setCircleInfoPendingInvites(rows);
-          } catch {
-            /* list refreshes when Circle info reopens */
-          }
-        }
-      }
-      setShowInviteSheet(false);
-      setInviteEmailDraft("");
-    } catch (e) {
-      console.error("Circles: sendCircleInvite failed", e);
-      setInviteSheetError(e?.message || "Could not send the invite.");
-    } finally {
-      setInviteSheetSubmitting(false);
+        errName === "AbortError" ||
+        String(errMsg).includes("AbortError") ||
+        String(errMsg).toLowerCase().includes("share canceled") ||
+        String(errMsg).toLowerCase().includes("share cancelled");
+      if (!canceled) setInviteSheetError(errMsg);
     }
   }
 
@@ -14216,44 +14149,20 @@ export default function App() {
           />
           <div className="circles-sheet">
             <div className="circles-sheet-handle" aria-hidden="true" />
-            <div className="circles-sheet-title">Invite others</div>
-            <div className="circles-sheet-sub">
-              They open the link, sign in, and tap Join. Sending it does not add them.
+            <div className="circles-sheet-title circles-invite-title">Invite others</div>
+            <div className="circles-sheet-sub circles-invite-note">
+              Share a Link to your friends to join this circle. They need to open the link, sign in, and tap Join. This link expires in 7 days.
             </div>
-
-            <div className="circles-field">
-              <label className="circles-field-label" htmlFor="invite-others-email">Email</label>
-              <input
-                id="invite-others-email"
-                className="circles-input"
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                placeholder="friend@example.com"
-                value={inviteEmailDraft}
-                onChange={(e) => setInviteEmailDraft(e.target.value)}
-                disabled={inviteSheetSubmitting || inviteLinkBusy}
-              />
-            </div>
-
+            {inviteLinkBusy && <div className="circles-sheet-sub">Getting your link…</div>}
             {inviteSheetError && <div className="circles-error-banner">{inviteSheetError}</div>}
-
-            <div className="circles-sheet-actions circles-invite-pair">
+            <div className="circles-invite-pills">
               <button
                 type="button"
-                className="circles-btn-primary"
+                className="circles-invite-pill circles-invite-pill--on"
                 onClick={() => void submitShareInviteLink()}
-                disabled={inviteSheetSubmitting || inviteLinkBusy}
+                disabled={inviteLinkBusy || !inviteShareUrl}
               >
-                {inviteLinkBusy ? "Preparing…" : "Share link"}
-              </button>
-              <button
-                type="button"
-                className="circles-btn-primary"
-                onClick={() => void submitInviteByEmail()}
-                disabled={inviteSheetSubmitting || inviteLinkBusy}
-              >
-                {inviteSheetSubmitting ? "Sending…" : "Email"}
+                Click here to Share link
               </button>
             </div>
           </div>

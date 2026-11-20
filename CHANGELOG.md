@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.184
+
+- **Circles — Invite others:** The title **Invite others** is centered. The sheet says **Share a Link** and shows one centered pill, **Click here to Share link**. Friends open the link, sign in, and tap Join. The link expires in 7 days. The address is not shown in the sheet. There is no email address field.
+
 ## 7.0.183
 
 - **Circles — Invite others:** The sheet is titled **Invite others**. **Share link** and **Email** sit side by side. **Share link** opens the phone’s own share sheet. Cinemastro does not read contacts, and sending the link does not add anyone. The message is **Join {Name}'s circle on Cinemastro.** then **This link expires in 7 days.** then the link. One link works for more than one person for 7 days, until the circle is full or no longer active. **Email** to an existing account sends that person’s in-app invite. Any other address opens the host’s email app with the same message. That link works only for the address they typed. The public page shows the Cinemastro card.
