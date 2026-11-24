@@ -4,6 +4,7 @@
 import { Capacitor } from "@capacitor/core";
 import { handleAppDeepLink, queueNativeDeepLink } from "./authRedirect.js";
 import { scheduleNativeShellViewportReset } from "./nativeViewport.js";
+import { initReviewKeyboard } from "./reviewKeyboard.js";
 
 /** Defer until WebView + React mount so auth listeners catch recovery deep links. */
 function scheduleDeepLink(url) {
@@ -40,6 +41,11 @@ export async function initCapacitorShell() {
       await Keyboard.setAccessoryBarVisible({ isVisible: false });
     } catch {
       /* Keyboard plugin not available */
+    }
+    try {
+      await initReviewKeyboard();
+    } catch {
+      /* Review field stays put if the keyboard events are missing */
     }
   }
 

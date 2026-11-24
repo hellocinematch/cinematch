@@ -2778,7 +2778,7 @@
   .review-text {
     width:100%; box-sizing:border-box; min-height:96px; resize:vertical;
     background:#141414; color:#e8e4dc; border:1px solid #2a2a2a; border-radius:10px;
-    padding:10px 12px; font-family:'DM Sans',sans-serif; font-size:calc(14px * var(--cm-read)); line-height:1.45;
+    padding:10px 12px; font-family:'DM Sans',sans-serif; font-size:calc(16px * var(--cm-read)); line-height:1.45;
   }
   .review-agreement { margin-top:8px; }
   .review-agreement p { margin:0; font-size:11px; line-height:1.4; color:#777; }

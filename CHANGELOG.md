@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.187
+
+- **Review on iPhone:** The review box is 16px, so focusing it no longer leaves the title sheet wider than the screen after the review is saved. In the iPhone app, focusing the box scrolls the title page until the box, the note, the count, and the buttons sit above the keyboard.
+
 ## 7.0.186
 
 - **Circles — one card per show:** Publishing a show shares one score, the average of the seasons that person scored. If no season is scored, the score is the whole-show rating. Season scores stay on the title, in the season list. The circle no longer adds a card per season. **Rated by** shows that one average. A review on a season stays on the title. SQL **`20261123120000_circle_publish_show_average.sql`** is applied on staging. Apply it on production before the released App Store and Play apps pick this up. Do not apply it on production until asked.
