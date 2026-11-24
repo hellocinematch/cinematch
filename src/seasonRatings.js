@@ -138,48 +138,58 @@ export function buildRatedLines({ wholeMap, seasonMapByKey, movieById, seasonsBy
 }
 
 /**
- * Circle Recent / All / Top display rows for one aggregated show row. `lines` are that show's
- * `get_circle_title_publisher_lines` rows (per member: `season_number` null = whole-show score).
- * Returns one row per rated season (ascending), preceded by a whole-show row only when some member
- * gave a whole-show score. Each row carries that line group's circle average, rater count, and the
- * viewer's own score; `show_row` keeps the original aggregated row (prediction, publish state).
- * Movies, whole-show-only TV, and rows whose lines are not loaded come back unchanged.
+ * One published score per person for a show. When that person scored any season, the score is
+ * the average of those seasons. Otherwise it is the whole-show score. Season lines are not
+ * published as their own circle cards. A review is kept only when it is on the whole show.
  */
-export function expandCircleRowBySeason(row, lines, viewerId) {
-  if (row?.media_type !== "tv" || !Array.isArray(lines) || lines.length === 0) return [row];
-  const groups = new Map();
-  for (const l of lines) {
-    const sc = Number(l?.score);
+export function publishedShowLines(lines) {
+  const byUser = new Map();
+  for (const line of lines || []) {
+    const uid = line?.user_id || "";
+    if (!uid) continue;
+    const sc = Number(line?.score);
     if (!Number.isFinite(sc)) continue;
-    const n = l?.season_number == null ? null : Number(l.season_number);
-    if (n != null && (!Number.isInteger(n) || n < 1)) continue;
-    const k = n ?? 0;
-    let g = groups.get(k);
+    const sn = line?.season_number == null ? null : Number(line.season_number);
+    const isSeason = Number.isInteger(sn) && sn >= 1;
+    let g = byUser.get(uid);
     if (!g) {
-      g = { seasonNumber: n, sum: 0, count: 0, users: new Set(), viewerScore: null };
-      groups.set(k, g);
-    }
-    g.sum += sc;
-    g.count += 1;
-    if (l.user_id) g.users.add(l.user_id);
-    if (viewerId && l.user_id === viewerId) g.viewerScore = sc;
-  }
-  if (![...groups.keys()].some((k) => k > 0)) return [row];
-  return [...groups.keys()]
-    .sort((a, b) => a - b)
-    .map((k) => {
-      const g = groups.get(k);
-      const raters = g.users.size || g.count;
-      return {
-        ...row,
-        season_number: g.seasonNumber,
-        group_rating: Math.round((g.sum / g.count) * 10) / 10,
-        distinct_circle_raters: raters,
-        section: raters >= 2 ? "together" : "solo",
-        viewer_score: g.viewerScore,
-        show_row: row,
+      g = {
+        user_id: line.user_id,
+        member_name: line.member_name || "",
+        seasonScores: [],
+        whole: null,
+        review_body: "",
+        circleNames: [],
       };
-    });
+      byUser.set(uid, g);
+    }
+    if (!g.member_name && line.member_name) g.member_name = line.member_name;
+    if (isSeason) g.seasonScores.push(sc);
+    else g.whole = sc;
+    if (!isSeason) {
+      const body = typeof line.review_body === "string" ? line.review_body.trim() : "";
+      if (body && !g.review_body) g.review_body = body;
+    }
+    for (const name of line.circleNames || []) {
+      if (name && !g.circleNames.includes(name)) g.circleNames.push(name);
+    }
+  }
+  return [...byUser.values()]
+    .map((g) => {
+      const score = g.seasonScores.length
+        ? Math.round((g.seasonScores.reduce((sum, n) => sum + n, 0) / g.seasonScores.length) * 10) / 10
+        : g.whole;
+      return {
+        user_id: g.user_id,
+        member_name: g.member_name,
+        season_number: null,
+        score,
+        ...(g.review_body ? { review_body: g.review_body } : {}),
+        ...(g.circleNames.length ? { circleNames: g.circleNames } : {}),
+      };
+    })
+    .filter((row) => Number.isFinite(row.score))
+    .sort((a, b) => String(a.member_name || "").localeCompare(String(b.member_name || ""), undefined, { sensitivity: "base" }));
 }
 
 /** TMDB season `vote_average` (0–10) → "77%". */

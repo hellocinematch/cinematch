@@ -2683,6 +2683,110 @@
   }
   .circle-strip-rater-count { font-size:calc(11px * var(--cm-read)); color:#666; margin-top:4px; letter-spacing:0.2px; text-align:center; }
   .circle-list-rater-count { font-size:11px; color:#666; margin-top:3px; letter-spacing:0.2px; }
+  .circle-score-foot { display:flex; flex-direction:column; align-items:stretch; margin-top:5px; width:100%; }
+  .circle-score-foot .circle-strip-below-title-scores { margin-top:0; width:100%; box-sizing:border-box; }
+  .circle-score-foot--joined .circle-strip-below-title-scores,
+  .circle-strip-below-title-scores--joined {
+    border-bottom-left-radius:0;
+    border-bottom-right-radius:0;
+    border-bottom-color:transparent;
+  }
+  .circle-rater-wash {
+    margin:0; padding:4px 6px 5px; border:none; cursor:pointer;
+    border-radius:0 0 10px 10px;
+    background:rgba(232,201,106,0.16);
+    color:rgba(232,201,106,0.78);
+    font-family:'DM Sans',sans-serif;
+    font-size:calc(11px * var(--cm-read));
+    letter-spacing:0.2px;
+    text-align:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .circle-score-foot--list .circle-rater-wash { border-radius:8px; margin-top:6px; }
+  .circle-rater-wash:hover { background:rgba(232,201,106,0.24); }
+  .circle-rater-wash:focus-visible { outline:2px solid #e8c96a; outline-offset:2px; }
+  .circle-review-pill {
+    margin-top:8px; padding:5px 8px; border:none; cursor:pointer;
+    border-radius:10px;
+    background:rgba(106,170,106,0.18);
+    color:#8fbf8f;
+    font-family:'DM Sans',sans-serif;
+    font-size:calc(11px * var(--cm-read));
+    letter-spacing:0.2px;
+    text-align:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .circle-review-pill:hover { background:rgba(106,170,106,0.28); }
+  .circle-review-pill:focus-visible { outline:2px solid #6aaa6a; outline-offset:2px; }
+  .circle-review-pager {
+    display:flex; align-items:center; justify-content:center; gap:16px;
+    margin:8px 0 12px; color:#c8c2b8; font-family:'DM Sans',sans-serif; font-size:14px;
+  }
+  .circle-review-pager button {
+    width:36px; height:36px; border-radius:999px; border:1px solid #3a3428;
+    background:#1a1a1a; color:#e8c96a; font-size:18px; cursor:pointer;
+  }
+  .circle-review-pager button:disabled { opacity:0.35; cursor:default; }
+  .circle-review-reader__name {
+    font-family:'DM Serif Display',serif; font-size:calc(18px * var(--cm-read));
+    color:#f0ebe0; text-align:center; margin-bottom:8px;
+  }
+  .circle-review-reader__body {
+    margin:0; color:#ddd7cd; font-size:calc(14px * var(--cm-read)); line-height:1.5;
+    white-space:pre-wrap; max-height:40vh; overflow:auto;
+  }
+  .review-note-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:22px; height:22px; padding:0; margin:0; border:none; background:transparent;
+    color:#e8c96a; cursor:pointer; flex-shrink:0;
+  }
+  .review-note-btn:focus-visible { outline:2px solid #e8c96a; outline-offset:1px; border-radius:4px; }
+  .review-note-icon { width:16px; height:16px; display:block; }
+  .who-published-modal-score { display:inline-flex; align-items:center; gap:6px; }
+  .review-note-pop {
+    position:fixed; inset:0; z-index:2400; display:flex; align-items:center; justify-content:center;
+    padding:24px; box-sizing:border-box;
+  }
+  .review-note-pop__backdrop { position:absolute; inset:0; border:none; background:rgba(0,0,0,0.5); cursor:pointer; }
+  .review-note-pop__card {
+    position:relative; z-index:1; width:min(100%, 360px); box-sizing:border-box;
+    background:#161616; border:1px solid rgba(232,201,106,0.35); border-radius:12px;
+    padding:28px 16px 16px;
+  }
+  .review-note-pop__close {
+    position:absolute; top:6px; right:8px; border:none; background:transparent;
+    color:#e8c96a; font-size:22px; line-height:1; cursor:pointer;
+  }
+  .review-note-pop__name {
+    font-family:'DM Serif Display',serif; font-size:calc(18px * var(--cm-read));
+    color:#f0ebe0; margin:0 0 8px;
+  }
+  .review-note-pop__body {
+    margin:0; color:#ddd7cd; font-size:calc(14px * var(--cm-read)); line-height:1.5;
+    white-space:pre-wrap; max-height:40vh; overflow:auto;
+  }
+  .detail-rate-pills { display:flex; flex-direction:column; gap:10px; width:100%; }
+  .detail-rate-pills .btn-full, .detail-rate-pill { width:100%; flex:none; border-radius:999px; box-sizing:border-box; }
+  .rate-review-tabs { display:flex; gap:8px; margin:14px 0 12px; }
+  .rate-review-tabs button {
+    flex:1; border-radius:999px; border:1px solid #2a2a2a; background:#1a1a1a; color:#ccc;
+    padding:8px 10px; font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer;
+  }
+  .rate-review-tabs button[aria-selected="true"] { border-color:#e8c96a; color:#e8c96a; }
+  .detail-rate-actions { flex-direction:column; margin-top:14px; }
+  .detail-rate-actions .btn-full, .detail-rate-actions .btn-full-danger { width:100%; flex:none; }
+  .review-text {
+    width:100%; box-sizing:border-box; min-height:96px; resize:vertical;
+    background:#141414; color:#e8e4dc; border:1px solid #2a2a2a; border-radius:10px;
+    padding:10px 12px; font-family:'DM Sans',sans-serif; font-size:calc(14px * var(--cm-read)); line-height:1.45;
+  }
+  .review-agreement { margin-top:8px; }
+  .review-agreement p { margin:0; font-size:11px; line-height:1.4; color:#777; }
+  .review-count { margin-top:4px; font-size:11px; color:#666; text-align:right; }
+  .season-score__review { margin-top:12px; text-align:left; }
+  .season-score__review-label { font-size:12px; color:#aaa; margin-bottom:6px; }
+  .season-score__confirm { margin-top:8px; font-size:13px; color:#e8d4d4; }
+  .season-score__confirm p { margin:0 0 8px; }
   .circle-strip-comm-line { font-size:11px; color:#888; margin-top:4px; letter-spacing:0.2px; }
   .circle-strip-comm-line--muted { color:#555; }
   .circle-detail-strip-empty { margin:0 !important; }

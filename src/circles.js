@@ -8,6 +8,8 @@
 
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import { attachReviewBodies, fetchCircleTitleReviews } from "./ratingReviews.js";
+import { publishedShowLines } from "./seasonRatings.js";
 
 /** Maximum active circles per user. Archived circles don't count. */
 export const CIRCLE_CAP = 10;
@@ -621,8 +623,8 @@ export async function fetchCircleTitlePublisherLines({ circleId, tmdbId, mediaTy
 
 /**
  * Merge published lines for one title across the viewer's circles.
- * The same person (and season) appears once. `circleNames` lists every shared circle
- * they published that line in. Score is the same in every circle; the first one wins.
+ * Each person appears once. A show score is the average of that person's seasons when
+ * any season is scored. `circleNames` lists every shared circle they published it in.
  * @param {Array<{ name: string, rows: Array<{ user_id?: string, member_name?: string, season_number?: number | null, score?: number }> }>} circleResults
  */
 export function mergePublishedLinesAcrossCircles(circleResults) {
@@ -648,15 +650,12 @@ export function mergePublishedLinesAcrossCircles(circleResults) {
         };
         map.set(key, group);
       }
+      const reviewBody = typeof row?.review_body === "string" ? row.review_body.trim() : "";
+      if (reviewBody && !group.review_body) group.review_body = reviewBody;
       if (circleName && !group.circleNames.includes(circleName)) group.circleNames.push(circleName);
     }
   }
-  return [...map.values()].sort((a, b) => {
-    const as = a.season_number == null ? -1 : a.season_number;
-    const bs = b.season_number == null ? -1 : b.season_number;
-    if (as !== bs) return as - bs;
-    return String(a.member_name || "").localeCompare(String(b.member_name || ""), undefined, { sensitivity: "base" });
-  });
+  return publishedShowLines([...map.values()]);
 }
 
 /** People other than the viewer who published this title. One person counts once, even across seasons. */
@@ -698,7 +697,19 @@ export async function fetchPublishedLinesAcrossMyCircles({ tmdbId, mediaType }) 
           tmdbId,
           mediaType,
         });
-        return { name: circle.name, rows };
+        let reviews = [];
+        try {
+          reviews = await fetchCircleTitleReviews({
+            circleId: circle.id,
+            tmdbId,
+            mediaType,
+          });
+        } catch (reviewErr) {
+          if (!String(reviewErr?.message || "").includes("not a member")) {
+            console.warn("In your circles: could not read reviews", reviewErr?.message || reviewErr);
+          }
+        }
+        return { name: circle.name, rows: attachReviewBodies(rows, reviews) };
       } catch (e) {
         if (String(e?.message || "").includes("not a member")) return { name: circle.name, rows: [] };
         console.warn("In your circles: could not read one circle", e?.message || e);

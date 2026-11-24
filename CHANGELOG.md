@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.0.186
+
+- **Circles — one card per show:** Publishing a show shares one score, the average of the seasons that person scored. If no season is scored, the score is the whole-show rating. Season scores stay on the title, in the season list. The circle no longer adds a card per season. **Rated by** shows that one average. A review on a season stays on the title. SQL **`20261123120000_circle_publish_show_average.sql`** is applied on staging. Apply it on production before the released App Store and Play apps pick this up. Do not apply it on production until asked.
+
+## 7.0.185
+
+- **Reviews:** A rating can carry a short review, up to 500 characters, and the box shows how many are left. One review per person per title, or per season. The score stays the number. A review cannot be saved without a score, and clearing the score deletes the review. On a title, the control is **Submit your rating & review**, then **Change rating and review**. Inside a circle, **2 of 7 rated** sits on the score pill and still opens **Rated by**. A green pill opens one review at a time. A gold note before a score opens that person's name and words. Names stay in circles. The Cinemastro page is later. A review does not send an alert. SQL **`20261120190000_rating_reviews.sql`** is applied on staging. Apply it on production before reviews can be saved there. Do not apply it on production until asked.
+
 ## 7.0.184
 
 - **Circles — Invite others:** The title **Invite others** is centered. The sheet says **Share a Link** and shows one centered pill, **Click here to Share link**. Friends open the link, sign in, and tap Join. The link expires in 7 days. The address is not shown in the sheet. There is no email address field.

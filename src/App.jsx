@@ -106,8 +106,21 @@ import {
   buildRatedLines,
   formatSeasonVotePercent,
   seasonYearEpisodesLine,
-  expandCircleRowBySeason,
+  publishedShowLines,
 } from "./seasonRatings.js";
+import {
+  REVIEW_MAX_CHARS,
+  REVIEW_AGREEMENT_LINE_1,
+  REVIEW_AGREEMENT_LINE_2,
+  normalizeReviewBody,
+  reviewBodyError,
+  reviewWriteError,
+  mapsFromReviewRows,
+  circleCardReviewCount,
+  attachReviewBodies,
+  fetchCircleTitleReviews,
+  fetchCircleReviewCounts,
+} from "./ratingReviews.js";
 import "./App.css";
 import { TEXT_SIZE_OPTIONS, readTextSize, writeTextSize } from "./textSize.js";
 import { PulsePage } from "./pages/PulsePage.jsx";
@@ -3596,11 +3609,6 @@ function circleStripResolveMovie(row, movieLookupById, circleStripExtraMovies) {
   );
 }
 
-/** Season-lines cache key: changes whenever the circle row's activity, average, or rater count changes. */
-function circleSeasonLinesCacheKey(circleId, row) {
-  return `${circleId}|tv-${Number(row.tmdb_id)}|${row.last_activity_at ?? ""}|${row.group_rating ?? ""}|${row.distinct_circle_raters ?? ""}`;
-}
-
 /** `openDetail` prediction payload from Edge `prediction` object (null if user already rated). */
 function circleStripPredictionForDetail(row) {
   if (row.viewer_score != null && Number.isFinite(Number(row.viewer_score))) return null;
@@ -3742,18 +3750,23 @@ function seasonRowPosterSrc(season, fallbackPoster) {
  * The user's score for one season: same chip picker as the title score, collapsed until tapped so
  * many seasons fit. `onSave` / `onClear` return promises; errors show inline.
  */
-function SeasonScoreControl({ value, onSave, onClear, canRate, seasonLabel }) {
+function SeasonScoreControl({ value, review = "", onSave, onClear, onSaveReview, onClearReview, canRate, seasonLabel }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(7);
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [reviewDraft, setReviewDraft] = useState(review || "");
+  const [clearConfirm, setClearConfirm] = useState(false);
   const hasValue = value != null && Number.isFinite(Number(value));
+  const savedReview = typeof review === "string" ? review.trim() : "";
 
   function begin() {
     setErr("");
+    setClearConfirm(false);
     setDraft(hasValue ? Number(value) : 7);
     setTouched(hasValue);
+    setReviewDraft(savedReview);
     setOpen(true);
   }
 
@@ -3810,11 +3823,26 @@ function SeasonScoreControl({ value, onSave, onClear, canRate, seasonLabel }) {
           type="button"
           className="season-score__btn season-score__btn--save"
           disabled={!touched || busy}
-          onClick={() => void run(() => onSave(draft))}
+          onClick={() => void run(async () => {
+            await onSave(draft);
+            const typed = normalizeReviewBody(reviewDraft);
+            if (!savedReview && typed && typeof onSaveReview === "function") {
+              await onSaveReview(reviewDraft);
+            }
+          })}
         >
           {busy ? "Saving…" : "Save"}
         </button>
-        <button type="button" className="season-score__btn" disabled={busy} onClick={() => setOpen(false)}>
+        <button
+          type="button"
+          className="season-score__btn"
+          disabled={busy}
+          onClick={() => {
+            setOpen(false);
+            setClearConfirm(false);
+            setReviewDraft(savedReview);
+          }}
+        >
           Cancel
         </button>
         {hasValue ? (
@@ -3822,12 +3850,86 @@ function SeasonScoreControl({ value, onSave, onClear, canRate, seasonLabel }) {
             type="button"
             className="season-score__btn season-score__btn--clear"
             disabled={busy}
-            onClick={() => void run(() => onClear())}
+            onClick={() => {
+              if (savedReview) {
+                setClearConfirm(true);
+                setErr("");
+                return;
+              }
+              void run(() => onClear());
+            }}
           >
             Clear
           </button>
         ) : null}
       </div>
+      {clearConfirm ? (
+        <div className="season-score__confirm">
+          <p>This score and the review will both be deleted.</p>
+          <div className="season-score__actions">
+            <button
+              type="button"
+              className="season-score__btn season-score__btn--clear"
+              disabled={busy}
+              onClick={() => void run(async () => {
+                if (savedReview && typeof onClearReview === "function") await onClearReview();
+                await onClear();
+              })}
+            >
+              Remove
+            </button>
+            <button type="button" className="season-score__btn" disabled={busy} onClick={() => setClearConfirm(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {typeof onSaveReview === "function" ? (
+        <div className="season-score__review">
+          <div className="season-score__review-label">Review</div>
+          <textarea
+            className="review-text"
+            maxLength={REVIEW_MAX_CHARS}
+            value={reviewDraft}
+            placeholder="Your review"
+            disabled={busy}
+            onChange={(e) => setReviewDraft(e.target.value)}
+          />
+          <ReviewAgreement />
+          <div className="review-count">{REVIEW_MAX_CHARS - reviewDraft.length} left</div>
+          <div className="season-score__actions">
+            <button
+              type="button"
+              className="season-score__btn season-score__btn--save"
+              disabled={busy || !hasValue || Boolean(reviewBodyError(reviewDraft)) || normalizeReviewBody(reviewDraft) === savedReview}
+              onClick={() => void run(() => onSaveReview(reviewDraft))}
+            >
+              Save new
+            </button>
+            {savedReview && typeof onClearReview === "function" ? (
+              <button
+                type="button"
+                className="season-score__btn season-score__btn--clear"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setErr("");
+                  try {
+                    await onClearReview();
+                    setReviewDraft("");
+                  } catch (e) {
+                    setErr(e?.message || "Could not clear review.");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Clear review
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {err ? <div className="season-score__err" role="alert">{err}</div> : null}
     </div>
   );
@@ -3837,7 +3939,7 @@ function SeasonScoreControl({ value, onSave, onClear, canRate, seasonLabel }) {
  * Title screen: every season (1+) of a show as {@link SeasonRow}s, each with the user's
  * own {@link SeasonScoreControl}. Long-running shows show the latest `initialMax` until expanded.
  */
-function TvSeasonRowsList({ seasons, showPoster, seasonScores, canRate, onSave, onClear, initialMax = 0 }) {
+function TvSeasonRowsList({ seasons, showPoster, seasonScores, seasonReviews, canRate, onSave, onClear, onSaveReview, onClearReview, initialMax = 0 }) {
   const [expanded, setExpanded] = useState(false);
   const list = Array.isArray(seasons) ? seasons : [];
   const capped = initialMax > 0 && !expanded && list.length > initialMax;
@@ -3862,10 +3964,13 @@ function TvSeasonRowsList({ seasons, showPoster, seasonScores, canRate, onSave, 
           >
             <SeasonScoreControl
               value={seasonScores?.[s.seasonNumber]}
+              review={seasonReviews?.[s.seasonNumber] || ""}
               canRate={canRate}
               seasonLabel={label}
               onSave={(score) => onSave(s.seasonNumber, score)}
               onClear={() => onClear(s.seasonNumber)}
+              onSaveReview={typeof onSaveReview === "function" ? (text) => onSaveReview(s.seasonNumber, text) : undefined}
+              onClearReview={typeof onClearReview === "function" ? () => onClearReview(s.seasonNumber) : undefined}
             />
           </SeasonRow>
         );
@@ -4070,26 +4175,17 @@ function formatCircleRaterOutOf(rated, members) {
   return `${r} of ${m} rated`;
 }
 
-function CircleRaterOutOfLine({ rated, members, className }) {
-  const label = formatCircleRaterOutOf(rated, members);
-  if (!label) return null;
-  return (
-    <div className={className} aria-label={label}>
-      {label}
-    </div>
-  );
-}
-
 /**
  * Circles — Recent strip: under the title — circle aggregate only (orange ⭐ + score).
  * Community / TMDB on title detail. Omits if no circle average.
  */
-function CircleStripRingCineBelowTitle({ groupRating, onWhoPublished }) {
+function CircleStripRingCineBelowTitle({ groupRating, onWhoPublished, attachedFoot = false }) {
   const hasGr = groupRating != null && Number.isFinite(Number(groupRating));
   if (!hasGr) return null;
   const a11y = `Circle ${formatScore(Number(groupRating))}`;
   const tappable = typeof onWhoPublished === "function";
   const a11yTap = tappable ? `${a11y}. Open who rated in this circle.` : a11y;
+  const joined = attachedFoot ? " circle-strip-below-title-scores--joined" : "";
   const inner = (
     <span className="circle-strip-below-title-scores__seg circle-strip-below-title-scores__seg--circle">
       <CircleGroupScoreIcon />
@@ -4100,7 +4196,7 @@ function CircleStripRingCineBelowTitle({ groupRating, onWhoPublished }) {
     return (
       <button
         type="button"
-        className="circle-strip-below-title-scores circle-strip-below-title-scores--tappable"
+        className={`circle-strip-below-title-scores circle-strip-below-title-scores--tappable${joined}`}
         title={a11yTap}
         aria-label={a11yTap}
         onClick={(e) => {
@@ -4114,8 +4210,90 @@ function CircleStripRingCineBelowTitle({ groupRating, onWhoPublished }) {
     );
   }
   return (
-    <div className="circle-strip-below-title-scores" title={a11y} aria-label={a11y}>
+    <div className={`circle-strip-below-title-scores${joined}`} title={a11y} aria-label={a11y}>
       {inner}
+    </div>
+  );
+}
+
+/** "2 of 7 rated" stuck under the score pill, and the green reviews pill when someone wrote one. */
+function CircleScoreFoot({ variant = "strip", rated, members, reviewCount, onWhoRated, onOpenReviews, children }) {
+  const raterLabel = formatCircleRaterOutOf(rated, members);
+  const n = Number(reviewCount) || 0;
+  const joined = variant === "strip" && Boolean(raterLabel);
+  if (!children && !raterLabel && n < 1) return null;
+  const reviewLabel = n === 1 ? "1 review" : `${n} reviews`;
+  return (
+    <div className={`circle-score-foot${joined ? " circle-score-foot--joined" : ""}${variant === "list" ? " circle-score-foot--list" : ""}`}>
+      {children}
+      {raterLabel ? (
+        <button
+          type="button"
+          className="circle-rater-wash"
+          aria-label={`${raterLabel}. Rated by.`}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onWhoRated?.();
+          }}
+        >
+          {raterLabel}
+        </button>
+      ) : null}
+      {n > 0 ? (
+        <button
+          type="button"
+          className="circle-review-pill"
+          aria-label={reviewLabel}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onOpenReviews?.();
+          }}
+        >
+          {reviewLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function ReviewNoteIcon() {
+  return (
+    <svg className="review-note-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5L14 3.5zM8 12h8v1.5H8V12zm0 4h8v1.5H8V16z"
+      />
+    </svg>
+  );
+}
+
+/** Gold note just before a circle score. Opens that person's words. */
+function ReviewNoteButton({ name, body, onOpen }) {
+  const text = typeof body === "string" ? body.trim() : "";
+  if (!text) return null;
+  return (
+    <button
+      type="button"
+      className="review-note-btn"
+      aria-label={`Review by ${name}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onOpen?.({ name, body: text });
+      }}
+    >
+      <ReviewNoteIcon />
+    </button>
+  );
+}
+
+function ReviewAgreement() {
+  return (
+    <div className="review-agreement">
+      <p>{REVIEW_AGREEMENT_LINE_1}</p>
+      <p>{REVIEW_AGREEMENT_LINE_2}</p>
     </div>
   );
 }
@@ -4302,7 +4480,7 @@ export default function App() {
   const ratingRowsRef = useRef([]);
   const seasonRowsRef = useRef([]);
   const ratingsSnapshotRef = useRef({ ratings: {}, show: {}, seasons: {} });
-  const ratingsBackfillFromRef = useRef({ ratingsFrom: null, seasonsFrom: null });
+  const ratingsBackfillFromRef = useRef({ ratingsFrom: null, seasonsFrom: null, reviewsFrom: null });
   const releaseHomeFeed = useCallback(() => setNtwSettled(true), []);
   const [catalogueRetryBusy, setCatalogueRetryBusy] = useState(false);
   /** True after the first `getSession()` returns, so an empty auth event cannot flash the signed-out page. */
@@ -4321,6 +4499,16 @@ export default function App() {
   const [userShowRatings, setUserShowRatings] = useState({});
   /** `{ "tv-<id>": { [seasonNumber]: score } }` from `season_ratings`. */
   const [userSeasonRatings, setUserSeasonRatings] = useState({});
+  /** Whole-title review text, keyed by movie id. Empty when there is no review. */
+  const [userTitleReviews, setUserTitleReviews] = useState({});
+  /** `{ "tv-<id>": { [seasonNumber]: text } }` from `rating_reviews`. */
+  const [userSeasonReviews, setUserSeasonReviews] = useState({});
+  const reviewRowsRef = useRef([]);
+  const reviewSnapshotRef = useRef({ titles: {}, seasons: {} });
+  const [circleReviewCounts, setCircleReviewCounts] = useState({});
+  const [circleReviewReloadKey, setCircleReviewReloadKey] = useState(0);
+  const [circleReviewsModal, setCircleReviewsModal] = useState(null);
+  const [reviewNote, setReviewNote] = useState(null);
   const userShowRatingsRef = useRef({});
   const userSeasonRatingsRef = useRef({});
   useEffect(() => {
@@ -4376,6 +4564,12 @@ export default function App() {
   const [detailRating, setDetailRating] = useState(7);
   const [detailTouched, setDetailTouched] = useState(false);
   const [detailEditRating, setDetailEditRating] = useState(false);
+  /** Unrated title: the Rating / Review tabs are open. + Watchlist does nothing until they close. */
+  const [detailRateOpen, setDetailRateOpen] = useState(false);
+  const [detailRateTab, setDetailRateTab] = useState("rating");
+  const [detailReviewDraft, setDetailReviewDraft] = useState("");
+  const [detailReviewErr, setDetailReviewErr] = useState("");
+  const [detailReviewBusy, setDetailReviewBusy] = useState(false);
   /** Title detail: "Clear rating" second step — confirm remove from all circles + delete rating. */
   const [detailClearRatingConfirm, setDetailClearRatingConfirm] = useState(false);
   const [detailClearRatingBusy, setDetailClearRatingBusy] = useState(false);
@@ -4526,10 +4720,6 @@ export default function App() {
   const [showCircleInfoSheet, setShowCircleInfoSheet] = useState(false);
   /** Rated-by modal (3b): null | { status, displayTitle?, rows?, message? } */
   const [whoPublishedModal, setWhoPublishedModal] = useState(null);
-  /** `get_circle_title_publisher_lines` per circle TV row, keyed by {@link circleSeasonLinesCacheKey}. */
-  const [circleSeasonLines, setCircleSeasonLines] = useState({});
-  const circleSeasonLinesRef = useRef({});
-  const circleSeasonLinesInflightRef = useRef(new Set());
   /** Pending in-app invites (moderators) for Circle info — refetched when sheet opens. */
   const [circleInfoPendingInvites, setCircleInfoPendingInvites] = useState([]);
   const [circleInfoPendingInvitesLoading, setCircleInfoPendingInvitesLoading] = useState(false);
@@ -6923,14 +7113,25 @@ export default function App() {
       .order("tmdb_id", { ascending: true })
       .order("season_number", { ascending: true })
       .range(0, RATINGS_PAGE_SIZE - 1);
-    const [{ data: ratingsData }, { data: watchlistData }, { data: seasonData, error: seasonErr }] = await Promise.all([
+    const reviewQuery = supabase
+      .from("rating_reviews")
+      .select("tmdb_id, media_type, season_number, body")
+      .eq("user_id", user.id)
+      .order("media_type", { ascending: true })
+      .order("tmdb_id", { ascending: true })
+      .order("season_number", { ascending: true })
+      .range(0, RATINGS_PAGE_SIZE - 1);
+    const [{ data: ratingsData }, { data: watchlistData }, { data: seasonData, error: seasonErr }, { data: reviewData, error: reviewErr }] = await Promise.all([
       ratingsQuery,
       supabase.from("watchlist").select("*").eq("user_id", user.id).order("sort_index", { ascending: true }),
       seasonQuery,
+      reviewQuery,
     ]);
     if (seasonErr) console.warn(`Could not read season scores (apply 20260925120000): ${seasonErr.message}`);
+    if (reviewErr) console.warn(`Could not read reviews (apply 20261120190000): ${reviewErr.message}`);
     ratingRowsRef.current = ratingsData || [];
     seasonRowsRef.current = seasonErr ? [] : (seasonData || []);
+    reviewRowsRef.current = reviewErr ? [] : (reviewData || []);
     if (ratingsData) {
       const { wholeMap, seasonMap, ratingsMap } = mapsFromRatingRows(ratingRowsRef.current, seasonRowsRef.current);
       ratingsSnapshotRef.current = { ratings: ratingsMap, show: wholeMap, seasons: seasonMap };
@@ -6938,13 +7139,19 @@ export default function App() {
       setUserSeasonRatings(seasonMap);
       setUserRatings(ratingsMap);
     }
+    const reviewMaps = mapsFromReviewRows(reviewRowsRef.current);
+    reviewSnapshotRef.current = reviewMaps;
+    setUserTitleReviews(reviewMaps.titles);
+    setUserSeasonReviews(reviewMaps.seasons);
     const ratingsFull = (ratingsData?.length ?? 0) >= RATINGS_PAGE_SIZE;
     const seasonsFull = !seasonErr && (seasonData?.length ?? 0) >= RATINGS_PAGE_SIZE;
+    const reviewsFull = !reviewErr && (reviewData?.length ?? 0) >= RATINGS_PAGE_SIZE;
     ratingsBackfillFromRef.current = {
       ratingsFrom: ratingsFull ? RATINGS_PAGE_SIZE : null,
       seasonsFrom: seasonsFull ? RATINGS_PAGE_SIZE : null,
+      reviewsFrom: reviewsFull ? RATINGS_PAGE_SIZE : null,
     };
-    setRatingsHistoryReady(!ratingsFull && !seasonsFull);
+    setRatingsHistoryReady(!ratingsFull && !seasonsFull && !reviewsFull);
     if (watchlistData?.length) {
       setWatchlist(buildWatchlistFromRows(watchlistData, catalogue));
     }
@@ -7010,7 +7217,7 @@ export default function App() {
   useEffect(() => {
     if (!user || !homeFeedReady || ratingsHistoryReady) return undefined;
     const uid = user.id;
-    const { ratingsFrom, seasonsFrom } = ratingsBackfillFromRef.current;
+    const { ratingsFrom, seasonsFrom, reviewsFrom } = ratingsBackfillFromRef.current;
     let cancelled = false;
     (async () => {
       try {
@@ -7030,19 +7237,26 @@ export default function App() {
           }
           return rows;
         }
-        const [moreRatings, moreSeasons] = await Promise.all([
+        const [moreRatings, moreSeasons, moreReviews] = await Promise.all([
           restOf("ratings", "tmdb_id, media_type, score, score_from_seasons", ["media_type", "tmdb_id"], ratingsFrom),
           restOf("season_ratings", "tmdb_id, season_number, score", ["tmdb_id", "season_number"], seasonsFrom),
+          restOf("rating_reviews", "tmdb_id, media_type, season_number, body", ["media_type", "tmdb_id", "season_number"], reviewsFrom),
         ]);
         if (cancelled) return;
         ratingRowsRef.current = [...ratingRowsRef.current, ...moreRatings];
         seasonRowsRef.current = [...seasonRowsRef.current, ...moreSeasons];
+        reviewRowsRef.current = [...reviewRowsRef.current, ...moreReviews];
         const { wholeMap, seasonMap, ratingsMap } = mapsFromRatingRows(ratingRowsRef.current, seasonRowsRef.current);
         const snap = ratingsSnapshotRef.current;
         setUserShowRatings((prev) => mergeMapPreservingEdits(wholeMap, prev, snap.show));
         setUserSeasonRatings((prev) => mergeMapPreservingEdits(seasonMap, prev, snap.seasons));
         setUserRatings((prev) => mergeMapPreservingEdits(ratingsMap, prev, snap.ratings));
         ratingsSnapshotRef.current = { ratings: ratingsMap, show: wholeMap, seasons: seasonMap };
+        const reviewMaps = mapsFromReviewRows(reviewRowsRef.current);
+        const reviewSnap = reviewSnapshotRef.current;
+        setUserTitleReviews((prev) => mergeMapPreservingEdits(reviewMaps.titles, prev, reviewSnap.titles));
+        setUserSeasonReviews((prev) => mergeMapPreservingEdits(reviewMaps.seasons, prev, reviewSnap.seasons));
+        reviewSnapshotRef.current = reviewMaps;
       } catch (e) {
         console.warn("Could not finish reading ratings:", e?.message || e);
       } finally {
@@ -7501,10 +7715,14 @@ export default function App() {
     setUserRatings({}); setWatchlist([]);
     setUserShowRatings({});
     setUserSeasonRatings({});
+    setUserTitleReviews({});
+    setUserSeasonReviews({});
     setRatingsHistoryReady(false);
     ratingRowsRef.current = [];
     seasonRowsRef.current = [];
-    ratingsBackfillFromRef.current = { ratingsFrom: null, seasonsFrom: null };
+    reviewRowsRef.current = [];
+    reviewSnapshotRef.current = { titles: {}, seasons: {} };
+    ratingsBackfillFromRef.current = { ratingsFrom: null, seasonsFrom: null, reviewsFrom: null };
     setMatchData(null);
     setSelectedStreamingProviderIds([]);
     setShowGenreIds([]);
@@ -8825,7 +9043,7 @@ export default function App() {
     }));
     setWatchlist(prev => prev.filter(m => m.id !== movieId));
     setSelectedToWatch(prev => { const n = { ...prev }; delete n[movieId]; return n; });
-    let ratingsUpsertOk = false;
+    let ratingsUpsertOk = !user;
     if (user) {
       const [type, tmdbId] = movieId.split("-");
       const { error: ratingErr } = await supabase.from("ratings").upsert({ user_id: user.id, tmdb_id: parseInt(tmdbId), media_type: type, score }, { onConflict: "user_id,tmdb_id,media_type" });
@@ -8837,6 +9055,7 @@ export default function App() {
       }
       await supabase.from("watchlist").delete().eq("user_id", user.id).eq("tmdb_id", parseInt(tmdbId)).eq("media_type", type);
     }
+    if (!ratingsUpsertOk) return false;
 
     const shouldOpenPublish = Boolean(user) && !skipPublishModal && !hadRating;
     if (shouldOpenPublish) {
@@ -8848,7 +9067,7 @@ export default function App() {
             setNoCirclesAfterDetailRatingModal({
               pendingNavigate: options.pendingNavigate ?? "none",
             });
-            return;
+            return true;
           }
         }
       }
@@ -8863,7 +9082,7 @@ export default function App() {
         pendingNavigate,
         defaultCircleIds: [...new Set(defaults)],
       });
-      return;
+      return true;
     }
 
     if (
@@ -8881,13 +9100,14 @@ export default function App() {
         setNoCirclesAfterDetailRatingModal({
           pendingNavigate: options.pendingNavigate ?? "none",
         });
-        return;
+        return true;
       }
     }
 
     if (pendingNavigate === "back") {
       setTimeout(() => goBack(), navigateDelayMs);
     }
+    return true;
   }
 
   async function clearMyRatingForMovieId(movieId) {
@@ -8927,6 +9147,8 @@ export default function App() {
     setUserRatings(dropKey);
     setUserShowRatings(dropKey);
     setUserSeasonRatings(dropKey);
+    setUserTitleReviews(dropKey);
+    setUserSeasonReviews(dropKey);
     userSeasonRatingsRef.current = dropKey(userSeasonRatingsRef.current);
     void refreshCinemastroAvgForMediaId(movieId);
     scheduleComputeNeighborsRebuild();
@@ -9005,6 +9227,95 @@ export default function App() {
     const next = { ...(userSeasonRatingsRef.current[movieId] || {}) };
     delete next[n];
     applyLocalSeasonScores(movieId, next);
+    setUserSeasonReviews((prev) => {
+      const cur = { ...(prev[movieId] || {}) };
+      if (!(n in cur)) return prev;
+      delete cur[n];
+      const out = { ...prev };
+      if (Object.keys(cur).length === 0) delete out[movieId];
+      else out[movieId] = cur;
+      return out;
+    });
+  }
+
+  function reviewTarget(movie, seasonNumber) {
+    const tmdbId = Number(movie?.tmdbId);
+    const mediaType = movie?.type === "tv" ? "tv" : movie?.type === "movie" ? "movie" : "";
+    const season = seasonNumber == null ? 0 : Number(seasonNumber);
+    if (!mediaType || !Number.isFinite(tmdbId)) return null;
+    if (season !== 0 && (mediaType !== "tv" || !Number.isInteger(season) || season < 1)) return null;
+    return { tmdbId, mediaType, season, movieId: movie.id };
+  }
+
+  function rememberReview(movieId, season, body) {
+    if (season === 0) {
+      setUserTitleReviews((prev) => ({ ...prev, [movieId]: body }));
+      return;
+    }
+    setUserSeasonReviews((prev) => ({
+      ...prev,
+      [movieId]: { ...(prev[movieId] || {}), [season]: body },
+    }));
+  }
+
+  function forgetReview(movieId, season) {
+    if (season === 0) {
+      setUserTitleReviews((prev) => {
+        if (!(movieId in prev)) return prev;
+        const next = { ...prev };
+        delete next[movieId];
+        return next;
+      });
+      return;
+    }
+    setUserSeasonReviews((prev) => {
+      const cur = { ...(prev[movieId] || {}) };
+      if (!(season in cur)) return prev;
+      delete cur[season];
+      const next = { ...prev };
+      if (Object.keys(cur).length === 0) delete next[movieId];
+      else next[movieId] = cur;
+      return next;
+    });
+  }
+
+  async function saveMyReview(movie, seasonNumber, text) {
+    if (!user) throw new Error("Sign in to save a review.");
+    const target = reviewTarget(movie, seasonNumber);
+    if (!target) throw new Error("Could not save review.");
+    const problem = reviewBodyError(text);
+    if (problem) throw new Error(problem);
+    const body = normalizeReviewBody(text);
+    const { error } = await supabase.from("rating_reviews").upsert(
+      {
+        user_id: user.id,
+        tmdb_id: target.tmdbId,
+        media_type: target.mediaType,
+        season_number: target.season,
+        body,
+        show_on_cinemastro: true,
+      },
+      { onConflict: "user_id,tmdb_id,media_type,season_number" },
+    );
+    if (error) throw new Error(reviewWriteError(error, "Could not save review."));
+    rememberReview(target.movieId, target.season, body);
+    setCircleReviewReloadKey((k) => k + 1);
+  }
+
+  async function clearMyReview(movie, seasonNumber) {
+    if (!user) throw new Error("Sign in to clear a review.");
+    const target = reviewTarget(movie, seasonNumber);
+    if (!target) return;
+    const { error } = await supabase
+      .from("rating_reviews")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("tmdb_id", target.tmdbId)
+      .eq("media_type", target.mediaType)
+      .eq("season_number", target.season);
+    if (error) throw new Error(reviewWriteError(error, "Could not clear review."));
+    forgetReview(target.movieId, target.season);
+    setCircleReviewReloadKey((k) => k + 1);
   }
 
   async function completePublishRatingModal(selectedIds) {
@@ -9349,6 +9660,10 @@ export default function App() {
     void refreshCinemastroAvgForMediaId(movie.id);
     void refreshOpenDetailRating(movie.id);
     const showLevelScore = userShowRatings[movie.id];
+    setDetailRateOpen(false);
+    setDetailRateTab("rating");
+    setDetailReviewErr("");
+    setDetailReviewDraft(userTitleReviews[movie.id] || "");
     if (opts.startEditing && showLevelScore != null) {
       setDetailEditRating(true);
       setDetailClearRatingConfirm(false);
@@ -10259,28 +10574,32 @@ export default function App() {
       const displayTitle = typeof titleText === "string" ? titleText.trim() : "";
       const mediaType = row.media_type === "tv" ? "tv" : "movie";
       const tmdbId = Number(row.tmdb_id);
-      const seasonScoped = Boolean(row.show_row);
-      const seasonFilter = seasonScoped && row.season_number != null ? Number(row.season_number) : null;
       const base = {
-        displayTitle: displayTitle && seasonFilter != null ? `${displayTitle} · Season ${seasonFilter}` : displayTitle,
+        displayTitle,
         mediaType,
         tmdbId,
         showPoster: showPoster || null,
       };
+      setReviewNote(null);
       setWhoPublishedModal({ ...base, status: "loading" });
-      if (mediaType === "tv") void ensureTvSeasons([tmdbId]);
       void (async () => {
         try {
-          const pubRows = await fetchCircleTitlePublisherLines({
-            circleId: selectedCircleId,
-            tmdbId: row.tmdb_id,
-            mediaType: row.media_type,
-          });
-          const rows = (pubRows || []).filter((r) => {
-            if (!seasonScoped) return true;
-            const sn = r.season_number != null ? Number(r.season_number) : null;
-            return sn === seasonFilter;
-          });
+          const [pubRows, reviewRows] = await Promise.all([
+            fetchCircleTitlePublisherLines({
+              circleId: selectedCircleId,
+              tmdbId: row.tmdb_id,
+              mediaType: row.media_type,
+            }),
+            fetchCircleTitleReviews({
+              circleId: selectedCircleId,
+              tmdbId: row.tmdb_id,
+              mediaType: row.media_type,
+            }).catch((err) => {
+              console.warn("Rated by reviews:", err?.message || err);
+              return [];
+            }),
+          ]);
+          const rows = publishedShowLines(attachReviewBodies(pubRows, reviewRows));
           setWhoPublishedModal({ ...base, status: "ok", rows });
         } catch (e) {
           setWhoPublishedModal({
@@ -10291,74 +10610,59 @@ export default function App() {
         }
       })();
     },
-    [selectedCircleId, ensureTvSeasons],
+    [selectedCircleId],
   );
 
-  const circleTvRowsForSeasonLines = useMemo(() => {
-    if (screen !== "circle-detail" || !selectedCircleId) return [];
-    const payload =
-      circleRatingsView === "all"
-        ? circleGridAllPayload
-        : circleRatingsView === "top"
-          ? circleGridTopPayload
-          : circleStripPayload;
-    const rows = Array.isArray(payload?.titles) ? payload.titles : [];
-    return rows.filter((r) => r?.media_type === "tv" && Number.isFinite(Number(r.tmdb_id)));
-  }, [screen, selectedCircleId, circleRatingsView, circleStripPayload, circleGridAllPayload, circleGridTopPayload]);
-
-  // Circle season lines: a show row → one row per rated season (see expandCircleRowBySeason).
-  useEffect(() => {
-    if (!user || !selectedCircleId || circleTvRowsForSeasonLines.length === 0) return;
-    const cid = selectedCircleId;
-    const need = circleTvRowsForSeasonLines.filter((r) => {
-      const k = circleSeasonLinesCacheKey(cid, r);
-      return !(k in circleSeasonLinesRef.current) && !circleSeasonLinesInflightRef.current.has(k);
-    });
-    if (need.length === 0) return;
-    for (const r of need) circleSeasonLinesInflightRef.current.add(circleSeasonLinesCacheKey(cid, r));
-    void (async () => {
-      for (let i = 0; i < need.length; i += 6) {
-        const chunk = need.slice(i, i + 6);
-        const results = await Promise.all(
-          chunk.map(async (r) => {
-            try {
-              const lines = await fetchCircleTitlePublisherLines({
-                circleId: cid,
-                tmdbId: r.tmdb_id,
-                mediaType: "tv",
-              });
-              return [r, Array.isArray(lines) ? lines : []];
-            } catch (e) {
-              console.warn("Circles: season lines failed", r.tmdb_id, e?.message);
-              return [r, []];
-            }
-          }),
-        );
-        const patch = {};
-        const seasonShowIds = [];
-        for (const [r, lines] of results) {
-          const k = circleSeasonLinesCacheKey(cid, r);
-          circleSeasonLinesInflightRef.current.delete(k);
-          patch[k] = lines;
-          if (lines.some((l) => l?.season_number != null)) seasonShowIds.push(Number(r.tmdb_id));
+  const openCircleReviewsForRow = useCallback(
+    (row, titleText) => {
+      if (!row || !selectedCircleId) return;
+      const mediaType = row.media_type === "tv" ? "tv" : "movie";
+      const tmdbId = Number(row.tmdb_id);
+      const displayTitle = typeof titleText === "string" ? titleText.trim() : "";
+      setReviewNote(null);
+      setCircleReviewsModal({ status: "loading", displayTitle, seasonFilter: null, index: 0, reviews: [] });
+      void (async () => {
+        try {
+          const all = await fetchCircleTitleReviews({
+            circleId: selectedCircleId,
+            tmdbId,
+            mediaType,
+          });
+          const reviews = (all || []).filter((r) => {
+            const sn = r?.season_number == null ? 0 : Number(r.season_number);
+            return !(Number.isInteger(sn) && sn >= 1);
+          });
+          setCircleReviewsModal({ status: "ok", displayTitle, seasonFilter: null, index: 0, reviews });
+        } catch (e) {
+          setCircleReviewsModal({
+            status: "err",
+            displayTitle,
+            seasonFilter: null,
+            index: 0,
+            reviews: [],
+            message: e?.message || "Could not load reviews.",
+          });
         }
-        circleSeasonLinesRef.current = { ...circleSeasonLinesRef.current, ...patch };
-        setCircleSeasonLines((prev) => ({ ...prev, ...patch }));
-        if (seasonShowIds.length > 0) void ensureTvSeasons(seasonShowIds);
-      }
-    })();
-  }, [user, selectedCircleId, circleTvRowsForSeasonLines, ensureTvSeasons]);
-
-  /** Circle list rows with each TV show split into its rated seasons (whole-show row only if scored as a whole). */
-  const expandCircleRowsBySeason = useCallback(
-    (rows) =>
-      (rows || []).flatMap((r) =>
-        r?.media_type === "tv" && selectedCircleId
-          ? expandCircleRowBySeason(r, circleSeasonLines[circleSeasonLinesCacheKey(selectedCircleId, r)], user?.id)
-          : [r],
-      ),
-    [circleSeasonLines, selectedCircleId, user?.id],
+      })();
+    },
+    [selectedCircleId],
   );
+
+  useEffect(() => {
+    if (!user || screen !== "circle-detail" || !selectedCircleId) {
+      setCircleReviewCounts({});
+      return undefined;
+    }
+    let cancelled = false;
+    const cid = selectedCircleId;
+    void (async () => {
+      const counts = await fetchCircleReviewCounts(cid);
+      if (!cancelled) setCircleReviewCounts(counts);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, screen, selectedCircleId, circleReviewReloadKey]);
 
   // Circle Recent: on first load / circle change, scroll so newest title is ~centered; after “Earlier”, preserve scroll across prepended width.
   useLayoutEffect(() => {
@@ -13174,7 +13478,7 @@ export default function App() {
                     </div>
                   );
                   const titles = Array.isArray(circleStripPayload?.titles) ? circleStripPayload.titles : [];
-                  const stripTitlesOrdered = titles.length > 0 ? expandCircleRowsBySeason([...titles].reverse()) : [];
+                  const stripTitlesOrdered = titles.length > 0 ? [...titles].reverse() : [];
                   const circleRowSeason = (row) => {
                     const sn = row.season_number != null ? Number(row.season_number) : null;
                     if (sn == null) return { seasonNumber: null, season: null };
@@ -13221,6 +13525,7 @@ export default function App() {
                       const el = e.target;
                       if (el.closest?.(".strip-card__menu-btn")) return;
                       if (el.closest?.(".circle-recent-strip-menu")) return;
+                      if (el.closest?.(".circle-score-foot")) return;
                       circleRecentStripLongPressStartRef.current = { x: e.clientX, y: e.clientY };
                       clearCircleRecentStripLongPressTimer();
                       circleRecentStripLongPressTimerRef.current = window.setTimeout(() => {
@@ -13265,6 +13570,7 @@ export default function App() {
                           const el = e.target;
                           if (el.closest?.(".strip-card__menu-btn")) return;
                           if (el.closest?.(".circle-recent-strip-menu")) return;
+                          if (el.closest?.(".circle-score-foot")) return;
                           if (el.closest?.(".circle-strip-below-title-scores--tappable")) return;
                           if (circleRecentStripSuppressClickRef.current) {
                             circleRecentStripSuppressClickRef.current = false;
@@ -13376,15 +13682,20 @@ export default function App() {
                             <div className="poster-inside-meta">{posterSeasonMark(seasonNumber)}</div>
                           ) : null}
                         </div>
-                        <CircleStripRingCineBelowTitle
-                          groupRating={row.group_rating}
-                          onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title, movie?.poster)}
-                        />
-                        <CircleRaterOutOfLine
+                        <CircleScoreFoot
+                          variant="strip"
                           rated={distinctRaters}
                           members={mc}
-                          className="circle-strip-rater-count"
-                        />
+                          reviewCount={circleCardReviewCount(circleReviewCounts, row)}
+                          onWhoRated={() => openWhoPublishedForCircleRow(row, movie?.title, movie?.poster)}
+                          onOpenReviews={() => openCircleReviewsForRow(row, movie?.title)}
+                        >
+                          <CircleStripRingCineBelowTitle
+                            groupRating={row.group_rating}
+                            attachedFoot={Boolean(formatCircleRaterOutOf(distinctRaters, mc))}
+                            onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title, movie?.poster)}
+                          />
+                        </CircleScoreFoot>
                       </div>
                     );
                   };
@@ -13440,6 +13751,7 @@ export default function App() {
                         }. Open details, or use the circle score row to see who rated in this group.`}
                         onClick={(e) => {
                           if (e.target?.closest?.(".circle-who-published-hit")) return;
+                          if (e.target?.closest?.(".circle-score-foot")) return;
                           openDetail(movie, predDetail);
                         }}
                         onKeyDown={(e) => {
@@ -13478,10 +13790,13 @@ export default function App() {
                             row={row}
                             onWhoPublished={() => openWhoPublishedForCircleRow(row, movie?.title, movie?.poster)}
                           />
-                          <CircleRaterOutOfLine
+                          <CircleScoreFoot
+                            variant="list"
                             rated={Number(row.distinct_circle_raters ?? 0)}
                             members={mc}
-                            className="circle-list-rater-count"
+                            reviewCount={circleCardReviewCount(circleReviewCounts, row)}
+                            onWhoRated={() => openWhoPublishedForCircleRow(row, movie?.title, movie?.poster)}
+                            onOpenReviews={() => openCircleReviewsForRow(row, movie?.title)}
                           />
                         </div>
                       </div>
@@ -13659,7 +13974,7 @@ export default function App() {
                               emptyRated
                             ) : (
                               <>
-                                <div className="circle-rated-list">{expandCircleRowsBySeason(allTitles).map(renderCircleAllTopListRow)}</div>
+                                <div className="circle-rated-list">{allTitles.map(renderCircleAllTopListRow)}</div>
                                 {showAllMore ? (
                                   <button
                                     type="button"
@@ -13678,7 +13993,7 @@ export default function App() {
                               emptyRated
                             ) : (
                               <>
-                                <div className="circle-rated-list">{expandCircleRowsBySeason(topTitles).map(renderCircleAllTopListRow)}</div>
+                                <div className="circle-rated-list">{topTitles.map(renderCircleAllTopListRow)}</div>
                                 {showTopMore ? (
                                   <button
                                     type="button"
@@ -13850,7 +14165,7 @@ export default function App() {
             type="button"
             className="circles-modal-backdrop"
             aria-label="Close"
-            onClick={() => setWhoPublishedModal(null)}
+            onClick={() => { setWhoPublishedModal(null); setReviewNote(null); }}
           />
           <div className="circles-modal-panel who-published-modal-panel">
             <div className="who-published-modal-header">
@@ -13858,7 +14173,7 @@ export default function App() {
                 type="button"
                 className="circles-modal-close who-published-modal-close"
                 aria-label="Close"
-                onClick={() => setWhoPublishedModal(null)}
+                onClick={() => { setWhoPublishedModal(null); setReviewNote(null); }}
               >
                 ×
               </button>
@@ -13892,7 +14207,10 @@ export default function App() {
                   return (
                     <li key={rowKey} className="who-published-modal-row">
                       <span className="who-published-modal-name">{label}</span>
-                      <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
+                      <span className="who-published-modal-score">
+                        <ReviewNoteButton name={label} body={r.review_body} onOpen={setReviewNote} />
+                        {formatScore(Number(r.score))}
+                      </span>
                     </li>
                   );
                 })}
@@ -13901,7 +14219,7 @@ export default function App() {
             <button
               type="button"
               className="circle-invite-btn circle-invite-btn--modal who-published-modal-close-cta"
-              onClick={() => setWhoPublishedModal(null)}
+              onClick={() => { setWhoPublishedModal(null); setReviewNote(null); }}
             >
               Close
             </button>
@@ -13920,7 +14238,7 @@ export default function App() {
             type="button"
             className="circles-modal-backdrop"
             aria-label="Close"
-            onClick={() => setTitleCirclesWindowOpen(false)}
+            onClick={() => { setTitleCirclesWindowOpen(false); setReviewNote(null); }}
           />
           <div className="circles-modal-panel who-published-modal-panel in-your-circles-modal-panel">
             <div className="who-published-modal-header">
@@ -13928,7 +14246,7 @@ export default function App() {
                 type="button"
                 className="circles-modal-close who-published-modal-close"
                 aria-label="Close"
-                onClick={() => setTitleCirclesWindowOpen(false)}
+                onClick={() => { setTitleCirclesWindowOpen(false); setReviewNote(null); }}
               >
                 ×
               </button>
@@ -13956,11 +14274,104 @@ export default function App() {
                       <span className="who-published-modal-name">{name}</span>
                       {circleBit ? <span className="in-your-circles-circle">{circleBit}</span> : null}
                     </span>
-                    <span className="who-published-modal-score">{formatScore(Number(r.score))}</span>
+                    <span className="who-published-modal-score">
+                      <ReviewNoteButton name={name} body={r.review_body} onOpen={setReviewNote} />
+                      {formatScore(Number(r.score))}
+                    </span>
                   </li>
                 );
               })}
             </ul>
+          </div>
+        </div>
+      ) : null}
+
+      {circleReviewsModal ? (
+        <div className="circles-modal-root" role="dialog" aria-modal="true" aria-label="Reviews">
+          <button
+            type="button"
+            className="circles-modal-backdrop"
+            aria-label="Close"
+            onClick={() => setCircleReviewsModal(null)}
+          />
+          <div className="circles-modal-panel who-published-modal-panel">
+            <div className="who-published-modal-header">
+              <button
+                type="button"
+                className="circles-modal-close who-published-modal-close"
+                aria-label="Close"
+                onClick={() => setCircleReviewsModal(null)}
+              >
+                ×
+              </button>
+              {circleReviewsModal.displayTitle ? (
+                <h2 className="who-published-modal-film-title">{circleReviewsModal.displayTitle}</h2>
+              ) : null}
+              <p className="who-published-modal-byline">Reviews</p>
+            </div>
+            {circleReviewsModal.status === "loading" ? (
+              <div className="who-published-modal-body who-published-modal-body--loading">Loading…</div>
+            ) : circleReviewsModal.status === "err" ? (
+              <div className="who-published-modal-body who-published-modal-error" role="alert">
+                {circleReviewsModal.message}
+              </div>
+            ) : (circleReviewsModal.reviews || []).length === 0 ? (
+              <p className="who-published-modal-empty">No review to show.</p>
+            ) : (
+              (() => {
+                const reviews = circleReviewsModal.reviews;
+                const index = Math.min(circleReviewsModal.index || 0, reviews.length - 1);
+                const review = reviews[index];
+                const isYou = review.user_id && user?.id && review.user_id === user.id;
+                const person = isYou ? "You" : ((review.member_name || "").trim() || "Member");
+                const sn = review.season_number == null ? null : Number(review.season_number);
+                const showSeason = sn != null && (circleReviewsModal.seasonFilter == null);
+                const name = showSeason ? `${person} · S${sn}` : person;
+                return (
+                  <div className="circle-review-reader">
+                    <div className="circle-review-pager">
+                      <button
+                        type="button"
+                        aria-label="Previous review"
+                        disabled={index <= 0}
+                        onClick={() => setCircleReviewsModal((prev) => prev ? { ...prev, index: index - 1 } : prev)}
+                      >
+                        &lt;
+                      </button>
+                      <span>{index + 1} of {reviews.length}</span>
+                      <button
+                        type="button"
+                        aria-label="Next review"
+                        disabled={index >= reviews.length - 1}
+                        onClick={() => setCircleReviewsModal((prev) => prev ? { ...prev, index: index + 1 } : prev)}
+                      >
+                        &gt;
+                      </button>
+                    </div>
+                    <div className="circle-review-reader__name">{name}</div>
+                    <p className="circle-review-reader__body">{review.body}</p>
+                  </div>
+                );
+              })()
+            )}
+            <button
+              type="button"
+              className="circle-invite-btn circle-invite-btn--modal who-published-modal-close-cta"
+              onClick={() => setCircleReviewsModal(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {reviewNote ? (
+        <div className="review-note-pop" role="dialog" aria-modal="true" aria-label={`Review by ${reviewNote.name}`}>
+          <button type="button" className="review-note-pop__backdrop" aria-label="Close review" onClick={() => setReviewNote(null)} />
+          <div className="review-note-pop__card">
+            <button type="button" className="review-note-pop__close" aria-label="Close review" onClick={() => setReviewNote(null)}>×</button>
+            <div className="review-note-pop__name">{reviewNote.name}</div>
+            <p className="review-note-pop__body">{reviewNote.body}</p>
           </div>
         </div>
       ) : null}
@@ -15660,10 +16071,16 @@ export default function App() {
             detailMeta.genresLine ||
             detailMeta.languageLabel,
         );
-        const detailRatePrimaryLabel =
-          movie.type === "tv" && detailHasSeasonScores
-            ? "Rate the whole show (optional)"
-            : detailRateEntry === "circle" ? "Rate this title" : "Select your rating and submit";
+        const savedTitleReview = userTitleReviews[movie.id] || "";
+        const seasonReviewMap = movie.type === "tv" ? (userSeasonReviews[movie.id] || {}) : {};
+        const hasAnyReview = Boolean(savedTitleReview) || Object.keys(seasonReviewMap).length > 0;
+        const clearRatingMessage = hasAnyReview
+          ? (detailHasSeasonScores
+            ? "This title will be removed from every circle you published it to. Your score and your review will both be deleted, and your season scores will be cleared."
+            : "This title will be removed from every circle you published it to. Your score and your review will both be deleted.")
+          : (detailHasSeasonScores
+            ? "This title will be removed from every circle you published it to, and your show rating and season scores will be cleared."
+            : "This title will be removed from every circle you published it to, and your rating will be cleared.");
         const confInlineClass =
           prediction?.confidence === "high"
             ? "detail-score-conf-inline--high"
@@ -15676,36 +16093,95 @@ export default function App() {
           (inTheaters.some((m) => m.tmdbId === movie.tmdbId) ||
             inTheatersPopularRanked.some((m) => m.tmdbId === movie.tmdbId) ||
             secondaryTheaterRows.some((m) => m.tmdbId === movie.tmdbId));
-        const unratedDetailRateInner = (
-          <>
-            <div className="d-rate-label d-rate-label--sentence">{detailRatePrimaryLabel}</div>
-            <RatingScoreChips
-              variant="detail"
-              value={detailRating}
-              touched={detailTouched}
-              onPick={(v) => { setDetailRating(v); setDetailTouched(true); }}
-            />
-            <div className="d-actions">
-              <button className="btn-full btn-full-gold" disabled={!detailTouched}
-                onClick={() => {
-                  void addRating(movie.id, detailRating, {
-                    pendingNavigate: "back",
-                    navigateDelayMs: 800,
-                    afterDetailSubmit: true,
-                  });
-                }}>
-                Submit Rating
-              </button>
-              <button
-                type="button"
-                className={`btn-full btn-full-dark ${inWatchlist(movie.id) ? "saved-style" : ""}`}
-                onClick={() => toggleWatchlist(movie)}
-              >
-                {inWatchlist(movie.id) ? "✓ Saved" : "+ Watchlist"}
-              </button>
-            </div>
-          </>
-        );
+        const updatingRating = Boolean(myShowRating && detailEditRating);
+        const reviewDraftTrimmed = normalizeReviewBody(detailReviewDraft);
+        const reviewUnchanged = reviewDraftTrimmed === savedTitleReview.trim();
+        function closeRateTabs() {
+          setDetailRateOpen(false);
+          setDetailEditRating(false);
+          setDetailRateTab("rating");
+          setDetailClearRatingConfirm(false);
+          setDetailClearRatingErr("");
+          setDetailReviewErr("");
+          setDetailReviewDraft(userTitleReviews[movie.id] || "");
+          if (myShowRating != null) {
+            setDetailRating(myShowRating);
+            setDetailTouched(true);
+          }
+        }
+        function openRateTabs() {
+          setDetailReviewErr("");
+          setDetailRateTab("rating");
+          setDetailClearRatingConfirm(false);
+          setDetailClearRatingErr("");
+          setDetailReviewDraft(savedTitleReview);
+          if (myShowRating != null) {
+            setDetailEditRating(true);
+            setDetailRating(myShowRating);
+            setDetailTouched(true);
+          } else {
+            setDetailRateOpen(true);
+            setDetailRating(7);
+            setDetailTouched(false);
+          }
+        }
+        async function submitDetailScore() {
+          setDetailReviewErr("");
+          setDetailReviewBusy(true);
+          try {
+            const ok = updatingRating
+              ? await addRating(movie.id, detailRating, {
+                skipPublishModal: true,
+                afterDetailRatingUpdate: true,
+              })
+              : await addRating(movie.id, detailRating, {
+                pendingNavigate: "back",
+                navigateDelayMs: 800,
+                afterDetailSubmit: true,
+              });
+            if (!ok) {
+              setDetailReviewErr("Could not save rating.");
+              return;
+            }
+            if (!updatingRating && reviewDraftTrimmed) {
+              try {
+                await saveMyReview(movie, null, reviewDraftTrimmed);
+              } catch (e) {
+                setDetailReviewErr(e?.message || "Could not save review.");
+              }
+            }
+            setDetailRateOpen(false);
+            setDetailEditRating(false);
+            setDetailClearRatingConfirm(false);
+          } finally {
+            setDetailReviewBusy(false);
+          }
+        }
+        async function submitDetailReview() {
+          setDetailReviewErr("");
+          setDetailReviewBusy(true);
+          try {
+            await saveMyReview(movie, null, detailReviewDraft);
+            setDetailRateOpen(false);
+            setDetailEditRating(false);
+          } catch (e) {
+            setDetailReviewErr(e?.message || "Could not save review.");
+          } finally {
+            setDetailReviewBusy(false);
+          }
+        }
+        async function clearDetailReview() {
+          setDetailReviewErr("");
+          setDetailReviewBusy(true);
+          try {
+            await clearMyReview(movie, null);
+            setDetailReviewDraft("");
+          } catch (e) {
+            setDetailReviewErr(e?.message || "Could not clear review.");
+          } finally {
+            setDetailReviewBusy(false);
+          }
+        }
         return (
           <div className="detail-overlay-root">
           <div className="detail">
@@ -15876,16 +16352,13 @@ export default function App() {
                           : "Your rating saved ✓"}
                       </div>
                       {hasPersonalPrediction(prediction) && <div className="rated-pred">Predicted was {formatScore(prediction.predicted)} ({formatScore(prediction.low)}–{formatScore(prediction.high)})</div>}
-                      <button type="button" className="btn-full btn-full-dark" style={{ marginTop: 16, width: "100%" }}
-                        onClick={() => {
-                          setDetailEditRating(true);
-                          setDetailClearRatingConfirm(false);
-                          setDetailClearRatingErr("");
-                          setDetailRating(myShowRating);
-                          setDetailTouched(true);
-                        }}>
-                        Change rating
+                      <button type="button" className="btn-full btn-full-dark detail-rate-pill" style={{ marginTop: 16, width: "100%" }}
+                        onClick={openRateTabs}>
+                        Change rating and review
                       </button>
+                      {detailReviewErr && !detailEditRating ? (
+                        <p className="detail-clear-rating-err">{detailReviewErr}</p>
+                      ) : null}
                       {user && publishModalCircles.length > 0 ? (
                         <button
                           type="button"
@@ -15912,9 +16385,7 @@ export default function App() {
                       {detailClearRatingConfirm ? (
                         <div className="detail-clear-rating-confirm">
                           <p className="detail-clear-rating-confirm-msg">
-                            {detailHasSeasonScores
-                              ? "This title will be removed from every circle you published it to, and your show rating and season scores will be cleared."
-                              : "This title will be removed from every circle you published it to, and your rating will be cleared."}
+                            {clearRatingMessage}
                           </p>
                           <div className="d-actions">
                             <button
@@ -15928,7 +16399,9 @@ export default function App() {
                                   try {
                                     await clearMyRatingForMovieId(movie.id);
                                     setDetailEditRating(false);
+                                    setDetailRateOpen(false);
                                     setDetailClearRatingConfirm(false);
+                                    setDetailReviewDraft("");
                                     setDetailRating(7);
                                     setDetailTouched(false);
                                   } catch (e) {
@@ -15959,66 +16432,159 @@ export default function App() {
                         </div>
                       ) : (
                         <>
-                          <RatingScoreChips
-                            variant="detail"
-                            value={detailRating}
-                            touched={detailTouched}
-                            onPick={(v) => { setDetailRating(v); setDetailTouched(true); }}
-                          />
-                          <div className="d-actions" style={{ marginTop: 14 }}>
-                            <button
-                              type="button"
-                              className="btn-full btn-full-gold"
-                              disabled={!detailTouched}
-                              onClick={() => {
-                                void addRating(movie.id, detailRating, {
-                                  skipPublishModal: true,
-                                  afterDetailRatingUpdate: true,
-                                });
-                                setDetailEditRating(false);
-                                setDetailClearRatingConfirm(false);
-                                setDetailClearRatingErr("");
-                              }}
-                            >
-                              Save new
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-full btn-full-dark"
-                              onClick={() => {
-                                setDetailEditRating(false);
-                                setDetailClearRatingConfirm(false);
-                                setDetailClearRatingErr("");
-                                setDetailRating(myShowRating);
-                              }}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-full-danger"
-                              disabled={!user}
-                              onClick={() => {
-                                setDetailClearRatingConfirm(true);
-                                setDetailClearRatingErr("");
-                              }}
-                            >
-                              Clear rating
-                            </button>
+                          <div className="rate-review-tabs" role="tablist" aria-label="Rating and review">
+                            <button type="button" role="tab" aria-selected={detailRateTab === "rating"} onClick={() => setDetailRateTab("rating")}>Rating</button>
+                            <button type="button" role="tab" aria-selected={detailRateTab === "review"} onClick={() => setDetailRateTab("review")}>Review</button>
                           </div>
+                          {detailRateTab === "review" ? (
+                            <>
+                              <textarea
+                                className="review-text"
+                                maxLength={REVIEW_MAX_CHARS}
+                                value={detailReviewDraft}
+                                placeholder="Your review"
+                                disabled={detailReviewBusy}
+                                onChange={(e) => setDetailReviewDraft(e.target.value)}
+                              />
+                              <ReviewAgreement />
+                              <div className="review-count">{REVIEW_MAX_CHARS - detailReviewDraft.length} left</div>
+                              <div className="d-actions detail-rate-actions">
+                                <button
+                                  type="button"
+                                  className="btn-full btn-full-gold"
+                                  disabled={detailReviewBusy || !myShowRating || Boolean(reviewBodyError(detailReviewDraft)) || reviewUnchanged}
+                                  onClick={() => { void submitDetailReview(); }}
+                                >
+                                  {detailReviewBusy ? "Saving…" : "Save new"}
+                                </button>
+                                <button type="button" className="btn-full btn-full-dark" disabled={detailReviewBusy} onClick={closeRateTabs}>
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-full-danger"
+                                  disabled={detailReviewBusy || !savedTitleReview}
+                                  onClick={() => { void clearDetailReview(); }}
+                                >
+                                  Clear review
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <RatingScoreChips
+                                variant="detail"
+                                value={detailRating}
+                                touched={detailTouched}
+                                onPick={(v) => { setDetailRating(v); setDetailTouched(true); }}
+                              />
+                              <div className="d-actions detail-rate-actions">
+                                <button
+                                  type="button"
+                                  className="btn-full btn-full-gold"
+                                  disabled={!detailTouched || detailReviewBusy}
+                                  onClick={() => { void submitDetailScore(); }}
+                                >
+                                  {detailReviewBusy ? "Saving…" : "Save new"}
+                                </button>
+                                <button type="button" className="btn-full btn-full-dark" disabled={detailReviewBusy} onClick={closeRateTabs}>
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-full-danger"
+                                  disabled={!user || detailReviewBusy}
+                                  onClick={() => {
+                                    setDetailClearRatingConfirm(true);
+                                    setDetailClearRatingErr("");
+                                  }}
+                                >
+                                  Clear rating
+                                </button>
+                              </div>
+                            </>
+                          )}
+                          {detailReviewErr ? <p className="detail-clear-rating-err">{detailReviewErr}</p> : null}
                         </>
                       )}
                     </div>
                   ) : !myShowRating ? (
-                    detailRateEntry === "circle" ? (
-                      <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
-                        <div className="d-rate-title-strip">{unratedDetailRateInner}</div>
+                    <div className="detail-rate-section--slider" style={{ marginTop: 20 }}>
+                      {movie.type === "tv" && detailHasSeasonScores ? (
+                        <div className="d-rate-label d-rate-label--sentence">Rate the whole show (optional)</div>
+                      ) : null}
+                      <div className="detail-rate-pills">
+                        <button type="button" className="btn-full btn-full-gold detail-rate-pill" onClick={openRateTabs}>
+                          Submit your rating & review
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn-full btn-full-dark detail-rate-pill ${inWatchlist(movie.id) ? "saved-style" : ""}`}
+                          disabled={detailRateOpen}
+                          onClick={() => { if (!detailRateOpen) toggleWatchlist(movie); }}
+                        >
+                          {inWatchlist(movie.id) ? "✓ Saved" : "+ Watchlist"}
+                        </button>
                       </div>
-                    ) : (
-                      <div className="detail-rate-section--slider detail-people-panel">
-                        {unratedDetailRateInner}
-                      </div>
-                    )
+                      {detailRateOpen ? (
+                        <div className="rate-review-panel">
+                          <div className="rate-review-tabs" role="tablist" aria-label="Rating and review">
+                            <button type="button" role="tab" aria-selected={detailRateTab === "rating"} onClick={() => setDetailRateTab("rating")}>Rating</button>
+                            <button type="button" role="tab" aria-selected={detailRateTab === "review"} onClick={() => setDetailRateTab("review")}>Review</button>
+                          </div>
+                          {detailRateTab === "review" ? (
+                            <>
+                              <textarea
+                                className="review-text"
+                                maxLength={REVIEW_MAX_CHARS}
+                                value={detailReviewDraft}
+                                placeholder="Your review"
+                                disabled={detailReviewBusy}
+                                onChange={(e) => setDetailReviewDraft(e.target.value)}
+                              />
+                              <ReviewAgreement />
+                              <div className="review-count">{REVIEW_MAX_CHARS - detailReviewDraft.length} left</div>
+                              <div className="d-actions detail-rate-actions">
+                                <button
+                                  type="button"
+                                  className="btn-full btn-full-gold"
+                                  disabled={!detailTouched || detailReviewBusy || !reviewDraftTrimmed}
+                                  onClick={() => { void submitDetailScore(); }}
+                                >
+                                  {detailReviewBusy ? "Saving…" : "Save"}
+                                </button>
+                                <button type="button" className="btn-full btn-full-dark" disabled={detailReviewBusy} onClick={closeRateTabs}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <RatingScoreChips
+                                variant="detail"
+                                value={detailRating}
+                                touched={detailTouched}
+                                onPick={(v) => { setDetailRating(v); setDetailTouched(true); }}
+                              />
+                              <div className="d-actions detail-rate-actions">
+                                <button
+                                  type="button"
+                                  className="btn-full btn-full-gold"
+                                  disabled={!detailTouched || detailReviewBusy}
+                                  onClick={() => { void submitDetailScore(); }}
+                                >
+                                  {detailReviewBusy ? "Saving…" : "Save"}
+                                </button>
+                                <button type="button" className="btn-full btn-full-dark" disabled={detailReviewBusy} onClick={closeRateTabs}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </>
+                          )}
+                          {detailReviewErr ? <p className="detail-clear-rating-err">{detailReviewErr}</p> : null}
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
                 {(() => {
@@ -16101,9 +16667,12 @@ export default function App() {
                         seasons={detailSeasons}
                         showPoster={movie.poster}
                         seasonScores={detailSeasonScores}
+                        seasonReviews={seasonReviewMap}
                         canRate={Boolean(user)}
                         onSave={(n, score) => saveSeasonRating(movie, n, score)}
                         onClear={(n) => clearSeasonRating(movie, n)}
+                        onSaveReview={(n, text) => saveMyReview(movie, n, text)}
+                        onClearReview={(n) => clearMyReview(movie, n)}
                       />
                     )}
                   </div>
